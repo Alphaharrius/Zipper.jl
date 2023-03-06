@@ -25,3 +25,4 @@ Manifest.toml
 
 # The virtual encironment
 venv
+.vscode/settings.json

@@ -1,14 +1,17 @@
-import Base: +, -
+import Base: +, -, ==
 
 module classical
 
-struct ClassicalSpace
-    basis::Matrix{Float64}
-    dimension::Int8
-end
+using LinearAlgebra
 
-function classical_space(basis::AbstractArray{Float64})
-    return ClassicalSpace(basis, size(basis, 1))
+"""
+Represents a classical space with basis that spans the space.
+"""
+struct ClassicalSpace
+    """ The basis vectors of this space stacked in columns. """
+    basis::Matrix{Float64}
+    """ The dimension of this space. """
+    dimension::Int8
 end
 
 """
@@ -22,11 +25,32 @@ struct Point
 end
 
 """
-    point(position[, parent_space])
+    create_classical_space(basis)
+
+Create a new [`ClassicalSpace`](@ref) with `basis`.
+"""
+function create_classical_space(basis::AbstractArray{Float64})::ClassicalSpace
+    return ClassicalSpace(Matrix(basis), size(basis, 1))
+end
+
+function euclidean(dimension::Int8)::ClassicalSpace
+    return create_classical_space(Matrix{Float64}(I, dimension, dimension))
+end
+
+function phys_operator(space::ClassicalSpace)::Function
+    basis::Matrix{Float64} = space.basis
+    euclidean_space::ClassicalSpace = euclidean(space.dimension)
+    return function (point::Point)
+        return Point(basis * point.position, euclidean_space)
+    end
+end
+
+"""
+    create_point(position[, parent_space])
 
 Create a new [`Point`](@ref) of `position` in the [`ClassicalSpace`](@ref) of `parent_space`.
 """
-function point(position::Vector{Float64}, parent_space::ClassicalSpace)::Point
+function create_point(position::Vector{Float64}, parent_space::ClassicalSpace)::Point
     @assert(length(position) == parent_space.dimension)
     return Point(position, parent_space)
 end
@@ -39,6 +63,10 @@ end
 function Base.:-(a::Point, b::Point)::Point
     @assert(typeof(a.parent_space) == typeof(b.parent_space))
     return Point(a.position - b.position, a.parent_space)
+end
+
+function Base.:(==)(a::Point, b::Point)::Bool
+    return a.parent_space == b.parent_space && isapprox(a.position, b.position)
 end
 
 function __init__()

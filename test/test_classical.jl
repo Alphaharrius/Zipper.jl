@@ -1,7 +1,9 @@
 include("../src/classical.jl")
 
-using .classical: ClassicalSpace, Point, create_classical_space, create_point, phys_operator
+using .classical: ClassicalSpace, Point
 
-space = create_classical_space([1. 0. 1.; 0. 1. 0.; 1. 0. -1.]')
-new_point = create_point([1., 1., 0.], space) + create_point([1., 0., 0.], space)
-phys_operator(space)(new_point)
+space = ClassicalSpace([1. 0. 1.; 0. 1. 0.; 1. 0. -1.]')
+
+point = Point([1//1, 1//1, 0//1], space)
+
+new_point = Point([1//1, 1//1, 0//1], space) + Point([1//1, 0//1, 0//1], space)

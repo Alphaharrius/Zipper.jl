@@ -1,8 +1,8 @@
-include("../src/classical.jl")
+include("../src/spaces.jl")
 
-using .classical: Space, Point
+using .spaces: RealSpace, MomentumSpace, Point, AbstractSpaceSubset, SpaceSubset
 
-space = Space([1. 0. 1.; 0. 1. 0.; 1. 0. -1.]')
+space = RealSpace([1. 0. 1.; 0. 1. 0.; 1. 0. -1.]')
 
 point = Point([1//1, 1//1, 0//1], space)
 

@@ -98,8 +98,7 @@ Base.:convert(::Type{T}, source::T) where {T <: SpaceSubset} = source
 Base.:convert(::Type{T}, source::F) where {T <: SpaceSubset, F <: Point} = SpaceSubset(Set{AbstractSpaceSubset}([source]))
 
 """ Chowning `SpaceSubset` as the common base for all subtypes of `AbstractSpaceSubset`. """
-Base.promote_rule(::Type{T}, ::Type{F}) where {T <: SpaceSubset, F <: AbstractSpaceSubset} = SpaceSubset
-Base.promote_rule(::Type{T}, ::Type{F}) where {T <: AbstractSpaceSubset, F <: SpaceSubset} = SpaceSubset
+Base.promote_rule(::Type{T}, ::Type{F}) where {T <: AbstractSpaceSubset, F <: AbstractSpaceSubset} = SpaceSubset
 
 Base.:(==)(a::SpaceSubset, b::SpaceSubset)::Bool = a.parent_space == b.parent_space && a.representation == b.representation
 Base.:union(a::SpaceSubset, b::SpaceSubset)::SpaceSubset = SpaceSubset(union(a.representation, b.representation))

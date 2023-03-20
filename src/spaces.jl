@@ -1,5 +1,3 @@
-import Base: +, -, ==
-
 module spaces
 
 using LinearAlgebra

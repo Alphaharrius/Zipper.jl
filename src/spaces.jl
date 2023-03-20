@@ -87,15 +87,29 @@ end
 struct SpaceSubset <: AbstractSpaceSubset
     representation::Set{AbstractSpaceSubset}
     parent_space::AbstractSpace
+
+    function SpaceSubset(elements::Set{AbstractSpaceSubset})::SpaceSubset
+        parent_space::AbstractSpace = first(elements).parent_space
+        @assert(all(element.parent_space == parent_space for element in elements))
+        return new(elements, parent_space)
+    end
 end
 
 """ Reflexive. """
 Base.:convert(::Type{T}, source::T) where {T <: SpaceSubset} = source
-Base.:convert(::Type{T}, source::F) where {T <: SpaceSubset, F <: Point} = SpaceSubset(Set{AbstractSpaceSubset}([source]), source.parent_space)
+Base.:convert(::Type{T}, source::F) where {T <: SpaceSubset, F <: Point} = SpaceSubset(Set{AbstractSpaceSubset}([source]))
 
-Base.promote_rule(::Type{SpaceSubset}, ::Type{Point}) = SpaceSubset
+""" Chowning `SpaceSubset` as the common base for all subtypes of `AbstractSpaceSubset`. """
+Base.promote_rule(::Type{T}, ::Type{F}) where {T <: SpaceSubset, F <: AbstractSpaceSubset} = SpaceSubset
+Base.promote_rule(::Type{T}, ::Type{F}) where {T <: AbstractSpaceSubset, F <: SpaceSubset} = SpaceSubset
 
 Base.:(==)(a::SpaceSubset, b::SpaceSubset)::Bool = a.parent_space == b.parent_space && a.representation == b.representation
+Base.:union(a::SpaceSubset, b::SpaceSubset)::SpaceSubset = SpaceSubset(union(a.representation, b.representation))
+Base.:intersect(a::SpaceSubset, b::SpaceSubset)::SpaceSubset = SpaceSubset(intersect(a.representation, b.representation))
+
+Base.:(==)(a::AbstractSpaceSubset, b::AbstractSpaceSubset)::Bool = (==)(promote(a, b) ...)
+Base.:union(a::AbstractSpaceSubset, b::AbstractSpaceSubset)::SpaceSubset = union(promote(a, b) ...)
+Base.:intersect(a::AbstractSpaceSubset, b::AbstractSpaceSubset)::SpaceSubset = intersect(promote(a, b) ...)
 
 function __init__()
 end

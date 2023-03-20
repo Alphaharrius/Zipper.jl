@@ -64,8 +64,10 @@ struct Point <: AbstractSpaceSubset
     """ The parent space that includes this point. """
     parent_space::AbstractSpace
 
-    Point(position::Vector{Rational{Int64}}, parent_space::AbstractSpace) = (
-        length(position) == dimension(parent_space) ? new(position, parent_space) : error("Dimension mismatch."))
+    function Point(position::Vector{Rational{Int64}}, parent_space::AbstractSpace)::Point
+        @assert(length(position) == dimension(parent_space))
+        return new(position, parent_space)
+    end
 end
 
 function Base.:+(a::Point, b::Point)::Point
@@ -78,9 +80,7 @@ function Base.:-(a::Point, b::Point)::Point
     return Point(a.position - b.position, a.parent_space)
 end
 
-function Base.:(==)(a::Point, b::Point)::Bool
-    return a.parent_space == b.parent_space && a.position == b.position
-end
+Base.:(==)(a::Point, b::Point)::Bool = a.parent_space == b.parent_space && a.position == b.position
 
 struct SpaceSubset <: AbstractSpaceSubset
     representation::Set{AbstractSpaceSubset}

@@ -16,4 +16,7 @@ point2 = Point([0//1, 0//1], space)
 region::Subset{Point} = union(convert(Subset, point0), convert(Subset, point1), convert(Subset, point2))
 
 modes::Subset{Mode} = quantize(region, 2)
+m0, m1, m2 = members(modes)
 fock_space::FockSpace = FockSpace(modes)
+
+fock_map::FockMap = FockMap(Dict((m0, m0) => 1. + 0im, (m1, m1) => 1. + 0im, (m2, m2) => 1. + 0im), fock_space, fock_space)

@@ -75,6 +75,8 @@ function flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
     return subset
 end
 
+members(subset::Subset)::Tuple = (representation(subset)...,)
+
 Base.:(==)(a::Subset, b::Subset)::Bool = space_of(a) == space_of(b) && representation(a) == representation(b)
 
 Base.:convert(::Type{Set{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
@@ -99,6 +101,6 @@ function Base.:intersect(input::Subset...)::Subset
 end
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
-export representation, euclidean, basis, dimension, space_of, center, pos, linear_transform, distance, flatten
+export representation, euclidean, basis, dimension, space_of, center, pos, linear_transform, distance, flatten, members
 
 end

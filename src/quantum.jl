@@ -2,6 +2,7 @@ if !isdefined(Main, :Spaces) include("spaces.jl") end
 
 module Quantum
 
+using SparseArrays
 using ..Spaces
 
 struct Mode <: AbstractSubset{Mode}
@@ -11,8 +12,6 @@ struct Mode <: AbstractSubset{Mode}
 
     Mode(base::Subset, fermion_count::Int64) = new(base, fermion_count, space_of(base))
 end
-
-base(mode::Mode)::Subset = mode.base
 
 struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     rep::Subset{Subset{Mode}}
@@ -28,7 +27,7 @@ struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(subset::Subset{Mode}) = FockSpace(convert(Subset{Subset{Mode}}, subset))
 end
 
-ordering(fock_space::FockSpace)::Dict{Mode, Int64} = fock_space.ordering
+dimension(fock_space::FockSpace)::Int64 = length(fock_space.ordering)
 
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = representation(a) == representation(b)
 
@@ -45,7 +44,23 @@ function quantize(subset::Subset{T}, fermion_count::Int64)::Subset where {T <: A
     return Subset(Set(quantized), space_of(quantized[1]))
 end
 
-export Mode, FockSpace
-export ordering, quantize
+struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
+    in_space::FockSpace
+    out_space::FockSpace
+    rep::SparseMatrixCSC{ComplexF64, Int64}
+
+    function FockMap(mapping::Dict{Tuple{Mode, Mode}, ComplexF64}, in_space::FockSpace, out_space::FockSpace)::FockMap
+        rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(out_space), dimension(in_space))
+        for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
+            rep[out_space.ordering[out_mode], in_space.ordering[in_mode]] = value
+        end
+        return new(in_space, out_space, rep)
+    end
+end
+
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
+
+export Mode, FockSpace, FockMap
+export dimension, quantize
 
 end

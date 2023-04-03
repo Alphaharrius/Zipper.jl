@@ -1,13 +1,13 @@
-include("../src/spaces.jl")
+include("../new/geometries.jl")
 
-using .spaces: RealSpace, MomentumSpace, Point, AbstractSpaceSubset, SpaceSubset
+using ..Spaces: RealSpace, Subset, Point, center
+using ..Geometries: radius
 
-space = RealSpace([1. 0. 1.; 0. 1. 0.; 1. 0. -1.]')
+space = RealSpace([1. 1.5; 0.5 0.5])
+point0 = Point([1//1, 3//1], space)
+point1 = Point([-8//1, 3//1], space)
+point2 = Point([0//1, 0//1], space)
 
-point = Point([1//1, 1//1, 0//1], space)
+region = union(convert(Subset, point0), convert(Subset, point1), convert(Subset, point2))
 
-new_point = Point([1//1, 1//1, 0//1], space) + Point([1//1, 0//1, 0//1], space)
-
-point == convert(SpaceSubset, point)
-
-union(point, convert(SpaceSubset, point))
+radius(region, center(space))

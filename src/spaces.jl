@@ -91,7 +91,7 @@ Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset{T}
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
 function Base.:union(input::T...)::Subset where {T <: AbstractSubset}
-    subsets::Set{Subset{T}} = Set([convert(Subset, element) for element in input])
+    subsets::Set{Subset} = Set([convert(Subset, element) for element in input])
     @assert(length(Set{AbstractSpace}([space_of(subset) for subset in subsets])) == 1)
     return Subset(union([representation(subset) for subset in subsets]...), space_of(input[1]))
 end

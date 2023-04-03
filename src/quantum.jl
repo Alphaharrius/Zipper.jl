@@ -49,6 +49,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     out_space::FockSpace
     rep::SparseMatrixCSC{ComplexF64, Int64}
 
+    FockMap(in_space::FockSpace, out_space::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = new(in_space, out_space, rep)
+
     function FockMap(mapping::Dict{Tuple{Mode, Mode}, ComplexF64}, in_space::FockSpace, out_space::FockSpace)::FockMap
         rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(out_space), dimension(in_space))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
@@ -58,9 +60,18 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     end
 end
 
+function columns(fock_map::FockMap, subset::Subset{Mode})::FockMap
+    in_space::FockSpace = FockSpace(subset)
+    rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fock_map.out_space), dimension(in_space))
+    for mode in representation(subset)
+        rep[:, in_space.ordering[mode]] = representation(fock_map)[:, fock_map.out_space.ordering[mode]]
+    end
+    return FockMap(in_space, fock_map.out_space, rep)
+end
+
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
 export Mode, FockSpace, FockMap
-export dimension, quantize
+export dimension, quantize, columns
 
 end

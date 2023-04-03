@@ -90,14 +90,16 @@ Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, 
 Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset{T}(representation(source), space_of(source))
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
-function Base.:union(input::Subset...)::Subset
-    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
-    return Subset(union([representation(subset) for subset in input]...), space_of(input[1]))
+function Base.:union(input::T...)::Subset where {T <: AbstractSubset}
+    subsets::Set{Subset{T}} = Set([convert(Subset, element) for element in input])
+    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in subsets])) == 1)
+    return Subset(union([representation(subset) for subset in subsets]...), space_of(input[1]))
 end
 
-function Base.:intersect(input::Subset...)::Subset
-    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
-    return Subset(intersect([representation(subset) for subset in input]...), space_of(input[1]))
+function Base.:intersect(input::T...)::Subset where {T <: AbstractSubset}
+    subsets::Set{Subset{T}} = Set([convert(Subset, element) for element in input])
+    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in subsets])) == 1)
+    return Subset(intersect([representation(subset) for subset in subsets]...), space_of(input[1]))
 end
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset

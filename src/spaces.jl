@@ -1,106 +1,104 @@
 module Spaces
-export representation, basis, dimension, euclidean
-export AbstractSpace, ClassicalSpace, RealSpace, MomentumSpace, AbstractSpaceSubset, SpaceSubset
 
 using LinearAlgebra
 
-abstract type AbstractSpace{T} end
+abstract type Element{R <: Any} end
 
-representation(space::AbstractSpace{T}) where {T <: Any} = space.representation
+""" Reflexive relation. """
+Base.:convert(::Type{T}, source::T) where {T <: Element} = source
+Base.:convert(::Type{Set{T}}, source::T) where {T <: Element} = Set{T}([source])
 
-abstract type ClassicalSpace <: AbstractSpace{Matrix{Float64}} end
+representation(source::Element{R}) where {R <: Any} = convert(R, source)
 
-"""
-    basis(space::ClassicalSpace)
+abstract type AbstractSpace{T} <: Element{T} end
 
-Retrieve the basis of an `ClassicalSpace`, this method assumed the existance of the attribute
-`representation::Matrix{Float64}` within all subtype of `ClassicalSpace`.
-"""
-basis(space::ClassicalSpace)::Matrix{Float64} = representation(space)
+abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
 
-"""
-    dimension(space::AbstractSpace)
+Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 
-Retieve the dimension spanned by the basis vectors of `space`.
-"""
-dimension(space::ClassicalSpace)::Int64 = size(basis(space), 1)
+euclidean(S::Type{<: AffineSpace}, n::Int64) = S(Matrix{Float64}(I(n)))
 
-function Base.:(==)(a::ClassicalSpace, b::ClassicalSpace)::Bool
-    return typeof(a) == typeof(b) && isapprox(basis(a), basis(b))
+basis(space::AffineSpace)::Matrix{Float64} = representation(space)
+
+dimension(space::AffineSpace) = size(basis(space), 1)
+
+abstract type AbstractSubset{T} <: Element{Set{T}} end
+
+space_of(subset::AbstractSubset) = subset.space
+
+struct RealSpace <: AffineSpace
+    rep::Matrix{Float64}
 end
 
-"""
-    RealSpace(basis::AbstractArray{Float64})
-
-Create a new `RealSpace` with `basis`.
-"""
-struct RealSpace <: ClassicalSpace
-    """ The basis vectors of this space stacked in columns. """
-    representation::Matrix{Float64}
-
-    RealSpace(basis::AbstractArray{Float64}) = new(Matrix(basis))
+struct MomentumSpace <: AffineSpace
+    rep::Matrix{Float64}
 end
 
-euclidean(dimension::Int64) = RealSpace(Matrix{Float64}(I(dimension)))
+Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = MomentumSpace(2.0 * π * Matrix(transpose(inv(basis(source)))))
+Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(basis(source) / (2.0 * π)))))
 
-"""
-    MomentumSpace(real_space::RealSpace)
-
-Create a new `MomentumSpace` from a `RealSpace`.
-"""
-struct MomentumSpace <: ClassicalSpace
-    """ The basis vectors of this space stacked in columns. """
-    representation::Matrix{Float64}
+struct Point <: AbstractSubset{Point}
+    pos::Vector{Rational{Int64}}
+    space::AbstractSpace
 end
 
-Base.:convert(::Type{T}, source::T) where {T <: AbstractSpace} = source
+center(space::AffineSpace)::Point = Point(zeros(Rational{Int64}, dimension(space)), space)
 
-Base.:convert(::Type{MomentumSpace}, source::RealSpace) = MomentumSpace(2.0 * π * Matrix(transpose(inv(basis(source)))))
-Base.:convert(::Type{RealSpace}, source::MomentumSpace) = RealSpace(Matrix(transpose(inv(basis(source) / (2.0 * π)))))
+pos(point::Point)::Vector{Rational{Int64}} = point.pos
 
-abstract type AbstractSpaceSubset end
+linear_transform(new_space::AffineSpace, point::Point)::Point = Point(collect(Rational{Int64}, basis(new_space) * inv(basis(space_of(point))) * pos(point)), new_space)
 
-struct SpaceSubset <: AbstractSpaceSubset
-    representation::Set{AbstractSpaceSubset}
-    parent_space::AbstractSpace
+Base.:(==)(a::Point, b::Point)::Bool = space_of(a) == space_of(b) && pos(a) == pos(b)
+LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
-    function SpaceSubset(elements::Set{T}, space::AbstractSpace)::SpaceSubset where {T <: AbstractSpaceSubset}
-        reference_space::AbstractSpace = first(elements).parent_space
-        @assert(reference_space == space)
-        @assert(all(element.parent_space == reference_space for element in elements))
-        return new(elements, reference_space)
+function Base.:+(a::Point, b::Point)::Point
+    @assert(typeof(space_of(a)) == typeof(space_of(b)))
+    return Point(pos(a) + pos(b), space_of(a))
+end
+
+function Base.:-(a::Point, b::Point)::Point
+    @assert(typeof(space_of(a)) == typeof(space_of(b)))
+    return Point(pos(a) - pos(b), space_of(a))
+end
+
+distance(a::Point, b::Point)::Float64 = sqrt(norm(a - b))
+
+struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
+    rep::Set{T}
+    space::AbstractSpace
+end
+
+function flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
+    if T <: Subset
+        return union([flatten(element) for element in representation(subset)]...)
     end
+    return subset
 end
 
-Base.:length(source::SpaceSubset)::Int64 = length(source.representation)
+Base.:(==)(a::Subset, b::Subset)::Bool = space_of(a) == space_of(b) && representation(a) == representation(b)
 
-""" Reflexive. """
-Base.:convert(::Type{T}, source::T) where {T <: SpaceSubset} = source
+Base.:convert(::Type{Set{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
+""" Reflexive relation. """
+Base.:convert(::Type{Subset}, source::Subset{T}) where {T <: AbstractSubset} = source
+Base.:convert(::Type{Subset{T}}, source::Subset{T}) where {T <: AbstractSubset} = source
+""" Element-wise conversions. """
+Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, B <: AbstractSubset} = (
+    Subset(Set{A}([convert(A, el) for el in representation(source)]), space_of(source)))
+""" Convert to the generalized type of `AbstractSubset`. """
+Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset{T}(representation(source), space_of(source))
+Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
-""" Chowning `SpaceSubset` as the common base for all subtypes of `AbstractSpaceSubset`. """
-Base.promote_rule(::Type{T}, ::Type{F}) where {T <: AbstractSpaceSubset, F <: AbstractSpaceSubset} = SpaceSubset
-
-Base.:(==)(a::SpaceSubset, b::SpaceSubset)::Bool = a.parent_space == b.parent_space && a.representation == b.representation
-
-function __union(a::SpaceSubset, b::SpaceSubset)::SpaceSubset
-    @assert(a.parent_space == b.parent_space)
-    return SpaceSubset(union(a.representation, b.representation), a.parent_space)
+function Base.:union(input::Subset...)::Subset
+    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
+    return Subset(union([representation(subset) for subset in input]...), space_of(input[1]))
 end
 
-function __intersect(a::SpaceSubset, b::SpaceSubset)::SpaceSubset
-    @assert(a.parent_space == b.parent_space)
-    return SpaceSubset(intersect(a.representation, b.representation), a.parent_space)
+function Base.:intersect(input::Subset...)::Subset
+    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
+    return Subset(intersect([representation(subset) for subset in input]...), space_of(input[1]))
 end
 
-Base.:union(a::SpaceSubset, b::SpaceSubset)::SpaceSubset = __union(a, b)
-Base.:intersect(a::SpaceSubset, b::SpaceSubset)::SpaceSubset = __intersect(a, b)
-
-Base.:(==)(a::AbstractSpaceSubset, b::AbstractSpaceSubset)::Bool = (==)(promote(a, b) ...)
-Base.:union(a::AbstractSpaceSubset, b::AbstractSpaceSubset)::SpaceSubset = union(promote(a, b) ...)
-Base.:intersect(a::AbstractSpaceSubset, b::AbstractSpaceSubset)::SpaceSubset = intersect(promote(a, b) ...)
-Base.:isempty(a::AbstractSpaceSubset)::Bool = isempty(convert(SpaceSubset, a).representation)
-
-function __init__()
-end
+export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
+export representation, euclidean, basis, dimension, space_of, center, pos, linear_transform, distance, flatten
 
 end

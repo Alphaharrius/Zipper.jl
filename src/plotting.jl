@@ -7,7 +7,7 @@ using PlotlyJS
 using ..Spaces, ..Geometries
 
 function visualize_region(region::Subset{Point}, visualization_space::AffineSpace)
-    ordered_points::Array{Point} = [linear_transform(visualization_space, point) for point in representation(region)]
+    ordered_points::Array{Point} = [linear_transform(visualization_space, point) for point in rep(region)]
     positions::Array{Vector} = [pos(point) for point in ordered_points]
     visualize_vector_positions(positions)
 end

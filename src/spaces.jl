@@ -8,7 +8,7 @@ abstract type Element{R <: Any} end
 Base.:convert(::Type{T}, source::T) where {T <: Element} = source
 Base.:convert(::Type{Set{T}}, source::T) where {T <: Element} = Set{T}([source])
 
-representation(source::Element{R}) where {R <: Any} = convert(R, source)
+rep(source::Element{R}) where {R <: Any} = convert(R, source)
 
 abstract type AbstractSpace{T} <: Element{T} end
 
@@ -18,7 +18,7 @@ Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 
 euclidean(S::Type{<: AffineSpace}, n::Int64) = S(Matrix{Float64}(I(n)))
 
-basis(space::AffineSpace)::Matrix{Float64} = representation(space)
+basis(space::AffineSpace)::Matrix{Float64} = rep(space)
 
 dimension(space::AffineSpace) = size(basis(space), 1)
 
@@ -46,7 +46,7 @@ center(space::AffineSpace)::Point = Point(zeros(Rational{Int64}, dimension(space
 
 pos(point::Point)::Vector{Rational{Int64}} = point.pos
 
-linear_transform(new_space::AffineSpace, point::Point)::Point = Point(collect(Rational{Int64}, basis(new_space) * inv(basis(space_of(point))) * pos(point)), new_space)
+linear_transform(new_space::AffineSpace, point::Point)::Point = Point(collect(Rational{Int64}, inv(basis(new_space)) * basis(space_of(point)) * pos(point)), new_space)
 
 Base.:(==)(a::Point, b::Point)::Bool = space_of(a) == space_of(b) && pos(a) == pos(b)
 LinearAlgebra.:norm(point::Point) = norm(pos(point))
@@ -70,14 +70,14 @@ end
 
 function flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
     if T <: Subset
-        return union([flatten(element) for element in representation(subset)]...)
+        return union([flatten(element) for element in rep(subset)]...)
     end
     return subset
 end
 
-members(subset::Subset)::Tuple = (representation(subset)...,)
+members(subset::Subset)::Tuple = (rep(subset)...,)
 
-Base.:(==)(a::Subset, b::Subset)::Bool = space_of(a) == space_of(b) && representation(a) == representation(b)
+Base.:(==)(a::Subset, b::Subset)::Bool = space_of(a) == space_of(b) && rep(a) == rep(b)
 
 Base.:convert(::Type{Set{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
 """ Reflexive relation. """
@@ -85,24 +85,26 @@ Base.:convert(::Type{Subset}, source::Subset{T}) where {T <: AbstractSubset} = s
 Base.:convert(::Type{Subset{T}}, source::Subset{T}) where {T <: AbstractSubset} = source
 """ Element-wise conversions. """
 Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, B <: AbstractSubset} = (
-    Subset(Set{A}([convert(A, el) for el in representation(source)]), space_of(source)))
+    Subset(Set{A}([convert(A, el) for el in rep(source)]), space_of(source)))
 """ Convert to the generalized type of `AbstractSubset`. """
-Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset{T}(representation(source), space_of(source))
+Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset{T}(rep(source), space_of(source))
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
-function Base.:union(input::T...)::Subset where {T <: AbstractSubset}
-    subsets::Set{Subset} = Set([convert(Subset, element) for element in input])
-    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in subsets])) == 1)
-    return Subset(union([representation(subset) for subset in subsets]...), space_of(input[1]))
+function Base.:union(input::Subset...)::Subset
+    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
+    return Subset(union([rep(subset) for subset in input]...), space_of(first(input)))
 end
 
-function Base.:intersect(input::T...)::Subset where {T <: AbstractSubset}
-    subsets::Set{Subset{T}} = Set([convert(Subset, element) for element in input])
-    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in subsets])) == 1)
-    return Subset(intersect([representation(subset) for subset in subsets]...), space_of(input[1]))
+Base.:union(input::T...) where {T <: AbstractSubset} = union((convert(Subset{T}, element) for element in input)...)
+
+function Base.:intersect(input::Subset...)::Subset
+    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
+    return Subset(intersect([rep(subset) for subset in input]...), space_of(first(input)))
 end
+
+Base.:intersect(input::T...) where {T <: AbstractSubset} = intersect((convert(Subset{T}, element) for element in input)...)
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
-export representation, euclidean, basis, dimension, space_of, center, pos, linear_transform, distance, flatten, members
+export rep, euclidean, basis, dimension, space_of, center, pos, linear_transform, distance, flatten, members
 
 end

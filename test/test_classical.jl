@@ -8,6 +8,18 @@ using ..Geometries
 using ..Quantum
 using ..Plotting
 
+using PlotlyJS
+
+triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
+honeycomb_unit_cell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
+honeycomb_crystal = Crystal(honeycomb_unit_cell, [3, 4])
+zone::Subset{Point} = points(honeycomb_crystal)
+
+d = hcat([collect(Float64, pos(linear_transform(euclidean(RealSpace, 2), point))) for point in rep(zone)]...)
+plot([scatter(x=d[1,:], y=d[2,:], mode="markers")])
+
+visualize_region(zone, euclidean(RealSpace, 2))
+
 space = RealSpace([1. 1.5; 0.5 0.5])
 point0 = Point([1//1, 3//1], space)
 point1 = Point([-8//1, 3//1], space)
@@ -15,9 +27,9 @@ point2 = Point([0//1, 0//1], space)
 
 region::Subset{Point} = union(point0, point1, point2)
 
-visualize_region(region, euclidean(RealSpace, 2))
+# visualize_region(region, euclidean(RealSpace, 2))
 
-modes::Subset{Mode} = quantize(region, 2)
+modes::Subset{Mode} = quantize("physical", region, 2)
 m0, m1, m2 = members(modes)
 fock_space::FockSpace = FockSpace(modes)
 
@@ -27,4 +39,4 @@ fock_map::FockMap = FockMap(
          (m2, m2) => 1. + 0im),
     fock_space, fock_space)
 
-cut::FockMap = columns(fock_map, union(m0, m1))
+cut::FockMap = columns(fock_map, union(m0))

@@ -8,17 +8,14 @@ using ..Geometries
 using ..Quantum
 using ..Plotting
 
-using PlotlyJS
-
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 honeycomb_unit_cell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
-honeycomb_crystal = Crystal(honeycomb_unit_cell, [3, 4])
-zone::Subset{Point} = points(honeycomb_crystal)
+honeycomb_crystal = Crystal(honeycomb_unit_cell, [32, 32])
+real_zone::Subset{Point} = points(honeycomb_crystal)
+reciprocal_zone::Subset{Point} = brillouin_zone(honeycomb_crystal)
 
-d = hcat([collect(Float64, pos(linear_transform(euclidean(RealSpace, 2), point))) for point in rep(zone)]...)
-plot([scatter(x=d[1,:], y=d[2,:], mode="markers")])
-
-visualize_region(zone, euclidean(RealSpace, 2))
+visualize_region("Honeycomb lattice", real_zone, euclidean(RealSpace, 2))
+visualize_region("Honeycomb lattice", reciprocal_zone, euclidean(RealSpace, 2))
 
 space = RealSpace([1. 1.5; 0.5 0.5])
 point0 = Point([1//1, 3//1], space)

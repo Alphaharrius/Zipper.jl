@@ -20,7 +20,7 @@ function points(crystal::Crystal)::Subset{Point}
     crystal_mesh::Matrix{Int64} = mesh(crystal.shape)
     mesh_points::Array{Point} = [Point(pos, real_space) for pos in eachcol(crystal_mesh)]
     points::Set{Point} = Set{Point}([mesh_point + point for mesh_point in mesh_points for point in rep(crystal.unit_cell)])
-    return Subset(points, real_space)
+    return Subset(points)
 end
 
 function brillouin_zone(crystal::Crystal)::Subset{Point}
@@ -29,7 +29,7 @@ function brillouin_zone(crystal::Crystal)::Subset{Point}
     tiled_shape::Matrix{Int64} = hcat([crystal.shape for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_shape / 2) ./ tiled_shape
     points::Set{Point} = Set{Point}([Point(pos, momentum_space) for pos in eachcol(recentered_mesh)])
-    return Subset(points, momentum_space)
+    return Subset(points)
 end
 
 export Crystal

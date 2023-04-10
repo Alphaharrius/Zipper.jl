@@ -48,6 +48,14 @@ pos(point::Point)::Vector{Rational{Int64}} = point.pos
 
 linear_transform(new_space::AffineSpace, point::Point)::Point = Point(collect(Rational{Int64}, inv(basis(new_space)) * basis(space_of(point)) * pos(point)), new_space)
 
+function fourier_coef(momentum::Point, point::Point)::ComplexF64
+    m_space::MomentumSpace = space_of(momentum)
+    r_space::RealSpace = space_of(point)
+    phys_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(m_space)), momentum)
+    phys_point::Point = linear_transform(euclidean(RealSpace, dimension(r_space)), point)
+    return exp(-1im * collect(Float64, pos(phys_momentum))'collect(Float64, pos(phys_point)))
+end
+
 Base.:(==)(a::Point, b::Point)::Bool = space_of(a) == space_of(b) && pos(a) == pos(b)
 LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
@@ -66,7 +74,12 @@ distance(a::Point, b::Point)::Float64 = sqrt(norm(a - b))
 struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     rep::Set{T}
     space::AbstractSpace
+
+    Subset(elements::Set{T}) where {T <: AbstractSubset} = new{T}(elements, space_of(first(elements)))
 end
+
+Base.:iterate(subset::T, i...) where {T <: Subset} = Base.iterate(rep(subset), i...)
+Base.:length(subset::T) where {T <: Subset} = Base.length(rep(subset))
 
 function flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
     if T <: Subset
@@ -85,26 +98,26 @@ Base.:convert(::Type{Subset}, source::Subset{T}) where {T <: AbstractSubset} = s
 Base.:convert(::Type{Subset{T}}, source::Subset{T}) where {T <: AbstractSubset} = source
 """ Element-wise conversions. """
 Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, B <: AbstractSubset} = (
-    Subset(Set{A}([convert(A, el) for el in rep(source)]), space_of(source)))
+    Subset(Set{A}([convert(A, el) for el in rep(source)])))
 """ Convert to the generalized type of `AbstractSubset`. """
-Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset{T}(rep(source), space_of(source))
+Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(rep(source))
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
 function Base.:union(input::Subset...)::Subset
     @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
-    return Subset(union([rep(subset) for subset in input]...), space_of(first(input)))
+    return Subset(union([rep(subset) for subset in input]...))
 end
 
 Base.:union(input::T...) where {T <: AbstractSubset} = union((convert(Subset{T}, element) for element in input)...)
 
 function Base.:intersect(input::Subset...)::Subset
     @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
-    return Subset(intersect([rep(subset) for subset in input]...), space_of(first(input)))
+    return Subset(intersect([rep(subset) for subset in input]...))
 end
 
 Base.:intersect(input::T...) where {T <: AbstractSubset} = intersect((convert(Subset{T}, element) for element in input)...)
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
-export rep, euclidean, basis, dimension, space_of, center, pos, linear_transform, distance, flatten, members
+export rep, euclidean, basis, dimension, space_of, center, pos, linear_transform, fourier_coef, distance, flatten, members
 
 end

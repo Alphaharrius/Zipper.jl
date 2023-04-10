@@ -12,9 +12,9 @@ using ..Plotting
 
 fcc_space = RealSpace([1/2 1/2 0; 0. 1/2 1/2; 1/2 0. 1/2]')
 
-points = interpolate(Point([0, 0, 0], fcc_space), Point([10, 10, 3], fcc_space), 100)
+line = interpolate(Point([0, 0, 0], fcc_space), Point([10, 10, 3], fcc_space), 100)
 
-visualize_region("Line", Subset(Set(points)), euclidean(RealSpace, 3))
+visualize_region("Line", Subset(Set(line)), euclidean(RealSpace, 3))
 
 r_space = convert(MomentumSpace, fcc_space)
 unit_cell = union(Point([0, 0, 0], fcc_space), Point([1/4, 1/4, 1/4], fcc_space))

@@ -29,7 +29,7 @@ bonds::Set{Bond} = Set([
     Bond((m0, m1), Point([0, 0, 1], fcc_space), tₙ)
 ])
 
-H = bloch(bonds, Point([0.5, 0, 0], r_space))
+Hₖ = bloch(bonds, Point([0.5, 0, 0], r_space))
 
 visualize_region("Honeycomb lattice", zone, euclidean(RealSpace, 3))
 visualize_region("Honeycomb lattice", k_zone, euclidean(MomentumSpace, 3))

@@ -69,7 +69,18 @@ function Base.:-(a::Point, b::Point)::Point
     return Point(pos(a) - pos(b), space_of(a))
 end
 
+Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) * val, space_of(point))
+Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) / val, space_of(point))
+
 distance(a::Point, b::Point)::Float64 = sqrt(norm(a - b))
+
+function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <: Integer}
+    @assert(space_of(from) == space_of(to))
+    march::Point = (to - from) / (count + 1)
+    points::Array{Point} = [from + march * n for n in 0:(count + 1)]
+    points[end] = to
+    return points
+end
 
 struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     rep::Set{T}
@@ -118,6 +129,6 @@ end
 Base.:intersect(input::T...) where {T <: AbstractSubset} = intersect((convert(Subset{T}, element) for element in input)...)
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
-export rep, euclidean, basis, dimension, space_of, center, pos, linear_transform, fourier_coef, distance, flatten, members
+export rep, euclidean, basis, dimension, space_of, center, pos, linear_transform, fourier_coef, distance, interpolate, flatten, members
 
 end

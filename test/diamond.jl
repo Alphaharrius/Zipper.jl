@@ -11,6 +11,11 @@ using ..Physical
 using ..Plotting
 
 fcc_space = RealSpace([1/2 1/2 0; 0. 1/2 1/2; 1/2 0. 1/2]')
+
+points = interpolate(Point([0, 0, 0], fcc_space), Point([10, 10, 3], fcc_space), 100)
+
+visualize_region("Line", Subset(Set(points)), euclidean(RealSpace, 3))
+
 r_space = convert(MomentumSpace, fcc_space)
 unit_cell = union(Point([0, 0, 0], fcc_space), Point([1/4, 1/4, 1/4], fcc_space))
 crystal = Crystal(unit_cell, [4, 4, 4])
@@ -29,7 +34,7 @@ bonds::Set{Bond} = Set([
     Bond((m0, m1), Point([0, 0, 1], fcc_space), tₙ)
 ])
 
-Hₖ = bloch(bonds, Point([0.5, 0, 0], r_space))
+Hₖ::FockMap = bloch(bonds, Point([0.5, 0, 0], r_space))
 
 visualize_region("Honeycomb lattice", zone, euclidean(RealSpace, 3))
 visualize_region("Honeycomb lattice", k_zone, euclidean(MomentumSpace, 3))

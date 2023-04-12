@@ -3,26 +3,81 @@ if !isdefined(Main, :Spaces) include("spaces.jl") end
 module Quantum
 
 using LinearAlgebra, SparseArrays, Arpack
-using ..Spaces, ..DataStructures
+using ..Spaces
+
+MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.ImmutableDict(
+    :groups => Vector{String},
+    :index => Integer,
+    :offset => Point,
+    :pos => Point,
+    :flavor => Integer)
+MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavor])
+
+group_name(type::Symbol, name::String)::String = "$(type):$(name)"
 
 struct Mode <: AbstractSubset{Mode}
-    name::String
-    indexes::Tuple{Vararg{Int64}}
-    base::Subset
-    flavor::Int64
-    space::AbstractSpace
+    attributes::Base.ImmutableDict{Symbol}
+    identifiers::Set{Symbol}
 
-    Mode(name::String, indexes::Tuple{Vararg{Int64}}, base::Subset, flavor::Int64) = new(name, indexes, base, flavor, space_of(base))
+    Mode(attributes::Base.ImmutableDict{Symbol, T}, identifiers::Set{Symbol}) where {T} = new(attributes, identifiers)
+
+    function Mode(datas::Vector{Pair{Symbol, T}}, identifiers::Set{Symbol} = MODE_DEFAULT_IDENTIFIERS) where {T}
+        @assert(any([data.second isa MODE_IDENTIFIERS_TYPE[data.first] for data in datas]))
+        attributes = Base.ImmutableDict(datas...)
+        @assert(any([haskey(attributes, identifier) for identifier in identifiers]))
+        return new(attributes, identifiers)
+    end
 end
 
-base_of(mode::Mode)::Subset = mode.base
+function Spaces.space_of(mode::Mode)::AbstractSpace
+    if hasattr(mode, :pos) return space_of(attr(mode, :pos)) end
+    if hasattr(mode, :offset) return space_of(attr(mode, :offset)) end
+    # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
+    # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
+    return euclidean(RealSpace, 1)
+end
 
-Base.:hash(mode::Mode)::UInt = hash((mode.name, mode.indexes, mode.flavor))
+hasattr(mode::Mode, identifier::Symbol) = haskey(mode.attributes, identifier)
+
+attr(mode::Mode, identifier::Symbol) = mode.attributes[identifier]
+
+identify(mode::Mode, identifier::Symbol)::Mode = Mode(mode.attributes, Set([mode.identifiers..., identifier]))
+
+function unidentify(mode::Mode, identifier::Symbol)::Mode
+    identifiers::Set{Symbol} = Set(mode.identifiers)
+    delete!(identifiers, identifier)
+    return Mode(mode.attributes, identifiers)
+end
+
+reidentify(mode::Mode, identifiers::Set{Symbol})::Mode = Mode(mode.attributes, identifiers)
+
+function add_attr(mode::Mode, attribute::Pair{Symbol, T})::Mode where {T}
+    @assert(attribute.second isa MODE_IDENTIFIERS_TYPE[attribute.first])
+    return Mode(Base.ImmutableDict(mode.attributes..., attribute), mode.identifiers)
+end
+
+function delete_attr(mode::Mode, identifier::Symbol)::Mode
+    intermediate = Dict(mode.attributes)
+    delete!(intermediate, identifier)
+    return Mode(Base.ImmutableDict(intermediate...), mode.identifiers)
+end
+
+function add_group(mode::Mode, group::String)::Mode
+    groups::Vector{String} = [attr(mode, :groups)..., group]
+    return add_attr(delete_attr(mode, :groups), :groups => groups)
+end
+
+Base.:hash(mode::Mode)::UInt = hash([attr(mode, identifier) for identifier in mode.identifiers])
 Base.:isequal(a::Mode, b::Mode) = a == b
 
-Base.:show(io::IO, mode::Mode) = print(io, "mode:$(mode.name)$(string(mode.indexes))")
-
-Base.:(==)(a::Mode, b::Mode)::Bool = a.name == b.name && a.indexes == b.indexes && a.base == b.base && a.flavor == b.flavor
+function Base.:(==)(a::Mode, b::Mode)::Bool
+    common_identifiers::Set{Symbol} = intersect(a.identifiers, b.identifiers)
+    if isempty(common_identifiers) return false end # Cannot determine if they are equal if they aren't identified by the same set of identifiers.
+    for identifier in common_identifiers
+        if !isequal(attr(a, identifier), attr(b, identifier)) return false end
+    end
+    return true
+end
 
 struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     rep::Subset{Subset{Mode}}
@@ -65,16 +120,12 @@ Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset,
 
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source)
 
-quantize(name::String, indexes::Tuple{Vararg{Int64}}, point::Point, flavor::Integer)::Mode = (
-    Mode(name, indexes, convert(Subset, point), flavor))
+quantize(name::String, index::Integer, point::Point, flavor::Integer)::Mode = (
+    # The new mode will take a group of q:$(name).
+    Mode([:groups => [group_name(:q, name)], :index => index, :pos => point, :flavor => flavor]))
 
-quantize(name::String, subset::Subset, count::Int64)::Subset = (
-    quantize(name, tuple(), subset, count))
-
-function quantize(name::String, indexes::Tuple{Vararg{Int64}}, subset::Subset{T}, count::Integer)::Subset where {T <: AbstractSubset}
-    quantized::Vector = [quantize(name, (indexes..., index), element, flavor) for (index, element) in enumerate(rep(subset)) for flavor in 1:count]
-    return Subset(Set(quantized))
-end
+quantize(name::String, subset::Subset{Point}, count::Integer)::Subset{Mode} = (
+    Subset(Set([quantize(name, index, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count])))
 
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     out_space::FockSpace
@@ -126,12 +177,12 @@ dagger(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space, co
 
 function eigvalsh(fock_map::FockMap)::Vector{Pair{Mode, Float64}}
     @assert(fock_map.in_space == fock_map.out_space)
-    evals::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
-    base::Subset = Subset(Set([data for mode in fock_map.in_space for data in base_of(mode)]))
-    return [Mode("eigmode", (index,), base, 1) => real(eval) for (index, eval) in enumerate(evals)]
+    evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
+    return [Mode([:groups => [group_name(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
 end
 
 export Mode, FockSpace, FockMap
+export group_name, hasattr, attr, identify, unidentify, reidentify, add_attr, delete_attr, add_group
 export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger, eigvalsh
 
 end

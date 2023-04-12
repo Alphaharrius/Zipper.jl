@@ -21,16 +21,6 @@ function bloch(bonds::Set{Bond}, k::Point, crystal::Crystal)::FockMap
     return upper_triangular + dagger(upper_triangular)
 end
 
-function test(bonds::Set{Bond}, k::Point, crystal::Crystal)
-    all_modes::Set{Mode} = Set([mode for bond in bonds for mode in bond.modes])
-    fock_space::FockSpace = FockSpace(Subset(all_modes))
-    m = zeros(ComplexF64, dimension(fock_space), dimension(fock_space))
-    for bond in bonds
-        m[2, 1] += fourier_coef(k, bond.offset, vol(crystal)) * bond.strength 
-    end
-    return m + conj(m)'
-end
-
 export Bond
 export bloch, test
 

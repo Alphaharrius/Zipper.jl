@@ -20,7 +20,7 @@ bonds::Set{Bond} = Set([
     Bond((m0, m0), Point([1], real_space), t_n)
 ])
 sampling = interpolate(Point([-4], k_space), Point([4], k_space), 1000)
-spectrum = hcat([eigvals(bloch(bonds, k, chain)) for k in sampling]...)
+spectrum = hcat([eigvalsh(bloch(bonds, k, chain)) for k in sampling]...)
 top = map(c -> c.value, spectrum[1, :])
 
 trace0 = scatter(y=top)

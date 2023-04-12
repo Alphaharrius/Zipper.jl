@@ -25,7 +25,13 @@ bonds::Set{Bond} = Set([
     Bond((m0, m1), Point([0, 1], triangular), tₙ)
 ])
 
-sampling = interpolate(Point([-1/2, 0], k_space), Point([1/2, 0], k_space), 300)
+spec = [hcat([eigvalsh(bloch(bonds, Point([h, k], k_space), crystal)) for h in -1:0.01:1]...) for k in -1:0.01:1]
+
+top = map(c -> c.value, hcat([v[1, :] for v in spec]...))
+bottom = map(c -> c.value, hcat([v[2, :] for v in spec]...))
+
+plot([surface(z=top), surface(z=bottom)])
+
 
 
 # visualize_region("Honeycomb lattice", real_zone, euclidean(RealSpace, 2))

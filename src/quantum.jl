@@ -125,14 +125,14 @@ transpose(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space,
 
 dagger(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space, conj(rep(source)'))
 
-function LinearAlgebra.:eigvals(fock_map::FockMap)::Vector{Composite{Mode, Float64}}
+function eigvalsh(fock_map::FockMap)::Vector{Composite{Mode, Float64}}
     @assert(fock_map.in_space == fock_map.out_space)
-    evals::Vector{Number} = eigvals(Matrix(rep(fock_map)))
+    evals::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
     base::Subset = Subset(Set([data for mode in fock_map.in_space for data in base_of(mode)]))
     return [Composite(Mode("eigmode", (index,), base, 1), real(eval)) for (index, eval) in enumerate(evals)]
 end
 
 export Mode, FockSpace, FockMap
-export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger
+export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger, eigvalsh
 
 end

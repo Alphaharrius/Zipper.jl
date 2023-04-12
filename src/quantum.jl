@@ -13,7 +13,7 @@ MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.ImmutableDict
     :flavor => Integer)
 MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavor])
 
-group_name(type::Symbol, name::String)::String = "$(type):$(name)"
+groupname(type::Symbol, name::String)::String = "$(type):$(name)"
 
 struct Mode <: AbstractSubset{Mode}
     attributes::Base.ImmutableDict{Symbol}
@@ -30,8 +30,8 @@ struct Mode <: AbstractSubset{Mode}
 end
 
 function Spaces.space_of(mode::Mode)::AbstractSpace
-    if hasattr(mode, :pos) return space_of(attr(mode, :pos)) end
-    if hasattr(mode, :offset) return space_of(attr(mode, :offset)) end
+    if hasattr(mode, :pos) return space_of(getattr(mode, :pos)) end
+    if hasattr(mode, :offset) return space_of(getattr(mode, :offset)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
     return euclidean(RealSpace, 1)
@@ -39,42 +39,42 @@ end
 
 hasattr(mode::Mode, identifier::Symbol) = haskey(mode.attributes, identifier)
 
-attr(mode::Mode, identifier::Symbol) = mode.attributes[identifier]
+getattr(mode::Mode, identifier::Symbol) = mode.attributes[identifier]
 
-identify(mode::Mode, identifier::Symbol)::Mode = Mode(mode.attributes, Set([mode.identifiers..., identifier]))
+identify(mode::Mode, identifier::Symbol...)::Mode = Mode(mode.attributes, Set([mode.identifiers..., identifier...]))
 
-function unidentify(mode::Mode, identifier::Symbol)::Mode
+function unidentify(mode::Mode, identifier::Symbol...)::Mode
     identifiers::Set{Symbol} = Set(mode.identifiers)
-    delete!(identifiers, identifier)
+    foreach(el -> delete!(identifiers, el), identifier)
     return Mode(mode.attributes, identifiers)
 end
 
 reidentify(mode::Mode, identifiers::Set{Symbol})::Mode = Mode(mode.attributes, identifiers)
 
-function add_attr(mode::Mode, attribute::Pair{Symbol, T})::Mode where {T}
+function addattr(mode::Mode, attribute::Pair{Symbol, T})::Mode where {T}
     @assert(attribute.second isa MODE_IDENTIFIERS_TYPE[attribute.first])
     return Mode(Base.ImmutableDict(mode.attributes..., attribute), mode.identifiers)
 end
 
-function delete_attr(mode::Mode, identifier::Symbol)::Mode
+function deleteattr(mode::Mode, identifier::Symbol)::Mode
     intermediate = Dict(mode.attributes)
     delete!(intermediate, identifier)
     return Mode(Base.ImmutableDict(intermediate...), mode.identifiers)
 end
 
-function add_group(mode::Mode, group::String)::Mode
-    groups::Vector{String} = [attr(mode, :groups)..., group]
-    return add_attr(delete_attr(mode, :groups), :groups => groups)
+function addgroup(mode::Mode, group::String)::Mode
+    groups::Vector{String} = [getattr(mode, :groups)..., group]
+    return addattr(deleteattr(mode, :groups), :groups => groups)
 end
 
-Base.:hash(mode::Mode)::UInt = hash([attr(mode, identifier) for identifier in mode.identifiers])
+Base.:hash(mode::Mode)::UInt = hash([getattr(mode, identifier) for identifier in mode.identifiers])
 Base.:isequal(a::Mode, b::Mode) = a == b
 
 function Base.:(==)(a::Mode, b::Mode)::Bool
     common_identifiers::Set{Symbol} = intersect(a.identifiers, b.identifiers)
     if isempty(common_identifiers) return false end # Cannot determine if they are equal if they aren't identified by the same set of identifiers.
     for identifier in common_identifiers
-        if !isequal(attr(a, identifier), attr(b, identifier)) return false end
+        if !isequal(getattr(a, identifier), getattr(b, identifier)) return false end
     end
     return true
 end
@@ -122,7 +122,7 @@ Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source)
 
 quantize(name::String, index::Integer, point::Point, flavor::Integer)::Mode = (
     # The new mode will take a group of q:$(name).
-    Mode([:groups => [group_name(:q, name)], :index => index, :pos => point, :flavor => flavor]))
+    Mode([:groups => [groupname(:q, name)], :index => index, :pos => point, :flavor => flavor]))
 
 quantize(name::String, subset::Subset{Point}, count::Integer)::Subset{Mode} = (
     Subset(Set([quantize(name, index, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count])))
@@ -178,11 +178,11 @@ dagger(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space, co
 function eigvalsh(fock_map::FockMap)::Vector{Pair{Mode, Float64}}
     @assert(fock_map.in_space == fock_map.out_space)
     evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
-    return [Mode([:groups => [group_name(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
+    return [Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
 end
 
 export Mode, FockSpace, FockMap
-export group_name, hasattr, attr, identify, unidentify, reidentify, add_attr, delete_attr, add_group
+export groupname, hasattr, getattr, identify, unidentify, reidentify, addattr, deleteattr, addgroup
 export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger, eigvalsh
 
 end

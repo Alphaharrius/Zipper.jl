@@ -1,9 +1,10 @@
 if !isdefined(Main, :Spaces) include("spaces.jl") end
+if !isdefined(Main, :Geometries) include("geometries.jl") end
 if !isdefined(Main, :Quantum) include("quantum.jl") end
 
 module Physical
 
-using ..Spaces, ..Quantum
+using ..Spaces, ..Quantum, ..Geometries
 
 struct Bond
     modes::Tuple{Mode, Mode}
@@ -11,16 +12,26 @@ struct Bond
     strength::Number
 end
 
-function bloch(bonds::Set{Bond}, k::Point)::FockMap
+function bloch(bonds::Set{Bond}, k::Point, crystal::Crystal)::FockMap
     all_modes::Set{Mode} = Set([mode for bond in bonds for mode in bond.modes])
     fock_space::FockSpace = FockSpace(Subset(all_modes))
     fock_dict::Dict{Tuple{Mode, Mode}, ComplexF64} = Dict()
-    foreach(bond -> fock_dict[bond.modes] = get(fock_dict, bond.modes, 0im) + fourier_coef(k, bond.offset) * bond.strength, bonds)
+    foreach(bond -> fock_dict[bond.modes] = get(fock_dict, bond.modes, 0im) + fourier_coef(k, bond.offset, vol(crystal)) * bond.strength, bonds)
     upper_triangular::FockMap = FockMap(fock_space, fock_space, fock_dict)
     return upper_triangular + dagger(upper_triangular)
 end
 
+function test(bonds::Set{Bond}, k::Point, crystal::Crystal)
+    all_modes::Set{Mode} = Set([mode for bond in bonds for mode in bond.modes])
+    fock_space::FockSpace = FockSpace(Subset(all_modes))
+    m = zeros(ComplexF64, dimension(fock_space), dimension(fock_space))
+    for bond in bonds
+        m[2, 1] += fourier_coef(k, bond.offset, vol(crystal)) * bond.strength 
+    end
+    return m + conj(m)'
+end
+
 export Bond
-export bloch
+export bloch, test
 
 end

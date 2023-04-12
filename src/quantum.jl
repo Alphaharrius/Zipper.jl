@@ -1,27 +1,29 @@
 if !isdefined(Main, :Spaces) include("spaces.jl") end
+if !isdefined(Main, :DataStructures) include("datastructures.jl") end
 
 module Quantum
 
-using SparseArrays
-using ..Spaces
+using LinearAlgebra, SparseArrays, Arpack
+using ..Spaces, ..DataStructures
 
 struct Mode <: AbstractSubset{Mode}
-    group_name::String
-    indexes::Tuple
+    name::String
+    indexes::Tuple{Vararg{Int64}}
     base::Subset
-    fermion_count::Int64
+    flavor::Int64
     space::AbstractSpace
 
-    Mode(group_name::String, indexes::Tuple, base::Subset, fermion_count::Int64) = new(group_name, indexes, base, fermion_count, space_of(base))
+    Mode(name::String, indexes::Tuple{Vararg{Int64}}, base::Subset, flavor::Int64) = new(name, indexes, base, flavor, space_of(base))
 end
 
-Base.:show(io::IO, mode::Mode) = print(io, "mode:$(mode.group_name)$(string(indexes(mode)))")
+base_of(mode::Mode)::Subset = mode.base
 
-indexes(mode::Mode)::Tuple = mode.indexes
+Base.:hash(mode::Mode)::UInt = hash((mode.name, mode.indexes, mode.flavor))
+Base.:isequal(a::Mode, b::Mode) = a == b
 
-expand(mode::Mode, data::T) where {T <: AbstractSubset} = Mode(mode.group_name, indexes(mode), union(mode.base, convert(Subset, data)), mode.fermion_count)
+Base.:show(io::IO, mode::Mode) = print(io, "mode:$(mode.name)$(string(mode.indexes))")
 
-Base.:(==)(a::Mode, b::Mode)::Bool = group_name(a) == group_name(b) && indexes(a) == indexes(b)
+Base.:(==)(a::Mode, b::Mode)::Bool = a.name == b.name && a.indexes == b.indexes && a.base == b.base && a.flavor == b.flavor
 
 struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     rep::Subset{Subset{Mode}}
@@ -37,9 +39,11 @@ struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(subset::Subset{Mode}) = FockSpace(convert(Subset{Subset{Mode}}, subset))
 end
 
+Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
+
 Base.:show(io::IO, fock_space::FockSpace) = print(io, string(rep(flatten(rep(fock_space)))))
 
-dimension(fock_space::FockSpace)::Int64 = length(fock_space.ordering)
+Base.:length(fock_space::FockSpace) = length(fock_space.ordering)
 
 function ordered_modes(fock_space::FockSpace)::Array{Mode}
     modes = Array{Mode}(undef, dimension(fock_space))
@@ -62,14 +66,14 @@ Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset,
 
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source)
 
-quantize(group_name::String, indexes::Tuple, point::Point, fermion_count)::Mode = (
-    Mode(group_name, indexes, convert(Subset, point), fermion_count))
+quantize(name::String, indexes::Tuple{Vararg{Int64}}, point::Point, flavor::Integer)::Mode = (
+    Mode(name, indexes, convert(Subset, point), flavor))
 
-quantize(group_name::String, subset::Subset, fermion_count::Int64)::Subset = (
-    quantize(group_name, tuple(), subset, fermion_count))
+quantize(name::String, subset::Subset, count::Int64)::Subset = (
+    quantize(name, tuple(), subset, count))
 
-function quantize(group_name::String, indexes::Tuple, subset::Subset{T}, fermion_count::Int64)::Subset where {T <: AbstractSubset}
-    quantized::Vector = [quantize(group_name, (indexes..., index), element, fermion_count) for (index, element) in enumerate(rep(subset))]
+function quantize(name::String, indexes::Tuple{Vararg{Int64}}, subset::Subset{T}, count::Integer)::Subset where {T <: AbstractSubset}
+    quantized::Vector = [quantize(name, (indexes..., index), element, flavor) for (index, element) in enumerate(rep(subset)) for flavor in 1:count]
     return Subset(Set(quantized))
 end
 
@@ -89,6 +93,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
         return new(out_space, in_space, rep)
     end
 end
+
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
 function columns(fock_map::FockMap, subset::Subset{Mode})::FockMap
     in_space::FockSpace = FockSpace(subset)
@@ -119,7 +125,12 @@ transpose(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space,
 
 dagger(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space, conj(rep(source)'))
 
-Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
+function LinearAlgebra.:eigvals(fock_map::FockMap)::Vector{Composite{Mode, Float64}}
+    @assert(fock_map.in_space == fock_map.out_space)
+    evals::Vector{Number} = eigvals(Matrix(rep(fock_map)))
+    base::Subset = Subset(Set([data for mode in fock_map.in_space for data in base_of(mode)]))
+    return [Composite(Mode("eigmode", (index,), base, 1), real(eval)) for (index, eval) in enumerate(evals)]
+end
 
 export Mode, FockSpace, FockMap
 export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger

@@ -12,6 +12,8 @@ rep(source::Element{R}) where {R <: Any} = convert(R, source)
 
 abstract type AbstractSpace{T} <: Element{T} end
 
+dimension(space::T) where {T <: AbstractSpace} = length(space)
+
 abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
 
 Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
@@ -20,7 +22,7 @@ euclidean(S::Type{<: AffineSpace}, n::Int64) = S(Matrix{Float64}(I(n)))
 
 basis(space::AffineSpace)::Matrix{Float64} = rep(space)
 
-dimension(space::AffineSpace) = size(basis(space), 1)
+Base.:length(space::T) where {T <: AffineSpace} = size(basis(space), 1)
 
 abstract type AbstractSubset{T} <: Element{Set{T}} end
 
@@ -42,18 +44,22 @@ struct Point <: AbstractSubset{Point}
     space::AbstractSpace
 end
 
+# Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Vector representation and leave to the Base.isequal for identification.
+Base.:hash(point::Point)::UInt = hash(pos(point))
+Base.:isequal(a::Point, b::Point)::Bool = a == b
+
 center(space::AffineSpace)::Point = Point(zeros(Rational{Int64}, dimension(space)), space)
 
 pos(point::Point)::Vector{Rational{Int64}} = point.pos
 
 linear_transform(new_space::AffineSpace, point::Point)::Point = Point(collect(Rational{Int64}, inv(basis(new_space)) * basis(space_of(point)) * pos(point)), new_space)
 
-function fourier_coef(momentum::Point, point::Point)::ComplexF64
+function fourier_coef(momentum::Point, point::Point, vol::Integer)::ComplexF64
     m_space::MomentumSpace = space_of(momentum)
     r_space::RealSpace = space_of(point)
     phys_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(m_space)), momentum)
     phys_point::Point = linear_transform(euclidean(RealSpace, dimension(r_space)), point)
-    return exp(-1im * collect(Float64, pos(phys_momentum))'collect(Float64, pos(phys_point)))
+    return exp(-1im * dot(collect(Float64, pos(phys_momentum)), collect(Float64, pos(phys_point)))) / sqrt(vol)
 end
 
 Base.:(==)(a::Point, b::Point)::Bool = space_of(a) == space_of(b) && pos(a) == pos(b)
@@ -88,6 +94,10 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
 
     Subset(elements::Set{T}) where {T <: AbstractSubset} = new{T}(elements, space_of(first(elements)))
 end
+
+# Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Set representation and leave to the Base.isequal for identification.
+Base.:hash(subset::Subset)::UInt = hash(rep(subset))
+Base.:isequal(a::Subset, b::Subset)::Bool = a == b
 
 Base.:iterate(subset::T, i...) where {T <: Subset} = Base.iterate(rep(subset), i...)
 Base.:length(subset::T) where {T <: Subset} = Base.length(rep(subset))

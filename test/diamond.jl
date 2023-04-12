@@ -4,17 +4,10 @@ include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
 
-using ..Spaces
-using ..Geometries
-using ..Quantum
-using ..Physical
-using ..Plotting
+using LinearAlgebra, PlotlyJS
+using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
 
 fcc_space = RealSpace([1/2 1/2 0; 0. 1/2 1/2; 1/2 0. 1/2]')
-
-line = interpolate(Point([0, 0, 0], fcc_space), Point([10, 10, 3], fcc_space), 100)
-
-visualize_region("Line", Subset(Set(line)), euclidean(RealSpace, 3))
 
 r_space = convert(MomentumSpace, fcc_space)
 unit_cell = union(Point([0, 0, 0], fcc_space), Point([1/4, 1/4, 1/4], fcc_space))
@@ -34,7 +27,10 @@ bonds::Set{Bond} = Set([
     Bond((m0, m1), Point([0, 0, 1], fcc_space), tₙ)
 ])
 
-Hₖ::FockMap = bloch(bonds, Point([0.5, 0, 0], r_space))
+line = interpolate(Point([0, 1/2, 0], r_space), Point([1, 1/2, 0], r_space), 100)
+spectrum = hcat([eigvals(bloch(bonds, k)) for k in line]...)
+top = map(c -> c.value, spectrum[1, :])
+plot(top)
 
 visualize_region("Honeycomb lattice", zone, euclidean(RealSpace, 3))
 visualize_region("Honeycomb lattice", k_zone, euclidean(MomentumSpace, 3))

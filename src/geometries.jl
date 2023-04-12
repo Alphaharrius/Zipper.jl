@@ -15,6 +15,8 @@ resize(crystal::Crystal, shape::Vector{Int64})::Crystal = Crystal(crystal.unit_c
 
 mesh(shape::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collect(Iterators.product([0:(d - 1) for d in shape]...))[:]]...)
 
+vol(crystal::Crystal)::Integer = prod(crystal.shape)
+
 function points(crystal::Crystal)::Subset{Point}
     real_space::RealSpace = space_of(crystal.unit_cell)
     crystal_mesh::Matrix{Int64} = mesh(crystal.shape)
@@ -33,6 +35,6 @@ function brillouin_zone(crystal::Crystal)::Subset{Point}
 end
 
 export Crystal
-export radius, resize, mesh, points, brillouin_zone
+export radius, resize, mesh, vol, points, brillouin_zone
 
 end

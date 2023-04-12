@@ -51,9 +51,10 @@ end
 
 reidentify(mode::Mode, identifiers::Set{Symbol})::Mode = Mode(mode.attributes, identifiers)
 
-function addattr(mode::Mode, attribute::Pair{Symbol, T})::Mode where {T}
+function setattr(mode::Mode, attribute::Pair{Symbol, T})::Mode where {T}
     @assert(attribute.second isa MODE_IDENTIFIERS_TYPE[attribute.first])
-    return Mode(Base.ImmutableDict(mode.attributes..., attribute), mode.identifiers)
+    intermediate::Mode = deleteattr(mode, attribute.first)
+    return Mode(Base.ImmutableDict(intermediate.attributes..., attribute), intermediate.identifiers)
 end
 
 function deleteattr(mode::Mode, identifier::Symbol)::Mode
@@ -64,7 +65,7 @@ end
 
 function addgroup(mode::Mode, group::String)::Mode
     groups::Vector{String} = [getattr(mode, :groups)..., group]
-    return addattr(deleteattr(mode, :groups), :groups => groups)
+    return setattr(deleteattr(mode, :groups), :groups => groups)
 end
 
 Base.:hash(mode::Mode)::UInt = hash([getattr(mode, identifier) for identifier in mode.identifiers])
@@ -182,7 +183,7 @@ function eigvalsh(fock_map::FockMap)::Vector{Pair{Mode, Float64}}
 end
 
 export Mode, FockSpace, FockMap
-export groupname, hasattr, getattr, identify, unidentify, reidentify, addattr, deleteattr, addgroup
+export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, deleteattr, addgroup
 export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger, eigvalsh
 
 end

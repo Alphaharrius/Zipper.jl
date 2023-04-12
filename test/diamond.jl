@@ -37,8 +37,8 @@ WU = interpolate(Point([1/2, 1/4, 0], r_space), Point([1/2, 1/8, 1/8], r_space),
 UX = interpolate(Point([1/2, 1/8, 1/8], r_space), Point([1/2, 0, 0], r_space), 200)
 line = vcat(ΓX, XW, WL, LΓ, ΓK, KW, WU, UX)
 spectrum = hcat([eigvalsh(bloch(bonds, k, crystal)) for k in line]...)
-top = map(c -> c.value, spectrum[1, :])
-bottom = map(c -> c.value, spectrum[2, :])
+top = map(p -> p.second, spectrum[1, :])
+bottom = map(p -> p.second, spectrum[2, :])
 plot([scatter(y=top), scatter(y=bottom)])
 
 visualize_region("Honeycomb lattice", zone, euclidean(RealSpace, 3))

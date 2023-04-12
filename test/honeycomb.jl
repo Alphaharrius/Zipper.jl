@@ -27,8 +27,8 @@ bonds::Set{Bond} = Set([
 
 spec = [hcat([eigvalsh(bloch(bonds, Point([h, k], k_space), crystal)) for h in -1:0.01:1]...) for k in -1:0.01:1]
 
-top = map(c -> c.value, hcat([v[1, :] for v in spec]...))
-bottom = map(c -> c.value, hcat([v[2, :] for v in spec]...))
+top = map(p -> p.second, hcat([v[1, :] for v in spec]...))
+bottom = map(p -> p.second, hcat([v[2, :] for v in spec]...))
 
 plot([surface(z=top), surface(z=bottom)])
 

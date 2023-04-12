@@ -21,7 +21,7 @@ bonds::Set{Bond} = Set([
 ])
 sampling = interpolate(Point([-4], k_space), Point([4], k_space), 1000)
 spectrum = hcat([eigvalsh(bloch(bonds, k, chain)) for k in sampling]...)
-top = map(c -> c.value, spectrum[1, :])
+top = map(p -> p.second, spectrum[1, :])
 
 trace0 = scatter(y=top)
 plot([trace0])

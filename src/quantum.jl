@@ -1,20 +1,22 @@
 if !isdefined(Main, :Spaces) include("spaces.jl") end
+if !isdefined(Main, :Geometries) include("geometries.jl") end
 
 module Quantum
 
-using LinearAlgebra, SparseArrays, Arpack
-using ..Spaces
+using LinearAlgebra, SparseArrays
+using ..Spaces, ..Geometries
 
-MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.ImmutableDict(
+const MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.ImmutableDict(
     :groups => Vector{String},
     :index => Integer,
     :offset => Point,
     :pos => Point,
     :flavor => Integer)
-MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavor])
+const MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavor])
 
 groupname(type::Symbol, name::String)::String = "$(type):$(name)"
 
+# This design of Mode have performance issue espectially on hashing.
 struct Mode <: AbstractSubset{Mode}
     attributes::Base.ImmutableDict{Symbol}
     identifiers::Set{Symbol}
@@ -29,6 +31,8 @@ struct Mode <: AbstractSubset{Mode}
     end
 end
 
+Base.:show(io::IO, mode::Mode) = show(io, "$(string(typeof(mode)))($(mode.identifiers))")
+
 function Spaces.space_of(mode::Mode)::AbstractSpace
     if hasattr(mode, :pos) return space_of(getattr(mode, :pos)) end
     if hasattr(mode, :offset) return space_of(getattr(mode, :offset)) end
@@ -40,6 +44,8 @@ end
 hasattr(mode::Mode, identifier::Symbol) = haskey(mode.attributes, identifier)
 
 getattr(mode::Mode, identifier::Symbol) = mode.attributes[identifier]
+
+identifiers(mode::Mode)::Set{Symbol} = mode.identifiers
 
 identify(mode::Mode, identifier::Symbol...)::Mode = Mode(mode.attributes, Set([mode.identifiers..., identifier...]))
 
@@ -53,11 +59,11 @@ reidentify(mode::Mode, identifiers::Set{Symbol})::Mode = Mode(mode.attributes, i
 
 function setattr(mode::Mode, attribute::Pair{Symbol, T})::Mode where {T}
     @assert(attribute.second isa MODE_IDENTIFIERS_TYPE[attribute.first])
-    intermediate::Mode = deleteattr(mode, attribute.first)
+    intermediate::Mode = hasattr(mode, attribute.first) ? removeattr(mode, attribute.first) : mode
     return Mode(Base.ImmutableDict(intermediate.attributes..., attribute), intermediate.identifiers)
 end
 
-function deleteattr(mode::Mode, identifier::Symbol)::Mode
+function removeattr(mode::Mode, identifier::Symbol)::Mode
     intermediate = Dict(mode.attributes)
     delete!(intermediate, identifier)
     return Mode(Base.ImmutableDict(intermediate...), mode.identifiers)
@@ -65,7 +71,7 @@ end
 
 function addgroup(mode::Mode, group::String)::Mode
     groups::Vector{String} = [getattr(mode, :groups)..., group]
-    return setattr(deleteattr(mode, :groups), :groups => groups)
+    return setattr(removeattr(mode, :groups), :groups => groups)
 end
 
 Base.:hash(mode::Mode)::UInt = hash([getattr(mode, identifier) for identifier in mode.identifiers])
@@ -83,20 +89,16 @@ end
 struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     rep::Subset{Subset{Mode}}
     """ Implicit ordering is required as matrices is used for mapping between `FockSpace`. """
-    ordering::Dict{Mode, Int64}
+    ordering::Base.ImmutableDict{Mode, Int64}
 
-    FockSpace(subsets::Subset{Subset{Mode}}) = new(
-        subsets,
-        Dict(mode => order
-             for (order, mode)
-             in enumerate([element for subset in rep(subsets) for element in rep(subset)])))
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Base.ImmutableDict{Mode, Int64}) = new(subsets, ordering)
 
-    FockSpace(subset::Subset{Mode}) = FockSpace(convert(Subset{Subset{Mode}}, subset))
+    FockSpace(subset::Subset{Mode}) = new(
+        Subset(Set([subset])),
+        Base.ImmutableDict([mode => order for (order, mode) in enumerate(subset)]...))
 end
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
-
-Base.:show(io::IO, fock_space::FockSpace) = print(io, string(rep(flatten(rep(fock_space)))))
 
 Base.:length(fock_space::FockSpace) = length(fock_space.ordering)
 
@@ -121,69 +123,91 @@ Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset,
 
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source)
 
-quantize(name::String, index::Integer, point::Point, flavor::Integer)::Mode = (
+function quantize(name::String, index::Integer, identifier::Symbol, point::Point, flavor::Integer)::Mode
+    @assert(identifier == :offset || identifier == :pos)
+    home::Point = origin(space_of(point))
+    # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
+    couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
-    Mode([:groups => [groupname(:q, name)], :index => index, :pos => point, :flavor => flavor]))
+    return Mode([:groups => [groupname(:q, name)], :index => index, identifier => point, :flavor => flavor, couple])
+end
 
-quantize(name::String, subset::Subset{Point}, count::Integer)::Subset{Mode} = (
-    Subset(Set([quantize(name, index, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count])))
+quantize(name::String, identifier::Symbol, subset::Subset{Point}, count::Integer)::Subset{Mode} = (
+    Subset(Set([quantize(name, index, identifier, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count])))
 
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
-    out_space::FockSpace
-    in_space::FockSpace
+    outspace::FockSpace
+    inspace::FockSpace
     rep::SparseMatrixCSC{ComplexF64, Int64}
 
-    FockMap(out_space::FockSpace, in_space::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = new(out_space, in_space, rep)
-    FockMap(out_space::FockSpace, in_space::FockSpace, rep::AbstractArray{<:Number}) = new(out_space, in_space, SparseMatrixCSC{ComplexF64, Int64}(rep))
+    FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = new(outspace, inspace, rep)
+    FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number}) = new(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
 
-    function FockMap(out_space::FockSpace, in_space::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})::FockMap
-        rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(out_space), dimension(in_space))
+    function FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})::FockMap
+        rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
-            rep[out_space.ordering[out_mode], in_space.ordering[in_mode]] = value
+            rep[outspace.ordering[out_mode], inspace.ordering[in_mode]] = value
         end
-        return new(out_space, in_space, rep)
+        return new(outspace, inspace, rep)
     end
 end
 
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
 function columns(fock_map::FockMap, subset::Subset{Mode})::FockMap
-    in_space::FockSpace = FockSpace(subset)
-    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fock_map.out_space), dimension(in_space))
+    inspace::FockSpace = FockSpace(subset)
+    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fock_map.outspace), dimension(inspace))
     for mode in rep(subset)
-        matrix[:, in_space.ordering[mode]] = rep(fock_map)[:, fock_map.out_space.ordering[mode]]
+        matrix[:, inspace.ordering[mode]] = rep(fock_map)[:, fock_map.outspace.ordering[mode]]
     end
-    return FockMap(in_space, fock_map.out_space, matrix)
+    return FockMap(inspace, fock_map.outspace, matrix)
 end
 
-function permute(source::FockMap, out_space::FockSpace=source.out_space, in_space::FockSpace=source.in_space)::FockMap
-    row_rule::Vector{Int64} = ordering_rule(source.out_space, out_space)
-    col_rule::Vector{Int64} = ordering_rule(source.in_space, in_space)
-    return FockMap(out_space, in_space, SparseArrays.permute(rep(source), row_rule, col_rule))
+function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
+    row_rule::Vector{Int64} = ordering_rule(source.outspace, outspace)
+    col_rule::Vector{Int64} = ordering_rule(source.inspace, inspace)
+    return FockMap(outspace, inspace, SparseArrays.permute(rep(source), row_rule, col_rule))
 end
 
 function Base.:+(a::FockMap, b::FockMap)::FockMap
-    @assert(a.in_space == b.in_space && a.out_space == b.out_space)
-    return FockMap(a.out_space, a.in_space, rep(a) + rep(permute(b, a.out_space, a.in_space)))
+    @assert(a.inspace == b.inspace && a.outspace == b.outspace)
+    return FockMap(a.outspace, a.inspace, rep(a) + rep(permute(b, a.outspace, a.inspace)))
 end
 
 function Base.:-(a::FockMap, b::FockMap)::FockMap
-    @assert(a.in_space == b.in_space && a.out_space == b.out_space)
-    return FockMap(a.out_space, a.in_space, rep(a) - rep(permute(b, a.out_space, a.in_space)))
+    @assert(a.inspace == b.inspace && a.outspace == b.outspace)
+    return FockMap(a.outspace, a.inspace, rep(a) - rep(permute(b, a.outspace, a.inspace)))
 end
 
-transpose(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space, rep(source)')
+transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
-dagger(source::FockMap)::FockMap = FockMap(source.in_space, source.out_space, conj(rep(source)'))
+dagger(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)') # `'` operator is dagger.
 
-function eigvalsh(fock_map::FockMap)::Vector{Pair{Mode, Float64}}
-    @assert(fock_map.in_space == fock_map.out_space)
+function eigvalsh(fock_map::FockMap, eigenattr::Pair{Symbol, T})::Vector{Pair{Mode, Float64}} where {T}
+    @assert(fock_map.inspace == fock_map.outspace)
     evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
-    return [Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
+    return [Mode([eigenattr, :groups => [groupname(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
+end
+
+function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
+    dict::Dict{Tuple{Mode, Mode}, ComplexF64} = Dict()
+    # Disable the identification by :offset so that all inmodes collapes to the basis mode. 
+    basismodes::Set{Mode} = Set(unidentify(inmode, :offset) for inmode in inmodes)
+    # Enable the identification by :offset when adding momentum as :offset for each basis mode.
+    outmodes = Iterators.map(tup -> identify(setattr(tup[1], :offset => tup[2]), :offset), Iterators.product(basismodes, momentums))
+    for (outmode, inmode) in Iterators.product(outmodes, inmodes)
+        momentum::Point = getattr(outmode, :offset)
+        euc_momentum::Point = linear_transform(euclidean(MomentumSpace, length(momentum)), momentum)
+        inoffset::Point = getattr(inmode, :offset)
+        euc_inoffset::Point = linear_transform(euclidean(RealSpace, length(inoffset)), inoffset)
+        dict[(outmode, inmode)] = exp(-1im * dot(euc_momentum, euc_inoffset))
+        dict[(outmode, inmode)] = 1im
+    end
+    return FockMap(FockSpace(Subset(Set(outmodes))), FockSpace(inmodes), dict)
 end
 
 export Mode, FockSpace, FockMap
-export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, deleteattr, addgroup
-export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger, eigvalsh
+export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
+export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger, eigvalsh, fourier
 
 end

@@ -4,10 +4,18 @@ using LinearAlgebra
 
 abstract type Element{R <: Any} end
 
+""" Restrict all print out of elements to just printing the type. """
+Base.:show(io::IO, element::Element) = print(io, string(typeof(element)))
+
 """ Reflexive relation. """
 Base.:convert(::Type{T}, source::T) where {T <: Element} = source
 Base.:convert(::Type{Set{T}}, source::T) where {T <: Element} = Set{T}([source])
 
+"""
+    rep(source::Element{R}) where {R <: Any}
+Retrieve the representation of the `source`, for each subtype of `Element{R}` are ensured to have a representation of type `R`.
+This method will throw error if the subtype `T <: Element{R}` does not overload `Base.convert` to convert `T` to `R`.
+"""
 rep(source::Element{R}) where {R <: Any} = convert(R, source)
 
 abstract type AbstractSpace{T} <: Element{T} end
@@ -43,6 +51,10 @@ struct Point <: AbstractSubset{Point}
     pos::Vector{Rational{Int64}}
     space::AbstractSpace
 end
+
+Base.:length(point::Point)::Integer = length(pos(point))
+
+LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, pos(a)), collect(Float64, pos(b)))
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Vector representation and leave to the Base.isequal for identification.
 Base.:hash(point::Point)::UInt = hash(pos(point))

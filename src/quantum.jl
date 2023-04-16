@@ -16,22 +16,12 @@ const MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavo
 
 groupname(type::Symbol, name::String)::String = "$(type):$(name)"
 
-# This design of Mode have performance issue espectially on hashing.
 struct Mode <: AbstractSubset{Mode}
-    attributes::Base.ImmutableDict{Symbol}
-    identifiers::Set{Symbol}
+    attrs::Base.ImmutableDict{Symbol}
 
-    Mode(attributes::Base.ImmutableDict{Symbol, T}, identifiers::Set{Symbol}) where {T} = new(attributes, identifiers)
-
-    function Mode(datas::Vector{Pair{Symbol, T}}, identifiers::Set{Symbol} = MODE_DEFAULT_IDENTIFIERS) where {T}
-        @assert(any([data.second isa MODE_IDENTIFIERS_TYPE[data.first] for data in datas]))
-        attributes = Base.ImmutableDict(datas...)
-        @assert(any([haskey(attributes, identifier) for identifier in identifiers]))
-        return new(attributes, identifiers)
-    end
+    Mode(attrs::Base.ImmutableDict{Symbol}) = new(attrs)
+    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Base.ImmutableDict(datas...))
 end
-
-Base.:show(io::IO, mode::Mode) = show(io, "$(string(typeof(mode)))($(mode.identifiers))")
 
 function Spaces.space_of(mode::Mode)::AbstractSpace
     if hasattr(mode, :pos) return space_of(getattr(mode, :pos)) end
@@ -41,61 +31,31 @@ function Spaces.space_of(mode::Mode)::AbstractSpace
     return euclidean(RealSpace, 1)
 end
 
-hasattr(mode::Mode, identifier::Symbol) = haskey(mode.attributes, identifier)
+hasattr(mode::Mode, key::Symbol) = haskey(mode.attrs, key)
 
-getattr(mode::Mode, identifier::Symbol) = mode.attributes[identifier]
+getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 
-identifiers(mode::Mode)::Set{Symbol} = mode.identifiers
+removeattr(mode::Mode, key::Symbol) = Mode(Base.ImmutableDict(filter(p -> p.first != key, [mode.attrs...])...))
 
-identify(mode::Mode, identifier::Symbol...)::Mode = Mode(mode.attributes, Set([mode.identifiers..., identifier...]))
-
-function unidentify(mode::Mode, identifier::Symbol...)::Mode
-    identifiers::Set{Symbol} = Set(mode.identifiers)
-    foreach(el -> delete!(identifiers, el), identifier)
-    return Mode(mode.attributes, identifiers)
+function setattr(mode::Mode, attr::Pair{Symbol, T})::Mode where {T}
+    @assert(attr.second isa MODE_IDENTIFIERS_TYPE[attr.first])
+    return Mode(Base.ImmutableDict(filter(p -> p.first != attr.first, [mode.attrs...])..., attr))
 end
 
-reidentify(mode::Mode, identifiers::Set{Symbol})::Mode = Mode(mode.attributes, identifiers)
+Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
 
-function setattr(mode::Mode, attribute::Pair{Symbol, T})::Mode where {T}
-    @assert(attribute.second isa MODE_IDENTIFIERS_TYPE[attribute.first])
-    intermediate::Mode = hasattr(mode, attribute.first) ? removeattr(mode, attribute.first) : mode
-    return Mode(Base.ImmutableDict(intermediate.attributes..., attribute), intermediate.identifiers)
-end
-
-function removeattr(mode::Mode, identifier::Symbol)::Mode
-    intermediate = Dict(mode.attributes)
-    delete!(intermediate, identifier)
-    return Mode(Base.ImmutableDict(intermediate...), mode.identifiers)
-end
-
-function addgroup(mode::Mode, group::String)::Mode
-    groups::Vector{String} = [getattr(mode, :groups)..., group]
-    return setattr(removeattr(mode, :groups), :groups => groups)
-end
-
-Base.:hash(mode::Mode)::UInt = hash([getattr(mode, identifier) for identifier in mode.identifiers])
+Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
-
-function Base.:(==)(a::Mode, b::Mode)::Bool
-    common_identifiers::Set{Symbol} = intersect(a.identifiers, b.identifiers)
-    if isempty(common_identifiers) return false end # Cannot determine if they are equal if they aren't identified by the same set of identifiers.
-    for identifier in common_identifiers
-        if !isequal(getattr(a, identifier), getattr(b, identifier)) return false end
-    end
-    return true
-end
 
 struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     rep::Subset{Subset{Mode}}
     """ Implicit ordering is required as matrices is used for mapping between `FockSpace`. """
-    ordering::Base.ImmutableDict{Mode, Int64}
+    ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Base.ImmutableDict{Mode, Int64}) = new(subsets, ordering)
-
-    FockSpace(subset::Subset{Mode}) = new(
-        Subset(Set([subset])),
-        Base.ImmutableDict([mode => order for (order, mode) in enumerate(subset)]...))
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, Integer}) = new(subsets, ordering)
+    FockSpace(subset::Subset{Mode}) = FockSpace(
+        Subset([subset]),
+        Dict([mode => order for (order, mode) in enumerate(subset)]...))
 end
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
@@ -190,20 +150,26 @@ function eigvalsh(fock_map::FockMap, eigenattr::Pair{Symbol, T})::Vector{Pair{Mo
 end
 
 function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
-    dict::Dict{Tuple{Mode, Mode}, ComplexF64} = Dict()
     # Disable the identification by :offset so that all inmodes collapes to the basis mode. 
-    basismodes::Set{Mode} = Set(unidentify(inmode, :offset) for inmode in inmodes)
+    basismodes::Set{Mode} = Set(removeattr(inmode, :offset) for inmode in inmodes)
     # Enable the identification by :offset when adding momentum as :offset for each basis mode.
-    outmodes = Iterators.map(tup -> identify(setattr(tup[1], :offset => tup[2]), :offset), Iterators.product(basismodes, momentums))
-    for (outmode, inmode) in Iterators.product(outmodes, inmodes)
+    outmodes = [Iterators.map(tup -> setattr(tup[1], :offset => tup[2]), Iterators.product(basismodes, momentums))...]
+    outspace_orderings::Vector{Pair{Mode, Integer}} = []
+    inspace_orderings::Vector{Pair{Mode, Integer}} = []
+    mat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
+    for ((oi, outmode), (ii, inmode)) in Iterators.product(enumerate(outmodes), enumerate(inmodes))
         momentum::Point = getattr(outmode, :offset)
         euc_momentum::Point = linear_transform(euclidean(MomentumSpace, length(momentum)), momentum)
         inoffset::Point = getattr(inmode, :offset)
         euc_inoffset::Point = linear_transform(euclidean(RealSpace, length(inoffset)), inoffset)
-        dict[(outmode, inmode)] = exp(-1im * dot(euc_momentum, euc_inoffset))
-        dict[(outmode, inmode)] = 1im
+        mat[oi, ii] = exp(-1im * dot(euc_momentum, euc_inoffset))
+        push!(outspace_orderings, outmode => oi)
+        push!(inspace_orderings, inmode => ii)
     end
-    return FockMap(FockSpace(Subset(Set(outmodes))), FockSpace(inmodes), dict)
+    return FockMap(
+        FockSpace(Subset([Subset(outmodes)]), Dict(outspace_orderings...)),
+        FockSpace(Subset([inmodes]), Dict(inspace_orderings...)),
+        mat)
 end
 
 export Mode, FockSpace, FockMap

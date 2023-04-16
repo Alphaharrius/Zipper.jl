@@ -4,6 +4,8 @@ module Geometries
 
 using ..Spaces
 
+origin(space::AffineSpace)::Point = Point(zeros(Rational{Int64}, dimension(space)), space)
+
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 
 struct Crystal
@@ -35,6 +37,6 @@ function brillouin_zone(crystal::Crystal)::Subset{Point}
 end
 
 export Crystal
-export radius, resize, mesh, vol, points, brillouin_zone
+export origin, radius, resize, mesh, vol, points, brillouin_zone
 
 end

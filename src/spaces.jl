@@ -67,9 +67,9 @@ pos(point::Point)::Vector{Rational{Int64}} = point.pos
 linear_transform(new_space::AffineSpace, point::Point)::Point = Point(collect(Rational{Int64}, inv(basis(new_space)) * basis(space_of(point)) * pos(point)), new_space)
 
 function fourier_coef(momentum::Point, point::Point, vol::Integer)::ComplexF64
-    m_space::MomentumSpace = space_of(momentum)
+    k_space::MomentumSpace = space_of(momentum)
     r_space::RealSpace = space_of(point)
-    phys_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(m_space)), momentum)
+    phys_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(k_space)), momentum)
     phys_point::Point = linear_transform(euclidean(RealSpace, dimension(r_space)), point)
     return exp(-1im * dot(collect(Float64, pos(phys_momentum)), collect(Float64, pos(phys_point)))) / sqrt(vol)
 end

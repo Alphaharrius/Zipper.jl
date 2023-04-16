@@ -105,6 +105,7 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     space::AbstractSpace
 
     Subset(elements::Set{T}) where {T <: AbstractSubset} = new{T}(elements, space_of(first(elements)))
+    Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(Set(elements))
 end
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Set representation and leave to the Base.isequal for identification.

@@ -13,7 +13,7 @@ struct Bond
 end
 
 function bloch(bonds::Set{Bond}, k::Point, crystal::Crystal)::FockMap
-    all_modes::Set{Mode} = Set([mode for bond in bonds for mode in bond.modes])
+    all_modes::Set{Mode} = Set([setattr(mode, :offset => k) for bond in bonds for mode in bond.modes])
     fock_space::FockSpace = FockSpace(Subset(all_modes))
     fock_dict::Dict{Tuple{Mode, Mode}, ComplexF64} = Dict()
     foreach(bond -> fock_dict[bond.modes] = get(fock_dict, bond.modes, 0im) + fourier_coef(k, bond.offset, vol(crystal)) * bond.strength, bonds)

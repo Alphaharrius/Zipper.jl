@@ -21,7 +21,14 @@ function bloch(bonds::Set{Bond}, k::Point, crystal::Crystal)::FockMap
     return upper_triangular + dagger(upper_triangular)
 end
 
+function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
+    modes::Set{Mode} = Set([mode for bond in bonds for mode in bond.first])
+    fockspace::FockSpace = FockSpace(Subset(modes))
+    half::FockMap = FockMap(fockspace, fockspace, Dict(bonds))
+    return half + dagger(half)
+end
+
 export Bond
-export bloch, test
+export bloch, bondmap
 
 end

@@ -27,9 +27,9 @@ end
 The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:pos`, if none of those are defined,
 it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
 """
-function Spaces.space_of(mode::Mode)::AbstractSpace
-    if hasattr(mode, :pos) return space_of(getattr(mode, :pos)) end
-    if hasattr(mode, :offset) return space_of(getattr(mode, :offset)) end
+function Spaces.spaceof(mode::Mode)::AbstractSpace
+    if hasattr(mode, :pos) return spaceof(getattr(mode, :pos)) end
+    if hasattr(mode, :offset) return spaceof(getattr(mode, :offset)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
     return euclidean(RealSpace, 1)
@@ -89,7 +89,7 @@ Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source)
 
 function quantize(name::String, index::Integer, identifier::Symbol, point::Point, flavor::Integer)::Mode
     @assert(identifier == :offset || identifier == :pos)
-    home::Point = origin(space_of(point))
+    home::Point = origin(spaceof(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
@@ -165,7 +165,7 @@ Create a `FockMap` corresponds to a Fourier transform of a `Subset{Mode}`. This 
 entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
-- `momentums` The momentums which spans the output reciprocal subspace, for `space_of(momentum) isa MomentumSpace`.
+- `momentums` The momentums which spans the output reciprocal subspace, for `spaceof(momentum) isa MomentumSpace`.
 - `inmodes` The modes from the input subspace, all modes must have the attribute `:offset` defined or result in errors.
 
 ### Output

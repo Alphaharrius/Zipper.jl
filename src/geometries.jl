@@ -20,7 +20,7 @@ mesh(shape::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 vol(crystal::Crystal)::Integer = prod(crystal.shape)
 
 function points(crystal::Crystal)::Subset{Point}
-    real_space::RealSpace = space_of(crystal.unit_cell)
+    real_space::RealSpace = spaceof(crystal.unit_cell)
     crystal_mesh::Matrix{Int64} = mesh(crystal.shape)
     mesh_points::Array{Point} = [Point(pos, real_space) for pos in eachcol(crystal_mesh)]
     points::Set{Point} = Set{Point}([mesh_point + point for mesh_point in mesh_points for point in rep(crystal.unit_cell)])
@@ -28,7 +28,7 @@ function points(crystal::Crystal)::Subset{Point}
 end
 
 function brillouin_zone(crystal::Crystal)::Subset{Point}
-    momentum_space::MomentumSpace = convert(MomentumSpace, space_of(crystal.unit_cell))
+    momentum_space::MomentumSpace = convert(MomentumSpace, spaceof(crystal.unit_cell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.shape)
     tiled_shape::Matrix{Int64} = hcat([crystal.shape for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_shape / 2) ./ tiled_shape

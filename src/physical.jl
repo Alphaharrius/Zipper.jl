@@ -28,7 +28,20 @@ function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
     return half + dagger(half)
 end
 
+function espec(bonds::FockMap, momentums::Vector{Point})::Vector{Pair{Mode, Float64}}
+    ret::Vector{Pair{Mode, Float64}} = []
+    bondmodes::Subset{Mode} = flatten(rep(bonds.inspace))
+
+    for momentum in momentums
+        Fₖ::FockMap = fourier(Subset([momentum]), bondmodes)
+        bloch::FockMap = Fₖ * bonds * dagger(Fₖ)
+        foreach(p -> push!(ret, setattr(p.first, :offset => momentum) => p.second), eigvalsh(bloch))
+    end
+
+    return ret
+end
+
 export Bond
-export bloch, bondmap
+export bloch, bondmap, espec
 
 end

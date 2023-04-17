@@ -4,7 +4,7 @@ module Geometries
 
 using ..Spaces
 
-origin(space::AffineSpace)::Point = Point(zeros(Rational{Int64}, dimension(space)), space)
+origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
 
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 

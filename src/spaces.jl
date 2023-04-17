@@ -2,6 +2,9 @@ module Spaces
 
 using LinearAlgebra
 
+export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
+export rep, euclidean, basis, dimension, space_of, rpos, pos, linear_transform, fourier_coef, distance, interpolate, flatten, members
+
 abstract type Element{R <: Any} end
 
 """ Restrict all print out of elements to just printing the type. """
@@ -48,23 +51,39 @@ Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = Momentu
 Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(basis(source) / (2.0 * π)))))
 
 struct Point <: AbstractSubset{Point}
-    pos::Vector{Rational{Int64}}
+    pos::Vector{Float64}
     space::AbstractSpace
 end
 
+"""
+    rpos(point::Point, denominator::Int64)
+
+Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in a fixed precision, this method can be used for hashing `Point`.
+
+### Input
+- `point`       The source point.
+- `denominator` The denominator of the `Rational{Int64}` representation for each element of the position, defaults to `1000000007` which round all error with order
+                below or equals `10e-11`.
+
+### Output
+A `Vector{Rational{Int64}}` which stores the rounded elements.
+"""
+rpos(point::Point, denominator::Int64 = 1000000007)::Vector{Rational{Int64}} = [Rational{Int64}(round(el * denominator)) // denominator for el in pos(point)]
+
 Base.:length(point::Point)::Integer = length(pos(point))
+# rpos is used to to equate the points to round off slight differences.
+Base.:(==)(a::Point, b::Point)::Bool = space_of(a) == space_of(b) && rpos(a) == rpos(b)
+LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
 LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, pos(a)), collect(Float64, pos(b)))
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Vector representation and leave to the Base.isequal for identification.
-Base.:hash(point::Point)::UInt = hash(pos(point))
+Base.:hash(point::Point)::UInt = hash(rpos(point))
 Base.:isequal(a::Point, b::Point)::Bool = a == b
 
-center(space::AffineSpace)::Point = Point(zeros(Rational{Int64}, dimension(space)), space)
+pos(point::Point)::Vector{Float64} = point.pos
 
-pos(point::Point)::Vector{Rational{Int64}} = point.pos
-
-linear_transform(new_space::AffineSpace, point::Point)::Point = Point(collect(Rational{Int64}, inv(basis(new_space)) * basis(space_of(point)) * pos(point)), new_space)
+linear_transform(new_space::AffineSpace, point::Point)::Point = Point(inv(basis(new_space)) * basis(space_of(point)) * pos(point), new_space)
 
 function fourier_coef(momentum::Point, point::Point, vol::Integer)::ComplexF64
     k_space::MomentumSpace = space_of(momentum)
@@ -73,9 +92,6 @@ function fourier_coef(momentum::Point, point::Point, vol::Integer)::ComplexF64
     phys_point::Point = linear_transform(euclidean(RealSpace, dimension(r_space)), point)
     return exp(-1im * dot(collect(Float64, pos(phys_momentum)), collect(Float64, pos(phys_point)))) / sqrt(vol)
 end
-
-Base.:(==)(a::Point, b::Point)::Bool = space_of(a) == space_of(b) && pos(a) == pos(b)
-LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
 function Base.:+(a::Point, b::Point)::Point
     @assert(typeof(space_of(a)) == typeof(space_of(b)))
@@ -150,8 +166,5 @@ function Base.:intersect(input::Subset...)::Subset
 end
 
 Base.:intersect(input::T...) where {T <: AbstractSubset} = intersect((convert(Subset{T}, element) for element in input)...)
-
-export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
-export rep, euclidean, basis, dimension, space_of, center, pos, linear_transform, fourier_coef, distance, interpolate, flatten, members
 
 end

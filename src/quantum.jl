@@ -169,7 +169,7 @@ entries corresponds to different fermionic site within the same translational in
 - `inmodes` The modes from the input subspace, all modes must have the attribute `:offset` defined or result in errors.
 
 ### Output
-The `FockMap` represents this specific Fourier transform, with shape `(N, M)` which `N = length(momentums) * count` for `count` is the number of fermionic site
+The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = length(momentums) * count` for `count` is the number of fermionic site
 within the translational invariant unit cell, supplied by `inmodes`; `M = length(inmodes)`. The `inspace` of the returned `FockMap` will equates to `FockSpace(inmodes)`;
 the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """

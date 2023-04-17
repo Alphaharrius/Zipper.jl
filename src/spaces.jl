@@ -37,6 +37,12 @@ Base.:length(space::T) where {T <: AffineSpace} = size(basis(space), 1)
 
 abstract type AbstractSubset{T} <: Element{Set{T}} end
 
+"""
+    space_of(subset::AbstractSubset)
+
+Get the space of the parameter `subset`. If `subset isa Point`, then the output will be its parent space where its position is defined; if `subset isa Subset`, then
+the output will be the common space of all elements within the `subset`.
+"""
 space_of(subset::AbstractSubset) = subset.space
 
 struct RealSpace <: AffineSpace

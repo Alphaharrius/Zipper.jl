@@ -4,7 +4,7 @@ include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
 
-using LinearAlgebra, PlotlyJS, BenchmarkTools
+using LinearAlgebra, PlotlyJS
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -16,28 +16,34 @@ crystal = Crystal(unitcell, [128, 128])
 modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 m0, m1 = members(modes)
 
-subset::Subset{Mode} = Subset([m0, m1, setattr(m1, :offset => Point([0, -1], triangular))])
-bzone = @time brillouin_zone(crystal)
+tₙ = ComplexF64(-1.)
+bm = bondmap([
+    (m0, m1) => tₙ,
+    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
+    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
-Fₖ::FockMap = @time fourier(bzone, subset)
+rng = -1:0.1:1
+tspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))
+bspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))
+for (j, k) in enumerate(rng)
+    for (i, h) in enumerate(rng)
+        fkk::FockMap = fourier(Subset([Point([h, k], k_space)]), Subset(ordered_modes(bm.outspace)))
+        bloch::FockMap = fkk * bm * dagger(fkk)
+        spec = eigvalsh(bloch)
+        tspec[j, i] = real(spec[1].second)
+        bspec[j, i] = real(spec[2].second)
+    end
+end
 
-tₙ = -1.
-bonds::Set{Bond} = Set([
-    Bond((m0, m1), Point([0, 0], triangular), tₙ),
-    Bond((m0, m1), Point([-1, 0], triangular), tₙ),
-    Bond((m0, m1), Point([0, 1], triangular), tₙ)
-])
+# spec = [hcat([eigvalsh(bloch(bonds, Point([h, k], k_space), crystal), :offset => Point([h, k], k_space)) for h in -1:0.1:1]...) for k in -1:0.1:1]
 
-spec = [hcat([eigvalsh(bloch(bonds, Point([h, k], k_space), crystal), :offset => Point([h, k], k_space)) for h in -1:0.1:1]...) for k in -1:0.1:1]
+# top = map(p -> linear_transform(euclidean(MomentumSpace, 2), getattr(p.first, :offset)) => p.second, hcat([v[1, :] for v in spec]...))
+# bottom = map(p -> linear_transform(euclidean(MomentumSpace, 2), getattr(p.first, :offset)) => p.second, hcat([v[2, :] for v in spec]...))
 
-top = map(p -> linear_transform(euclidean(MomentumSpace, 2), getattr(p.first, :offset)) => p.second, hcat([v[1, :] for v in spec]...))
-bottom = map(p -> linear_transform(euclidean(MomentumSpace, 2), getattr(p.first, :offset)) => p.second, hcat([v[2, :] for v in spec]...))
+# topvals = hcat([map(p -> [pos(p.first)..., p.second], top)...]...)
+# botvals = hcat([map(p -> [pos(p.first)..., p.second], bottom)...]...)
 
-topvals = hcat([map(p -> [pos(p.first)..., p.second], top)...]...)
-botvals = hcat([map(p -> [pos(p.first)..., p.second], bottom)...]...)
-
-layout = Layout(title="", scene=attr(aspectmode="data"))
-plot([scatter3d(x=topvals[1,:], y=topvals[2,:], z=topvals[3,:]*100), scatter3d(x=botvals[1,:], y=botvals[2,:], z=botvals[3,:]*100)], layout)
+plot([surface(z=tspec), surface(z=bspec)])
 
 
 

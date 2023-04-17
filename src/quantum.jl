@@ -17,10 +17,10 @@ const MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavo
 groupname(type::Symbol, name::String)::String = "$(type):$(name)"
 
 struct Mode <: AbstractSubset{Mode}
-    attrs::Base.ImmutableDict{Symbol}
+    attrs::Dict{Symbol}
 
-    Mode(attrs::Base.ImmutableDict{Symbol}) = new(attrs)
-    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Base.ImmutableDict(datas...))
+    Mode(attrs::Dict{Symbol}) = new(attrs)
+    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(datas...))
 end
 
 """
@@ -39,11 +39,11 @@ hasattr(mode::Mode, key::Symbol) = haskey(mode.attrs, key)
 
 getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 
-removeattr(mode::Mode, key::Symbol) = Mode(Base.ImmutableDict(filter(p -> p.first != key, [mode.attrs...])...))
+removeattr(mode::Mode, keys::Symbol...) = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
 
-function setattr(mode::Mode, attr::Pair{Symbol, T})::Mode where {T}
-    @assert(attr.second isa MODE_IDENTIFIERS_TYPE[attr.first])
-    return Mode(Base.ImmutableDict(filter(p -> p.first != attr.first, [mode.attrs...])..., attr))
+function setattr(mode::Mode, attrs::Pair{Symbol, T}...)::Mode where {T}
+    # TODO: The @assert is removed temporarily.
+    return Mode(Dict(mode.attrs..., attrs...))
 end
 
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs

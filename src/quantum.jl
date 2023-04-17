@@ -143,10 +143,10 @@ transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, r
 
 dagger(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)') # `'` operator is dagger.
 
-function eigvalsh(fock_map::FockMap, eigenattr::Pair{Symbol, T})::Vector{Pair{Mode, Float64}} where {T}
+function eigvalsh(fock_map::FockMap)::Vector{Pair{Mode, Float64}} where {T}
     @assert(fock_map.inspace == fock_map.outspace)
     evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
-    return [Mode([eigenattr, :groups => [groupname(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
+    return [Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
 end
 
 function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap

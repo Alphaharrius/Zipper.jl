@@ -7,25 +7,24 @@ include("../src/plotting.jl")
 using LinearAlgebra, PlotlyJS
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
 
-fcc_space = RealSpace([1/2 1/2 0; 0. 1/2 1/2; 1/2 0. 1/2]')
+fcc = RealSpace([1/2 1/2 0; 0. 1/2 1/2; 1/2 0. 1/2]')
 
-r_space = convert(MomentumSpace, fcc_space)
-unit_cell = union(Point([0, 0, 0], fcc_space), Point([1/4, 1/4, 1/4], fcc_space))
+r_space = convert(MomentumSpace, fcc)
+unit_cell = union(Point([0, 0, 0], fcc), Point([1/4, 1/4, 1/4], fcc))
 crystal = Crystal(unit_cell, [4, 4, 4])
 zone::Subset{Point} = points(crystal)
 k_zone::Subset{Point} = brillouin_zone(crystal)
 
-modes::Subset{Mode} = quantize("physical", unit_cell, 1)
+modes::Subset{Mode} = quantize("physical", :pos, unit_cell, 1)
 fock::FockSpace = FockSpace(modes)
 
 m0, m1 = members(modes)
-tₙ = -1.
-bonds::Set{Bond} = Set([
-    Bond((m0, m1), Point([0, 0, 0], fcc_space), tₙ),
-    Bond((m0, m1), Point([1, 0, 0], fcc_space), tₙ),
-    Bond((m0, m1), Point([0, 1, 0], fcc_space), tₙ),
-    Bond((m0, m1), Point([0, 0, 1], fcc_space), tₙ)
-])
+tₙ = ComplexF64(-1.)
+bmap::FockMap = bondmap([
+    (m0, m1) => tₙ,
+    (m0, setattr(m1, :offset => Point([1, 0, 0], fcc))) => tₙ,
+    (m0, setattr(m1, :offset => Point([0, 1, 0], fcc))) => tₙ,
+    (m0, setattr(m1, :offset => Point([0, 0, 1], fcc))) => tₙ])
 
 ΓX = interpolate(Point([0, 0, 0], r_space), Point([1/2, 0, 0], r_space), 200)
 XW = interpolate(Point([1/2, 0, 0], r_space), Point([1/2, 1/4, 0], r_space), 200)
@@ -36,10 +35,11 @@ KW = interpolate(Point([3/8, 3/8, 0], r_space), Point([1/2, 1/4, 0], r_space), 2
 WU = interpolate(Point([1/2, 1/4, 0], r_space), Point([1/2, 1/8, 1/8], r_space), 200)
 UX = interpolate(Point([1/2, 1/8, 1/8], r_space), Point([1/2, 0, 0], r_space), 200)
 line = vcat(ΓX, XW, WL, LΓ, ΓK, KW, WU, UX)
-spectrum = hcat([eigvalsh(bloch(bonds, k, crystal)) for k in line]...)
-top = map(p -> p.second, spectrum[1, :])
-bottom = map(p -> p.second, spectrum[2, :])
-plot([scatter(y=top), scatter(y=bottom)])
+spectrum = espec(bmap, line)
 
-visualize_region("Honeycomb lattice", zone, euclidean(RealSpace, 3))
-visualize_region("Honeycomb lattice", k_zone, euclidean(MomentumSpace, 3))
+tspec = filter(p -> getattr(p.first, :index) == 1, spectrum)
+bspec = filter(p -> getattr(p.first, :index) == 2, spectrum)
+
+trace0 = scatter(y=map(p -> p.second, tspec))
+trace1 = scatter(y=map(p -> p.second, bspec))
+plot([trace0, trace1])

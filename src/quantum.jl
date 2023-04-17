@@ -158,6 +158,7 @@ function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
     inspace_orderings::Vector{Pair{Mode, Integer}} = []
     mat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
     for ((oi, outmode), (ii, inmode)) in Iterators.product(enumerate(outmodes), enumerate(inmodes))
+        if removeattr(outmode, :offset) != removeattr(inmode, :offset) continue end
         momentum::Point = getattr(outmode, :offset)
         euc_momentum::Point = linear_transform(euclidean(MomentumSpace, length(momentum)), momentum)
         inoffset::Point = getattr(inmode, :offset)

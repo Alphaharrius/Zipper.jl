@@ -20,7 +20,7 @@ function espec(bonds::FockMap, momentums::Vector{Point})::Vector{Pair{Mode, Floa
     for momentum in momentums
         Fₖ::FockMap = fourier(Subset([momentum]), bondmodes)
         bloch::FockMap = Fₖ * bonds * dagger(Fₖ)
-        foreach(p -> push!(ret, setattr(p.first, :offset => momentum) => p.second), eigvalsh(bloch))
+        foreach(p -> push!(ret, p), eigvalsh(bloch, :offset => momentum))
     end
 
     return ret

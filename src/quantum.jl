@@ -23,6 +23,10 @@ struct Mode <: AbstractSubset{Mode}
     Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Base.ImmutableDict(datas...))
 end
 
+"""
+The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:pos`, if none of those are defined,
+it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
+"""
 function Spaces.space_of(mode::Mode)::AbstractSpace
     if hasattr(mode, :pos) return space_of(getattr(mode, :pos)) end
     if hasattr(mode, :offset) return space_of(getattr(mode, :offset)) end

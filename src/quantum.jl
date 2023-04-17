@@ -52,7 +52,7 @@ struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     """ Implicit ordering is required as matrices is used for mapping between `FockSpace`. """
     ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, Integer}) = new(subsets, ordering)
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}) = new(subsets, ordering)
     FockSpace(subset::Subset{Mode}) = FockSpace(
         Subset([subset]),
         Dict([mode => order for (order, mode) in enumerate(subset)]...))

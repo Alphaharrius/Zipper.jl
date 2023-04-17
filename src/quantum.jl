@@ -139,6 +139,11 @@ function Base.:-(a::FockMap, b::FockMap)::FockMap
     return FockMap(a.outspace, a.inspace, rep(a) - rep(permute(b, a.outspace, a.inspace)))
 end
 
+function Base.:*(a::FockMap, b::FockMap)::FockMap
+    @assert(a.inspace == b.outspace)
+    return FockMap(a.outspace, b.inspace, rep(a) * rep(permute(b, a.inspace, b.inspace)))
+end
+
 transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
 dagger(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)') # `'` operator is dagger.

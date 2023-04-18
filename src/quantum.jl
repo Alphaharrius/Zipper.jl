@@ -66,7 +66,7 @@ Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i
 
 Base.:length(fock_space::FockSpace) = length(fock_space.ordering)
 
-function ordered_modes(fock_space::FockSpace)::Array{Mode}
+function orderedmodes(fock_space::FockSpace)::Array{Mode}
     modes = Array{Mode}(undef, dimension(fock_space))
     for mode in flatten(rep(fock_space))
         modes[fock_space.ordering[mode]] = mode
@@ -74,9 +74,9 @@ function ordered_modes(fock_space::FockSpace)::Array{Mode}
     return modes
 end
 
-function ordering_rule(from_space::FockSpace, to_space::FockSpace)::Vector{Int64}
+function orderingrule(from_space::FockSpace, to_space::FockSpace)::Vector{Int64}
     @assert(from_space == to_space)
-    return [to_space.ordering[mode] for mode in ordered_modes(from_space)]
+    return [to_space.ordering[mode] for mode in orderedmodes(from_space)]
 end
 
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
@@ -128,8 +128,8 @@ function columns(fock_map::FockMap, subset::Subset{Mode})::FockMap
 end
 
 function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
-    row_rule::Vector{Int64} = ordering_rule(source.outspace, outspace)
-    col_rule::Vector{Int64} = ordering_rule(source.inspace, inspace)
+    row_rule::Vector{Int64} = orderingrule(source.outspace, outspace)
+    col_rule::Vector{Int64} = orderingrule(source.inspace, inspace)
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), row_rule, col_rule))
 end
 
@@ -198,8 +198,26 @@ function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
         mat)
 end
 
+function directsum(elements::Vector{FockMap})::FockMap
+    outparts, inparts = Iterators.map(el -> (orderedmodes(el.outspace), orderedmodes(el.inspace)), elements) |> Base.transpose |> Base.vec
+    lengths::Vector{Integer} = sum(part -> [length(first(part)), length(last(part))], fockparts)
+    outmodes::Vector{Mode} = hcat(outparts)
+    inmodes::Vector{Mode} = hcat(inparts)
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(lengths...)
+    outordering::Dict{Mode, Integer} = Dict(Iterators.map(tup -> first(tup) => last(tup), enumerate(outmodes)))
+    inordering::Dict{Mode, Integer} = Dict(Iterators.map(tup -> first(tup) => last(tup), enumerate(inmodes)))
+    for (spidx, fockpart) in enumerate(fockparts)
+        rowslice = outordering[first(fockpart)]:outordering[last(fockpart)]
+        colslice = inordering[first(fockpart)]:inordering[last(fockpart)]
+        spmat[rowslice, colslice] = rep(elements[spidx])
+    end
+    outspace::FockSpace = FockSpace(Subset(Set(Iterators.map(part -> Subset(part), outparts))))
+    inspace::FockSpace = FockSpace(Subset(Set(Iterators.map(part -> Subset(part), inparts))))
+    return FockMap(outspace, inspace, spmat)
+end
+
 export Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, ordered_modes, ordering_rule, quantize, columns, transpose, dagger, eigvalsh, fourier
+export dimension, orderedmodes, orderingrule, quantize, columns, transpose, dagger, eigvalsh, fourier
 
 end

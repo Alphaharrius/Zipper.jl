@@ -3,7 +3,7 @@ module Spaces
 using LinearAlgebra
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
-export rep, euclidean, basis, dimension, space_of, rpos, pos, linear_transform, fourier_coef, distance, interpolate, flatten, members
+export rep, euclidean, basis, dimension, spaceof, rpos, pos, linear_transform, fourier_coef, distance, interpolate, flatten, members
 
 abstract type Element{R <: Any} end
 
@@ -38,12 +38,12 @@ Base.:length(space::T) where {T <: AffineSpace} = size(basis(space), 1)
 abstract type AbstractSubset{T} <: Element{Set{T}} end
 
 """
-    space_of(subset::AbstractSubset)
+    spaceof(subset::AbstractSubset)
 
 Get the space of the parameter `subset`. If `subset isa Point`, then the output will be its parent space where its position is defined; if `subset isa Subset`, then
 the output will be the common space of all elements within the `subset`.
 """
-space_of(subset::AbstractSubset) = subset.space
+spaceof(subset::AbstractSubset) = subset.space
 
 struct RealSpace <: AffineSpace
     rep::Matrix{Float64}
@@ -60,6 +60,8 @@ struct Point <: AbstractSubset{Point}
     pos::Vector{Float64}
     space::AbstractSpace
 end
+
+Base.show(io::IO, point::Point) = print(io, string("P$(pos(point))"))
 
 """
     rpos(point::Point, denominator::Int64)
@@ -78,7 +80,7 @@ rpos(point::Point, denominator::Int64 = 1000000007)::Vector{Rational{Int64}} = [
 
 Base.:length(point::Point)::Integer = length(pos(point))
 # rpos is used to to equate the points to round off slight differences.
-Base.:(==)(a::Point, b::Point)::Bool = space_of(a) == space_of(b) && rpos(a) == rpos(b)
+Base.:(==)(a::Point, b::Point)::Bool = spaceof(a) == spaceof(b) && rpos(a) == rpos(b)
 LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
 LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, pos(a)), collect(Float64, pos(b)))
@@ -89,33 +91,33 @@ Base.:isequal(a::Point, b::Point)::Bool = a == b
 
 pos(point::Point)::Vector{Float64} = point.pos
 
-linear_transform(new_space::AffineSpace, point::Point)::Point = Point(inv(basis(new_space)) * basis(space_of(point)) * pos(point), new_space)
+linear_transform(new_space::AffineSpace, point::Point)::Point = Point(inv(basis(new_space)) * basis(spaceof(point)) * pos(point), new_space)
 
 function fourier_coef(momentum::Point, point::Point, vol::Integer)::ComplexF64
-    k_space::MomentumSpace = space_of(momentum)
-    r_space::RealSpace = space_of(point)
+    k_space::MomentumSpace = spaceof(momentum)
+    r_space::RealSpace = spaceof(point)
     phys_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(k_space)), momentum)
     phys_point::Point = linear_transform(euclidean(RealSpace, dimension(r_space)), point)
     return exp(-1im * dot(collect(Float64, pos(phys_momentum)), collect(Float64, pos(phys_point)))) / sqrt(vol)
 end
 
 function Base.:+(a::Point, b::Point)::Point
-    @assert(typeof(space_of(a)) == typeof(space_of(b)))
-    return Point(pos(a) + pos(b), space_of(a))
+    @assert(typeof(spaceof(a)) == typeof(spaceof(b)))
+    return Point(pos(a) + pos(b), spaceof(a))
 end
 
 function Base.:-(a::Point, b::Point)::Point
-    @assert(typeof(space_of(a)) == typeof(space_of(b)))
-    return Point(pos(a) - pos(b), space_of(a))
+    @assert(typeof(spaceof(a)) == typeof(spaceof(b)))
+    return Point(pos(a) - pos(b), spaceof(a))
 end
 
-Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) * val, space_of(point))
-Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) / val, space_of(point))
+Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) * val, spaceof(point))
+Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) / val, spaceof(point))
 
 distance(a::Point, b::Point)::Float64 = sqrt(norm(a - b))
 
 function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <: Integer}
-    @assert(space_of(from) == space_of(to))
+    @assert(spaceof(from) == spaceof(to))
     march::Point = (to - from) / (count + 1)
     points::Array{Point} = [from + march * n for n in 0:(count + 1)]
     points[end] = to
@@ -126,7 +128,7 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     rep::Set{T}
     space::AbstractSpace
 
-    Subset(elements::Set{T}) where {T <: AbstractSubset} = new{T}(elements, space_of(first(elements)))
+    Subset(elements::Set{T}) where {T <: AbstractSubset} = new{T}(elements, spaceof(first(elements)))
     Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(Set(elements))
 end
 
@@ -146,7 +148,7 @@ end
 
 members(subset::Subset)::Tuple = (rep(subset)...,)
 
-Base.:(==)(a::Subset, b::Subset)::Bool = space_of(a) == space_of(b) && rep(a) == rep(b)
+Base.:(==)(a::Subset, b::Subset)::Bool = spaceof(a) == spaceof(b) && rep(a) == rep(b)
 
 Base.:convert(::Type{Set{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
 """ Reflexive relation. """
@@ -160,14 +162,14 @@ Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(re
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
 function Base.:union(input::Subset...)::Subset
-    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
+    @assert(length(Set{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
     return Subset(union([rep(subset) for subset in input]...))
 end
 
 Base.:union(input::T...) where {T <: AbstractSubset} = union((convert(Subset{T}, element) for element in input)...)
 
 function Base.:intersect(input::Subset...)::Subset
-    @assert(length(Set{AbstractSpace}([space_of(subset) for subset in input])) == 1)
+    @assert(length(Set{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
     return Subset(intersect([rep(subset) for subset in input]...))
 end
 

@@ -17,19 +17,19 @@ const MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavo
 groupname(type::Symbol, name::String)::String = "$(type):$(name)"
 
 struct Mode <: AbstractSubset{Mode}
-    attrs::Base.ImmutableDict{Symbol}
+    attrs::Dict{Symbol}
 
-    Mode(attrs::Base.ImmutableDict{Symbol}) = new(attrs)
-    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Base.ImmutableDict(datas...))
+    Mode(attrs::Dict{Symbol}) = new(attrs)
+    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(datas...))
 end
 
 """
 The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:pos`, if none of those are defined,
 it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
 """
-function Spaces.space_of(mode::Mode)::AbstractSpace
-    if hasattr(mode, :pos) return space_of(getattr(mode, :pos)) end
-    if hasattr(mode, :offset) return space_of(getattr(mode, :offset)) end
+function Spaces.spaceof(mode::Mode)::AbstractSpace
+    if hasattr(mode, :pos) return spaceof(getattr(mode, :pos)) end
+    if hasattr(mode, :offset) return spaceof(getattr(mode, :offset)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
     return euclidean(RealSpace, 1)
@@ -39,11 +39,11 @@ hasattr(mode::Mode, key::Symbol) = haskey(mode.attrs, key)
 
 getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 
-removeattr(mode::Mode, key::Symbol) = Mode(Base.ImmutableDict(filter(p -> p.first != key, [mode.attrs...])...))
+removeattr(mode::Mode, keys::Symbol...) = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
 
-function setattr(mode::Mode, attr::Pair{Symbol, T})::Mode where {T}
-    @assert(attr.second isa MODE_IDENTIFIERS_TYPE[attr.first])
-    return Mode(Base.ImmutableDict(filter(p -> p.first != attr.first, [mode.attrs...])..., attr))
+function setattr(mode::Mode, attrs::Pair{Symbol, T}...)::Mode where {T}
+    # TODO: The @assert is removed temporarily.
+    return Mode(Dict(mode.attrs..., attrs...))
 end
 
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
@@ -89,7 +89,7 @@ Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source)
 
 function quantize(name::String, index::Integer, identifier::Symbol, point::Point, flavor::Integer)::Mode
     @assert(identifier == :offset || identifier == :pos)
-    home::Point = origin(space_of(point))
+    home::Point = origin(spaceof(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
@@ -152,10 +152,10 @@ transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, r
 
 dagger(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)') # `'` operator is dagger.
 
-function eigvalsh(fock_map::FockMap)::Vector{Pair{Mode, Float64}} where {T}
+function eigvalsh(fock_map::FockMap, attrs::Pair{Symbol, T}...)::Vector{Pair{Mode, Float64}} where {T}
     @assert(fock_map.inspace == fock_map.outspace)
     evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
-    return [Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1]) => ev for (index, ev) in enumerate(evs)]
+    return [Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1, attrs...]) => ev for (index, ev) in enumerate(evs)]
 end
 
 """
@@ -165,11 +165,11 @@ Create a `FockMap` corresponds to a Fourier transform of a `Subset{Mode}`. This 
 entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
-- `momentums` The momentums which spans the output reciprocal subspace, for `space_of(momentum) isa MomentumSpace`.
+- `momentums` The momentums which spans the output reciprocal subspace, for `spaceof(momentum) isa MomentumSpace`.
 - `inmodes` The modes from the input subspace, all modes must have the attribute `:offset` defined or result in errors.
 
 ### Output
-The `FockMap` represents this specific Fourier transform, with shape `(N, M)` which `N = length(momentums) * count` for `count` is the number of fermionic site
+The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = length(momentums) * count` for `count` is the number of fermionic site
 within the translational invariant unit cell, supplied by `inmodes`; `M = length(inmodes)`. The `inspace` of the returned `FockMap` will equates to `FockSpace(inmodes)`;
 the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """

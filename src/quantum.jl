@@ -6,15 +6,24 @@ module Quantum
 using LinearAlgebra, SparseArrays, OrderedCollections
 using ..Spaces, ..Geometries
 
+@enum ModeGroupType begin
+    quantized
+    transformed
+    symmetrized
+end
+
+struct ModeGroup
+    type::ModeGroupType
+    name::String
+end
+
 const MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.ImmutableDict(
-    :groups => Vector{String},
+    :groups => Vector{ModeGroup},
     :index => Integer,
     :offset => Point,
     :pos => Point,
     :flavor => Integer)
 const MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavor])
-
-groupname(type::Symbol, name::String)::String = "$(type):$(name)"
 
 struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
@@ -93,7 +102,7 @@ function quantize(name::String, index::Integer, identifier::Symbol, point::Point
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
-    return Mode([:groups => [groupname(:q, name)], :index => index, identifier => point, :flavor => flavor, couple])
+    return Mode([:groups => [ModeGroup(quantized, name)], :index => index, identifier => point, :flavor => flavor, couple])
 end
 
 quantize(name::String, identifier::Symbol, subset::Subset{Point}, count::Integer)::Subset{Mode} = (
@@ -226,7 +235,8 @@ function directsum(elements::Vector{FockMap})::FockMap
     return FockMap(FockSpace(Subset(outparts), outordering), FockSpace(Subset(inparts), inordering), mat)
 end
 
-export Mode, FockSpace, FockMap
+export quantized, transformed, symmetrized
+export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
 export dimension, orderedmodes, orderingrule, quantize, columns, transpose, dagger, eigvecsh, eigvalsh, fourier, directsum
 

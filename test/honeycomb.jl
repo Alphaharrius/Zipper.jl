@@ -22,24 +22,19 @@ bm = bondmap([
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
-bzone::Subset{Point} = brillouin_zone(crystal)
+ff = fourier(brillouin_zone(crystal), Subset([m0, m1]))
 
-function make_bloch(k::Point)::FockMap
-    fmap::FockMap = fourier(Subset([k]), Subset(orderedmodes(bm.outspace)))
-    return fmap * bm * dagger(fmap)
-end
 
-bhs::Vector{FockMap} = [make_bloch(k) for k in bzone]
-
-hamiltonian::FockMap = directsum(bhs)
-U::FockMap = @time eigvecsh(hamiltonian)
-spectrum = eigvalsh(hamiltonian)
-gsmodes = map(p -> p.first, filter(p -> p.second <= 0, spectrum))
-Uᵣ::FockMap = columns(U, Subset(gsmodes))
-Uᵣ⁺::FockMap = dagger(Uᵣ)
-C::FockMap = Uᵣ * Uᵣ⁺
+H::FockMap = hamiltonian(crystal, bm)
+C::FockMap = ground_state_correlation(H)
 corrspec = eigvalsh(C)
 plot(scatter(y=map(p -> p.second, corrspec)))
+
+small_crystal = Crystal(unitcell, [2, 2])
+region = [points(small_crystal)...]
+ms = Subset([setattr(m, :offset => p) for p in region for m in modes])
+fm = fourier(C.outspace, ms)
+Cᵣ = dagger(fm) * C * fm
 
 rng = -1:0.1:1
 tspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))

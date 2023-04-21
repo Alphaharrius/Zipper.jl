@@ -27,7 +27,23 @@ function espec(bonds::FockMap, momentums::Vector{Point})::Vector{Pair{Mode, Floa
     return ret
 end
 
+function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
+    bzone::Subset{Point} = brillouin_zone(crystal)
+    bondmodes::Subset{Mode} = flatten(rep(bondmap.outspace))
+    fmaps = Iterators.map(momentum -> fourier(Subset([momentum]), bondmodes), bzone)
+    bloch_hamiltonians = Iterators.map(fmap -> fmap * bondmap * dagger(fmap), fmaps)
+    return directsum([bloch_hamiltonians...])
+end
+
+function ground_state_correlation(hamiltonian::FockMap)::FockMap
+    spectrum::Vector{Pair{Mode, Float64}} = eigvalsh(hamiltonian) # Since the eigenmodes here is intermediate within this function, we don't have to identify them.
+    contributing_modes::Vector{Mode} = map(p -> p.first, filter(p -> p.second <= 0, spectrum)) # Extract all eigenmodes that has negative eigenenergy.
+    unitary::FockMap = eigvecsh(hamiltonian)
+    groundstate_unitary::FockMap = columns(unitary, Subset(contributing_modes)) # Extract the eigenmode representations with negative eigenenergies.
+    return groundstate_unitary * dagger(groundstate_unitary) # Using convention of C = <cc†>
+end
+
 export Bond
-export bloch, bondmap, espec
+export bloch, bondmap, espec, hamiltonian, ground_state_correlation
 
 end

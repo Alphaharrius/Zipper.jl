@@ -6,14 +6,32 @@ module Quantum
 using LinearAlgebra, SparseArrays, OrderedCollections
 using ..Spaces, ..Geometries
 
+export quantized, transformed, symmetrized
+export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
+export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
+export dimension, orderedmodes, orderingrule, quantize, columns, transpose, dagger, eigvecsh, eigvalsh, fourier, directsum
+
+"""
+    ModeGroupType
+
+Classifiers of the type of a `ModeGroup`.
+"""
 @enum ModeGroupType begin
     quantized
     transformed
     symmetrized
 end
 
+
+"""
+    ModeGroup(type::ModeGroupType, name::String)
+
+A structure that holds the information of a specific group of mode.
+"""
 struct ModeGroup
+    "The type of the group."
     type::ModeGroupType
+    "The name of the group."
     name::String
 end
 
@@ -75,11 +93,11 @@ Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i
 
 Base.:length(fock_space::FockSpace) = length(fock_space.ordering)
 
-function orderedmodes(fock_space::FockSpace)::Array{Mode}
-    modes = Array{Mode}(undef, dimension(fock_space))
-    for mode in flatten(rep(fock_space))
-        modes[fock_space.ordering[mode]] = mode
-    end
+function orderedmodes(fockspace::FockSpace)::Array{Mode}
+    modes = Array{Mode}(undef, dimension(fockspace))
+    # This method could be enhanced as the current implementation of `Subset` is based on `OrderedSet`, but to avoid implicit ordering assumption, using the ordering
+    # information is still desired.
+    foreach(mode -> modes[fockspace.ordering[mode]] = mode, flatten(rep(fockspace)))
     return modes
 end
 
@@ -234,10 +252,5 @@ function directsum(elements::Vector{FockMap})::FockMap
     end
     return FockMap(FockSpace(Subset(outparts), outordering), FockSpace(Subset(inparts), inordering), mat)
 end
-
-export quantized, transformed, symmetrized
-export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
-export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, orderedmodes, orderingrule, quantize, columns, transpose, dagger, eigvecsh, eigvalsh, fourier, directsum
 
 end

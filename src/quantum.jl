@@ -164,7 +164,7 @@ dagger(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol, T}...)::OrderedSet{Mode} where {T}
     @assert(fockmap.inspace == fockmap.outspace)
     return OrderedSet([
-        Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
+        Mode([:groups => [ModeGroup(transformed, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
 end
 
 function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol, T}...)::FockMap where {T}

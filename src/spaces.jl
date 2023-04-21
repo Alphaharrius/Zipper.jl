@@ -1,6 +1,6 @@
 module Spaces
 
-using LinearAlgebra
+using LinearAlgebra, OrderedCollections
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
 export rep, euclidean, basis, dimension, spaceof, rpos, pos, linear_transform, fourier_coef, distance, interpolate, flatten, members
@@ -12,7 +12,7 @@ Base.:show(io::IO, element::Element) = print(io, string(typeof(element)))
 
 """ Reflexive relation. """
 Base.:convert(::Type{T}, source::T) where {T <: Element} = source
-Base.:convert(::Type{Set{T}}, source::T) where {T <: Element} = Set{T}([source])
+Base.:convert(::Type{OrderedSet{T}}, source::T) where {T <: Element} = OrderedSet{T}([source])
 
 """
     rep(source::Element{R}) where {R <: Any}
@@ -35,7 +35,7 @@ basis(space::AffineSpace)::Matrix{Float64} = rep(space)
 
 Base.:length(space::T) where {T <: AffineSpace} = size(basis(space), 1)
 
-abstract type AbstractSubset{T} <: Element{Set{T}} end
+abstract type AbstractSubset{T} <: Element{OrderedSet{T}} end
 
 """
     spaceof(subset::AbstractSubset)
@@ -93,14 +93,6 @@ pos(point::Point)::Vector{Float64} = point.pos
 
 linear_transform(new_space::AffineSpace, point::Point)::Point = Point(inv(basis(new_space)) * basis(spaceof(point)) * pos(point), new_space)
 
-function fourier_coef(momentum::Point, point::Point, vol::Integer)::ComplexF64
-    k_space::MomentumSpace = spaceof(momentum)
-    r_space::RealSpace = spaceof(point)
-    phys_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(k_space)), momentum)
-    phys_point::Point = linear_transform(euclidean(RealSpace, dimension(r_space)), point)
-    return exp(-1im * dot(collect(Float64, pos(phys_momentum)), collect(Float64, pos(phys_point)))) / sqrt(vol)
-end
-
 function Base.:+(a::Point, b::Point)::Point
     @assert(typeof(spaceof(a)) == typeof(spaceof(b)))
     return Point(pos(a) + pos(b), spaceof(a))
@@ -125,19 +117,21 @@ function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <:
 end
 
 struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
-    rep::Set{T}
+    rep::OrderedSet{T}
     space::AbstractSpace
 
-    Subset(elements::Set{T}) where {T <: AbstractSubset} = new{T}(elements, spaceof(first(elements)))
-    Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(Set(elements))
+    Subset(elements::OrderedSet{T}) where {T <: AbstractSubset} = new{T}(elements, spaceof(first(elements)))
+    Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
 end
 
-# Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Set representation and leave to the Base.isequal for identification.
+# Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the OrderedSet representation and leave to the Base.isequal for identification.
 Base.:hash(subset::Subset)::UInt = hash(rep(subset))
 Base.:isequal(a::Subset, b::Subset)::Bool = a == b
 
 Base.:iterate(subset::T, i...) where {T <: Subset} = Base.iterate(rep(subset), i...)
 Base.:length(subset::T) where {T <: Subset} = Base.length(rep(subset))
+Base.:lastindex(subset::T) where {T <: Subset} = length(subset)
+Base.:getindex(subset::T, inds...) where {T <: Subset} = rep(subset)[inds...]
 
 function flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
     if T <: Subset
@@ -150,26 +144,26 @@ members(subset::Subset)::Tuple = (rep(subset)...,)
 
 Base.:(==)(a::Subset, b::Subset)::Bool = spaceof(a) == spaceof(b) && rep(a) == rep(b)
 
-Base.:convert(::Type{Set{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
+Base.:convert(::Type{OrderedSet{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
 """ Reflexive relation. """
 Base.:convert(::Type{Subset}, source::Subset{T}) where {T <: AbstractSubset} = source
 Base.:convert(::Type{Subset{T}}, source::Subset{T}) where {T <: AbstractSubset} = source
 """ Element-wise conversions. """
 Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, B <: AbstractSubset} = (
-    Subset(Set{A}([convert(A, el) for el in rep(source)])))
+    Subset(OrderedSet{A}([convert(A, el) for el in rep(source)])))
 """ Convert to the generalized type of `AbstractSubset`. """
 Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(rep(source))
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
 function Base.:union(input::Subset...)::Subset
-    @assert(length(Set{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
+    @assert(length(OrderedSet{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
     return Subset(union([rep(subset) for subset in input]...))
 end
 
 Base.:union(input::T...) where {T <: AbstractSubset} = union((convert(Subset{T}, element) for element in input)...)
 
 function Base.:intersect(input::Subset...)::Subset
-    @assert(length(Set{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
+    @assert(length(OrderedSet{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
     return Subset(intersect([rep(subset) for subset in input]...))
 end
 

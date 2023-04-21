@@ -2,6 +2,7 @@ if !isdefined(Main, :Spaces) include("spaces.jl") end
 
 module Geometries
 
+using OrderedCollections
 using ..Spaces
 
 origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
@@ -32,8 +33,7 @@ function brillouin_zone(crystal::Crystal)::Subset{Point}
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2) ./ tiled_sizes
-    points::Set{Point} = Set{Point}([Point(pos, momentum_space) for pos in eachcol(recentered_mesh)])
-    return Subset(points)
+    return Subset([Point(pos, momentum_space) for pos in eachcol(recentered_mesh)])
 end
 
 export Crystal

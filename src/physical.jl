@@ -4,10 +4,11 @@ if !isdefined(Main, :Quantum) include("quantum.jl") end
 
 module Physical
 
+using OrderedCollections
 using ..Spaces, ..Quantum, ..Geometries
 
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
-    modes::Set{Mode} = Set([mode for bond in bonds for mode in bond.first])
+    modes::OrderedSet{Mode} = OrderedSet([mode for bond in bonds for mode in bond.first])
     fockspace::FockSpace = FockSpace(Subset(modes))
     half::FockMap = FockMap(fockspace, fockspace, Dict(bonds))
     return half + dagger(half)

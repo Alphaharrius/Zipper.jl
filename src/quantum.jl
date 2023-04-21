@@ -3,7 +3,7 @@ if !isdefined(Main, :Geometries) include("geometries.jl") end
 
 module Quantum
 
-using LinearAlgebra, SparseArrays
+using LinearAlgebra, SparseArrays, OrderedCollections
 using ..Spaces, ..Geometries
 
 const MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.ImmutableDict(
@@ -97,7 +97,7 @@ function quantize(name::String, index::Integer, identifier::Symbol, point::Point
 end
 
 quantize(name::String, identifier::Symbol, subset::Subset{Point}, count::Integer)::Subset{Mode} = (
-    Subset(Set([quantize(name, index, identifier, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count])))
+    Subset([quantize(name, index, identifier, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count]))
 
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     outspace::FockSpace
@@ -118,13 +118,13 @@ end
 
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
-function columns(fock_map::FockMap, subset::Subset{Mode})::FockMap
+function columns(fockmap::FockMap, subset::Subset{Mode})::FockMap
     inspace::FockSpace = FockSpace(subset)
-    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fock_map.outspace), dimension(inspace))
+    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fockmap.outspace), dimension(inspace))
     for mode in rep(subset)
-        matrix[:, inspace.ordering[mode]] = rep(fock_map)[:, fock_map.outspace.ordering[mode]]
+        matrix[:, inspace.ordering[mode]] = rep(fockmap)[:, fockmap.inspace.ordering[mode]]
     end
-    return FockMap(inspace, fock_map.outspace, matrix)
+    return FockMap(fockmap.outspace, inspace, matrix)
 end
 
 function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
@@ -152,10 +152,22 @@ transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, r
 
 dagger(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)') # `'` operator is dagger.
 
-function eigvalsh(fock_map::FockMap, attrs::Pair{Symbol, T}...)::Vector{Pair{Mode, Float64}} where {T}
-    @assert(fock_map.inspace == fock_map.outspace)
-    evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fock_map))))
-    return [Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1, attrs...]) => ev for (index, ev) in enumerate(evs)]
+function eigmodes(fockmap::FockMap, attrs::Pair{Symbol, T}...)::OrderedSet{Mode} where {T}
+    @assert(fockmap.inspace == fockmap.outspace)
+    return OrderedSet([
+        Mode([:groups => [groupname(:t, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
+end
+
+function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol, T}...)::FockMap where {T}
+    @assert(fockmap.inspace == fockmap.outspace)
+    evecs::Matrix{ComplexF64} = eigvecs(Hermitian(Matrix(rep(fockmap))))
+    return FockMap(fockmap.outspace, FockSpace(Subset(eigmodes(fockmap, attrs...))), SparseMatrixCSC{ComplexF64, Int64}(evecs))
+end
+
+function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol, T}...)::Vector{Pair{Mode, Float64}} where {T}
+    @assert(fockmap.inspace == fockmap.outspace)
+    evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
+    return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
 end
 
 """
@@ -199,25 +211,23 @@ function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
 end
 
 function directsum(elements::Vector{FockMap})::FockMap
-    outparts, inparts = Iterators.map(el -> (orderedmodes(el.outspace), orderedmodes(el.inspace)), elements) |> Base.transpose |> Base.vec
-    lengths::Vector{Integer} = sum(part -> [length(first(part)), length(last(part))], fockparts)
-    outmodes::Vector{Mode} = hcat(outparts)
-    inmodes::Vector{Mode} = hcat(inparts)
-    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(lengths...)
-    outordering::Dict{Mode, Integer} = Dict(Iterators.map(tup -> first(tup) => last(tup), enumerate(outmodes)))
-    inordering::Dict{Mode, Integer} = Dict(Iterators.map(tup -> first(tup) => last(tup), enumerate(inmodes)))
-    for (spidx, fockpart) in enumerate(fockparts)
-        rowslice = outordering[first(fockpart)]:outordering[last(fockpart)]
-        colslice = inordering[first(fockpart)]:inordering[last(fockpart)]
-        spmat[rowslice, colslice] = rep(elements[spidx])
+    outparts::Vector{Subset{Mode}} = [subset for fm in elements for subset in rep(fm.outspace)]
+    inparts::Vector{Subset{Mode}} = [subset for fm in elements for subset in rep(fm.inspace)]
+    outmodes::OrderedSet{Mode} = OrderedSet([mode for subset in outparts for mode in subset])
+    inmodes::OrderedSet{Mode} = OrderedSet([mode for subset in inparts for mode in subset])
+    outordering::Dict{Mode, Int64} = Dict(map(tup -> last(tup) => first(tup), enumerate(outmodes)))
+    inordering::Dict{Mode, Int64} = Dict(map(tup -> last(tup) => first(tup), enumerate(inmodes)))
+    mat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
+    for (outpart, inpart, fockmap) in Iterators.zip(outparts, inparts, elements)
+        outslice::UnitRange{Int64} = outordering[first(outpart)]:outordering[last(outpart)]
+        inslice::UnitRange{Int64} = inordering[first(inpart)]:inordering[last(inpart)]
+        mat[outslice, inslice] += rep(fockmap)
     end
-    outspace::FockSpace = FockSpace(Subset(Set(Iterators.map(part -> Subset(part), outparts))))
-    inspace::FockSpace = FockSpace(Subset(Set(Iterators.map(part -> Subset(part), inparts))))
-    return FockMap(outspace, inspace, spmat)
+    return FockMap(FockSpace(Subset(outparts), outordering), FockSpace(Subset(inparts), inordering), mat)
 end
 
 export Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, orderedmodes, orderingrule, quantize, columns, transpose, dagger, eigvalsh, fourier
+export dimension, orderedmodes, orderingrule, quantize, columns, transpose, dagger, eigvecsh, eigvalsh, fourier, directsum
 
 end

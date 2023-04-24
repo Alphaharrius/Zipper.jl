@@ -31,7 +31,7 @@ function visualize_spectrum(title::String, spectrum::Vector{Pair{Mode, T}}) wher
         offset::Point = getattr(element.first, :offset)
         pos::Point = linear_transform(spaceof(offset), getattr(element.first, :pos))
         point::Point = offset + pos
-        position::Vector{Float64} = Spaces.pos(linear_transform(euclidean(RealSpace, length(point)), point))
+        position::Vector{Float64} = Spaces.pos(linear_transform(euclidean(RealSpace, dimension(point)), point))
         padded_position::Vector{Float64} = vcat(position, zeros(Float64, 3 - length(position)))
         value::ComplexF64 = ComplexF64(element.second)
     

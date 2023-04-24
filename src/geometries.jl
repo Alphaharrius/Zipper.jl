@@ -6,7 +6,7 @@ using OrderedCollections
 using ..Spaces
 
 export Crystal
-export origin, radius, resize, mesh, vol, points, brillouin_zone
+export origin, radius, resize, mesh, vol, latticepoints, sitepoints, brillouin_zone
 
 origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
 
@@ -23,13 +23,16 @@ mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 
-function points(crystal::Crystal)::Subset{Point}
+function latticepoints(crystal::Crystal)::Subset{Point}
     real_space::RealSpace = spaceof(crystal.unit_cell)
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     mesh_points::Array{Point} = [Point(pos, real_space) for pos in eachcol(crystal_mesh)]
-    points::OrderedSet{Point} = OrderedSet{Point}([mesh_point + point for mesh_point in mesh_points for point in rep(crystal.unit_cell)])
+    points::OrderedSet{Point} = OrderedSet{Point}([mesh_point for mesh_point in mesh_points])
     return Subset(points)
 end
+
+sitepoints(crystal::Crystal)::Subset{Point} = Subset([
+    latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unit_cell])
 
 function brillouin_zone(crystal::Crystal)::Subset{Point}
     momentum_space::MomentumSpace = convert(MomentumSpace, spaceof(crystal.unit_cell))

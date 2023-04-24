@@ -27,6 +27,8 @@ dimension(space::T) where {T <: AbstractSpace} = length(space)
 
 abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
 
+Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = isapprox(basis(a), basis(b))
+
 Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 
 euclidean(S::Type{<: AffineSpace}, n::Int64) = S(Matrix{Float64}(I(n)))
@@ -142,7 +144,7 @@ end
 
 members(subset::Subset)::Tuple = (rep(subset)...,)
 
-Base.:(==)(a::Subset, b::Subset)::Bool = spaceof(a) == spaceof(b) && rep(a) == rep(b)
+Base.:(==)(a::Subset, b::Subset)::Bool = spaceof(a) == spaceof(b) && Set(rep(a)) == Set(rep(b))
 
 Base.:convert(::Type{OrderedSet{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
 """ Reflexive relation. """

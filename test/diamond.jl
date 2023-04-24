@@ -51,7 +51,7 @@ bspecs::Matrix{Float64} = zeros(Float64, length(rng), length(rng))
 for (j, k) in enumerate(rng)
     for (i, h) in enumerate(rng)
         fkk::FockMap = fourier(Subset([Point([h, k, 0], kspace)]), Subset(orderedmodes(bmap.outspace)))
-        bloch::FockMap = fkk * bmap * dagger(fkk)
+        bloch::FockMap = fkk * bmap * fkk'
         spec = eigvalsh(bloch)
         tspecs[j, i] = real(spec[1].second)
         bspecs[j, i] = real(spec[2].second)

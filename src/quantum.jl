@@ -9,7 +9,7 @@ using ..Spaces, ..Geometries
 export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, orderedmodes, orderingrule, quantize, columns, transpose, dagger, eigvecsh, eigvalsh, fourier, directsum
+export dimension, orderedmodes, orderingrule, modes, hassamespan, quantize, columns, rows, eigvecsh, eigvalsh, fourier, directsum, hermitian_partitioning, columnspec
 
 """
     ModeGroupType
@@ -93,6 +93,10 @@ Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i
 
 Base.:length(fock_space::FockSpace) = length(fock_space.ordering)
 
+order(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
+
+modes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
+
 function orderedmodes(fockspace::FockSpace)::Array{Mode}
     modes = Array{Mode}(undef, dimension(fockspace))
     # This method could be enhanced as the current implementation of `Subset` is based on `OrderedSet`, but to avoid implicit ordering assumption, using the ordering
@@ -101,10 +105,12 @@ function orderedmodes(fockspace::FockSpace)::Array{Mode}
     return modes
 end
 
-function orderingrule(from_space::FockSpace, to_space::FockSpace)::Vector{Int64}
-    @assert(from_space == to_space)
-    return [to_space.ordering[mode] for mode in orderedmodes(from_space)]
+function orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
+    @assert(hassamespan(fromspace, tospace))
+    return [tospace.ordering[mode] for mode in orderedmodes(fromspace)]
 end
+
+hassamespan(a::FockSpace, b::FockSpace)::Bool = modes(a) == modes(b)
 
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
 
@@ -145,13 +151,20 @@ end
 
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
-function columns(fockmap::FockMap, subset::Subset{Mode})::FockMap
-    inspace::FockSpace = FockSpace(subset)
-    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fockmap.outspace), dimension(inspace))
-    for mode in rep(subset)
-        matrix[:, inspace.ordering[mode]] = rep(fockmap)[:, fockmap.inspace.ordering[mode]]
+function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
+    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fockmap.outspace), dimension(restrictspace))
+    for mode in modes(restrictspace)
+        matrix[:, restrictspace.ordering[mode]] = rep(fockmap)[:, fockmap.inspace.ordering[mode]]
     end
-    return FockMap(fockmap.outspace, inspace, matrix)
+    return FockMap(fockmap.outspace, restrictspace, matrix)
+end
+
+function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
+    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(restrictspace), dimension(fockmap.inspace))
+    for mode in modes(restrictspace)
+        matrix[restrictspace.ordering[mode], :] = rep(fockmap)[fockmap.outspace.ordering[mode], :]
+    end
+    return FockMap(restrictspace, fockmap.inspace, matrix)
 end
 
 function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
@@ -171,13 +184,15 @@ function Base.:-(a::FockMap, b::FockMap)::FockMap
 end
 
 function Base.:*(a::FockMap, b::FockMap)::FockMap
-    @assert(a.inspace == b.outspace)
+    @assert(hassamespan(a.inspace, b.outspace)) # Even if the fockspaces are different, composition works as long as they have same span.
     return FockMap(a.outspace, b.inspace, rep(a) * rep(permute(b, a.inspace, b.inspace)))
 end
 
-transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
+Base.:*(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) * number)
+Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) / number)
 
-dagger(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)') # `'` operator is dagger.
+Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
+Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol, T}...)::OrderedSet{Mode} where {T}
     @assert(fockmap.inspace == fockmap.outspace)
@@ -192,8 +207,8 @@ function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol, T}...)::FockMap where {T
 end
 
 function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol, T}...)::Vector{Pair{Mode, Float64}} where {T}
-    @assert(fockmap.inspace == fockmap.outspace)
-    evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
+    @time @assert(fockmap.inspace == fockmap.outspace)
+    @time evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
     return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
 end
 
@@ -250,7 +265,37 @@ function directsum(elements::Vector{FockMap})::FockMap
         inslice::UnitRange{Int64} = inordering[first(inpart)]:inordering[last(inpart)]
         mat[outslice, inslice] += rep(fockmap)
     end
-    return FockMap(FockSpace(Subset(outparts), outordering), FockSpace(Subset(inparts), inordering), mat)
+    return FockMap(FockSpace(Subset([outparts...]), outordering), FockSpace(Subset([inparts...]), inordering), mat)
+end
+
+"""
+    hermitian_partitioning(hermitian::FockMap, partitions::Pair{Symbol}...)::Dict{Symbol, FockMap}
+
+Partition the Hermitian `FockMap` into column partitions by a given set of rules based on the eigenvalues from eigenvalue decompositions.
+
+### Input
+- `hermitian` The source `FockMap` to be partitioned, this is assumed to be a Hermitian.
+- `partition_rules` The rules for each partition in form of `Pair{Symbol, T}` for `T` is a predicate function with input of type `<: Float`,
+                    each rule `Pair` have the first `Symbol` typed element as the partition name.
+
+### Output
+A `Dict{Symbol, FockMap}` keyed by the partition name specified from the `partition_rules` with value of the associated partitioned `FockMap`.
+"""
+function hermitian_partitioning(hermitian::FockMap, partition_rules::Pair{Symbol}...)::Dict{Symbol, FockMap}
+    eigenvalues::Vector{Pair{Mode, Float64}} = eigvalsh(hermitian)
+    𝔘::FockMap = eigvecsh(hermitian)
+    ret::Dict{Symbol, FockMap} = Dict()
+    for rule in partition_rules
+        modes::Vector{Mode} = map(p -> p.first, filter(p -> rule.second(p.second), eigenvalues))
+        ret[rule.first] = columns(𝔘, FockSpace(Subset(modes)))
+    end
+    return ret
+end
+
+function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
+    @assert(dimension(fockmap.inspace) == 1)
+    mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
+    return [outmode => mat[order(fockmap.outspace, outmode), 1] for outmode in orderedmodes(fockmap.outspace)]
 end
 
 end

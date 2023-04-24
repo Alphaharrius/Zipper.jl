@@ -4,7 +4,7 @@ include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
 
-using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays
+using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -15,26 +15,27 @@ unitcell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
 crystal = Crystal(unitcell, [32, 32])
 modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 m0, m1 = members(modes)
-
 tₙ = ComplexF64(-1.)
-bm = bondmap([
+bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
-ff = fourier(brillouin_zone(crystal), Subset([m0, m1]))
+𝐻::FockMap = hamiltonian(crystal, bonds)
+𝐶::FockMap = @time ground_state_correlation(𝐻)
+𝔘::FockMap = eigvecsh(𝐶)
 
+small_crystal = Crystal(unitcell, [8, 8])
+restricted_fockspace = FockSpace(Subset([setattr(m, :offset => p) for p in latticepoints(small_crystal) for m in modes]))
+𝐹::FockMap = fourier(brillouin_zone(crystal), flatten(rep(restricted_fockspace)))
+𝐶ᵣ::FockMap = 𝐹' * 𝐶 * 𝐹
+𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
+plot(heatmap(z=real(rep(𝑈ᵣ))))
+emode::Mode = orderedmodes(𝑈ᵣ.inspace)[1]
+moderep::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode])))
+values = columnspec(moderep)
 
-H::FockMap = hamiltonian(crystal, bm)
-C::FockMap = ground_state_correlation(H)
-corrspec = eigvalsh(C)
-plot(scatter(y=map(p -> p.second, corrspec)))
-
-small_crystal = Crystal(unitcell, [2, 2])
-region = [points(small_crystal)...]
-ms = Subset([setattr(m, :offset => p) for p in region for m in modes])
-fm = fourier(C.outspace, ms)
-Cᵣ = dagger(fm) * C * fm
+visualize_spectrum("Mode", values)
 
 rng = -1:0.1:1
 tspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))
@@ -42,7 +43,7 @@ bspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))
 for (j, k) in enumerate(rng)
     for (i, h) in enumerate(rng)
         fkk::FockMap = fourier(Subset([Point([h, k], k_space)]), Subset(orderedmodes(bm.outspace)))
-        bloch::FockMap = fkk * bm * dagger(fkk)
+        bloch::FockMap = fkk * bm * fkk'
         spec = eigvalsh(bloch)
         tspec[j, i] = real(spec[1].second)
         bspec[j, i] = real(spec[2].second)

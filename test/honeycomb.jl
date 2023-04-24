@@ -4,7 +4,7 @@ include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
 
-using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes
+using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes 
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -21,17 +21,23 @@ bonds::FockMap = bondmap([
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
-𝐻::FockMap = hamiltonian(crystal, bonds)
-𝐶::FockMap = @time ground_state_correlation(𝐻)
+𝐻::FockMap = @time hamiltonian(crystal, bonds)
+filled::FockMap = @time filledstates(𝐻)
+𝐶::FockMap = filled * filled'
+plot(heatmap(z=real(rep(𝐶))))
+cvs = eigvalsh(𝐶)
+plot(scatter(y=map(p -> p.second, cvs), mode="markers"))
 𝔘::FockMap = eigvecsh(𝐶)
 
 small_crystal = Crystal(unitcell, [8, 8])
 restricted_fockspace = FockSpace(Subset([setattr(m, :offset => p) for p in latticepoints(small_crystal) for m in modes]))
+
 𝐹::FockMap = fourier(brillouin_zone(crystal), flatten(rep(restricted_fockspace)))
 𝐶ᵣ::FockMap = 𝐹' * 𝐶 * 𝐹
+plot(heatmap(z=real(rep(𝐶ᵣ))))
 𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
 plot(heatmap(z=real(rep(𝑈ᵣ))))
-emode::Mode = orderedmodes(𝑈ᵣ.inspace)[1]
+emode::Mode = orderedmodes(𝑈ᵣ.inspace)[64]
 moderep::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode])))
 values = columnspec(moderep)
 

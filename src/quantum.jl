@@ -9,7 +9,7 @@ using ..Spaces, ..Geometries
 export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, orderedmodes, orderingrule, modes, hassamespan, quantize, columns, rows, eigvecsh, eigvalsh, fourier, directsum, hermitian_partitioning, columnspec
+export dimension, orderedmodes, orderingrule, partitions, modes, hassamespan, quantize, columns, rows, restrict, eigvecsh, eigvalsh, fourier, directsum, hermitian_partitioning, columnspec
 
 """
     ModeGroupType
@@ -95,6 +95,8 @@ struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
         Dict([mode => order for (order, mode) in enumerate(subset)]...))
 end
 
+partitions(fockspace::FockSpace)::OrderedSet{Subset{Mode}} = rep(rep(fockspace))
+
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
 
 Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering)
@@ -158,19 +160,22 @@ end
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
 function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(fockmap.outspace), dimension(restrictspace))
-    for mode in modes(restrictspace)
-        matrix[:, restrictspace.ordering[mode]] = rep(fockmap)[:, fockmap.inspace.ordering[mode]]
-    end
-    return FockMap(fockmap.outspace, restrictspace, matrix)
+    restrictindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(restrictspace)]
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), :, restrictindices))
+    return FockMap(fockmap.outspace, restrictspace, spmat)
 end
 
 function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    matrix::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(restrictspace), dimension(fockmap.inspace))
-    for mode in modes(restrictspace)
-        matrix[restrictspace.ordering[mode], :] = rep(fockmap)[fockmap.outspace.ordering[mode], :]
+    restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(restrictspace)]
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
+    return FockMap(restrictspace, fockmap.inspace, spmat)
     end
-    return FockMap(restrictspace, fockmap.inspace, matrix)
+
+function restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
+    out_restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(out_restrictspace)]
+    in_restrictindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(in_restrictspace)]
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), out_restrictindices, in_restrictindices))
+    return FockMap(out_restrictspace, in_restrictspace, spmat)
 end
 
 function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap

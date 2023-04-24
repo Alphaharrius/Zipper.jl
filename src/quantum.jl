@@ -243,23 +243,21 @@ function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
     basismodes::Set{Mode} = Set(removeattr(inmode, :offset) for inmode in inmodes)
     # Enable the identification by :offset when adding momentum as :offset for each basis mode.
     outmodes = [Iterators.map(tup -> setattr(tup[1], :offset => tup[2]), Iterators.product(basismodes, momentums))...]
-    outspace_orderings::Vector{Pair{Mode, Integer}} = []
-    inspace_orderings::Vector{Pair{Mode, Integer}} = []
+    outorderings::Dict{Mode, Int64} = Dict(mode => index for (index, mode) in enumerate(outmodes))
+    inorderings::Dict{Mode, Int64} = Dict(mode => index for (index, mode) in enumerate(inmodes))
     mat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
     for ((oi, outmode), (ii, inmode)) in Iterators.product(enumerate(outmodes), enumerate(inmodes))
         # Different fermionic site within the same translational invariant unit cell will not be considered.
         if removeattr(outmode, :offset) != removeattr(inmode, :offset) continue end
         momentum::Point = getattr(outmode, :offset)
-        euc_momentum::Point = linear_transform(euclidean(MomentumSpace, length(momentum)), momentum)
+        euc_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(momentum)), momentum)
         inoffset::Point = getattr(inmode, :offset)
-        euc_inoffset::Point = linear_transform(euclidean(RealSpace, length(inoffset)), inoffset)
+        euc_inoffset::Point = linear_transform(euclidean(RealSpace, dimension(inoffset)), inoffset)
         mat[oi, ii] = exp(-1im * dot(euc_momentum, euc_inoffset))
-        push!(outspace_orderings, outmode => oi)
-        push!(inspace_orderings, inmode => ii)
     end
     return FockMap(
-        FockSpace(Subset([Subset(outmodes)]), Dict(outspace_orderings...)),
-        FockSpace(Subset([inmodes]), Dict(inspace_orderings...)),
+        FockSpace(Subset([Subset(outmodes)]), outorderings),
+        FockSpace(Subset([inmodes]), inorderings),
         mat)
 end
 

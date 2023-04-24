@@ -51,12 +51,18 @@ struct Mode <: AbstractSubset{Mode}
 end
 
 """
+    spaceof(mode::Mode)
+
 The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:pos`, if none of those are defined,
 it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
+
+### Output
+The space of the attribute `:offset` if available, fall back to `:pos` if otherwise; returns a Euclidean space of dimension `1` if both `:offset` & `:pos` is missing.
 """
-function Spaces.spaceof(mode::Mode)::AbstractSpace
-    if hasattr(mode, :pos) return spaceof(getattr(mode, :pos)) end
+function Spaces.spaceof(mode::Mode)
+    # :offset have a higher priority in determining the space of the mode.
     if hasattr(mode, :offset) return spaceof(getattr(mode, :offset)) end
+    if hasattr(mode, :pos) return spaceof(getattr(mode, :pos)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
     return euclidean(RealSpace, 1)

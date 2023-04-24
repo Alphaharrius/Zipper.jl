@@ -6,7 +6,22 @@ using OrderedCollections
 using ..Spaces
 
 export Crystal
-export origin, radius, resize, mesh, vol, latticepoints, sitepoints, brillouin_zone
+export distance, interpolate, origin, radius, resize, mesh, vol, latticepoints, sitepoints, brillouin_zone
+
+"""
+    distance(a::Point, b::Point)::Float64
+
+Compute the distance between two points `a` & `b` within the same parent `AffineSpace`.
+"""
+distance(a::Point, b::Point)::Float64 = sqrt(norm(a - b))
+
+function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <: Integer}
+    @assert(spaceof(from) == spaceof(to))
+    march::Point = (to - from) / (count + 1)
+    points::Array{Point} = [from + march * n for n in 0:(count + 1)]
+    points[end] = to
+    return points
+end
 
 origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
 

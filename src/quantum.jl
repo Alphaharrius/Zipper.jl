@@ -169,7 +169,7 @@ function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
     restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
     return FockMap(restrictspace, fockmap.inspace, spmat)
-    end
+end
 
 function restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
     out_restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(out_restrictspace)]
@@ -273,7 +273,7 @@ function directsum(fockmaps::Vector{FockMap})::FockMap
         source::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
         for (outmode, inmode) in Iterators.product(outpart, inpart)
             spmat[outordering[outmode], inordering[inmode]] = source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
-    end
+        end
     end
     return FockMap(FockSpace(Subset([outparts...]), outordering), FockSpace(Subset([inparts...]), inordering), spmat)
 end

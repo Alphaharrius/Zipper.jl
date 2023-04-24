@@ -36,6 +36,22 @@ function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
     return directsum([∑𝐻ₖ...])
 end
 
+function filledstates(hamiltonian::FockMap)::FockMap
+    bloch_partitions::OrderedSet{Subset{Mode}} = partitions(hamiltonian.inspace)
+    ∑𝑈₀::Vector{FockMap} = Vector{FockMap}(undef, length(bloch_partitions))
+    filledgroup::ModeGroup = ModeGroup(quantized, "filled")
+    for (n, partition) in enumerate(bloch_partitions)
+        𝑘::Point = getattr(first(partition), :offset)
+        fockspace::FockSpace = FockSpace(partition)
+        𝐻ₖ::FockMap = restrict(hamiltonian, fockspace, fockspace)
+        𝔘::FockMap = eigvecsh(𝐻ₖ, :offset => 𝑘, :groups => [filledgroup])
+        filledmodes::Vector{Mode} = map(p -> p.first, filter(p -> p.second < 0, eigvalsh(𝐻ₖ, :offset => 𝑘, :groups => [filledgroup])))
+        𝑈₀::FockMap = columns(𝔘, FockSpace(Subset(filledmodes)))
+        ∑𝑈₀[n] = 𝑈₀
+    end
+    return directsum(∑𝑈₀)
+end
+
 function ground_state_correlation(hamiltonian::FockMap)::FockMap
     spectrum::Vector{Pair{Mode, Float64}} = @time eigvalsh(hamiltonian) # Since the eigenmodes here is intermediate within this function, we don't have to identify them.
     contributing_modes::Vector{Mode} = @time map(p -> p.first, filter(p -> p.second <= 0, spectrum)) # Extract all eigenmodes that has negative eigenenergy.
@@ -45,6 +61,6 @@ function ground_state_correlation(hamiltonian::FockMap)::FockMap
 end
 
 export Bond
-export bloch, bondmap, espec, hamiltonian, ground_state_correlation
+export bloch, bondmap, espec, hamiltonian, filledstates, ground_state_correlation
 
 end

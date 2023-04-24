@@ -205,21 +205,21 @@ Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, f
 Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
-function eigmodes(fockmap::FockMap, attrs::Pair{Symbol, T}...)::OrderedSet{Mode} where {T}
+function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::OrderedSet{Mode}
     @assert(fockmap.inspace == fockmap.outspace)
     return OrderedSet([
         Mode([:groups => [ModeGroup(transformed, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
 end
 
-function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol, T}...)::FockMap where {T}
+function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
     @assert(fockmap.inspace == fockmap.outspace)
     evecs::Matrix{ComplexF64} = eigvecs(Hermitian(Matrix(rep(fockmap))))
     return FockMap(fockmap.outspace, FockSpace(Subset(eigmodes(fockmap, attrs...))), SparseMatrixCSC{ComplexF64, Int64}(evecs))
 end
 
-function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol, T}...)::Vector{Pair{Mode, Float64}} where {T}
-    @time @assert(fockmap.inspace == fockmap.outspace)
-    @time evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
+function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, Float64}}
+    @assert(fockmap.inspace == fockmap.outspace)
+    evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
     return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
 end
 

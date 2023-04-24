@@ -263,20 +263,21 @@ function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
         mat)
 end
 
-function directsum(elements::Vector{FockMap})::FockMap
-    outparts::Vector{Subset{Mode}} = [subset for fm in elements for subset in rep(fm.outspace)]
-    inparts::Vector{Subset{Mode}} = [subset for fm in elements for subset in rep(fm.inspace)]
+function directsum(fockmaps::Vector{FockMap})::FockMap
+    outparts::Vector{Subset{Mode}} = [part for fockmap in fockmaps for part in rep(fockmap.outspace)]
+    inparts::Vector{Subset{Mode}} = [part for fockmap in fockmaps for part in rep(fockmap.inspace)]
     outmodes::OrderedSet{Mode} = OrderedSet([mode for subset in outparts for mode in subset])
     inmodes::OrderedSet{Mode} = OrderedSet([mode for subset in inparts for mode in subset])
     outordering::Dict{Mode, Int64} = Dict(map(tup -> last(tup) => first(tup), enumerate(outmodes)))
     inordering::Dict{Mode, Int64} = Dict(map(tup -> last(tup) => first(tup), enumerate(inmodes)))
-    mat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
-    for (outpart, inpart, fockmap) in Iterators.zip(outparts, inparts, elements)
-        outslice::UnitRange{Int64} = outordering[first(outpart)]:outordering[last(outpart)]
-        inslice::UnitRange{Int64} = inordering[first(inpart)]:inordering[last(inpart)]
-        mat[outslice, inslice] += rep(fockmap)
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
+    for (outpart, inpart, fockmap) in Iterators.zip(outparts, inparts, fockmaps)
+        source::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
+        for (outmode, inmode) in Iterators.product(outpart, inpart)
+            spmat[outordering[outmode], inordering[inmode]] = source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
     end
-    return FockMap(FockSpace(Subset([outparts...]), outordering), FockSpace(Subset([inparts...]), inordering), mat)
+    end
+    return FockMap(FockSpace(Subset([outparts...]), outordering), FockSpace(Subset([inparts...]), inordering), spmat)
 end
 
 """

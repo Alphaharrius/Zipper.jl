@@ -91,7 +91,7 @@ end
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
 
-Base.:length(fock_space::FockSpace) = length(fock_space.ordering)
+Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering)
 
 order(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
 

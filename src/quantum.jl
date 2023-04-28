@@ -9,7 +9,7 @@ using ..Spaces, ..Geometries
 export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, orderedmodes, orderingrule, partitions, modes, hassamespan, quantize, columns, rows, restrict, eigvecsh, eigvalsh, fourier, directsum, hermitian_partitioning, columnspec
+export dimension, orderedmodes, orderingrule, modes, hassamespan, quantize, columns, rows, restrict, eigvecsh, eigvalsh, fourier, directsum, hermitian_partitioning, columnspec
 
 """
     ModeGroupType
@@ -96,8 +96,6 @@ struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
         Subset([subset]),
         Dict([mode => order for (order, mode) in enumerate(subset)]...))
 end
-
-partitions(fockspace::FockSpace)::OrderedSet{Subset{Mode}} = rep(rep(fockspace))
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
 
@@ -264,7 +262,7 @@ function directsum(fockmaps::Vector{FockMap})::FockMap
     for (outpart, inpart, fockmap) in Iterators.zip(outparts, inparts, fockmaps)
         source::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
         for (outmode, inmode) in Iterators.product(outpart, inpart)
-            spmat[outordering[outmode], inordering[inmode]] = source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
+            spmat[outordering[outmode], inordering[inmode]] += source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
         end
     end
     return FockMap(FockSpace(Subset([outparts...]), outordering), FockSpace(Subset([inparts...]), inordering), spmat)

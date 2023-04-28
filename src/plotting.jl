@@ -4,7 +4,7 @@ if !isdefined(Main, :Quantum) include("quantum.jl") end
 
 module Plotting
 
-using PlotlyJS, ColorTypes
+using PlotlyJS, ColorTypes, LinearAlgebra
 using ..Spaces, ..Geometries, ..Quantum
 
 function visualize_region(title::String, region::Subset{Point}, visualization_space::AffineSpace)
@@ -27,26 +27,16 @@ function visualize_vector_positions(title::String, positions::Array{Vector})
 end
 
 function visualize_spectrum(title::String, spectrum::Vector{Pair{Mode, T}}) where {T <: Number}
-    function generatetrace(element::Pair{Mode, T}) where {T <: Number}
-        offset::Point = getattr(element.first, :offset)
-        pos::Point = linear_transform(spaceof(offset), getattr(element.first, :pos))
-        point::Point = offset + pos
-        position::Vector{Float64} = Spaces.pos(linear_transform(euclidean(RealSpace, dimension(point)), point))
-        padded_position::Vector{Float64} = vcat(position, zeros(Float64, 3 - length(position)))
-        value::ComplexF64 = ComplexF64(element.second)
-    
-        # Generate the RGB color based on the complex value.
-        hue = angle(value) / 2π
-        rgb::RGB{Float64} = convert(RGB{Float64}, HSV(hue, 1, 1))
-        colortext::String = "rgba($(rgb.r * 255), $(rgb.g * 255), $(rgb.b * 255), 0.3)"
-
-        return scatter3d(x=[padded_position[1]], y=[padded_position[2]], z=[padded_position[3]], mode="marker", marker=attr(
-            size=abs(value) * 50,
-            color=colortext))
-    end
-
+    𝑁::Int64 = length(spectrum)
+    ∑𝑝::Vector{Point} = [getattr(pair.first, :offset) + getattr(pair.first, :pos) for pair in spectrum]
+    𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> pos(linear_transform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
+    sizes::Vector{Float64} = [abs(pair.second) for pair in spectrum]
+    markersizes::Vector{Float64} = sizes / norm(sizes) * 50
+    colors::Vector{RGB{Float64}} = [convert(RGB{Float64}, HSV(angle(pair.second) / 2π, 1, 1)) for pair in spectrum]
+    markercolors::Vector{Tuple{Int16, Int64, Int16}} = map(c -> Tuple([c.r, c.g, c.b] * 255), colors)
+    trace = scatter3d(x=𝑀ₚ[1, :], y=𝑀ₚ[2, :], z=𝑀ₚ[3, :], mode="marker", marker=attr(size=markersizes, color=markercolors))
     layout::Layout = Layout(title=title, scene=attr(aspectmode="data"))
-    plot([generatetrace(element) for element in spectrum], layout)
+    plot([trace], layout)
 end
 
 export visualize_region, visualize_vector_positions, visualize_spectrum

@@ -37,7 +37,7 @@ function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
 end
 
 function filledstates(hamiltonian::FockMap)::FockMap
-    bloch_partitions::OrderedSet{Subset{Mode}} = partitions(hamiltonian.inspace)
+    bloch_partitions::Subset{Subset{Mode}} = rep(hamiltonian.inspace)
     ∑𝑈₀::Vector{FockMap} = Vector{FockMap}(undef, length(bloch_partitions))
     filledgroup::ModeGroup = ModeGroup(quantized, "filled")
     for (n, partition) in enumerate(bloch_partitions)

@@ -31,7 +31,7 @@ function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
     𝐵𝑍::Subset{Point} = brillouin_zone(crystal)
     bondmodes::Subset{Mode} = flatten(rep(bondmap.outspace))
     sqrtvol::Float64 = sqrt(vol(crystal))
-    ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset([𝑘]), bondmodes) / sqrtvol, 𝐵𝑍)
+    ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset([𝑘]), FockSpace(bondmodes)) / sqrtvol, 𝐵𝑍)
     ∑𝐻ₖ = Iterators.map(𝐹ₖ -> 𝐹ₖ * bondmap * 𝐹ₖ', ∑𝐹ₖ)
     return directsum([∑𝐻ₖ...])
 end

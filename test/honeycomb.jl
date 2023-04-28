@@ -12,7 +12,7 @@ triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 k_space = convert(MomentumSpace, triangular)
 
 unitcell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
-crystal = Crystal(unitcell, [32, 32])
+crystal = Crystal(unitcell, [128, 128])
 modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 m0, m1 = members(modes)
 tₙ = ComplexF64(-1.)
@@ -32,12 +32,12 @@ plot(scatter(y=map(p -> p.second, cvs), mode="markers"))
 small_crystal = Crystal(unitcell, [8, 8])
 restricted_fockspace = FockSpace(Subset([setattr(m, :offset => p) for p in latticepoints(small_crystal) for m in modes]))
 
-𝐹::FockMap = fourier(brillouin_zone(crystal), flatten(rep(restricted_fockspace)))
+𝐹::FockMap = @time fourier(brillouin_zone(crystal), restricted_fockspace)
 𝐶ᵣ::FockMap = 𝐹' * 𝐶 * 𝐹
 plot(heatmap(z=real(rep(𝐶ᵣ))))
 𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
 plot(heatmap(z=real(rep(𝑈ᵣ))))
-emode::Mode = orderedmodes(𝑈ᵣ.inspace)[64]
+emode::Mode = orderedmodes(𝑈ᵣ.inspace)[1]
 moderep::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode])))
 values = columnspec(moderep)
 

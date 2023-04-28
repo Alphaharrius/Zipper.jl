@@ -74,7 +74,9 @@ getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 
 removeattr(mode::Mode, keys::Symbol...) = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
 
-function setattr(mode::Mode, attrs::Pair{Symbol, T}...)::Mode where {T}
+removeattr(modes::Subset{Mode}, keys::Symbol...) = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
+
+function setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode
     # TODO: The @assert is removed temporarily.
     return Mode(Dict(mode.attrs..., attrs...))
 end

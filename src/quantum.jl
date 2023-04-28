@@ -105,13 +105,7 @@ order(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
 
 modes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
 
-function orderedmodes(fockspace::FockSpace)::Array{Mode}
-    modes = Array{Mode}(undef, dimension(fockspace))
-    # This method could be enhanced as the current implementation of `Subset` is based on `OrderedSet`, but to avoid implicit ordering assumption, using the ordering
-    # information is still desired.
-    foreach(mode -> modes[fockspace.ordering[mode]] = mode, flatten(rep(fockspace)))
-    return modes
-end
+orderedmodes(fockspace::FockSpace)::Subset{Mode} = flatten(rep(fockspace))
 
 function orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
     @assert(hassamespan(fromspace, tospace))

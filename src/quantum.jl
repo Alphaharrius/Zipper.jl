@@ -227,34 +227,30 @@ entries corresponds to different fermionic site within the same translational in
 
 ### Input
 - `momentums` The momentums which spans the output reciprocal subspace, for `spaceof(momentum) isa MomentumSpace`.
-- `inmodes` The modes from the input subspace, all modes must have the attribute `:offset` defined or result in errors.
+- `inspace` The input space, all contituent modes must have the attribute `:offset` defined or result in errors.
 
 ### Output
 The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = length(momentums) * count` for `count` is the number of fermionic site
 within the translational invariant unit cell, supplied by `inmodes`; `M = length(inmodes)`. The `inspace` of the returned `FockMap` will equates to `FockSpace(inmodes)`;
 the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """
-function fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
-    # Disable the identification by :offset so that all inmodes collapes to the basis mode. 
-    basismodes::Set{Mode} = Set(removeattr(inmode, :offset) for inmode in inmodes)
-    # Enable the identification by :offset when adding momentum as :offset for each basis mode.
-    outmodes = [Iterators.map(tup -> setattr(tup[1], :offset => tup[2]), Iterators.product(basismodes, momentums))...]
-    outorderings::Dict{Mode, Int64} = Dict(mode => index for (index, mode) in enumerate(outmodes))
-    inorderings::Dict{Mode, Int64} = Dict(mode => index for (index, mode) in enumerate(inmodes))
-    mat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
-    for ((oi, outmode), (ii, inmode)) in Iterators.product(enumerate(outmodes), enumerate(inmodes))
-        # Different fermionic site within the same translational invariant unit cell will not be considered.
-        if removeattr(outmode, :offset) != removeattr(inmode, :offset) continue end
-        momentum::Point = getattr(outmode, :offset)
-        euc_momentum::Point = linear_transform(euclidean(MomentumSpace, dimension(momentum)), momentum)
-        inoffset::Point = getattr(inmode, :offset)
-        euc_inoffset::Point = linear_transform(euclidean(RealSpace, dimension(inoffset)), inoffset)
-        mat[oi, ii] = exp(-1im * dot(euc_momentum, euc_inoffset))
+function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
+    𝑅ₖ::MomentumSpace = euclidean(MomentumSpace, dimension(first(momentums)))
+    ∑𝑘::Matrix{Float64} = hcat([pos(linear_transform(𝑅ₖ, 𝑘)) for 𝑘 in momentums]...)
+
+    inmodes::Subset{Mode} = orderedmodes(inspace)
+    𝑅::RealSpace = euclidean(RealSpace, dimension(first(momentums)))
+    basismodes::Subset{Mode} = removeattr(inmodes, :offset)
+    values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), length(momentums), dimension(inspace))
+    for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(inmodes))
+        if removeattr(inmode, :offset) != basismode continue end
+        𝑟ₑ::Point = linear_transform(𝑅, getattr(inmode, :offset))
+        values[n, :, m] = exp.(-1im * ∑𝑘' * pos(𝑟ₑ))
     end
-    return FockMap(
-        FockSpace(Subset([Subset(outmodes)]), outorderings),
-        FockSpace(Subset([inmodes]), inorderings),
-        mat)
+
+    spmat::SparseMatrixCSC = SparseMatrixCSC(reshape(values, (length(basismodes) * length(momentums), dimension(inspace))))
+    outspace::FockSpace = FockSpace(Subset(OrderedSet{Mode}(setattr(m, :offset => 𝑘) for 𝑘 in momentums for m in basismodes)))
+    return FockMap(outspace, inspace, spmat)
 end
 
 function directsum(fockmaps::Vector{FockMap})::FockMap

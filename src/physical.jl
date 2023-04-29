@@ -52,15 +52,4 @@ function filledstates(hamiltonian::FockMap)::FockMap
     return directsum(∑𝑈₀)
 end
 
-function ground_state_correlation(hamiltonian::FockMap)::FockMap
-    spectrum::Vector{Pair{Mode, Float64}} = @time eigvalsh(hamiltonian) # Since the eigenmodes here is intermediate within this function, we don't have to identify them.
-    contributing_modes::Vector{Mode} = @time map(p -> p.first, filter(p -> p.second <= 0, spectrum)) # Extract all eigenmodes that has negative eigenenergy.
-    𝖀::FockMap = @time eigvecsh(hamiltonian) # Unitary.
-    𝑈₀::FockMap = @time columns(𝖀, FockSpace(Subset(contributing_modes))) # Extract the eigenmode representations with negative eigenenergies.
-    return @time 𝑈₀ * 𝑈₀' # Using convention of 𝐶 ≔ ⟨𝑐𝑐†⟩
-end
-
-export Bond
-export bloch, bondmap, espec, hamiltonian, filledstates, ground_state_correlation
-
 end

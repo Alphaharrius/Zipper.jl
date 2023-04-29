@@ -7,6 +7,8 @@ module Physical
 using OrderedCollections
 using ..Spaces, ..Quantum, ..Geometries
 
+export bloch, bondmap, espec, hamiltonian, groundstates, ground_state_correlation
+
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
     modes::OrderedSet{Mode} = OrderedSet([mode for bond in bonds for mode in bond.first])
     fockspace::FockSpace = FockSpace(Subset(modes))
@@ -36,7 +38,7 @@ function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
     return directsum([∑𝐻ₖ...])
 end
 
-function filledstates(hamiltonian::FockMap)::FockMap
+function groundstates(hamiltonian::FockMap)::FockMap
     bloch_partitions::Subset{Subset{Mode}} = rep(hamiltonian.inspace)
     ∑𝑈₀::Vector{FockMap} = Vector{FockMap}(undef, length(bloch_partitions))
     filledgroup::ModeGroup = ModeGroup(quantized, "filled")

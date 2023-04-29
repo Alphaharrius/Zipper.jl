@@ -30,11 +30,15 @@ function visualize_spectrum(title::String, spectrum::Vector{Pair{Mode, T}}) wher
     𝑁::Int64 = length(spectrum)
     ∑𝑝::Vector{Point} = [getattr(pair.first, :offset) + getattr(pair.first, :pos) for pair in spectrum]
     𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> pos(linear_transform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
+    markerpositions::Matrix{Float64} = zeros(3, 𝑁)
+    copyto!(view(markerpositions, 1:size(𝑀ₚ, 1), :), 𝑀ₚ)
     sizes::Vector{Float64} = [abs(pair.second) for pair in spectrum]
-    markersizes::Vector{Float64} = sizes / norm(sizes) * 50
-    colors::Vector{RGB{Float64}} = [convert(RGB{Float64}, HSV(angle(pair.second) / 2π, 1, 1)) for pair in spectrum]
-    markercolors::Vector{Tuple{Int16, Int64, Int16}} = map(c -> Tuple([c.r, c.g, c.b] * 255), colors)
-    trace = scatter3d(x=𝑀ₚ[1, :], y=𝑀ₚ[2, :], z=𝑀ₚ[3, :], mode="marker", marker=attr(size=markersizes, color=markercolors))
+    markersizes::Vector{Float64} = sizes / norm(sizes) * 80
+    colors::Vector{RGB{Float64}} = [convert(RGB{Float64}, HSV(angle(pair.second) / 2π * 360, 1, 1)) for pair in spectrum]
+    markercolors::Vector{Tuple{Float32, Float32, Float32}} = map(c -> Tuple([c.r, c.g, c.b] * 255), colors)
+    trace = scatter3d(x=markerpositions[1, :], y=markerpositions[2, :], z=markerpositions[3, :], mode="markers", marker=attr(
+        size=markersizes,
+        color=markercolors))
     layout::Layout = Layout(title=title, scene=attr(aspectmode="data"))
     plot([trace], layout)
 end

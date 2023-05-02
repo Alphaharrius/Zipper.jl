@@ -41,9 +41,9 @@ vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 function latticepoints(crystal::Crystal)::Subset{Point}
     real_space::RealSpace = spaceof(crystal.unit_cell)
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
-    mesh_points::Array{Point} = [Point(pos, real_space) for pos in eachcol(crystal_mesh)]
-    points::OrderedSet{Point} = OrderedSet{Point}([mesh_point for mesh_point in mesh_points])
-    return Subset(points)
+    tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
+    recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2)
+    return Subset([Point(pos, real_space) for pos in eachcol(recentered_mesh)])
 end
 
 sitepoints(crystal::Crystal)::Subset{Point} = Subset([

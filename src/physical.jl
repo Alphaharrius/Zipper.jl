@@ -30,7 +30,7 @@ function espec(bonds::FockMap, momentums::Vector{Point})::Vector{Pair{Mode, Floa
 end
 
 function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
-    𝐵𝑍::Subset{Point} = brillouin_zone(crystal)
+    𝐵𝑍::Subset{Point} = brillouinzone(crystal)
     bondmodes::Subset{Mode} = flatten(rep(bondmap.outspace))
     sqrtvol::Float64 = sqrt(vol(crystal))
     ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset([𝑘]), FockSpace(bondmodes)) / sqrtvol, 𝐵𝑍)

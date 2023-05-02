@@ -2,11 +2,11 @@ if !isdefined(Main, :Spaces) include("spaces.jl") end
 
 module Geometries
 
-using OrderedCollections
+using LinearAlgebra, OrderedCollections
 using ..Spaces
 
 export Crystal
-export distance, interpolate, origin, radius, resize, mesh, vol, latticepoints, sitepoints, brillouin_zone
+export distance, interpolate, origin, radius, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, geometricalfilter, circularfilter
 
 """
     distance(a::Point, b::Point)::Float64

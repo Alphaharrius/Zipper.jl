@@ -13,7 +13,7 @@ kspace = convert(MomentumSpace, fcc)
 unitcell = union(Point([0, 0, 0], fcc), Point([1/4, 1/4, 1/4], fcc))
 crystal = Crystal(unitcell, [4, 4, 4])
 zone::Subset{Point} = points(crystal)
-k_zone::Subset{Point} = brillouin_zone(crystal)
+k_zone::Subset{Point} = brillouinzone(crystal)
 
 modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 fock::FockSpace = FockSpace(modes)

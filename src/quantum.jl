@@ -237,7 +237,7 @@ the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """
 function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
     𝑅ₖ::MomentumSpace = euclidean(MomentumSpace, dimension(first(momentums)))
-    ∑𝑘::Matrix{Float64} = hcat([pos(linear_transform(𝑅ₖ, 𝑘)) for 𝑘 in momentums]...)
+    ∑𝑘::Matrix{Float64} = hcat([pos(lineartransform(𝑅ₖ, 𝑘)) for 𝑘 in momentums]...)
 
     inmodes::Subset{Mode} = orderedmodes(inspace)
     𝑅::RealSpace = euclidean(RealSpace, dimension(first(momentums)))
@@ -245,7 +245,7 @@ function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
     values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), length(momentums), dimension(inspace))
     for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(inmodes))
         if removeattr(inmode, :offset) != basismode continue end
-        𝑟ₑ::Point = linear_transform(𝑅, getattr(inmode, :offset))
+        𝑟ₑ::Point = lineartransform(𝑅, getattr(inmode, :offset))
         values[n, :, m] = exp.(-1im * ∑𝑘' * pos(𝑟ₑ))
     end
 
@@ -254,7 +254,7 @@ function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
     return FockMap(outspace, inspace, spmat)
 end
 
-function directsum(fockmaps::Vector{FockMap})::FockMap
+function focksum(fockmaps::Vector{FockMap})::FockMap
     outparts::Vector{Subset{Mode}} = [part for fockmap in fockmaps for part in rep(fockmap.outspace)]
     inparts::Vector{Subset{Mode}} = [part for fockmap in fockmaps for part in rep(fockmap.inspace)]
     outmodes::OrderedSet{Mode} = OrderedSet([mode for subset in outparts for mode in subset])

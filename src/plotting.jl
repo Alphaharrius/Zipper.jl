@@ -8,7 +8,7 @@ using PlotlyJS, ColorTypes, LinearAlgebra
 using ..Spaces, ..Geometries, ..Quantum
 
 function visualize_region(title::String, region::Subset{Point}, visualization_space::AffineSpace)
-    ordered_points::Array{Point} = [linear_transform(visualization_space, point) for point in rep(region)]
+    ordered_points::Array{Point} = [lineartransform(visualization_space, point) for point in rep(region)]
     positions::Array{Vector} = [pos(point) for point in ordered_points]
     visualize_vector_positions(title, positions)
 end
@@ -29,7 +29,7 @@ end
 function visualize_spectrum(title::String, spectrum::Vector{Pair{Mode, T}}) where {T <: Number}
     𝑁::Int64 = length(spectrum)
     ∑𝑝::Vector{Point} = [getattr(pair.first, :offset) + getattr(pair.first, :pos) for pair in spectrum]
-    𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> pos(linear_transform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
+    𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> pos(lineartransform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
     markerpositions::Matrix{Float64} = zeros(3, 𝑁)
     copyto!(view(markerpositions, 1:size(𝑀ₚ, 1), :), 𝑀ₚ)
     sizes::Vector{Float64} = [abs(pair.second) for pair in spectrum]

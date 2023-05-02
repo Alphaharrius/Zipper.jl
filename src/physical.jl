@@ -35,7 +35,7 @@ function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
     sqrtvol::Float64 = sqrt(vol(crystal))
     ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset([𝑘]), FockSpace(bondmodes)) / sqrtvol, 𝐵𝑍)
     ∑𝐻ₖ = Iterators.map(𝐹ₖ -> 𝐹ₖ * bondmap * 𝐹ₖ', ∑𝐹ₖ)
-    return directsum([∑𝐻ₖ...])
+    return focksum([∑𝐻ₖ...])
 end
 
 function groundstates(hamiltonian::FockMap)::FockMap
@@ -51,7 +51,7 @@ function groundstates(hamiltonian::FockMap)::FockMap
         𝑈₀::FockMap = columns(𝔘, FockSpace(Subset(filledmodes)))
         ∑𝑈₀[n] = 𝑈₀
     end
-    return directsum(∑𝑈₀)
+    return focksum(∑𝑈₀)
 end
 
 end

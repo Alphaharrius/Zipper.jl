@@ -200,11 +200,11 @@ Get the vector representation of a `Point`.
 pos(point::Point)::Vector{Float64} = point.pos
 
 """
-    linear_transform(new_space::AffineSpace, point::Point)::Point
+    lineartransform(new_space::AffineSpace, point::Point)::Point
 
 Perform linear transformation on the point from the original space `spaceof(point)` to `newspace`, the vector representation of the `point` will be transformed.
 """
-linear_transform(newspace::AffineSpace, point::Point)::Point = Point(inv(basis(newspace)) * basis(spaceof(point)) * pos(point), newspace)
+lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(basis(newspace)) * basis(spaceof(point)) * pos(point), newspace)
 
 function Base.:+(a::Point, b::Point)::Point
     @assert(typeof(spaceof(a)) == typeof(spaceof(b)))

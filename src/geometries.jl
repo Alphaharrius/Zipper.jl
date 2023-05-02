@@ -57,4 +57,8 @@ function brillouin_zone(crystal::Crystal)::Subset{Point}
     return Subset([Point(pos, momentum_space) for pos in eachcol(recentered_mesh)])
 end
 
+geometricalfilter(f, center::Point) = input -> f(lineartransform(spaceof(center), convert(Point, input)), center)
+
+circularfilter(center::Point, radius::Float64) = geometricalfilter((point, center) -> norm(point - center) <= radius, center)
+
 end

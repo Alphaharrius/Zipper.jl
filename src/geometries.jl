@@ -13,7 +13,7 @@ export distance, interpolate, origin, radius, resize, mesh, vol, latticepoints, 
 
 Compute the distance between two points `a` & `b` within the same parent `AffineSpace`.
 """
-distance(a::Point, b::Point)::Float64 = sqrt(norm(a - b))
+distance(a::Point, b::Point)::Float64 = norm(a - b)
 
 function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <: Integer}
     @assert(spaceof(from) == spaceof(to))

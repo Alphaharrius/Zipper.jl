@@ -85,6 +85,8 @@ setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset([se
 
 spanbasis(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset([setattr(mode, :offset => point) for point in points for mode in basismodes])
 
+Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
+
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
 
 Base.:hash(mode::Mode)::UInt = hash(mode.attrs)

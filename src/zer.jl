@@ -9,36 +9,30 @@ using ..Spaces, ..Geometries, ..Quantum
 export DistillRegion
 export frozenisometries, frozenselectionbythreshold, frozenselectionbycount
 
-struct DistillRegion
-    center::Point
-    modes::Subset{Mode}
-end
-
 function frozenselectionbythreshold(threshold::Float64)
-    function frozenfocks(𝐶ᵣ::FockMap)::Dict{Symbol, FockSpace}
-        corrspec::Vector{Pair{Mode, Float64}} = eigvalsh(𝐶ᵣ)
-        filledmodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second < threshold, corrspec)))
-        emptymodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second > 1.0 - threshold, corrspec)))
-        return Dict(:filled => FockSpace(filledmodes), :empty => FockSpace(emptymodes))
+    function frozenfocks(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
+        spectrum, 𝑈ᵣ::FockMap = eigh(𝐶ᵣ)
+        filledmodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second < threshold, spectrum)))
+        emptymodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second > 1.0 - threshold, spectrum)))
+        return Dict(:filled => columns(𝑈ᵣ, FockSpace(filledmodes)), :empty => columns(𝑈ᵣ, FockSpace(emptymodes)))
     end
     return frozenfocks
 end
 
 function frozenselectionbycount(count::Integer)
-    function frozenfocks(𝐶ᵣ::FockMap)::Dict{Symbol, FockSpace}
+    function frozenfocks(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
         𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
         modes::Subset{Mode} = orderedmodes(𝑈ᵣ.inspace)
-        return Dict(:filled => FockSpace(modes[1:count]), :empty => FockSpace(modes[(end - count):end]))
+        return Dict(:filled => columns(𝑈ᵣ, FockSpace(modes[1:count])), :empty => columns(𝑈ᵣ, FockSpace(modes[(end - count):end])))
     end
     return frozenfocks
 end
 
-function frozenisometries(crystal::Crystal, correlations::FockMap, region::DistillRegion;
+function frozenisometries(crystal::Crystal, correlations::FockMap, restrictedfock::FockSpace;
                           selectionstrategy = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap}
-    𝐹ₖ::FockMap = fourier(brillouin_zone(crystal), FockSpace(region.modes)) / sqrt(vol(crystal))
+    𝐹ₖ::FockMap = fourier(brillouinzone(crystal), restrictedfock) / sqrt(vol(crystal))
     𝐶ᵣ::FockMap = 𝐹ₖ' * correlations * 𝐹ₖ
-    frozenfocks::Dict{Symbol, FockSpace} = selectionstrategy(𝐶ᵣ)
-    return Dict(:filled => columns(𝐶ᵣ, frozenfocks[:filled]), :empty => columns(𝐶ᵣ, frozenfocks[:empty]))
+    return selectionstrategy(𝐶ᵣ)
 end
 
 end

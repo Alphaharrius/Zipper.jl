@@ -202,16 +202,16 @@ Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, f
 Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
-function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::OrderedSet{Mode}
+function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     @assert(fockmap.inspace == fockmap.outspace)
-    return OrderedSet([
+    return Subset([
         Mode([:groups => [ModeGroup(transformed, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
 end
 
 function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
     @assert(fockmap.inspace == fockmap.outspace)
     evecs::Matrix{ComplexF64} = eigvecs(Hermitian(Matrix(rep(fockmap))))
-    return FockMap(fockmap.outspace, FockSpace(Subset(eigmodes(fockmap, attrs...))), SparseMatrixCSC{ComplexF64, Int64}(evecs))
+    return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), SparseMatrixCSC{ComplexF64, Int64}(evecs))
 end
 
 function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, Float64}}

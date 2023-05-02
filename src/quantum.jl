@@ -184,10 +184,7 @@ end
 
 Base.:-(target::FockMap)::FockMap = FockMap(target.outspace, target.inspace, -rep(target))
 
-function Base.:+(a::FockMap, b::FockMap)::FockMap
-    @assert(a.inspace == b.inspace && a.outspace == b.outspace)
-    return FockMap(a.outspace, a.inspace, rep(a) + rep(permute(b, a.outspace, a.inspace)))
-end
+Base.:+(a::FockMap, b::FockMap)::FockMap = focksum([a, b])
 
 Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 

@@ -220,6 +220,14 @@ function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, F
     return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
 end
 
+function eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
+    decomposed::Eigen = eigen(Hermitian(Matrix(rep(fockmap))))
+    modes::Subset{Mode} = eigmodes(fockmap, attrs...)
+    evals::Vector{Pair{Mode, Float64}} = [m => v for (m, v) in Iterators.zip(modes, decomposed.values)]
+    evecs::FockMap = FockMap(fockmap.outspace, FockSpace(modes), decomposed.vectors)
+    return evals, evecs
+end
+
 """
     fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
 

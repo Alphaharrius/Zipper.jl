@@ -81,6 +81,10 @@ function setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode
     return Mode(Dict(mode.attrs..., attrs...))
 end
 
+setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset([setattr(mode, attrs...) for mode in subset])
+
+spanbasis(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset([setattr(mode, :offset => point) for point in points for mode in basismodes])
+
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
 
 Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
@@ -178,15 +182,14 @@ function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), row_rule, col_rule))
 end
 
+Base.:-(target::FockMap)::FockMap = FockMap(target.outspace, target.inspace, -rep(target))
+
 function Base.:+(a::FockMap, b::FockMap)::FockMap
     @assert(a.inspace == b.inspace && a.outspace == b.outspace)
     return FockMap(a.outspace, a.inspace, rep(a) + rep(permute(b, a.outspace, a.inspace)))
 end
 
-function Base.:-(a::FockMap, b::FockMap)::FockMap
-    @assert(a.inspace == b.inspace && a.outspace == b.outspace)
-    return FockMap(a.outspace, a.inspace, rep(a) - rep(permute(b, a.outspace, a.inspace)))
-end
+Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 
 function Base.:*(a::FockMap, b::FockMap)::FockMap
     @assert(hassamespan(a.inspace, b.outspace)) # Even if the fockspaces are different, composition works as long as they have same span.

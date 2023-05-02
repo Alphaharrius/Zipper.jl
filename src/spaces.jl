@@ -260,7 +260,8 @@ Base.:isequal(a::Subset, b::Subset)::Bool = a == b
 Base.:iterate(subset::T, i...) where {T <: Subset} = iterate(rep(subset), i...)
 Base.:length(subset::T) where {T <: Subset} = length(rep(subset))
 Base.:lastindex(subset::T) where {T <: Subset} = length(subset)
-Base.:getindex(subset::T, inds...) where {T <: Subset} = rep(subset)[inds...]
+Base.:getindex(subset::T, index) where {T <: Subset} = rep(subset)[index]
+Base.:getindex(subset::T, inds...) where {T <: Subset} = Subset([rep(subset)...][inds...])
 
 """
     flatten(subset::Subset{T})::Subset

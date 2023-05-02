@@ -3,9 +3,10 @@ include("../src/geometries.jl")
 include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
+include("../src/zer.jl")
 
 using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes 
-using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
+using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting, ..Zer
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 
@@ -21,10 +22,49 @@ bonds::FockMap = bondmap([
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
+be = eigvecsh(bonds)
+
 𝐻::FockMap = @time hamiltonian(crystal, bonds)
 filled::FockMap = @time groundstates(𝐻)
 𝐶::FockMap = filled * filled'
-plot(heatmap(z=imag(rep(𝐶))))
+
+plot(heatmap(z=real(rep(𝐶))))
+
+genmodes = [setattr(m, :offset => Point([x, y], triangular)) for (x, y) in Iterators.product(-4:1:4, -4:1:4) for m in modes]
+function incirc(mode::Mode)::Bool
+    𝑝 = getattr(mode, :offset) + getattr(mode, :pos)
+    𝑝ₑ = linear_transform(euclidean(RealSpace, dimension(𝑝)), 𝑝)
+    return sqrt(norm(𝑝ₑ)) < 1.3
+end
+circular = Subset(filter(m -> incirc(m), genmodes))
+
+distill = frozenisometries(crystal, 𝐶, DistillRegion(Point([0, 0], triangular), circular))
+
+function globaldistiller_(crystal::Crystal, correlations::FockMap, region::Zer.DistillRegion; frozen_threshold::Float64 = 1e-3)
+    𝐹ₖ::FockMap = fourier(brillouin_zone(crystal), FockSpace(region.modes)) / sqrt(vol(crystal))
+    𝐶ᵣ::FockMap = 𝐹ₖ' * correlations * 𝐹ₖ
+    corrspec::Vector{Pair{Mode, Float64}} = eigvalsh(𝐶ᵣ)
+    plot(scatter(y=map(p -> p.second, corrspec), mode="markers"))
+    filledmodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second < frozen_threshold, corrspec)))
+    emptymodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second > 1.0 - frozen_threshold, corrspec)))
+    𝔘ᵣ::FockMap = eigvecsh(𝐶ᵣ)
+    filledisometry::FockMap = columns(𝔘ᵣ, FockSpace(filledmodes))
+    emptyisometry::FockMap = columns(𝔘ᵣ, FockSpace(emptymodes))
+    # TODO: Handle symmetry.
+    return emptyisometry * emptyisometry' - filledisometry * filledisometry'
+end
+
+gd = globaldistiller_(crystal, 𝐶, Zer.DistillRegion(Point([0, 0], triangular), circular))
+plot(heatmap(z=real(rep(gd))))
+gdspec = eigvalsh(gd)
+plot(scatter(y=map(p -> p.second, gdspec), mode="markers"))
+gdvecs = eigvecsh(gd)
+plot(heatmap(z=real(rep(gdvecs))))
+gdm = gdspec[24].first
+gdmm = columns(gdvecs, FockSpace(Subset([gdm])))
+values = columnspec(gdmm)
+visualize_spectrum("Mode", values)
+
 cvs = eigvalsh(𝐶)
 plot(scatter(y=map(p -> p.second, cvs), mode="markers"))
 𝔘::FockMap = eigvecsh(𝐶)
@@ -49,8 +89,11 @@ plot(heatmap(z=real(rep(𝐶ᵣ))))
 plot(heatmap(z=real(rep(𝑈ᵣ))))
 crvs = eigvalsh(𝐶ᵣ)
 plot(scatter(y=map(p -> p.second, crvs), mode="markers"))
-emode::Mode = orderedmodes(𝑈ᵣ.inspace)[13]
-moderep::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode])))
+emode1::Mode = orderedmodes(𝑈ᵣ.inspace)[12]
+emode2::Mode = orderedmodes(𝑈ᵣ.inspace)[13]
+moderep1 = columns(𝑈ᵣ, FockSpace(Subset([emode1])))
+moderep2::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode2])))
+moderep = moderep1 + (FockMap(moderep2.outspace, moderep1.inspace, rep(moderep2)) * 1im)
 values = columnspec(moderep)
 
 visualize_spectrum("Mode", values)

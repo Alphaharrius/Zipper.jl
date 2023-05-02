@@ -49,7 +49,7 @@ end
 sitepoints(crystal::Crystal)::Subset{Point} = Subset([
     latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unit_cell])
 
-function brillouin_zone(crystal::Crystal)::Subset{Point}
+function brillouinzone(crystal::Crystal)::Subset{Point}
     momentum_space::MomentumSpace = convert(MomentumSpace, spaceof(crystal.unit_cell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)

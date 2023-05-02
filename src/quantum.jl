@@ -197,6 +197,8 @@ function Base.:*(a::FockMap, b::FockMap)::FockMap
 end
 
 Base.:*(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) * number)
+Base.:*(number::Number, fockmap::FockMap)::FockMap = fockmap * number
+
 Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) / number)
 
 Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')

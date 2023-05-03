@@ -32,6 +32,8 @@ struct Crystal
     sizes::Vector{Int64}
 end
 
+Spaces.spaceof(crystal::Crystal) = spaceof(crystal.unitcell)
+
 resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitcell, sizes)
 
 mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collect(Iterators.product([0:(d - 1) for d in sizes]...))[:]]...)

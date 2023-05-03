@@ -9,8 +9,8 @@ using ..Spaces, ..Geometries
 export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, orderedmodes, orderingrule, modes, hassamespan, quantize, columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum
-export hermitian_partitioning, columnspec, spanbasis
+export dimension, order, orderedmodes, orderingrule, modes, hassamespan, quantize, columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum
+export trivial, hermitian_partitioning, columnspec, spanbasis, sparsefock
 
 """
     ModeGroupType

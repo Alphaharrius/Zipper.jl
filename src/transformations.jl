@@ -44,4 +44,10 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     return Crystal(scaledunitcell, diag(diagm(boundary_snf)))
 end
 
+function Base.:*(scale, composite::Tuple{FockSpace, Vararg{Pair{Symbol}}})
+    fockspace::FockSpace = first(composite)
+    companions::Dict{Symbol} = Dict(composite[2:end]...)
+    # TODO: Complete method.
+end
+
 end

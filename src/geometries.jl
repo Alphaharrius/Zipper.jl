@@ -53,7 +53,7 @@ function brillouinzone(crystal::Crystal)::Subset{Point}
     momentum_space::MomentumSpace = convert(MomentumSpace, spaceof(crystal.unit_cell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
-    recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2) ./ tiled_sizes
+    recentered_mesh::Matrix{Float64} = crystal_mesh ./ tiled_sizes
     return Subset([Point(pos, momentum_space) for pos in eachcol(recentered_mesh)])
 end
 

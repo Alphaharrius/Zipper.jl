@@ -7,6 +7,12 @@ module Plotting
 using PlotlyJS, ColorTypes, LinearAlgebra
 using ..Spaces, ..Geometries, ..Quantum
 
+function visualize(fockmap::FockMap; title::String="", rowrange=:, colrange=:)
+    subplots = [plot(heatmap(z=real(rep(fockmap)[rowrange, colrange]))) plot(heatmap(z=imag(rep(fockmap)[rowrange, colrange])))]
+    relayout!(subplots, title_text=title)
+    subplots
+end
+
 function visualize_region(title::String, region::Subset{Point}, visualization_space::AffineSpace)
     ordered_points::Array{Point} = [lineartransform(visualization_space, point) for point in rep(region)]
     positions::Array{Vector} = [pos(point) for point in ordered_points]
@@ -43,6 +49,6 @@ function visualize_spectrum(title::String, spectrum::Vector{Pair{Mode, T}}) wher
     plot([trace], layout)
 end
 
-export visualize_region, visualize_vector_positions, visualize_spectrum
+export visualize_region, visualize_vector_positions, visualize_spectrum, visualize
 
 end

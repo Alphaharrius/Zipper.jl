@@ -234,6 +234,7 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     rep::OrderedSet{T}
 
     Subset(elements::OrderedSet{T}) where {T <: AbstractSubset} = new{T}(elements)
+    Subset(elements::T) where {T <: Base.Generator} = Subset(OrderedSet(elements))
     Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
 end
 

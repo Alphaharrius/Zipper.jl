@@ -48,7 +48,7 @@ struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
 
     Mode(attrs::Dict{Symbol}) = new(attrs)
-    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(datas...))
+    Mode(attrs::Pair{Symbol}...) = Mode(Dict(attrs...))
 end
 
 """
@@ -135,11 +135,11 @@ function quantize(name::String, index::Integer, identifier::Symbol, point::Point
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
-    return Mode([:groups => [ModeGroup(quantized, name)], :index => index, identifier => point, :flavor => flavor, couple])
+    return Mode(:groups => [ModeGroup(quantized, name)], :index => index, identifier => point, :flavor => flavor, couple)
 end
 
 quantize(name::String, identifier::Symbol, subset::Subset{Point}, count::Integer)::Subset{Mode} = (
-    Subset([quantize(name, index, identifier, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count]))
+    Subset(quantize(name, index, identifier, point, flavor) for (index, point) in enumerate(subset) for flavor in 1:count))
 
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     outspace::FockSpace
@@ -207,7 +207,7 @@ Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspac
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     @assert(fockmap.inspace == fockmap.outspace)
     return Subset([
-        Mode([:groups => [ModeGroup(transformed, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
+        Mode(:groups => [ModeGroup(transformed, "eigh")], :index => index, :flavor => 1, attrs...) for index in 1:dimension(fockmap.inspace)])
 end
 
 function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap

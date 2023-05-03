@@ -42,8 +42,24 @@ const MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.Immutab
     :offset => Point,
     :pos => Point,
     :flavor => Integer)
-const MODE_DEFAULT_IDENTIFIERS::Set{Symbol} = Set([:groups, :index, :pos, :flavor])
 
+"""
+    Mode(attrs::Dict{Symbol})
+    Mode(datas::Vector{Pair{Symbol, T}}) where {T}
+
+Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
+
+### Attributes to put in `attrs`
+- `:groups` stores a `Vector{ModeGroup}` which `ModeGroup` identifies a group of modes created by some action.
+- `:index` stores an `Integer` that identifies the basis index.
+- `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
+- `:pos` stores a `Point` which is the unit cell offset, this is associated to the attributes of `:index` and `:flavor`.
+- `:flavor` stores am `Integer` that identifies a fermionic freedom at a lattice site.
+
+### Input
+- `attrs` The attributes which uniquely identifies the `Mode` object.
+
+"""
 struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
 
@@ -69,22 +85,47 @@ function Spaces.spaceof(mode::Mode)
     return euclidean(RealSpace, 1)
 end
 
-hasattr(mode::Mode, key::Symbol) = haskey(mode.attrs, key)
+"""
+    hasattr(mode::Mode, key::Symbol)::Bool
 
+Check if the `mode` has the attribute identified by `key`.
+"""
+hasattr(mode::Mode, key::Symbol)::Bool = haskey(mode.attrs, key)
+
+"""
+    getattr(mode::Mode, key::Symbol)
+
+Retrieve the attribute value identified by `key` from `mode`.
+"""
 getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 
-removeattr(mode::Mode, keys::Symbol...) = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
+"""
+    removeattr(mode::Mode, keys::Symbol...)::Mode
 
-removeattr(modes::Subset{Mode}, keys::Symbol...) = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
+Create a **copy** of `mode` **without** the attributes identified by `keys`.
+"""
+removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
 
-function setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode
-    # TODO: The @assert is removed temporarily.
-    return Mode(Dict(mode.attrs..., attrs...))
+"""
+    removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode}
+
+Create a **copy** of every `Mode` of `modes` **without** the attributes identified by `keys`, the resulting `Subset` might not have the
+same length as the input `modes` as some `Mode` might be **condensed** into a single one after some unique identifier attributes is removed.
+"""
+removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
+
+setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
+
+setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
+
+spanbasis(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
+
+function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
+    partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
+    modes::Subset{Mode} = spanbasis(basismodes, points)
+    orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
+    return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
 end
-
-setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset([setattr(mode, attrs...) for mode in subset])
-
-spanbasis(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset([setattr(mode, :offset => point) for point in points for mode in basismodes])
 
 Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
 

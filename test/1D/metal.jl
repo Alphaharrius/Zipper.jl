@@ -8,12 +8,12 @@ using LinearAlgebra, PlotlyJS
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
 
 real_space = euclidean(RealSpace, 1)
-unit_cell = union(Point([1/2], real_space))
-chain = Crystal(unit_cell, [256])
+unitcell = union(Point([1/2], real_space))
+chain = Crystal(unitcell, [256])
 
 k_space = convert(MomentumSpace, real_space)
 
-modes::Subset{Mode} = quantize("physical", unit_cell, 1)
+modes::Subset{Mode} = quantize("physical", unitcell, 1)
 m0 = first(rep(modes))
 t_n = -1
 bonds::Set{Bond} = Set([

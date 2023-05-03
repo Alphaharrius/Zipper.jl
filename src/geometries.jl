@@ -28,11 +28,11 @@ origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), spac
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 
 struct Crystal
-    unit_cell::Subset{Point}
+    unitcell::Subset{Point}
     sizes::Vector{Int64}
 end
 
-resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unit_cell, sizes)
+resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitcell, sizes)
 
 mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collect(Iterators.product([0:(d - 1) for d in sizes]...))[:]]...)
 

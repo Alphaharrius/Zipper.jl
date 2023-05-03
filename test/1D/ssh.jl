@@ -8,12 +8,12 @@ using LinearAlgebra, PlotlyJS
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting
 
 chain = euclidean(RealSpace, 1)
-unit_cell = union(Point([1/4], chain), Point([3/4], chain))
-ssh_chain = Crystal(unit_cell, [64])
+unitcell = union(Point([1/4], chain), Point([3/4], chain))
+ssh_chain = Crystal(unitcell, [64])
 
 k_space = convert(MomentumSpace, chain)
 
-modes::Subset{Mode} = quantize("physical", :pos, unit_cell, 1)
+modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 m0, m1 = members(modes)
 t_n = ComplexF64(-0.4)
 t_nn = ComplexF64(-0.6)

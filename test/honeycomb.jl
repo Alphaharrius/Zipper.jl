@@ -33,15 +33,13 @@ bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
-plot(heatmap(z=real(rep(bonds))))
-
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
-plot(heatmap(z=real(rep(𝐻)[1:64,1:64])))
+visualize(𝐻, title="Hamiltonian", rowrange=1:64, colrange=1:64)
 filled::FockMap = groundstates(𝐻)
 
-𝐶::FockMap = trivial(filled.outspace) - filled * filled'
-plot(heatmap(z=real(rep(𝐶)[1:128,1:128])))
+𝐶::FockMap = idmap(filled.outspace, filled.outspace) - filled * filled'
+visualize(𝐶, title="Correlation", rowrange=1:64, colrange=1:64)
 
 crystalpoints::Subset{Point} = latticepoints(crystal)
 physicalmodes::Subset{Mode} = spanbasis(modes, crystalpoints)
@@ -58,10 +56,11 @@ plot(heatmap(z=real(rep(fillediso))))
 ∑𝐹ₖ::Vector{FockMap} = [fourier(FockSpace(partition), fillediso.outspace) / sqrt(vol(crystal)) for partition in rep(reciprocalfock)]
 filledglobalstates = [𝐹ₖ * fillediso for 𝐹ₖ in ∑𝐹ₖ]
 test1 = focksum(filledglobalstates)
-plot(heatmap(z=real(rep(test1)[1:8, :])))
+visualize(test1, title="Filled Global State")
 filledglobalstate::FockMap = focksum([FockMap(state.outspace, FockSpace(setattr(orderedmodes(state.inspace), :offset => k)), rep(state)) for (k, state) in zip(brillouinzone(crystal), filledglobalstates)])
+visualize(filledglobalstate, title="Filled Global State", rowrange=1:32, colrange=1:32)
 filledprojector::FockMap = filledglobalstate * filledglobalstate'
-plot(heatmap(z=real(rep(filledprojector))))
+visualize(filledprojector, title="Filled Projector", rowrange=1:32, colrange=1:32)
 
 emptyiso::FockMap = distill[:empty]
 test2 = 𝐹ₖ * emptyiso
@@ -82,9 +81,9 @@ circle_fockspace = FockSpace(region)
 
 𝐹::FockMap = @time fourier(brillouinzone(crystal), restrictedfock) / sqrt(vol(crystal))
 𝐶ᵣ::FockMap = 𝐹' * 𝐶 * 𝐹
-plot(heatmap(z=real(rep(𝐶ᵣ))))
+visualize(𝐶ᵣ, title="Restricted Correlations")
 𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
-plot(heatmap(z=real(rep(𝑈ᵣ))))
+visualize(𝑈ᵣ, title="Restricted Unitary")
 crvs = eigvalsh(𝐶ᵣ)
 plot(scatter(y=map(p -> p.second, crvs), mode="markers"))
 emode1::Mode = orderedmodes(𝑈ᵣ.inspace)[23]

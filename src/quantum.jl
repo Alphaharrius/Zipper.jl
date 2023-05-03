@@ -206,6 +206,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     end
 end
 
+trivial(fockspace::FockSpace)::FockMap = FockMap(fockspace, fockspace, SparseMatrixCSC(Matrix{Float64}(I(dimension(fockspace)))))
+
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
 function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap

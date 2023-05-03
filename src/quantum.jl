@@ -10,7 +10,7 @@ export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
 export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
 export dimension, order, orderedmodes, orderingrule, modes, hassamespan, quantize, columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum
-export trivial, hermitian_partitioning, columnspec, spanbasis, sparsefock
+export idmap, hermitian_partitioning, columnspec, spanbasis, sparsefock
 
 """
     ModeGroupType
@@ -206,7 +206,10 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     end
 end
 
-trivial(fockspace::FockSpace)::FockMap = FockMap(fockspace, fockspace, SparseMatrixCSC(Matrix{Float64}(I(dimension(fockspace)))))
+function idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
+    @assert(dimension(outspace) == dimension(inspace))
+    FockMap(outspace, inspace, SparseMatrixCSC(Matrix{Float64}(I(dimension(outspace)))))
+end
 
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 

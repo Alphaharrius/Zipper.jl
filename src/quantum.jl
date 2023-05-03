@@ -296,21 +296,27 @@ within the translational invariant unit cell, supplied by `inmodes`; `M = length
 the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """
 function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
-    𝑅ₖ::MomentumSpace = euclidean(MomentumSpace, dimension(first(momentums)))
-    ∑𝑘::Matrix{Float64} = hcat([pos(lineartransform(𝑅ₖ, 𝑘)) for 𝑘 in momentums]...)
-
+    ∑𝑘::Matrix{Float64} = hcat([pos(euclidean(𝑘)) for 𝑘 in momentums]...)
     inmodes::Subset{Mode} = orderedmodes(inspace)
-    𝑅::RealSpace = euclidean(RealSpace, dimension(first(momentums)))
     basismodes::Subset{Mode} = removeattr(inmodes, :offset)
-    values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), length(momentums), dimension(inspace))
-    for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(inmodes))
-        if removeattr(inmode, :offset) != basismode continue end
-        𝑟ₑ::Point = lineartransform(𝑅, getattr(inmode, :offset))
-        values[n, :, m] = exp.(-1im * ∑𝑘' * pos(𝑟ₑ))
-    end
+    outspace::FockSpace = sparsefock(basismodes, momentums)
+    return fourier(outspace, inspace, ∑𝑘, basismodes)
+end
 
-    spmat::SparseMatrixCSC = SparseMatrixCSC(reshape(values, (length(basismodes) * length(momentums), dimension(inspace))))
-    outspace::FockSpace = FockSpace(Subset(OrderedSet{Mode}(setattr(m, :offset => 𝑘) for 𝑘 in momentums for m in basismodes)))
+function fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
+    ∑𝑘::Matrix{Float64} = hcat([pos(euclidean(getattr(first(partition), :offset))) for partition in rep(outspace)]...)
+    basismodes::Subset{Mode} = removeattr(first(rep(outspace)), :offset) # Assumed the similarity in structure for each partitions.
+    return fourier(outspace, inspace, ∑𝑘, basismodes)
+end
+
+function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix{Float64}, basismodes::Subset{Mode})::FockMap
+    values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), size(momentummatrix, 2), dimension(inspace))
+    for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(orderedmodes(inspace)))
+        if removeattr(inmode, :offset) != basismode continue end
+        𝑟ₑ::Point = euclidean(getattr(inmode, :offset))
+        values[n, :, m] = exp.(-1im * momentummatrix' * pos(𝑟ₑ))
+    end
+    spmat::SparseMatrixCSC = SparseMatrixCSC(reshape(values, (length(basismodes) * size(momentummatrix, 2), dimension(inspace))))
     return FockMap(outspace, inspace, spmat)
 end
 

@@ -112,7 +112,7 @@ removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first 
 Create a **copy** of every `Mode` of `modes` **without** the attributes identified by `keys`, the resulting `Subset` might not have the
 same length as the input `modes` as some `Mode` might be **condensed** into a single one after some unique identifier attributes is removed.
 """
-removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode} = Subset([OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes)])
+removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
 
 setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
 

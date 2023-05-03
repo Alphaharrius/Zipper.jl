@@ -17,14 +17,22 @@ crystal = Crystal(unitcell, [32, 32])
 modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 m0, m1 = members(modes)
 tₙ = ComplexF64(-1.)
+
+reciprocalfock::FockSpace = sparsefock(modes, brillouinzone(crystal))
+
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
+plot(heatmap(z=real(rep(bonds))))
+
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
+plot(heatmap(z=real(rep(𝐻)[1:64,1:64])))
 filled::FockMap = groundstates(𝐻)
-𝐶::FockMap = filled * filled'
+
+𝐶::FockMap = trivial(filled.outspace) - filled * filled'
+plot(heatmap(z=real(rep(𝐶)[1:128,1:128])))
 
 crystalpoints::Subset{Point} = latticepoints(crystal)
 physicalmodes::Subset{Mode} = spanbasis(modes, crystalpoints)
@@ -34,13 +42,24 @@ restrictedfock::FockSpace = FockSpace(restrictedregion)
 distill = frozenisometries(crystal, 𝐶, restrictedfock)
 
 fillediso::FockMap = distill[:filled]
-𝐹ₖ::FockMap = fourier(brillouinzone(crystal), fillediso.outspace) / sqrt(vol(crystal))
-filledglobalstate::FockMap = 𝐹ₖ * fillediso
+𝐹ₖ = fourier(reciprocalfock, fillediso.outspace) / sqrt(vol(crystal))
+test = 𝐹ₖ * fillediso
+plot(heatmap(z=real(rep(fillediso))))
+# FockSpace(setattr(orderedmodes(fillediso.outspace), :offset => getattr(first(partition)
+∑𝐹ₖ::Vector{FockMap} = [fourier(FockSpace(partition), fillediso.outspace) / sqrt(vol(crystal)) for partition in rep(reciprocalfock)]
+filledglobalstates = [𝐹ₖ * fillediso for 𝐹ₖ in ∑𝐹ₖ]
+test1 = focksum(filledglobalstates)
+plot(heatmap(z=real(rep(test1)[1:8, :])))
+filledglobalstate::FockMap = focksum([FockMap(state.outspace, FockSpace(setattr(orderedmodes(state.inspace), :offset => k)), rep(state)) for (k, state) in zip(brillouinzone(crystal), filledglobalstates)])
 filledprojector::FockMap = filledglobalstate * filledglobalstate'
+plot(heatmap(z=real(rep(filledprojector))))
 
 emptyiso::FockMap = distill[:empty]
-emptyglobalstate::FockMap = 𝐹ₖ * emptyiso
+test2 = 𝐹ₖ * emptyiso
+emptyglobalstates = [𝐹ₖ * emptyiso for 𝐹ₖ in ∑𝐹ₖ]
+emptyglobalstate::FockMap = focksum([FockMap(state.outspace, FockSpace(setattr(orderedmodes(state.inspace), :offset => k)), rep(state)) for (k, state) in zip(brillouinzone(crystal), emptyglobalstates)])
 emptyprojector::FockMap = emptyglobalstate * emptyglobalstate'
+plot(heatmap(z=real(rep(emptyiso))))
 
 projector::FockMap = emptyprojector - filledprojector
 
@@ -52,19 +71,19 @@ plot(heatmap(z=real(rep(projector))))
 # restricted_fockspace = FockSpace(Subset([setattr(m, :offset => p) for p in latticepoints(small_crystal) for m in modes]))
 circle_fockspace = FockSpace(region)
 
-𝐹::FockMap = @time fourier(brillouinzone(crystal), circle_fockspace) / sqrt(vol(crystal))
+𝐹::FockMap = @time fourier(brillouinzone(crystal), restrictedfock) / sqrt(vol(crystal))
 𝐶ᵣ::FockMap = 𝐹' * 𝐶 * 𝐹
 plot(heatmap(z=real(rep(𝐶ᵣ))))
 𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
 plot(heatmap(z=real(rep(𝑈ᵣ))))
 crvs = eigvalsh(𝐶ᵣ)
 plot(scatter(y=map(p -> p.second, crvs), mode="markers"))
-emode1::Mode = orderedmodes(𝑈ᵣ.inspace)[12]
-emode2::Mode = orderedmodes(𝑈ᵣ.inspace)[13]
+emode1::Mode = orderedmodes(𝑈ᵣ.inspace)[23]
+emode2::Mode = orderedmodes(𝑈ᵣ.inspace)[24]
 moderep1 = columns(𝑈ᵣ, FockSpace(Subset([emode1])))
 moderep2::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode2])))
 moderep = moderep1 + (FockMap(moderep2.outspace, moderep1.inspace, rep(moderep2)) * 1im)
-values = columnspec(moderep)
+values = columnspec(moderep1)
 
 visualize_spectrum("Mode", values)
 

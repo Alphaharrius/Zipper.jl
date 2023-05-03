@@ -8,7 +8,8 @@ using PlotlyJS, ColorTypes, LinearAlgebra
 using ..Spaces, ..Geometries, ..Quantum
 
 function visualize(fockmap::FockMap; title::String="", rowrange=:, colrange=:)
-    subplots = [plot(heatmap(z=real(rep(fockmap)[rowrange, colrange]))) plot(heatmap(z=imag(rep(fockmap)[rowrange, colrange])))]
+    source = rep(fockmap)[rowrange, colrange]
+    subplots = [plot(heatmap(z=real(source))) plot(heatmap(z=imag(source)))]
     relayout!(subplots, title_text=title)
     subplots
 end

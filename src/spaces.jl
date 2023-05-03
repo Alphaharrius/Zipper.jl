@@ -141,6 +141,9 @@ struct MomentumSpace <: AffineSpace
     rep::Matrix{Float64}
 end
 
+Base.:convert(::Type{RealSpace}, source::Matrix{Float64})::RealSpace = RealSpace(source)
+Base.:convert(::Type{MomentumSpace}, source::Matrix{Float64})::MomentumSpace = MomentumSpace(source)
+
 """ Performing conversion from `RealSpace` to `MomentumSpace` using formula 𝑅ₖ ≝ 2π⋅(𝑅ᵣ⁻¹)ᵀ."""
 Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = MomentumSpace(2.0 * π * Matrix(transpose(inv(basis(source)))))
 """ Performing conversion from `MomentumSpace` to `RealSpace`."""

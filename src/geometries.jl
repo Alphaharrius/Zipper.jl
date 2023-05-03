@@ -39,7 +39,7 @@ mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 
 function latticepoints(crystal::Crystal)::Subset{Point}
-    real_space::RealSpace = spaceof(crystal.unit_cell)
+    real_space::RealSpace = spaceof(crystal.unitcell)
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2)

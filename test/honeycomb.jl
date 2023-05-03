@@ -4,16 +4,25 @@ include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
 include("../src/zer.jl")
+include("../src/transformations.jl")
 
-using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes 
-using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting, ..Zer
+using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes, SmithNormalForm
+using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting, ..Zer, ..Transformations
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
+scale = Scale([2 0; 0 2])
 
 k_space = convert(MomentumSpace, triangular)
 
 unitcell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
+pp = scale * unitcell[1]
+invscale = Scale(inv(rep(scale)))
+ip = invscale * pp
 crystal = Crystal(unitcell, [32, 32])
+
+scaledcrystal = scale * (scale * crystal)
+visualize_region("space", scaledcrystal.unitcell, euclidean(RealSpace, 2))
+
 modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 m0, m1 = members(modes)
 tₙ = ComplexF64(-1.)

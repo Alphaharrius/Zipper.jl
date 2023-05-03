@@ -142,7 +142,14 @@ struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}) = new(subsets, ordering)
     FockSpace(subset::Subset{Mode}) = FockSpace(
         Subset([subset]),
-        Dict([mode => order for (order, mode) in enumerate(subset)]...))
+        Dict(mode => order for (order, mode) in enumerate(subset)))
+end
+
+function Base.:union(focks::FockSpace...)::FockSpace
+    partitions::Subset{Subset{Mode}} = union([rep(fock) for fock in focks]...)
+    modes::Subset{Mode} = flatten(partitions)
+    ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
+    return FockSpace(partitions, ordering)
 end
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)

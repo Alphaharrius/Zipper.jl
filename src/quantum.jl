@@ -321,20 +321,17 @@ function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix
 end
 
 function focksum(fockmaps::Vector{FockMap})::FockMap
-    outparts::Vector{Subset{Mode}} = [part for fockmap in fockmaps for part in rep(fockmap.outspace)]
-    inparts::Vector{Subset{Mode}} = [part for fockmap in fockmaps for part in rep(fockmap.inspace)]
-    outmodes::OrderedSet{Mode} = OrderedSet([mode for subset in outparts for mode in subset])
-    inmodes::OrderedSet{Mode} = OrderedSet([mode for subset in inparts for mode in subset])
-    outordering::Dict{Mode, Int64} = Dict(map(tup -> last(tup) => first(tup), enumerate(outmodes)))
-    inordering::Dict{Mode, Int64} = Dict(map(tup -> last(tup) => first(tup), enumerate(inmodes)))
-    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(length(outmodes), length(inmodes))
-    for (outpart, inpart, fockmap) in Iterators.zip(outparts, inparts, fockmaps)
+    parts = [(fockmap, outpart, inpart) for fockmap in fockmaps for (outpart, inpart) in zip(rep(fockmap.outspace), rep(fockmap.inspace))]
+    outfock = union([fockmap.outspace for fockmap in fockmaps]...)
+    infock = union([fockmap.inspace for fockmap in fockmaps]...)
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outfock), dimension(infock))
+    for (fockmap, outpart, inpart) in parts
         source::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
         for (outmode, inmode) in Iterators.product(outpart, inpart)
-            spmat[outordering[outmode], inordering[inmode]] += source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
+            spmat[order(outfock, outmode), order(infock, inmode)] += source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
         end
     end
-    return FockMap(FockSpace(Subset([outparts...]), outordering), FockSpace(Subset([inparts...]), inordering), spmat)
+    return FockMap(outfock, infock, spmat)
 end
 
 """

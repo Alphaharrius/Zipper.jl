@@ -7,10 +7,10 @@ using LinearAlgebra, SparseArrays, OrderedCollections
 using ..Spaces, ..Geometries
 
 export quantized, transformed, symmetrized
-export ModeGroupType, ModeGroup, Mode, FockSpace, FockMap
-export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup
-export dimension, order, orderedmodes, orderingrule, modes, hassamespan, quantize, columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum
-export idmap, hermitian_partitioning, columnspec, spanbasis, sparsefock
+export ModeGroupType, ModeGroup, Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
+export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup, quantize, flavorcount, spanoffset
+export dimension, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
+export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, columnspec
 
 """
     ModeGroupType
@@ -35,13 +35,6 @@ struct ModeGroup
     "The name of the group."
     name::String
 end
-
-const MODE_IDENTIFIERS_TYPE::Base.ImmutableDict{Symbol, DataType} = Base.ImmutableDict(
-    :groups => Vector{ModeGroup},
-    :index => Integer,
-    :offset => Point,
-    :pos => Point,
-    :flavor => Integer)
 
 """
     Mode(attrs::Dict{Symbol})
@@ -337,30 +330,6 @@ function focksum(fockmaps::Vector{FockMap})::FockMap
         end
     end
     return FockMap(outfock, infock, spmat)
-end
-
-"""
-    hermitian_partitioning(hermitian::FockMap, partitions::Pair{Symbol}...)::Dict{Symbol, FockMap}
-
-Partition the Hermitian `FockMap` into column partitions by a given set of rules based on the eigenvalues from eigenvalue decompositions.
-
-### Input
-- `hermitian` The source `FockMap` to be partitioned, this is assumed to be a Hermitian.
-- `partition_rules` The rules for each partition in form of `Pair{Symbol, T}` for `T` is a predicate function with input of type `<: Float`,
-                    each rule `Pair` have the first `Symbol` typed element as the partition name.
-
-### Output
-A `Dict{Symbol, FockMap}` keyed by the partition name specified from the `partition_rules` with value of the associated partitioned `FockMap`.
-"""
-function hermitian_partitioning(hermitian::FockMap, partition_rules::Pair{Symbol}...)::Dict{Symbol, FockMap}
-    eigenvalues::Vector{Pair{Mode, Float64}} = eigvalsh(hermitian)
-    𝔘::FockMap = eigvecsh(hermitian)
-    ret::Dict{Symbol, FockMap} = Dict()
-    for rule in partition_rules
-        modes::Vector{Mode} = map(p -> p.first, filter(p -> rule.second(p.second), eigenvalues))
-        ret[rule.first] = columns(𝔘, FockSpace(Subset(modes)))
-    end
-    return ret
 end
 
 function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}

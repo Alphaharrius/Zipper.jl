@@ -164,7 +164,7 @@ Noted that the ordering of the partitions will follow the ordering of `points`, 
 """
 function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
     partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
-    modes::Subset{Mode} = spanbasis(basismodes, points)
+    modes::Subset{Mode} = spanoffset(basismodes, points)
     orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
     return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
 end

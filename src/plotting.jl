@@ -7,16 +7,18 @@ module Plotting
 using PlotlyJS, ColorTypes, LinearAlgebra
 using ..Spaces, ..Geometries, ..Quantum
 
-function visualize(fockmap::FockMap; title::String="", rowrange=:, colrange=:)
+export visualize
+
+function visualize(fockmap::FockMap; title::String = "", rowrange = :, colrange = :)
     source = rep(fockmap)[rowrange, colrange]
-    subplots = [plot(heatmap(z=real(source))) plot(heatmap(z=imag(source)))]
+    layout = Layout(yaxis=attr(autorange="reversed"))
+    subplots = [plot(heatmap(z=real(source)), layout) plot(heatmap(z=imag(source)), layout)]
     relayout!(subplots, title_text=title)
     subplots
 end
 
-function visualize_region(title::String, region::Subset{Point}, visualization_space::AffineSpace)
-    ordered_points::Array{Point} = [lineartransform(visualization_space, point) for point in rep(region)]
-    positions::Array{Vector} = [pos(point) for point in ordered_points]
+function visualize(region::Subset{Point}; title::String = "")
+    positions::Array{Vector} = [pos(point) for point in region]
     visualize_vector_positions(title, positions)
 end
 
@@ -33,7 +35,7 @@ function visualize_vector_positions(title::String, positions::Array{Vector})
     plot([trace], layout)
 end
 
-function visualize_spectrum(title::String, spectrum::Vector{Pair{Mode, T}}) where {T <: Number}
+function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T <: Number}
     𝑁::Int64 = length(spectrum)
     ∑𝑝::Vector{Point} = [getattr(pair.first, :offset) + getattr(pair.first, :pos) for pair in spectrum]
     𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> pos(lineartransform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
@@ -49,7 +51,5 @@ function visualize_spectrum(title::String, spectrum::Vector{Pair{Mode, T}}) wher
     layout::Layout = Layout(title=title, scene=attr(aspectmode="data"))
     plot([trace], layout)
 end
-
-export visualize_region, visualize_vector_positions, visualize_spectrum, visualize
 
 end

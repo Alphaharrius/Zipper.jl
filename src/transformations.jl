@@ -39,11 +39,7 @@ Base.:*(a::Scale, b::Scale)::Scale = Scale(rep(a) * rep(b))
 Base.:*(scale::Scale, space::RealSpace) = convert(typeof(space), rep(scale) * rep(space))
 Base.:*(scale::Scale, space::MomentumSpace) = convert(typeof(space), rep(inv(scale)) * rep(space))
 
-function Base.:*(scale::Scale, point::Point)::Point
-    oldspace::AffineSpace = spaceof(point)
-    scaledspace::AffineSpace = scale * oldspace
-    return lineartransform(scaledspace, point)
-end
+Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * spaceof(point), point)
 
 Base.:*(scale::Scale, subset::Subset{T}) where {T} = Subset([scale * element for element in subset])
 

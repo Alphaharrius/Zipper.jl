@@ -284,7 +284,7 @@ of the permuted list of modes will matches the ordering of `tospace`.
 """
 function orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
     @assert(hassamespan(fromspace, tospace))
-    return [tospace.ordering[mode] for mode in orderedmodes(fromspace)]
+    return [fromspace.ordering[mode] for mode in orderedmodes(tospace)]
 end
 
 """

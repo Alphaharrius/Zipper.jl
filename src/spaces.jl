@@ -249,6 +249,8 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
 end
 
+Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
+
 """
     spaceof(subset::Subset)::AbstractSpace
 

@@ -227,6 +227,9 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock) = FockSpace(rep(fockspace), fockspace.ordering, T=T)
 end
 
+""" Displays the fock type, partition and dimension information of a `FockSpace`. """
+Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(part=$(length(rep(fockspace))), dim=$(dimension(fockspace)))"))
+
 function Base.:union(focks::FockSpace...)::FockSpace
     partitions::Subset{Subset{Mode}} = union([rep(fock) for fock in focks]...)
     modes::Subset{Mode} = flatten(partitions)

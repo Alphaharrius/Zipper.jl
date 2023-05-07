@@ -467,7 +467,7 @@ within the translational invariant unit cell, supplied by `inmodes`; `M = length
 the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """
 function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
-    ∑𝑘::Matrix{Float64} = hcat([pos(euclidean(𝑘)) for 𝑘 in momentums]...)
+    ∑𝑘::Matrix{Float64} = hcat([𝑘 |> euclidean |> pos for 𝑘 in momentums]...)
     inmodes::Subset{Mode} = orderedmodes(inspace)
     basismodes::Subset{Mode} = removeattr(inmodes, :offset)
     outspace::FockSpace = sparsefock(basismodes, momentums)
@@ -475,8 +475,8 @@ function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
 end
 
 function fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
-    ∑𝑘::Matrix{Float64} = hcat([pos(euclidean(getattr(first(partition), :offset))) for partition in rep(outspace)]...)
-    basismodes::Subset{Mode} = removeattr(first(rep(outspace)), :offset) # Assumed the similarity in structure for each partitions.
+    ∑𝑘::Matrix{Float64} = hcat([getattr(first(partition), :offset) |> euclidean |> pos for partition in rep(outspace)]...)
+    basismodes::Subset{Mode} = removeattr(outspace |> rep |> first, :offset) # Assumed the similarity in structure for each partitions.
     return fourier(outspace, inspace, ∑𝑘, basismodes)
 end
 

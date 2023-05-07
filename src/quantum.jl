@@ -304,9 +304,15 @@ issparse(fockspace::FockSpace)::Bool = length(rep(fockspace)) > 1
 """ Check if fockspaces of `a` and `b` has the exact same structure. """
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
 
+# ======================================================================================
+# Overloads that makes rep(::FockSpace) works.
 Base.:convert(::Type{Subset}, source::FockSpace) = source.rep
 Base.:convert(::Type{Subset{Subset}}, source::FockSpace) = convert(Subset, source)
 Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset, source)
+# ======================================================================================
+
+Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source) # Added for completeness.
+
 """
     quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup)::Mode
 

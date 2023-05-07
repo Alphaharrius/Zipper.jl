@@ -300,6 +300,8 @@ hassamespan(a::FockSpace, b::FockSpace)::Bool = modes(a) == modes(b)
 Check if `fockspace` is a sparse fockspace.
 """
 issparse(fockspace::FockSpace)::Bool = length(rep(fockspace)) > 1
+
+""" Check if fockspaces of `a` and `b` has the exact same structure. """
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
 
 Base.:convert(::Type{Subset}, source::FockSpace) = source.rep

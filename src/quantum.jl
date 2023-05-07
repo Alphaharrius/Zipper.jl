@@ -187,6 +187,13 @@ Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
 # =====================================================
 
+# =========================================
+# Types of different fockspaces
+abstract type AnyFock end
+abstract type SparseFock <: AnyFock end
+abstract type CrystalFock <: SparseFock end
+# =========================================
+
 """
     FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; T::Type{<: AnyFock})
     FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock})
@@ -224,7 +231,8 @@ function Base.:union(focks::FockSpace...)::FockSpace
     partitions::Subset{Subset{Mode}} = union([rep(fock) for fock in focks]...)
     modes::Subset{Mode} = flatten(partitions)
     ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(partitions, ordering)
+    T::Type{<: AnyFock} = length(partitions) > 1 ? SparseFock : AnyFock
+    return FockSpace(partitions::Subset{Subset{Mode}}, ordering, T=T)
 end
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)

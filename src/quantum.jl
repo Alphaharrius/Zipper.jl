@@ -51,7 +51,7 @@ Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 - `:index` stores an `Integer` that identifies the basis index.
 - `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
 - `:pos` stores a `Point` which is the unit cell offset, this is associated to the attributes of `:index` and `:flavor`.
-- `:flavor` stores am `Integer` that identifies a fermionic freedom at a lattice site.
+- `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
 
 ### Input
 - `attrs` The attributes which uniquely identifies the `Mode` object.

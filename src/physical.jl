@@ -7,7 +7,7 @@ module Physical
 using OrderedCollections
 using ..Spaces, ..Quantum, ..Geometries
 
-export bloch, bondmap, espec, hamiltonian, groundstates, ground_state_correlation
+export bloch, bondmap, espec, hamiltonian, groundstates, groundstatecorrelation
 
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
     modes::OrderedSet{Mode} = OrderedSet([mode for bond in bonds for mode in bond.first])
@@ -54,6 +54,12 @@ function groundstates(hamiltonian::FockMap)::FockMap
     𝔘₀::FockMap = focksum(∑𝑈₀)
     return FockMap(FockSpace(𝔘₀.outspace, T=CrystalFock), 𝔘₀.inspace, rep(𝔘₀))
 end
+
+function groundstatecorrelation(hamiltonian::FockMap)::FockMap
+    𝔘₀::FockMap = groundstates(hamiltonian)
+    𝐼::FockMap = idmap(𝔘₀.outspace, 𝔘₀.outspace)
+    𝐶::FockMap = 𝐼 - 𝔘₀ * 𝔘₀'
+    return FockMap(FockSpace(𝐶.outspace, T=CrystalFock), FockSpace(𝐶.inspace, T=CrystalFock), rep(𝐶))
 end
 
 end

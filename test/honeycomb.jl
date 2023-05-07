@@ -10,24 +10,19 @@ using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes, Smi
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting, ..Zer, ..Transformations
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
-scale = Scale([2 0; 0 2])
 
 k_space = convert(MomentumSpace, triangular)
 
 unitcell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
-pp = scale * unitcell[1]
-invscale = Scale(inv(rep(scale)))
-ip = invscale * pp
+unitcell[1]
 crystal = Crystal(unitcell, [32, 32])
 
-scaledcrystal = scale * (scale * crystal)
-visualize_region("space", scaledcrystal.unitcell, euclidean(RealSpace, 2))
+modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 
-modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
 m0, m1 = members(modes)
 tₙ = ComplexF64(-1.)
 
-reciprocalfock::FockSpace = sparsefock(modes, brillouinzone(crystal))
+reciprocalfock::FockSpace = crystalfock(modes, crystal)
 
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
@@ -36,13 +31,12 @@ bonds::FockMap = bondmap([
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
 visualize(𝐻, title="Hamiltonian", rowrange=1:64, colrange=1:64)
-filled::FockMap = groundstates(𝐻)
 
-𝐶::FockMap = idmap(filled.outspace, filled.outspace) - filled * filled'
+𝐶::FockMap = groundstatecorrelation(𝐻)
 visualize(𝐶, title="Correlation", rowrange=1:64, colrange=1:64)
 
 crystalpoints::Subset{Point} = latticepoints(crystal)
-physicalmodes::Subset{Mode} = spanbasis(modes, crystalpoints)
+physicalmodes::Subset{Mode} = spanoffset(modes, crystalpoints)
 restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)
 restrictedfock::FockSpace = FockSpace(restrictedregion)
 
@@ -79,21 +73,23 @@ plot(heatmap(z=real(rep(projector))))
 # restricted_fockspace = FockSpace(Subset([setattr(m, :offset => p) for p in latticepoints(small_crystal) for m in modes]))
 circle_fockspace = FockSpace(region)
 
-𝐹::FockMap = @time fourier(brillouinzone(crystal), restrictedfock) / sqrt(vol(crystal))
+[m.attrs for m in orderedmodes(restrictedfock)]
+
+𝐹::FockMap = fourier(brillouinzone(crystal), restrictedfock) / sqrt(vol(crystal))
 𝐶ᵣ::FockMap = 𝐹' * 𝐶 * 𝐹
 visualize(𝐶ᵣ, title="Restricted Correlations")
 𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
 visualize(𝑈ᵣ, title="Restricted Unitary")
 crvs = eigvalsh(𝐶ᵣ)
 plot(scatter(y=map(p -> p.second, crvs), mode="markers"))
-emode1::Mode = orderedmodes(𝑈ᵣ.inspace)[23]
-emode2::Mode = orderedmodes(𝑈ᵣ.inspace)[24]
+emode1::Mode = orderedmodes(𝑈ᵣ.inspace)[12]
+emode2::Mode = orderedmodes(𝑈ᵣ.inspace)[13]
 moderep1 = columns(𝑈ᵣ, FockSpace(Subset([emode1])))
 moderep2::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode2])))
 moderep = moderep1 + (FockMap(moderep2.outspace, moderep1.inspace, rep(moderep2)) * 1im)
 values = columnspec(moderep1)
 
-visualize_spectrum("Mode", values)
+visualize(values)
 
 rng = -1:0.1:1
 tspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))

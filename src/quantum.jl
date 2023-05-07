@@ -329,12 +329,13 @@ Quantizing a mode from a given `Point`.
 ### Output
 The quantized `Mode` object.
 """
+function quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Mode
     @assert(identifier == :offset || identifier == :pos)
     home::Point = origin(spaceof(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
-    return Mode([:groups => [ModeGroup(quantized, name)], :index => index, identifier => point, :flavor => flavor, couple])
+    return Mode([:groups => [group], :index => index, identifier => point, :flavor => flavor, couple])
 end
 
 """
@@ -353,6 +354,8 @@ Quantizing a set of mode from a given set of `Point`.
 ### Output
 The quantized set of
 """
+quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Subset{Mode} = (
+    Subset([quantize(index, identifier, point, flavor, group=group) for (index, point) in enumerate(subset) for flavor in 1:count]))
 
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     outspace::FockSpace

@@ -178,7 +178,7 @@ Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in
 ### Output
 A `Vector{Rational{Int64}}` which stores the rounded elements.
 """
-rpos(point::Point, denominator::Int64 = 1000000007)::Vector{Rational{Int64}} = [Rational{Int64}(round(el * denominator)) // denominator for el in pos(point)]
+rpos(point::Point, denominator::Int64 = 10000000)::Vector{Rational{Int64}} = [Rational{Int64}(round(el * denominator)) // denominator for el in pos(point)]
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}

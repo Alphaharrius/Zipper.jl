@@ -163,7 +163,7 @@ struct Point <: AbstractSubset{Point}
     space::AbstractSpace
 end
 
-Base.show(io::IO, point::Point) = print(io, string("P$(pos(point))"))
+Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)])"))
 
 """
     rpos(point::Point, denominator::Int64)

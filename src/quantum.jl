@@ -294,6 +294,12 @@ Check if fockspaces of `a` and `b` shares the same set of underlying modes regar
 """
 hassamespan(a::FockSpace, b::FockSpace)::Bool = modes(a) == modes(b)
 
+"""
+    issparse(fockspace::FockSpace)::Bool
+
+Check if `fockspace` is a sparse fockspace.
+"""
+issparse(fockspace::FockSpace)::Bool = length(rep(fockspace)) > 1
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
 
 Base.:convert(::Type{Subset}, source::FockSpace) = source.rep

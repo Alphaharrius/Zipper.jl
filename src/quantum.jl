@@ -181,11 +181,11 @@ Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + g
 
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
 
-# =====================================================
+# ==================================================
 # Mode can be used as keys in dictionaries and sets.
 Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
-# =====================================================
+# ==================================================
 
 # =========================================
 # Types of different fockspaces

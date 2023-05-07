@@ -134,15 +134,17 @@ Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
 Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
 
-struct FockSpace <: AbstractSpace{Subset{Subset{Mode}}}
+struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     rep::Subset{Subset{Mode}}
-    """ Implicit ordering is required as matrices is used for mapping between `FockSpace`. """
     ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}) = new(subsets, ordering)
-    FockSpace(subset::Subset{Mode}) = FockSpace(
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer};
+        T::Type{<: AnyFock} = (length(subsets) > 1 ? SparseFock : AnyFock)) = new{T}(subsets, ordering)
+    FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock} = AnyFock) = FockSpace(
         Subset([subset]),
-        Dict(mode => order for (order, mode) in enumerate(subset)))
+        Dict(mode => order for (order, mode) in enumerate(subset)),
+        T=T)
+    FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock) = FockSpace(rep(fockspace), fockspace.ordering, T=T)
 end
 
 function Base.:union(focks::FockSpace...)::FockSpace

@@ -169,6 +169,13 @@ function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
     return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
 end
 
+"""
+    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace{CrystalFock}
+
+A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
+"""
+crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace{CrystalFock} = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), T=CrystalFock)
+
 """ By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space. """
 Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
 

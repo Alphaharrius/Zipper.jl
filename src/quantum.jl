@@ -284,8 +284,8 @@ This method is used when you need to compose two elements with the composing por
 - `tospace` The fockspace as the target of the permutation.
 
 ### output
-The returned vector that at each mode position `n` of `tospace`, contains the order index a mode in `fromspace` to be moved/permuted into slot `n`, the mode ordering
-of the permuted list of modes will matches the ordering of `tospace`.
+The returned vector that at each mode position `n` of `tospace`, contains the order index a mode in `fromspace` to be moved/permuted into slot `n`,
+the mode ordering of the permuted list of modes will matches the ordering of `tospace`.
 """
 function orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
     @assert(hassamespan(fromspace, tospace))
@@ -357,11 +357,32 @@ Quantizing a set of mode from a given set of `Point`.
   defaults to `ModeGroup(quantized, "physical")`.
 
 ### Output
-The quantized set of
+The quantized set of `Mode` objects.
 """
 quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Subset{Mode} = (
     Subset([quantize(index, identifier, point, flavor, group=group) for (index, point) in enumerate(subset) for flavor in 1:count]))
 
+"""
+    FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
+    FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})
+    FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})
+
+Represents an mapping between two fockspaces with the same span of the underlying Hilbert space.
+
+### Input
+- `outspace` The output `FockSpace` of this map. If this object is the multiplier, then this will be the `outspace` of the resulting `FockMap`;
+             if this object is the factor, then this must have the same span as the `inspace` of the multiplier.
+- `inspace`  The input `FockSpace` of this map. If this object is the multiplier, then must have the same span as the `outspace` of the multiplier;
+             if this object is the factor, then this will be the `inspace` of the resulting `FockMap`.
+- `rep`      A complex sparse matrix represents the 2-point maps between the elements of the `inspace` & `outspace`.
+- `mapping`  The values of the map have to be specified for a distinct 2-point pair, keyed by the pair in `Tuple`.
+
+### Examples
+- `FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})` is used when every ingredients are precomputed.
+- `FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})` is used when the `rep` is an arbitary array like object.
+- `FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})` is used when the values of the map have to be specified
+  for a distinct 2-point pair
+"""
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     outspace::FockSpace
     inspace::FockSpace
@@ -379,25 +400,46 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     end
 end
 
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
+
+"""
+    idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
+
+Create an injective `FockMap` from `inspace` to `outspace` of the same dimension, and the mapping pairs are determined by the order of both spaces,
+i.e. the n-th element of the `inspace` will be mapped to the n-th element of the outspace.
+"""
 function idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
     @assert(dimension(outspace) == dimension(inspace))
     FockMap(outspace, inspace, SparseMatrixCSC(Matrix{Float64}(I(dimension(outspace)))))
 end
 
-Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
+"""
+    columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
 
+Restrict the `inspace` of the `fockmap` by a sub-fockspace `restrictspace`.
+"""
 function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
     restrictindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), :, restrictindices))
     return FockMap(fockmap.outspace, restrictspace, spmat)
 end
 
+"""
+    rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
+
+Restrict the `outspace` of the `fockmap` by a sub-fockspace `restrictspace`.
+"""
 function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
     restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
     return FockMap(restrictspace, fockmap.inspace, spmat)
 end
 
+"""
+    restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
+
+Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `out_restrictspace` & `in_restrictspace` respectively.
+"""
 function restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
     out_restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(out_restrictspace)]
     in_restrictindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(in_restrictspace)]
@@ -405,6 +447,16 @@ function restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspa
     return FockMap(out_restrictspace, in_restrictspace, spmat)
 end
 
+"""
+    permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
+
+Permute the columns and rows of the representation of the `source` `FockMap` by `outspace` & `inspace` respectively.
+
+### Input
+- `source`   The target `FockMap` to be permuted.
+- `outspace` A `FockSpace` with the same span as the `outspace` of the `source` `FockMap`.
+- `inspace`  A `FockSpace` with the same span as the `inspace` of the `source` `FockMap`.
+"""
 function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
     row_rule::Vector{Int64} = orderingrule(source.outspace, outspace)
     col_rule::Vector{Int64} = orderingrule(source.inspace, inspace)
@@ -430,24 +482,70 @@ Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, f
 Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, transpose(rep(source)))
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
+"""
+    eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
+
+According to the provided Hermitian `FockMap`, generate a set of eigenmodes that corresponds one to one to the eigenvectors and eigenvalues when
+performing eigenvalue decomposition.
+
+### Input
+- `fockmap` The source of the generation.
+- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
+"""
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
-    @assert(fockmap.inspace == fockmap.outspace)
+    @assert(hassamespan(fockmap.inspace, fockmap.outspace))
     return Subset([
         Mode([:groups => [ModeGroup(transformed, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
 end
 
+"""
+    eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
+
+Perform eigenvalue decomposition to find the eigenvectors horizontally concatenated into a `FockMap`, ordered by the eigenvalues in ascending order.
+
+### Input
+- `fockmap` The source of the decomposition.
+- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
+
+### Output
+A `FockMap` with `outspace` of `fockmap` and the inspace of the associated eigenmodes, containing the horizontally concatenated eigenvectors.
+"""
 function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
     @assert(fockmap.inspace == fockmap.outspace)
     evecs::Matrix{ComplexF64} = eigvecs(Hermitian(Matrix(rep(fockmap))))
     return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), SparseMatrixCSC{ComplexF64, Int64}(evecs))
 end
 
+"""
+    eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, Float64}}
+
+Perform eigenvalue decomposition to find the eigenvalues as pairs of eigenmode to eigenvalue ordered by the eigenmode attribute `index`, ordered by the
+eigenvalues in ascending order.
+
+### Input
+- `fockmap` The source of the decomposition.
+- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
+"""
 function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, Float64}}
     @assert(fockmap.inspace == fockmap.outspace)
     evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
     return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
 end
 
+"""
+    eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
+
+Perform eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously.
+
+### Input
+- `fockmap` The source of the decomposition.
+- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
+
+### Output
+The first returned value will be pairs of eigenmode to eigenvalue ordered by the eigenmode attribute `index`; the second returned value is a `FockMap`
+with `outspace` of `fockmap` and the inspace of the associated eigenmodes, containing the horizontally concatenated eigenvectors. The eigenmodes are
+ordered by the eigenvalues in ascending order.
+"""
 function eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
     decomposed::Eigen = eigen(Hermitian(Matrix(rep(fockmap))))
     modes::Subset{Mode} = eigmodes(fockmap, attrs...)
@@ -457,14 +555,15 @@ function eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode,
 end
 
 """
-    fourier(momentums::Subset{Point}, inmodes::Subset{Mode})::FockMap
+    fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
 
-Create a `FockMap` corresponds to a Fourier transform of a `Subset{Mode}`. This map assumed orthogonality of modes with the attribute `:offset` dropped, which means
+Create a `FockMap` corresponds to a Fourier transform of a `FockSpace`. This map assumed orthogonality of modes with the attribute `:offset` dropped, which means
 entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
 - `momentums` The momentums which spans the output reciprocal subspace, for `spaceof(momentum) isa MomentumSpace`.
-- `inspace` The input space, all contituent modes must have the attribute `:offset` defined or result in errors.
+- `inspace` The input space, all contituent modes must have the attribute `:offset` defined or result in errors. The `inspace` should include all possible basis modes
+  so that they can be identified and span the momentum `FockSpace`.
 
 ### Output
 The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = length(momentums) * count` for `count` is the number of fermionic site
@@ -479,12 +578,27 @@ function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
     return fourier(outspace, inspace, ∑𝑘, basismodes)
 end
 
+"""
+    fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
+
+Create a `FockMap` corresponds to a Fourier transform of a physical fockspace `inspace` to Fourier fockspace `outspace`. This map assumed orthogonality of modes with the
+attribute `:offset` dropped, which means entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
+
+### Input
+- `outspace` The output space of the Fourier transform, which is the momentum `FockSpace`, most likely with type `FockSpace{CrystalFock}`, noted that the basis modes in
+  each momentum subspace should matches with the possible basis modes within `inspace`.
+- `inspace`  The input space, all contituent modes must have the attribute `:offset` defined or result in errors.
+
+### Output
+The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = dimension(outspace); M = dimension(inspace)`.
+"""
 function fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
     ∑𝑘::Matrix{Float64} = hcat([getattr(first(partition), :offset) |> euclidean |> pos for partition in rep(outspace)]...)
     basismodes::Subset{Mode} = removeattr(outspace |> rep |> first, :offset) # Assumed the similarity in structure for each partitions.
     return fourier(outspace, inspace, ∑𝑘, basismodes)
 end
 
+""" Internal use only. """
 function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix{Float64}, basismodes::Subset{Mode})::FockMap
     values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), size(momentummatrix, 2), dimension(inspace))
     for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(orderedmodes(inspace)))
@@ -496,6 +610,14 @@ function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix
     return FockMap(outspace, inspace, spmat)
 end
 
+"""
+    focksum(fockmaps::Vector{FockMap})::FockMap
+
+Perform summation of a set of `FockMap`, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
+non-overlapping `inspace` and `outspace`, this corresponds to a direct sum; if they have overlapping but different span of `inspace` or `outspace`, the result will
+be a `FockMap` with `outspace` and `inspace` as a `SparseFock` with all sub-fockspaces of different span, with the corresponding representation summed. Please be
+noted that `focksum([a, b, c, d]) == a + b + c + d`.
+"""
 function focksum(fockmaps::Vector{FockMap})::FockMap
     parts = [(fockmap, outpart, inpart) for fockmap in fockmaps for (outpart, inpart) in zip(rep(fockmap.outspace), rep(fockmap.inspace))]
     outfock = union([fockmap.outspace for fockmap in fockmaps]...)
@@ -510,6 +632,11 @@ function focksum(fockmaps::Vector{FockMap})::FockMap
     return FockMap(outfock, infock, spmat)
 end
 
+"""
+    columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
+
+Extract the column values as a `Mode` to `ComplexF64` pair from a `N×1` `FockMap`, this is used when you need to visualize the column spectrum.
+"""
 function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     @assert(dimension(fockmap.inspace) == 1)
     mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)

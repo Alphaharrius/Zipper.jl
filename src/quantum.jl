@@ -208,6 +208,11 @@ represented by `Subset{Mode}`.
 The type of the fockspace will be determined by the constructor with the structure of the representation, if there is more than one partition,
 `SparseFock` will be selected, else `AnyFock` is the default option.
 
+### `FockSpace` Types
+- `AnyFock`     An arbitary `FockSpace`.
+- `SparseFock`  A `FockSpace` that have multiple sub-fockspaces.
+- `CrystalFock` A `SparseFock` which the sub-fockspaces are the basismode fockspaces with different momentum from the brillouin zone.
+
 ### Examples
 - `FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; T::Type{<: AnyFock})` is used when all the components of the `FockSpace`
   is already constructed prior instantiation.

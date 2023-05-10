@@ -422,7 +422,7 @@ Base.:*(number::Number, fockmap::FockMap)::FockMap = fockmap * number
 
 Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) / number)
 
-Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
+Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, transpose(rep(source)))
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}

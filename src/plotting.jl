@@ -42,14 +42,19 @@ function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T
     markerpositions::Matrix{Float64} = zeros(3, 𝑁)
     copyto!(view(markerpositions, 1:size(𝑀ₚ, 1), :), 𝑀ₚ)
     sizes::Vector{Float64} = [abs(pair.second) for pair in spectrum]
-    markersizes::Vector{Float64} = sizes / norm(sizes) * 80
+    markersizes::Vector{Float64} = sizes / norm(sizes) * 120
     colors::Vector{RGB{Float64}} = [convert(RGB{Float64}, HSV(angle(pair.second) / 2π * 360, 1, 1)) for pair in spectrum]
-    markercolors::Vector{Tuple{Float32, Float32, Float32}} = map(c -> Tuple([c.r, c.g, c.b] * 255), colors)
-    trace = scatter3d(x=markerpositions[1, :], y=markerpositions[2, :], z=markerpositions[3, :], mode="markers", marker=attr(
-        size=markersizes,
-        color=markercolors))
+    markercolors::Vector{Tuple{Float32, Float32, Float32, Float32}} = map(c -> Tuple([c.r, c.g, c.b, 1.0] * 255), colors)
+    trace = scatter3d(
+        x=markerpositions[1, :], y=markerpositions[2, :], z=markerpositions[3, :], mode="markers",
+        marker=attr(
+            symbol="circle",
+            size=markersizes,
+            color=markercolors))
     layout::Layout = Layout(title=title, scene=attr(aspectmode="data"))
-    plot([trace], layout)
+    fig = plot([trace], layout)
+    relayout!(fig, template="simple_white")
+    fig
 end
 
 end

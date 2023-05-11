@@ -48,9 +48,8 @@ Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 
 ### Attributes to put in `attrs`
 - `:groups` stores a `Vector{ModeGroup}` which `ModeGroup` identifies a group of modes created by some action.
-- `:index` stores an `Integer` that identifies the basis index.
 - `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
-- `:pos` stores a `Point` which is the unit cell offset, this is associated to the attributes of `:index` and `:flavor`.
+- `:pos` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
 
 ### Input
@@ -124,7 +123,7 @@ Create a **copy** of `mode` with the new attributes identified by `keys` added t
 record will be overwritten.
 
 ### Examples
-- To add `:offset` and `index`, we use `newmode = setattr(mode, :offset => point, :index => 1)`
+- To add `:offset` and `:flavor`, we use `newmode = setattr(mode, :offset => point, :flavor => 1)`
 """
 setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
 
@@ -135,7 +134,7 @@ Create a **copy** of `modes` with the new attributes identified by `keys` added 
 exists in the modes, the current record will be overwritten.
 
 ### Examples
-- To add `:offset` and `index`, we use `newmodes = setattr(modes, :offset => point, :index => 1)`
+- To add `:offset` and `:flavor`, we use `newmodes = setattr(modes, :offset => point, :flavor => 1)`
 """
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset([setattr(mode, attrs...) for mode in subset])
 
@@ -324,7 +323,6 @@ Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source) # Add
 Quantizing a mode from a given `Point`.
 
 ### Input
-- `index` The index of the `Mode` within it's own group.
 - `identifier` The identifying atttibute key which the `point` object will be linked to.
 - `point` The `Point` as the physical attribute or object to be quantized.
 - `flavor` The flavor index of the `Mode`, don't mistaken this with the flavor count.
@@ -334,13 +332,13 @@ Quantizing a mode from a given `Point`.
 ### Output
 The quantized `Mode` object.
 """
-function quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Mode
+function quantize(identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Mode
     @assert(identifier == :offset || identifier == :pos)
     home::Point = origin(spaceof(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
-    return Mode([:groups => [group], :index => index, identifier => point, :flavor => flavor, couple])
+    return Mode([:groups => [group], identifier => point, :flavor => flavor, couple])
 end
 
 """
@@ -360,7 +358,7 @@ Quantizing a set of mode from a given set of `Point`.
 The quantized set of `Mode` objects.
 """
 quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Subset{Mode} = (
-    Subset([quantize(index, identifier, point, flavor, group=group) for (index, point) in enumerate(subset) for flavor in 1:count]))
+    Subset([quantize(identifier, point, flavor, group=group) for point in subset for flavor in 1:count]))
 
 """
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
@@ -495,7 +493,7 @@ performing eigenvalue decomposition.
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     @assert(hassamespan(fockmap.inspace, fockmap.outspace))
     return Subset([
-        Mode([:groups => [ModeGroup(transformed, "eigh")], :index => index, :flavor => 1, attrs...]) for index in 1:dimension(fockmap.inspace)])
+        Mode([:groups => [ModeGroup(transformed, "eigh")], :flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace)])
 end
 
 """

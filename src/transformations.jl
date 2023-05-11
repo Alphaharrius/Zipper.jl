@@ -83,8 +83,8 @@ function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::Fo
     function repack_fourierblocks(sourcemap::FockMap, scaled_k::Point, partition::Subset{Mode})::FockMap
         mappart::FockMap = rows(sourcemap, FockSpace(partition))
         inmodes::Subset{Mode} = Subset([
-            setattr(m, :groups => ModeGroup(transformed, "scaled"), :index => i, :offset => scaled_k, :pos => scale * convert(Point, m))
-            for (i, m) in enumerate(orderedmodes(mappart.inspace))])
+            setattr(m, :groups => [ModeGroup(transformed, "scaled")], :offset => scaled_k, :pos => scale * convert(Point, m))
+            for m in orderedmodes(mappart.inspace)])
         return FockMap(mappart.outspace, FockSpace(inmodes), rep(mappart))
     end
     mapblocks::Vector{FockMap} = [repack_fourierblocks(permutedmap, scaled_k, partition)

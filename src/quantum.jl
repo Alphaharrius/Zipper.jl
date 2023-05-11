@@ -9,7 +9,7 @@ using ..Spaces, ..Geometries
 export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
 export groupname, hasattr, getattr, setattr, removeattr, addgroup, quantize, flavorcount, spanoffset
-export dimension, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
+export dimension, subspacecount, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
 export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, columnspec
 
 """
@@ -250,6 +250,13 @@ Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i
 Returns the number of unique member modes within the `fockspace`, each of those represents a vector from the Hilbert space.
 """
 Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
+
+"""
+    subspacecount(fockspace::FockSpace)::Integer
+
+Get the number of sub-fockspaces of this `fockspace`.
+"""
+subspacecount(fockspace::FockSpace)::Integer = fockspace |> rep |> length
 
 """
     order(fockspace::FockSpace, mode::Mode)::Int64

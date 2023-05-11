@@ -22,8 +22,6 @@ scale = Scale([2 0; 0 2])
 recipient = Recipient(fullfock, :crystal => crystal)
 blockmap = scale * recipient
 newcrystal = scale * crystal
-newrecipient = Recipient(blockmap.outspace, :crystal => newcrystal)
-newblockmap = scale * newrecipient
 
 tₙ = ComplexF64(-1.)
 m0, m1 = members(modes)
@@ -40,49 +38,28 @@ filled::FockMap = groundstates(𝐻)
 visualize(𝐶, title="Correlation", rowrange=1:64, colrange=1:64)
 blockedcorrelation = blockmap * 𝐶 * blockmap'
 visualize(blockedcorrelation, title="Correlation", rowrange=1:64, colrange=1:64)
-firstfock = FockSpace(first(rep(blockedcorrelation.outspace)))
-onepart = restrict(blockedcorrelation, firstfock, firstfock)
-visualize(onepart)
 
-newblockedcorrelation = newblockmap * blockedcorrelation * newblockmap'
-visualize(newblockedcorrelation, rowrange=1:128, colrange=1:128)
+crystalpoints::Subset{Point} = latticepoints(newcrystal)
+newmodes::Subset{Mode} = removeattr(rep(blockedcorrelation.outspace)[1], :offset)
+physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
+restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 1.0), physicalmodes)
+restrictedfock::FockSpace = FockSpace(restrictedregion)
 
-newcrystal::Crystal = scale * crystal
-blockedregion::Subset{Point} = inv(scale) * newcrystal.unitcell
-[p for p in blockedregion]
-BZ::Subset{Point} = brillouinzone(crystal)
-fockspace::FockSpace = sparsefock(modes, BZ)
-basismodes::Subset{Mode} = fockspace |> rep |> first
-newBZ::Subset{Point} = brillouinzone(newcrystal)
-# Generate the Dict which keys each fockspace partition by its momentum.
-momentumtopartition::Dict{Point, Subset{Mode}} = Dict(getattr(first(part), :offset) => part for part in rep(fockspace))
-momentummappings::Vector{Pair{Point, Point}} = [basispoint(scale * p) => p for p in BZ]
-mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point,Vector{Point}}()) do d,(k,v)
-    mergewith!(append!, d, LittleDict(k=>[v]))
-end
-blockedcrystalpartitions::Subset{Subset{Mode}} = Subset([union([momentumtopartition[k] for k in mappingpartitions[scaled_k]]...) for scaled_k in newBZ])
-blockedcrystalordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(flatten(blockedcrystalpartitions)))
-blockedcrystalfock::FockSpace = FockSpace(blockedcrystalpartitions, blockedcrystalordering)
-[m.attrs for m in [orderedmodes(blockedcrystalfock)...][1:33]]
+restrictfourier::FockMap = fourier(blockedcorrelation.inspace, restrictedfock) / sqrt(vol(newcrystal))
+visualize(restrictfourier, rowrange=1:32)
+restrictedcorrelation::FockMap = restrictfourier' * blockedcorrelation * restrictfourier
+visualize(restrictedcorrelation)
+crvs = eigvalsh(restrictedcorrelation)
+plot(scatter(y=map(p -> p.second, crvs), mode="markers"))
 
-blockedoffsets::Subset{Point} = Subset([pbc(crystal, p) |> latticeoff for p in blockedregion])
-blockedfock::FockSpace = FockSpace(spanoffset(basismodes, blockedoffsets))
-[m.attrs for m in orderedmodes(blockedfock)]
+restrictedunitary::FockMap = eigvecsh(restrictedcorrelation)
+visualize(restrictedunitary)
 
-restrictedfourier::FockMap = fourier(BZ, blockedfock)
-[m.attrs for m in [orderedmodes(restrictedfourier.outspace)...][1:33]]
-visualize(restrictedfourier, rowrange=1:40)
+emode1::Mode = orderedmodes(restrictedunitary.inspace)[4]
+emode2::Mode = orderedmodes(restrictedunitary.inspace)[5]
+mr1::FockMap = columns(restrictedunitary, FockSpace(Subset([emode1])))
+mr2::FockMap = columns(restrictedunitary, FockSpace(Subset([emode2])))
+mr = FockMap(mr1.outspace, mr1.inspace, rep(mr1) + 1im * rep(mr2))
+values = columnspec(mr)
 
-permutedmap::FockMap = Quantum.permute(restrictedfourier, blockedcrystalfock, restrictedfourier.inspace) / sqrt(vol(crystal) / vol(newcrystal))
-visualize(permutedmap, rowrange=1:40)
-orderingrule(blockedcrystalfock, restrictedfourier.outspace)
-function repack_fourierblocks(sourcemap::FockMap, scaled_k::Point, partition::Subset{Mode})::FockMap
-    mappart::FockMap = rows(sourcemap, FockSpace(partition))
-    inmodes::Subset{Mode} = Subset([
-        setattr(m, :groups => ModeGroup(transformed, "scaled"), :index => i, :offset => scaled_k, :pos => convert(Point, m))
-        for (i, m) in enumerate(orderedmodes(mappart.inspace))])
-    return FockMap(mappart.outspace, FockSpace(inmodes), rep(mappart))
-end
-mapblocks::Vector{FockMap} = [repack_fourierblocks(permutedmap, scaled_k, partition) for (scaled_k, partition) in Iterators.zip(newBZ, rep(blockedcrystalfock))]
-blockmap::FockMap = focksum(mapblocks)
-visualize(blockmap)
+visualize(values)

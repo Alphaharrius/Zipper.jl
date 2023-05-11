@@ -8,7 +8,7 @@ using ..Spaces, ..Geometries
 
 export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
-export groupname, hasattr, getattr, identify, unidentify, reidentify, setattr, removeattr, addgroup, quantize, flavorcount, spanoffset
+export groupname, hasattr, getattr, setattr, removeattr, addgroup, quantize, flavorcount, spanoffset
 export dimension, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
 export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, columnspec
 

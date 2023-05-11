@@ -8,6 +8,7 @@ using ..Spaces, ..Geometries, ..Quantum
 
 export DistillRegion
 export frozenisometries, frozenselectionbythreshold, frozenselectionbycount
+export blocking
 
 function frozenselectionbythreshold(threshold::Float64)
     function frozenfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
@@ -33,6 +34,26 @@ function frozenisometries(correlations::FockMap, restrictedfock::FockSpace;
     𝐹ₖ::FockMap = fourier(correlations.inspace, restrictedfock) / sqrt(subspacecount(correlations.inspace))
     𝐶ᵣ::FockMap = 𝐹ₖ' * correlations * 𝐹ₖ
     return selectionstrategy(𝐶ᵣ)
+end
+
+blocking(parameters::Pair{Symbol}...)::Dict{Symbol} = blocking(Dict(parameters...))
+
+function blocking(parameters::Dict{Symbol})::Dict{Symbol}
+    @assert(haskey(parameters, :scale))
+    @assert(haskey(parameters, :correlations))
+    @assert(haskey(parameters, :crystal))
+    result::Dict{Symbol, Any} = Dict()
+
+    scale::Scale = parameters[:scale]
+    correlation::FockMap = parameters[:correlations]
+    crystal::Crystal = parameters[:crystal]
+
+    scaling::FockMap = scale * Recipient(correlation.inspace, :crystal => crystal)
+    result[:action] = scaling
+    result[:correlations] = scaling * correlation * scaling'
+    result[:crystal] = scale * crystal
+
+    return result
 end
 
 end

@@ -218,6 +218,8 @@ Perform linear transformation on the point from the original space `spaceof(poin
 """
 euclidean(point::Point)::Point = Point(basis(spaceof(point)) * pos(point), euclidean(typeof(spaceof(point)), dimension(point)))
 
+Base.:-(point::Point)::Point = Point(-pos(point), spaceof(point))
+
 function Base.:+(a::Point, b::Point)::Point
     @assert(typeof(spaceof(a)) == typeof(spaceof(b)))
     return Point(pos(a) + pos(b), spaceof(a))

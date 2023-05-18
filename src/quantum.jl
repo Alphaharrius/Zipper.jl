@@ -86,6 +86,13 @@ function Spaces.spaceof(mode::Mode)
 end
 
 """
+    Spaces.pos(mode::Mode)::Point
+
+Get the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space.
+"""
+Spaces.pos(mode::Mode)::Point = convert(Point, mode)
+
+"""
     hasattr(mode::Mode, key::Symbol)::Bool
 
 Check if the `mode` has the attribute identified by `key`.

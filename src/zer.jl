@@ -2,7 +2,7 @@ module Zer
 
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations
 export DistillRegion
-export frozenisometries, frozenselectionbythreshold, frozenselectionbycount
+export localfrozenisometries, frozenselectionbythreshold, frozenselectionbycount
 export blocking
 
 function frozenselectionbythreshold(threshold::Float64)
@@ -24,8 +24,8 @@ function frozenselectionbycount(count::Integer)
     return frozenfockmaps
 end
 
-function frozenisometries(correlations::FockMap, restrictedfock::FockSpace;
-                          selectionstrategy = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap}
+function localfrozenisometries(correlations::FockMap, restrictedfock::FockSpace;
+                               selectionstrategy = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap}
     𝐹ₖ::FockMap = fourier(correlations.inspace, restrictedfock) / sqrt(subspacecount(correlations.inspace))
     𝐶ᵣ::FockMap = 𝐹ₖ' * correlations * 𝐹ₖ
     return selectionstrategy(𝐶ᵣ)

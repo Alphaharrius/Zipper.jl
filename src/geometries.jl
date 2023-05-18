@@ -51,18 +51,18 @@ function latticepoints(crystal::Crystal)::Subset{Point}
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2)
-    return Subset([Point(pos, real_space) for pos in eachcol(recentered_mesh)])
+    return Subset(Point(pos, real_space) for pos in eachcol(recentered_mesh))
 end
 
-sitepoints(crystal::Crystal)::Subset{Point} = Subset([
-    latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell])
+sitepoints(crystal::Crystal)::Subset{Point} = Subset(
+    latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
 
 function brillouinzone(crystal::Crystal)::Subset{Point}
     momentum_space::MomentumSpace = convert(MomentumSpace, spaceof(crystal.unitcell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = crystal_mesh ./ tiled_sizes
-    return Subset([Point(pos, momentum_space) for pos in eachcol(recentered_mesh)])
+    return Subset(Point(pos, momentum_space) for pos in eachcol(recentered_mesh))
 end
 
 geometricalfilter(f, center::Point) = input -> f(lineartransform(spaceof(center), convert(Point, input)), center)

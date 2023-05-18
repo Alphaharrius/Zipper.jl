@@ -41,7 +41,7 @@ Base.:*(scale::Scale, space::MomentumSpace) = convert(typeof(space), rep(inv(sca
 
 Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * spaceof(point), point)
 
-Base.:*(scale::Scale, subset::Subset{T}) where {T} = Subset([scale * element for element in subset])
+Base.:*(scale::Scale, subset::Subset{T}) where {T} = Subset(scale * element for element in subset)
 
 function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     oldspace::RealSpace = spaceof(crystal)
@@ -51,7 +51,7 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     newbasiscoords::Matrix{Float64} = boundarysnf.T * diagm(diag(Δ)) * snf.T
     blockingpoints::Vector{Point} = [Point(collect(coord), oldspace) for coord in [Iterators.product([0:size - 1 for size in diag(Δ)]...)...]]
     relativescale::Scale = Scale(newbasiscoords)
-    scaledunitcell::Subset{Point} = Subset([relativescale * (a + b) for (a, b) in [Iterators.product(blockingpoints, crystal.unitcell)...]])
+    scaledunitcell::Subset{Point} = Subset(relativescale * (a + b) for (a, b) in [Iterators.product(blockingpoints, crystal.unitcell)...])
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
 end
 
@@ -69,12 +69,12 @@ function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::Fo
     mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point,Vector{Point}}()) do d,(k,v)
         mergewith!(append!, d, LittleDict(k=>[v]))
     end
-    blockedcrystalpartitions::Subset{Subset{Mode}} = Subset([
-        union([momentumtopartition[k] for k in mappingpartitions[scaled_k]]...) for scaled_k in newBZ])
+    blockedcrystalpartitions::Subset{Subset{Mode}} = Subset(
+        union([momentumtopartition[k] for k in mappingpartitions[scaled_k]]...) for scaled_k in newBZ)
     blockedcrystalordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(flatten(blockedcrystalpartitions)))
     blockedcrystalfock::FockSpace = FockSpace(blockedcrystalpartitions, blockedcrystalordering)
 
-    blockedoffsets::Subset{Point} = Subset([pbc(crystal, p) |> latticeoff for p in blockedregion])
+    blockedoffsets::Subset{Point} = Subset(pbc(crystal, p) |> latticeoff for p in blockedregion)
     blockedfock::FockSpace = FockSpace(spanoffset(basismodes, blockedoffsets))
 
     restrictedfourier::FockMap = fourier(BZ, blockedfock)
@@ -82,9 +82,9 @@ function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::Fo
     permutedmap::FockMap = Quantum.permute(restrictedfourier, blockedcrystalfock, restrictedfourier.inspace) / volumeratio
     function repack_fourierblocks(sourcemap::FockMap, scaled_k::Point, partition::Subset{Mode})::FockMap
         mappart::FockMap = rows(sourcemap, FockSpace(partition))
-        inmodes::Subset{Mode} = Subset([
+        inmodes::Subset{Mode} = Subset(
             setattr(m, :groups => [ModeGroup(transformed, "scaled")], :offset => scaled_k, :pos => scale * convert(Point, m))
-            for m in orderedmodes(mappart.inspace)])
+            for m in orderedmodes(mappart.inspace))
         return FockMap(mappart.outspace, FockSpace(inmodes), rep(mappart))
     end
     mapblocks::Vector{FockMap} = [repack_fourierblocks(permutedmap, scaled_k, partition)

@@ -136,7 +136,7 @@ exists in the modes, the current record will be overwritten.
 ### Examples
 - To add `:offset` and `:flavor`, we use `newmodes = setattr(modes, :offset => point, :flavor => 1)`
 """
-setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset([setattr(mode, attrs...) for mode in subset])
+setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
 """
     spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode}
@@ -144,7 +144,7 @@ setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset([se
 Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset`, the primary ordering will be
 the ordering of `points`, then follows the ordering of `basismodes`.
 """
-spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset([setattr(mode, :offset => point) for point in points for mode in basismodes])
+spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
 
 """
     flavorcount(basismodes::Subset{Mode})::Integer
@@ -225,7 +225,7 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer};
         T::Type{<: AnyFock} = (length(subsets) > 1 ? SparseFock : AnyFock)) = new{T}(subsets, ordering)
     FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock} = AnyFock) = FockSpace(
-        Subset([subset]),
+        Subset(subset),
         Dict(mode => order for (order, mode) in enumerate(subset)),
         T=T)
     FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock) = FockSpace(rep(fockspace), fockspace.ordering, T=T)
@@ -365,7 +365,7 @@ Quantizing a set of mode from a given set of `Point`.
 The quantized set of `Mode` objects.
 """
 quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Subset{Mode} = (
-    Subset([quantize(identifier, point, flavor, group=group) for point in subset for flavor in 1:count]))
+    Subset(quantize(identifier, point, flavor, group=group) for point in subset for flavor in 1:count))
 
 """
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
@@ -499,8 +499,8 @@ performing eigenvalue decomposition.
 """
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     @assert(hassamespan(fockmap.inspace, fockmap.outspace))
-    return Subset([
-        Mode([:groups => [ModeGroup(transformed, "eigh")], :flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace)])
+    return Subset(
+        Mode([:groups => [ModeGroup(transformed, "eigh")], :flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
 end
 
 """

@@ -247,6 +247,7 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
 
     Subset(elements::OrderedSet{T}) where {T <: AbstractSubset} = new{T}(elements)
     Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
+    Subset(input) = Subset(Base.isiterable(input |> typeof) && !(input isa Subset) ? [input...] : [input])
 end
 
 Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))

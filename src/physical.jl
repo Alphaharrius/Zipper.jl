@@ -10,8 +10,7 @@ using ..Spaces, ..Quantum, ..Geometries
 export bloch, bondmap, espec, hamiltonian, groundstates, groundstatecorrelation
 
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
-    modes::OrderedSet{Mode} = OrderedSet([mode for bond in bonds for mode in bond.first])
-    fockspace::FockSpace = FockSpace(Subset(modes))
+    fockspace::FockSpace = FockSpace(Subset(mode for bond in bonds for mode in bond.first))
     half::FockMap = FockMap(fockspace, fockspace, Dict(bonds))
     return half + half'
 end
@@ -21,7 +20,7 @@ function espec(bonds::FockMap, momentums::Vector{Point})::Vector{Pair{Mode, Floa
     bondmodes::Subset{Mode} = flatten(rep(bonds.inspace))
 
     for momentum in momentums
-        Fₖ::FockMap = fourier(Subset([momentum]), bondmodes)
+        Fₖ::FockMap = fourier(Subset(momentum), bondmodes)
         bloch::FockMap = Fₖ * bonds * Fₖ'
         foreach(p -> push!(ret, p), eigvalsh(bloch, :offset => momentum))
     end
@@ -32,7 +31,7 @@ end
 function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
     𝐵𝑍::Subset{Point} = brillouinzone(crystal)
     bondmodes::Subset{Mode} = flatten(rep(bondmap.outspace))
-    ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset([𝑘]), FockSpace(bondmodes)), 𝐵𝑍)
+    ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset(𝑘), FockSpace(bondmodes)), 𝐵𝑍)
     ∑𝐻ₖ = Iterators.map(𝐹ₖ -> 𝐹ₖ * bondmap * 𝐹ₖ', ∑𝐹ₖ)
     fockmap::FockMap = focksum([∑𝐻ₖ...])
     return FockMap(FockSpace(fockmap.outspace, T=CrystalFock), FockSpace(fockmap.inspace, T=CrystalFock), rep(fockmap))

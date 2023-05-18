@@ -9,8 +9,8 @@ using ..Spaces, ..Geometries
 export quantized, transformed, symmetrized
 export ModeGroupType, ModeGroup, Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
 export groupname, hasattr, getattr, setattr, removeattr, addgroup, quantize, flavorcount, spanoffset
-export dimension, subspacecount, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
-export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, columnspec
+export dimension, commonattr, subspaces, subspacecount, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
+export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, onesmap, colmap, columnspec
 
 """
     ModeGroupType
@@ -252,6 +252,26 @@ Returns the number of unique member modes within the `fockspace`, each of those 
 Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
 
 """
+    commonattr(fockspace::FockSpace, key::Symbol)
+
+Retrieve the common attribute associated to `key` of all the child modes of the `fockspace`, and throws assertion error if the attribute
+is not unique within the `fockspace`.
+"""
+function commonattr(fockspace::FockSpace, key::Symbol)
+    set::Set = Set()
+    foreach(m -> push!(set, getattr(m, key)), orderedmodes(fockspace))
+    @assert(length(set) == 1, "The modes in this fockspace does not share the same attr `$(key)`!")
+    return first(set)
+end
+
+"""
+    subspaces(fockspace::FockSpace)::Vector{FockSpace}
+
+Retrieve the sub-fockspaces of the `fockspace`.
+"""
+subspaces(fockspace::FockSpace)::Vector{FockSpace} = [FockSpace(partition) for partition in rep(fockspace)]
+
+"""
     subspacecount(fockspace::FockSpace)::Integer
 
 Get the number of sub-fockspaces of this `fockspace`.
@@ -416,6 +436,32 @@ i.e. the n-th element of the `inspace` will be mapped to the n-th element of the
 function idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
     @assert(dimension(outspace) == dimension(inspace))
     FockMap(outspace, inspace, SparseMatrixCSC(Matrix{Float64}(I(dimension(outspace)))))
+end
+
+"""
+    onesmap(outspace::FockSpace, inspace::FockSpace)::FockMap
+
+Generate a `FockMap` full of `1`s from `inspace` to `outspace`.
+"""
+onesmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(outspace, inspace, spzeros(dimension(outspace), dimension(inspace)) .+ 1)
+
+"""
+    colmap(inmode::Mode, rowdata::Vector{Pair{Mode, ComplexF64}})::FockMap
+
+Create a column `FockMap` with the specified complex value entries associated with the modes which forms the outspace, with a dimension `1` inspace.
+
+### Input
+- `inmode`  The single `Mode` that will form the inspace of the fock map.
+- `rowdata` The `Mode` to `ComplexF64` pairs which the modes forms the outspace of the fock map and the complex values as the entries.
+
+### Output
+A column `FockMap` with the outspace ordered by the order of `rowdata`.
+"""
+function colmap(inmode::Mode, rowdata::Vector{Pair{Mode, ComplexF64}})::FockMap
+    outfock::FockSpace = FockSpace(Subset(p.first for p in rowdata))
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outfock), 1)
+    foreach(n -> spmat[n, 1] += rowdata[n].second, 1:dimension(outfock))
+    return FockMap(outfock, FockSpace(Subset(inmode)), spmat)
 end
 
 """

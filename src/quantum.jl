@@ -63,6 +63,10 @@ struct Mode <: AbstractSubset{Mode}
     Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(datas...))
 end
 
+""" Allow for offset the `:offset` attribute of a mode. """
+Base.:+(mode::Mode, offset::Point)::Mode = setattr(mode, :offset => getattr(mode, :offset) + offset)
+Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)
+
 """
     spaceof(mode::Mode)
 

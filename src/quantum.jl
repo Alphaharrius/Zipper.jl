@@ -436,6 +436,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     end
 end
 
+Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(typeof(fockmap))(in=$(fockmap.inspace), out=$(fockmap.outspace))"))
+
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 
 """

@@ -462,7 +462,7 @@ Permute the columns and rows of the representation of the `source` `FockMap` by 
 - `outspace` A `FockSpace` with the same span as the `outspace` of the `source` `FockMap`.
 - `inspace`  A `FockSpace` with the same span as the `inspace` of the `source` `FockMap`.
 """
-function permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
+function permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
     row_rule::Vector{Int64} = orderingrule(source.outspace, outspace)
     col_rule::Vector{Int64} = orderingrule(source.inspace, inspace)
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), row_rule, col_rule))
@@ -476,7 +476,7 @@ Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 
 function Base.:*(a::FockMap, b::FockMap)::FockMap
     @assert(hassamespan(a.inspace, b.outspace)) # Even if the fockspaces are different, composition works as long as they have same span.
-    return FockMap(a.outspace, b.inspace, rep(a) * rep(permute(b, a.inspace, b.inspace)))
+    return FockMap(a.outspace, b.inspace, rep(a) * rep(permute(b, outspace=a.inspace, inspace=b.inspace)))
 end
 
 Base.:*(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) * number)

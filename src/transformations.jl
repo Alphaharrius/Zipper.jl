@@ -79,7 +79,7 @@ function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::Fo
 
     restrictedfourier::FockMap = fourier(BZ, blockedfock)
     volumeratio::Float64 = sqrt(vol(crystal) / vol(newcrystal))
-    permutedmap::FockMap = Quantum.permute(restrictedfourier, blockedcrystalfock, restrictedfourier.inspace) / volumeratio
+    permutedmap::FockMap = Quantum.permute(restrictedfourier, outspace=blockedcrystalfock, inspace=restrictedfourier.inspace) / volumeratio
     function repack_fourierblocks(sourcemap::FockMap, scaled_k::Point, partition::Subset{Mode})::FockMap
         mappart::FockMap = rows(sourcemap, FockSpace(partition))
         inmodes::Subset{Mode} = Subset(

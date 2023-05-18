@@ -252,6 +252,10 @@ end
 
 Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
 
+""" Allows additions for a subset with another type. """
+Base.:+(subset::Subset, val)::Subset = Subset(p + val for p in subset)
+Base.:-(subset::Subset, val)::Subset = subset + (-val)
+
 """
     spaceof(subset::Subset)::AbstractSpace
 

@@ -32,7 +32,7 @@ bonds::FockMap = bondmap([
 𝐻::FockMap = hamiltonian(crystal, bonds)
 visualize(𝐻, title="Hamiltonian", rowrange=1:64, colrange=1:64)
 
-𝐶::FockMap = groundstatecorrelation(𝐻)
+𝐶::FockMap = groundstatecorrelations(𝐻)
 visualize(𝐶, title="Correlation", rowrange=1:64, colrange=1:64)
 
 crystalpoints::Subset{Point} = latticepoints(crystal)

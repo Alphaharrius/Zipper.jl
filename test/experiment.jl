@@ -25,7 +25,7 @@ bonds::FockMap = bondmap([
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
-𝐶::FockMap = groundstatecorrelation(𝐻)
+𝐶::FockMap = groundstatecorrelations(𝐻)
 
 blocked = blocking(:scale => Scale([2. 0.; 0. 2.]), :correlations => 𝐶, :crystal => crystal)
 blockedcorrelations::FockMap = blocked[:correlations]

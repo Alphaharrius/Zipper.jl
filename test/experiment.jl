@@ -17,8 +17,16 @@ unitcell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
 crystal = Crystal(unitcell, [32, 32])
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 
+# m::Mode = modes[1]
+# m.attrs
+# setattr(m, :edge => (Point([1, 0], triangular), Point([1, 1], triangular))).attrs
+
+# c6::Symmetry = Symmetry(:c6, [cos(π/3) -sin(π/3); sin(π/3) cos(π/3)], 6, triangular |> origin)
+# visualize(Subset(p |> euclidean for p in c6 * unitcell))
+
 tₙ = ComplexF64(-1.)
 m0, m1 = members(modes)
+
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
@@ -42,7 +50,7 @@ physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)
 restrictedfock::FockSpace = FockSpace(restrictedregion)
 
-isometries = frozenisometries(blocked[:correlations], restrictedfock, selectionstrategy=frozenselectionbycount(3))
+isometries = localfrozenisometries(blocked[:correlations], restrictedfock, selectionstrategy=frozenselectionbycount(3))
 emptyprojector::FockMap = isometries[:empty] * isometries[:empty]'
 filledprojector::FockMap = isometries[:filled] * isometries[:filled]'
 projector::FockMap = emptyprojector - filledprojector
@@ -50,7 +58,7 @@ pvs, pu = eigh(projector)
 plot(scatter(y=map(p -> p.second, pvs), mode="markers"))
 visualize(pu)
 cmode::Mode = orderedmodes(pu.inspace)[4]
-cmr::FockMap = columns(pu, FockSpace(Subset([cmode])))
+cmr::FockMap = columns(pu, FockSpace(Subset(cmode)))
 cspec = columnspec(cmr)
 visualize(cspec)
 
@@ -64,10 +72,10 @@ plot(scatter(y=map(p -> p.second, crvs), mode="markers"))
 restrictedunitary::FockMap = eigvecsh(restrictedcorrelations)
 visualize(restrictedunitary)
 
-emode1::Mode = orderedmodes(restrictedunitary.inspace)[11]
-emode2::Mode = orderedmodes(restrictedunitary.inspace)[12]
-mr1::FockMap = columns(restrictedunitary, FockSpace(Subset([emode1])))
-mr2::FockMap = columns(restrictedunitary, FockSpace(Subset([emode2])))
+emode1::Mode = orderedmodes(restrictedunitary.inspace)[13]
+emode2::Mode = orderedmodes(restrictedunitary.inspace)[14]
+mr1::FockMap = columns(restrictedunitary, FockSpace(Subset(emode1)))
+mr2::FockMap = columns(restrictedunitary, FockSpace(Subset(emode2)))
 mr = FockMap(mr1.outspace, mr1.inspace, rep(mr1) + 1im * rep(mr2))
 values = columnspec(mr)
 

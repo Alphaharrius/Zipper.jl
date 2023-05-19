@@ -84,8 +84,8 @@ crvs = eigvalsh(𝐶ᵣ)
 plot(scatter(y=map(p -> p.second, crvs), mode="markers"))
 emode1::Mode = orderedmodes(𝑈ᵣ.inspace)[12]
 emode2::Mode = orderedmodes(𝑈ᵣ.inspace)[13]
-moderep1 = columns(𝑈ᵣ, FockSpace(Subset([emode1])))
-moderep2::FockMap = columns(𝑈ᵣ, FockSpace(Subset([emode2])))
+moderep1 = columns(𝑈ᵣ, FockSpace(Subset(emode1)))
+moderep2::FockMap = columns(𝑈ᵣ, FockSpace(Subset(emode2)))
 moderep = moderep1 + (FockMap(moderep2.outspace, moderep1.inspace, rep(moderep2)) * 1im)
 values = columnspec(moderep1)
 
@@ -96,7 +96,7 @@ tspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))
 bspec::Matrix{Float64} = zeros(Float64, length(rng), length(rng))
 for (j, k) in enumerate(rng)
     for (i, h) in enumerate(rng)
-        fkk::FockMap = fourier(Subset([Point([h, k], k_space)]), Subset(orderedmodes(bm.outspace)))
+        fkk::FockMap = fourier(Subset(Point([h, k], k_space)), Subset(orderedmodes(bm.outspace)))
         bloch::FockMap = fkk * bm * fkk'
         spec = eigvalsh(bloch)
         tspec[j, i] = real(spec[1].second)

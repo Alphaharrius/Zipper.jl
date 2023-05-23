@@ -10,6 +10,9 @@ using PlotlyJS, LinearAlgebra, OrderedCollections, SparseArrays, ColorTypes, Smi
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Transformations, ..Zer
 using ..Plotting
 
+reps = [Irrep(exp(n * 1im * 2π/6)) for n in 0:5]
+Set([el * el for el in reps]) == Set([Irrep(exp(n * 1im * 2π/3)) for n in 0:2])
+
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
@@ -45,7 +48,7 @@ visualize(blockedcorrelations, title="Correlation", rowrange=1:64, colrange=1:64
 newcrystal = blocked[:crystal]
 
 crystalpoints::Subset{Point} = latticepoints(newcrystal)
-newmodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1, group=ModeGroup(transformed, "scaled"))
+newmodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)
 restrictedfock::FockSpace = FockSpace(restrictedregion)

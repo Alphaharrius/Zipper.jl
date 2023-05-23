@@ -18,11 +18,10 @@ mode::Mode = first(quantized)
 𝑁::Integer = 64 # Number of lattice sites.
 crystal::Crystal = Crystal(unitcell, [𝑁])
 modes::Subset{Mode} = spanoffset(Subset(mode), latticepoints(crystal))
-[convert(Point, m) for m in modes]
 
 # ======================================================================================================
 # Generate the AAH hamiltonian.
-𝑉::Float64 = 0
+𝑉::Float64 = 2
 𝑡::Float64 = 1
 α::Float64 = (√5 + 1) / 2
 onsite_bonds::Dict{Tuple{Mode, Mode}, ComplexF64} = Dict()
@@ -52,12 +51,12 @@ visualize(𝐻)
 visualize(𝐶)
 
 scale::Scale = Scale([2.0][:,:])
-newcrystal::Crystal = scale * crystal
+newcrystal::Crystal = scale * scale * crystal
 newbasismodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
 newmodes::Subset{Mode} = spanoffset(newbasismodes, latticepoints(newcrystal))
 
 modemapping::Dict{Point, Mode} = Dict(convert(Point, m) => m for m in newmodes)
-allignment::Subset{Mode} = Subset(modemapping[scale * convert(Point, m)] for m in modes)
+allignment::Subset{Mode} = Subset(modemapping[scale * scale * convert(Point, m)] for m in modes)
 newlattfock::FockSpace = FockSpace(newmodes)
 temp::FockMap = Quantum.permute(idmap(newlattfock, newlattfock), inspace=FockSpace(allignment))
 permutation::FockMap = FockMap(temp.outspace, FockSpace(modes), rep(temp))
@@ -72,8 +71,9 @@ rcvals, rcunitary = eigh(restrictedcorrelations)
 plot(scatter(y=map(p -> p.second, rcvals), mode="markers"), Layout(title="Local Distiller 𝑉 = $(𝑉)"))
 
 distillers::Vector{FockMap} = []
-for offset in [latticepoints(newcrystal)...][3:end-1]
+for offset in [latticepoints(newcrystal)...][2:end]
     distillregion::Subset{Mode} = restrictedregion + offset
+    @show [euclidean(pos(m)) for m in distillregion]
     distillfock::FockSpace = FockSpace(distillregion)
     distillcorrelations::FockMap = restrict(blockedcorrelations, distillfock, distillfock)
     frozenfocks = frozenselectionbycount(1)(distillcorrelations)
@@ -87,6 +87,44 @@ plot(scatter(y=map(p -> p.second, gdvals), mode="markers"), Layout(title="Global
 globalcourier::Subset{Mode} = Subset(map(p -> p.first, filter(p -> -0.12 < p.second < 0.12, gdvals)))
 globalcourierisometry::FockMap = columns(globalunitary, FockSpace(globalcourier))
 visualize(globalcourierisometry)
-mode = orderedmodes(globalcourierisometry.inspace)[21]
-modespec = columnspec(columns(globalunitary, FockSpace(Subset(mode))))
+# mode = orderedmodes(globalcourierisometry.inspace)[21]
+# modespec = columnspec(columns(globalunitary, FockSpace(Subset(mode))))
+# visualize(modespec)
+
+positions = [m |> pos |> euclidean for m in globalunitary.outspace |> orderedmodes]
+using SparseArrays
+
+mat = spzeros(positions |> length, positions |> length)
+foreach(enum -> mat[enum |> first, enum |> first] = (enum |> last |> pos)[1], enumerate(positions))
+x = FockMap(globalunitary.outspace, globalunitary.outspace, mat)
+courierprojector = globalcourierisometry * globalcourierisometry'
+visualize(courierprojector)
+wanniermap = courierprojector * x * courierprojector'
+visualize(wanniermap)
+wannierevals, wannierunitary = eigh(wanniermap)
+wanniermodes = Subset(map(p -> p.first, filter(p -> -1e-5 > p.second || p.second > 1e-5, wannierevals)))
+wanniercourierisometry = columns(wannierunitary, FockSpace(wanniermodes))
+visualize(wannierunitary, title="Wannier unitary 𝑉 = $(𝑉)")
+plot(scatter(y=map(p -> p.second, wannierevals), mode="markers"), Layout(title="Wannier spectrum 𝑉 = $(𝑉)"))
+
+wanniercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
+wcorrcals = eigvalsh(wanniercorrelations)
+visualize(wanniercorrelations, title="Wannier correlation 𝑉 = $(𝑉)")
+plot(scatter(y=map(p -> p.second, wcorrcals), mode="markers"), Layout(title="Wannier correlation spectrum 𝑉 = $(𝑉)"))
+
+plot(surface(z=Matrix(real(wannierunitary.rep))))
+
+mode = orderedmodes(wannierunitary.inspace)[6]
+modespec = columnspec(columns(wannierunitary, FockSpace(Subset(mode))))
 visualize(modespec)
+
+globalempty::Subset{Mode} = Subset(map(p -> p.first, filter(p -> -0.12 > p.second, gdvals)))
+globalemptyisometry::FockMap = columns(globalunitary, FockSpace(globalempty))
+emptyprojector = globalemptyisometry * globalemptyisometry'
+wanniermap = emptyprojector * x * emptyprojector'
+visualize(wanniermap)
+wannierevals, wannierunitary = eigh(wanniermap)
+visualize(wannierunitary, title="Wannier unitary 𝑉 = $(𝑉)")
+plot(scatter(y=map(p -> p.second, wannierevals), mode="markers"), Layout(title="Wannier spectrum 𝑉 = $(𝑉)"))
+
+plot(surface(z=Matrix(real(wannierunitary.rep))))

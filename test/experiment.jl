@@ -10,9 +10,6 @@ using PlotlyJS, LinearAlgebra, OrderedCollections, SparseArrays, ColorTypes, Smi
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Transformations, ..Zer
 using ..Plotting
 
-reps = [Irrep(exp(n * 1im * 2π/6)) for n in 0:5]
-Set([el * el for el in reps]) == Set([Irrep(exp(n * 1im * 2π/3)) for n in 0:2])
-
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 

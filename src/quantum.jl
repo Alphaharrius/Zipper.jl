@@ -34,6 +34,9 @@ struct Mode <: AbstractSubset{Mode}
     Mode(datas::Vector{Pair{Symbol, T}}; orbitals::Dict{Symbol, Symbol} = Dict{Symbol, Symbol}()) where {T} = Mode(Dict(datas...), orbitals=orbitals)
 end
 
+""" Display the number of attributes that identifies this `Mode`. """
+Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
+
 """ Allow for offset the `:offset` attribute of a mode. """
 Base.:+(mode::Mode, offset::Point)::Mode = setattr(mode, :offset => getattr(mode, :offset) + offset)
 Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)

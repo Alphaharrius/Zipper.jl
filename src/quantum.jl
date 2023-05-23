@@ -177,7 +177,7 @@ Get the orbital which the `mode` transforms like under the symmetry `group`, if 
 """
 function orbital(group::Symbol, mode::Mode)::Symbol
     orbitals::Dict{Symbol, Symbol} = getattr(mode, :orbitals)
-    return haskey(orbitals, group) ? orbitals[group] : :s
+    return haskey(orbitals, group) ? orbitals[group] : :s # Return the s-orbital when no orbital of the symmetry is specified.
 end
 
 """

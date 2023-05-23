@@ -7,7 +7,7 @@ module Transformations
 using LinearAlgebra, SmithNormalForm, OrderedCollections
 using ..Spaces, ..Geometries, ..Quantum
 
-export Recipient, Scale
+export Recipient, Scale, Symmetry, Irrep
 
 abstract type Transformation{T} <: Element{T} end
 
@@ -83,7 +83,7 @@ function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::Fo
     function repack_fourierblocks(sourcemap::FockMap, scaled_k::Point, partition::Subset{Mode})::FockMap
         mappart::FockMap = rows(sourcemap, FockSpace(partition))
         inmodes::Subset{Mode} = Subset(
-            setattr(m, :groups => [ModeGroup(transformed, "scaled")], :offset => scaled_k, :pos => scale * convert(Point, m))
+            setattr(m, :offset => scaled_k, :pos => scale * convert(Point, m))
             for m in orderedmodes(mappart.inspace))
         return FockMap(mappart.outspace, FockSpace(inmodes), rep(mappart))
     end
@@ -92,5 +92,49 @@ function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::Fo
     blockmap::FockMap = focksum(mapblocks)
     return FockMap(blockmap.outspace, FockSpace(blockmap.inspace, T=CrystalFock), rep(blockmap))'
 end
+
+struct Irrep <: Element{ComplexF64}
+    rep::ComplexF64
+end
+
+Base.:show(io::IO, irrep::Irrep) = print(io, string("$(typeof(irrep))($(rep(irrep)))"))
+
+Base.:(==)(a::Irrep, b::Irrep)::Bool = isapprox(rep(a), rep(b))
+
+Base.:*(a::Irrep, b::Irrep)::Irrep = Irrep(rep(a) * rep(b))
+
+Base.:convert(::Type{ComplexF64}, source::Irrep) = source.rep
+
+function Base.:hash(source::Irrep)::UInt
+    denom::Int64 = 10000000
+    rationalizedrep::Complex{Rational{Int64}} = (
+        Rational{Int64}(round((source |> rep |> real) * denom)) // denom + Rational{Int64}(round((source |> rep |> imag) * denom)) // denom * 1im)
+    return hash(rationalizedrep)
+end
+
+Base.:isequal(a::Irrep, b::Irrep)::Bool = a == b
+
+struct Symmetry <: Transformation{Matrix{Float64}}
+    group::Symbol
+    rep::Matrix{Float64}
+    order::Integer
+    center::Point
+    irreps::Dict{Symbol, Irrep}
+
+    Symmetry(group::Symbol, rep::Matrix{Float64}, order::Integer, center::Point, irreps::Pair{Symbol, Irrep}...) = new(
+        group, rep, order, center, Dict(irreps...))
+end
+
+Base.:convert(::Type{Matrix{Float64}}, source::Symmetry) = source.rep
+
+Spaces.:dimension(symmetry::Symmetry)::Integer = size(rep(symmetry), 1)
+
+groupreps(symmetry::Symmetry)::Vector{Matrix{Float64}} = [rep(symmetry) ^ n for n in 0:symmetry.order - 1]
+
+Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point} = Subset(
+    Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center
+    for sym in groupreps(symmetry) for p in region)
+
+Base.:*(symmetry::Symmetry, point::Point)::Subset{Point} = symmetry * Subset(point)
 
 end

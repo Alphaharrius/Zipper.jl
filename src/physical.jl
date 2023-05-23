@@ -40,13 +40,12 @@ end
 function groundstates(hamiltonian::FockMap)::FockMap
     bloch_partitions::Subset{Subset{Mode}} = rep(hamiltonian.inspace)
     ∑𝑈₀::Vector{FockMap} = Vector{FockMap}(undef, length(bloch_partitions))
-    filledgroup::ModeGroup = ModeGroup(quantized, "filled")
     for (n, partition) in enumerate(bloch_partitions)
         𝑘::Point = getattr(first(partition), :offset)
         fockspace::FockSpace = FockSpace(partition)
         𝐻ₖ::FockMap = restrict(hamiltonian, fockspace, fockspace)
-        𝔘::FockMap = eigvecsh(𝐻ₖ, :offset => 𝑘, :groups => [filledgroup])
-        filledmodes::Vector{Mode} = map(p -> p.first, filter(p -> p.second < 0, eigvalsh(𝐻ₖ, :offset => 𝑘, :groups => [filledgroup])))
+        𝔘::FockMap = eigvecsh(𝐻ₖ, :offset => 𝑘)
+        filledmodes::Vector{Mode} = map(p -> p.first, filter(p -> p.second < 0, eigvalsh(𝐻ₖ, :offset => 𝑘)))
         𝑈₀::FockMap = columns(𝔘, FockSpace(Subset(filledmodes)))
         ∑𝑈₀[n] = 𝑈₀
     end

@@ -7,38 +7,10 @@ using LinearAlgebra, SparseArrays, OrderedCollections
 using ..Spaces, ..Geometries
 
 export quantized, transformed, symmetrized
-export ModeGroupType, ModeGroup, Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
-export groupname, hasattr, getattr, setattr, removeattr, addgroup, quantize, flavorcount, spanoffset
+export Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
+export hasattr, getattr, setattr, removeattr, setorbital, orbital, quantize, flavorcount, spanoffset
 export dimension, commonattr, subspaces, subspacecount, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
 export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, onesmap, colmap, columnspec
-
-"""
-    ModeGroupType
-
-Classifiers of the type of a `ModeGroup`.
-- `quantized`   The mode is being quantized from some physical objects.
-- `transformed` The mode is being created by transforming existing set of modes.
-- `symmetrized` The mode is being created by symmetry-transforming existing set of modes.
-"""
-@enum ModeGroupType begin
-    quantized
-    transformed
-    symmetrized
-end
-
-"""
-    ModeGroup(type::ModeGroupType, name::String)
-
-A structure that holds the information of a specific group of mode.
-
-### Input
-- `type` The type of the group.
-- `name` The name of the group.
-"""
-struct ModeGroup
-    type::ModeGroupType
-    name::String
-end
 
 """
     Mode(attrs::Dict{Symbol})
@@ -47,20 +19,19 @@ end
 Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 
 ### Attributes to put in `attrs`
-- `:groups` stores a `Vector{ModeGroup}` which `ModeGroup` identifies a group of modes created by some action.
 - `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
 - `:pos` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
+- `:orbitals` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
 
 ### Input
 - `attrs` The attributes which uniquely identifies the `Mode` object.
-
 """
 struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
 
-    Mode(attrs::Dict{Symbol}) = new(attrs)
-    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(datas...))
+    Mode(attrs::Dict{Symbol}; orbitals::Dict{Symbol, Symbol} = Dict{Symbol, Symbol}()) = new(Dict(:orbitals => orbitals, attrs...))
+    Mode(datas::Vector{Pair{Symbol, T}}; orbitals::Dict{Symbol, Symbol} = Dict{Symbol, Symbol}()) where {T} = Mode(Dict(datas...), orbitals=orbitals)
 end
 
 """ Allow for offset the `:offset` attribute of a mode. """
@@ -107,6 +78,16 @@ Retrieve the attribute value identified by `key` from `mode`.
 getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 
 """
+    getattr(key::Symbol)
+
+Shorthand of `getattr(mode::Mode, key::Symbol)` with the pipe operator `|>`.
+
+### Examples
+The line `mode |> getattr(:flavor)` is equal to `getattr(mode, :flavor)`.
+"""
+getattr(key::Symbol) = mode::Mode -> getattr(mode, key)
+
+"""
     removeattr(mode::Mode, keys::Symbol...)::Mode
 
 Create a **copy** of `mode` **without** the attributes identified by `keys`.
@@ -115,6 +96,16 @@ Create a **copy** of `mode` **without** the attributes identified by `keys`.
 - To remove the attribute of `:offset` and `:pos`, we use `removeattr(mode, :offset, :pos)`.
 """
 removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
+
+"""
+    removeattr(keys::Symbol...)
+
+Shorthand of `removeattr(mode::Mode, keys::Symbol...)::Mode` with the pipe operator `|>`.
+
+### Examples
+The line `mode |> removeattr(:flavor, :index)` is equal to `removeattr(mode, :flavor, :index)`.
+"""
+removeattr(keys::Symbol...) = mode::Mode -> removeattr(mode, keys...)
 
 """
     removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode}
@@ -139,6 +130,16 @@ record will be overwritten.
 setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
 
 """
+    setattr(attrs::Pair{Symbol}...)
+
+Shorthand of `setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode` with the pipe operator `|>`.
+
+### Examples
+The line `mode |> setattr(:flavor => 1)` is equal to `setattr(mode, :flavor => 1)`.
+"""
+setattr(attrs::Pair{Symbol}...) = mode::Mode -> setattr(mode, attrs...)
+
+"""
     setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode}
 
 Create a **copy** of `modes` with the new attributes identified by `keys` added to the current attributes for each mode in `modes`, if the attribute
@@ -148,6 +149,33 @@ exists in the modes, the current record will be overwritten.
 - To add `:offset` and `:flavor`, we use `newmodes = setattr(modes, :offset => point, :flavor => 1)`
 """
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
+
+"""
+    setorbital(mode::Mode, orbitals::Pair{Symbol, Symbol}...)::Mode
+
+Create a **copy** of `mode` with new orbitals added to the current orbitals of `mode`.
+"""
+setorbital(mode::Mode, orbitals::Pair{Symbol, Symbol}...)::Mode = setattr(mode, :orbitals => Dict(getattr(mode, :orbitals)..., orbitals))
+
+"""
+    setorbital(orbitals::Pair{Symbol, Symbol}...)
+
+Shorthand of `setorbital(mode::Mode, orbitals::Pair{Symbol, Symbol}...)::Mode` with the pipe operator `|>`.
+
+### Examples
+The line `mode |> setorbital(:c3 => :s)` is equal to `setorbital(mode, :c3 => :s)`.
+"""
+setorbital(orbitals::Pair{Symbol, Symbol}...) = mode::Mode -> setorbital(mode, orbitals...)
+
+"""
+    orbital(group::Symbol, mode::Mode)::Symbol
+
+Get the orbital which the `mode` transforms like under the symmetry `group`, if no orbital is specified for symmetry `group`, s-orbital `:s` is returned.
+"""
+function orbital(group::Symbol, mode::Mode)::Symbol
+    orbitals::Dict{Symbol, Symbol} = getattr(mode, :orbitals)
+    return haskey(orbitals, group) ? orbitals[group] : :s
+end
 
 """
     spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode}
@@ -356,7 +384,7 @@ Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset,
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source) # Added for completeness.
 
 """
-    quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup)::Mode
+    quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer)::Mode
 
 Quantizing a mode from a given `Point`.
 
@@ -364,23 +392,21 @@ Quantizing a mode from a given `Point`.
 - `identifier` The identifying atttibute key which the `point` object will be linked to.
 - `point` The `Point` as the physical attribute or object to be quantized.
 - `flavor` The flavor index of the `Mode`, don't mistaken this with the flavor count.
-- `group` Optional parameter that stores the information about the origins of the mode group, or the actions they have been through,
-  defaults to `ModeGroup(quantized, "physical")`.
 
 ### Output
 The quantized `Mode` object.
 """
-function quantize(identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Mode
+function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
     @assert(identifier == :offset || identifier == :pos)
     home::Point = origin(spaceof(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
-    return Mode([:groups => [group], identifier => point, :flavor => flavor, couple])
+    return Mode([identifier => point, :flavor => flavor, couple])
 end
 
 """
-    quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup)::Subset{Mode}
+    quantize(identifier::Symbol, subset::Subset{Point}, count::Integer)::Subset{Mode}
 
 Quantizing a set of mode from a given set of `Point`.
 
@@ -389,14 +415,12 @@ Quantizing a set of mode from a given set of `Point`.
 - `subset` The set of `Point` provided as the physical attributes or objects to be quantized.
 - `count` The flavor count of the quantization, if it is greater than `1`, it means the given site defined by a `Point` in `subset` has more
   than one fermionic degree of freedom.
-- `group` Optional parameter that stores the information about the origins of the mode group, or the actions they have been through,
-  defaults to `ModeGroup(quantized, "physical")`.
 
 ### Output
 The quantized set of `Mode` objects.
 """
-quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Subset{Mode} = (
-    Subset(quantize(identifier, point, flavor, group=group) for point in subset for flavor in 1:count))
+quantize(identifier::Symbol, subset::Subset{Point}, count::Int64)::Subset{Mode} = (
+    Subset(quantize(identifier, point, flavor) for point in subset for flavor in 1:count))
 
 """
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
@@ -559,7 +583,7 @@ performing eigenvalue decomposition.
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     @assert(hassamespan(fockmap.inspace, fockmap.outspace))
     return Subset(
-        Mode([:groups => [ModeGroup(transformed, "eigh")], :flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
+        Mode([:flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
 end
 
 """

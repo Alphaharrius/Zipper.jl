@@ -114,22 +114,20 @@ end
 
 Base.:isequal(a::Irrep, b::Irrep)::Bool = a == b
 
-struct Symmetry <: Transformation{Matrix{Float64}}
+struct Symmetry <: Transformation{Vector{Matrix{Float64}}}
     group::Symbol
-    rep::Matrix{Float64}
+    firstorderrep::Matrix{Float64}
     order::Integer
     center::Point
     irreps::Dict{Symbol, Irrep}
 
-    Symmetry(group::Symbol, rep::Matrix{Float64}, order::Integer, center::Point, irreps::Pair{Symbol, Irrep}...) = new(
+    Symmetry(; group::Symbol, rep::Matrix{Float64}, order::Integer, center::Point, irreps::Vector{Pair{Symbol, Irrep}}) = new(
         group, rep, order, center, Dict(irreps...))
 end
 
-Base.:convert(::Type{Matrix{Float64}}, source::Symmetry) = source.rep
+Base.:convert(::Type{Matrix{Float64}}, source::Symmetry) = [symmetry.firstorderrep ^ n for n in 0:symmetry.order - 1]
 
-Spaces.:dimension(symmetry::Symmetry)::Integer = size(rep(symmetry), 1)
-
-groupreps(symmetry::Symmetry)::Vector{Matrix{Float64}} = [rep(symmetry) ^ n for n in 0:symmetry.order - 1]
+Spaces.:dimension(symmetry::Symmetry)::Integer = size(symmetry.firstorderrep, 1)
 
 Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point} = Subset(
     Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center

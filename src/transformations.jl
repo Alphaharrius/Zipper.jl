@@ -11,18 +11,6 @@ export Recipient, Scale, Symmetry, Irrep
 
 abstract type Transformation{T} <: Element{T} end
 
-struct Recipient{T}
-    object::T
-    parameters::Dict{Symbol}
-
-    Recipient(object::T, parameters::Vararg{Pair{Symbol}}) where {T} = new{T}(object, Dict(parameters...))
-end
-
-function recipientparam(recipient::Recipient, key::Symbol)
-    @assert(haskey(recipient.parameters, key), "Missing parameter of `$(key)`!")
-    return recipient.parameters[key]
-end
-
 Base.:*(transformation::T, element::F) where {T <: Transformation, F <: Element} = error(
     "Composition of `$(typeof(transformation))` with `$(typeof(element))` is not defined.")
 
@@ -55,15 +43,14 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
 end
 
-function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::FockMap # For fockspace that is sparse under momentum partitions.
-    fockspace::FockSpace{CrystalFock} = recipient.object
-    crystal::Crystal = recipientparam(recipient, :crystal)
+function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
+    crystal::Crystal = crystalof(crystalfock)
     newcrystal::Crystal = scale * crystal
     blockedregion::Subset{Point} = inv(scale) * newcrystal.unitcell
     BZ::Subset{Point} = brillouinzone(crystal)
-    basismodes::Subset{Mode} = fockspace |> rep |> first
+    basismodes::Subset{Mode} = crystalfock |> rep |> first
     newBZ::Subset{Point} = brillouinzone(newcrystal)
-    # Generate the Dict which keys each fockspace partition by its momentum.
+    # Generate the Dict which keys each crystal fockspace partition by its momentum.
     momentumtopartition::Dict{Point, Subset{Mode}} = Dict(getattr(first(part), :offset) => part for part in rep(fockspace))
     momentummappings::Vector{Pair{Point, Point}} = [basispoint(scale * p) => p for p in BZ]
     mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point,Vector{Point}}()) do d,(k,v)
@@ -90,7 +77,7 @@ function Base.:*(scale::Scale, recipient::Recipient{FockSpace{CrystalFock}})::Fo
     mapblocks::Vector{FockMap} = [repack_fourierblocks(permutedmap, scaled_k, partition)
                                   for (scaled_k, partition) in Iterators.zip(newBZ, rep(blockedcrystalfock))]
     blockmap::FockMap = focksum(mapblocks)
-    return FockMap(blockmap.outspace, FockSpace(blockmap.inspace, T=CrystalFock), rep(blockmap))'
+    return FockMap(blockmap.outspace, FockSpace(blockmap.inspace, reflected=newcrystal), rep(blockmap))'
 end
 
 struct Irrep <: Element{ComplexF64}

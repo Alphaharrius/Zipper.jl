@@ -7,9 +7,10 @@ using LinearAlgebra, SparseArrays, OrderedCollections
 using ..Spaces, ..Geometries
 
 export quantized, transformed, symmetrized
-export Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
+export Mode, FockSpace, FockMap
 export hasattr, getattr, setattr, removeattr, setorbital, orbital, quantize, flavorcount, spanoffset
-export dimension, commonattr, subspaces, subspacecount, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
+export dimension, crystalof, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
+export order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
 export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, onesmap, colmap, columnspec
 
 """
@@ -200,7 +201,7 @@ flavorcount(basismodes::Subset{Mode})::Integer = trunc(Integer, length(basismode
     sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
 
 Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset` and form a `FockSpace`. Not to
-be mistakened with `spanoffset`, this method will partition the modes by the generator points, in normal conditions the return type will be `FockSpace{SparseFock}`.
+be mistakened with `spanoffset`, this method will partition the modes by the generator points.
 Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
 """
 function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
@@ -211,11 +212,11 @@ function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
 end
 
 """
-    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace{CrystalFock}
+    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace{CrystalFock} = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), T=CrystalFock)
+crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
 
 """ By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space. """
 Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
@@ -228,17 +229,11 @@ Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
 # ==================================================
 
-# =========================================
-# Types of different fockspaces
-abstract type AnyFock end
-abstract type SparseFock <: AnyFock end
-abstract type CrystalFock <: SparseFock end
-# =========================================
-
 """
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; T::Type{<: AnyFock})
-    FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock})
-    FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock)
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)
+    FockSpace(subset::Subset{Mode}; reflected=Nothing)
+    FockSpace(fockspace::FockSpace; reflected=Nothing)
+    FockSpace(mode::Mode) = FockSpace(Subset(mode); reflected=Nothing)
 
 A collection of `Modes` or `Mode` partitions in the case of sparse fockspace, implicit ordering of underlying modes is assumed.
 
@@ -246,42 +241,37 @@ The structure of fockspace is assume to hold partitions, a fockspace that **does
 all underlying modes. The design can be seen with the type of the representation `Subset{Subset{Mode}}`, which the higher order `Subset` holds partitions
 represented by `Subset{Mode}`.
 
-The type of the fockspace will be determined by the constructor with the structure of the representation, if there is more than one partition,
-`SparseFock` will be selected, else `AnyFock` is the default option.
-
-### `FockSpace` Types
-- `AnyFock`     An arbitary `FockSpace`.
-- `SparseFock`  A `FockSpace` that have multiple sub-fockspaces.
-- `CrystalFock` A `SparseFock` which the sub-fockspaces are the basismode fockspaces with different momentum from the brillouin zone.
+The `reflected` attribute is used to store the object this fockspace is reflected to, such as `Crystal` for a crystal fockspace, by default it will be `Nothing`.
 
 ### Examples
-- `FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; T::Type{<: AnyFock})` is used when all the components of the `FockSpace`
+- `FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)` is used when all the components of the `FockSpace`
   is already constructed prior instantiation.
-- `FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock})` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
-- `FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock)` is used to change the fockspace type to `AnyFock`, `SparseFock` or `CrystalFock`.
+- `FockSpace(subset::Subset{Mode}; reflected=Nothing)` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
+- `FockSpace(fockspace::FockSpace; reflected=Nothing)` is used to set the `reflected` attribute.
+- `FockSpace(mode::Mode; reflected=Nothing)` is used to create a fockspace with a single mode.
 """
 struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
+    reflected::T
     rep::Subset{Subset{Mode}}
     ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer};
-        T::Type{<: AnyFock} = (length(subsets) > 1 ? SparseFock : AnyFock)) = new{T}(subsets, ordering)
-    FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock} = AnyFock) = FockSpace(
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing) = new{typeof(reflected)}(reflected, subsets, ordering)
+    FockSpace(subset::Subset{Mode}; reflected=Nothing) = FockSpace(
         Subset(subset),
         Dict(mode => order for (order, mode) in enumerate(subset)),
-        T=T)
-    FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock) = FockSpace(rep(fockspace), fockspace.ordering, T=T)
+        reflected=reflected)
+    FockSpace(fockspace::FockSpace; reflected=Nothing) = FockSpace(rep(fockspace), fockspace.ordering, reflected=reflected)
+    FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
 end
 
-""" Displays the fock type, partition and dimension information of a `FockSpace`. """
-Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(part=$(length(rep(fockspace))), dim=$(dimension(fockspace)))"))
+""" Displays the fock type, subspace count and dimension information of a `FockSpace`. """
+Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
 
 function Base.:union(focks::FockSpace...)::FockSpace
     partitions::Subset{Subset{Mode}} = union([rep(fock) for fock in focks]...)
     modes::Subset{Mode} = flatten(partitions)
     ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    T::Type{<: AnyFock} = length(partitions) > 1 ? SparseFock : AnyFock
-    return FockSpace(partitions::Subset{Subset{Mode}}, ordering, T=T)
+    return FockSpace(partitions::Subset{Subset{Mode}}, ordering)
 end
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
@@ -294,7 +284,11 @@ Returns the number of unique member modes within the `fockspace`, each of those 
 Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
 
 """
-    commonattr(fockspace::FockSpace, key::Symbol)
+    crystalof(crystalfock::FockSpace{Crystal})::Crystal
+
+Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
+"""
+crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
 
 Retrieve the common attribute associated to `key` of all the child modes of the `fockspace`, and throws assertion error if the attribute
 is not unique within the `fockspace`.
@@ -330,7 +324,8 @@ order(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
 """
     modes(fockspace::FockSpace)::Set{Mode}
 
-Returns an unordered set of modes of `fockspace`, this is a more efficient way to retrieve the underlying modes for a fockspace of type `SparseFock`.
+Returns an unordered set of modes of `fockspace`, this is a more efficient way to retrieve the underlying modes for a fockspace with
+more than one partitions.
 """
 modes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
 
@@ -676,7 +671,7 @@ Create a `FockMap` corresponds to a Fourier transform of a physical fockspace `i
 attribute `:offset` dropped, which means entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
-- `outspace` The output space of the Fourier transform, which is the momentum `FockSpace`, most likely with type `FockSpace{CrystalFock}`, noted that the basis modes in
+- `outspace` The output space of the Fourier transform, which is the momentum `FockSpace`, most likely with type `FockSpace{Crystal}`, noted that the basis modes in
   each momentum subspace should matches with the possible basis modes within `inspace`.
 - `inspace`  The input space, all contituent modes must have the attribute `:offset` defined or result in errors.
 
@@ -706,8 +701,8 @@ end
 
 Perform summation of a set of `FockMap`, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
 non-overlapping `inspace` and `outspace`, this corresponds to a direct sum; if they have overlapping but different span of `inspace` or `outspace`, the result will
-be a `FockMap` with `outspace` and `inspace` as a `SparseFock` with all sub-fockspaces of different span, with the corresponding representation summed. Please be
-noted that `focksum([a, b, c, d]) == a + b + c + d`.
+be a `FockMap` with `outspace` and `inspace` with all sub-fockspaces of different span, with the corresponding representation summed. Please be noted that
+`focksum([a, b, c, d]) == a + b + c + d`.
 """
 function focksum(fockmaps::Vector{FockMap})::FockMap
     parts = [(fockmap, outpart, inpart) for fockmap in fockmaps for (outpart, inpart) in zip(rep(fockmap.outspace), rep(fockmap.inspace))]

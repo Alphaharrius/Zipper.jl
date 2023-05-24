@@ -43,7 +43,7 @@ function blocking(parameters::Dict{Symbol})::Dict{Symbol}
     correlation::FockMap = parameters[:correlations]
     crystal::Crystal = parameters[:crystal]
 
-    scaling::FockMap = scale * Recipient(correlation.inspace, :crystal => crystal)
+    scaling::FockMap = scale * correlation.inspace
     result[:action] = scaling
     result[:correlations] = scaling * correlation * scaling'
     result[:crystal] = scale * crystal

@@ -34,7 +34,7 @@ function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
     ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset(𝑘), FockSpace(bondmodes)), 𝐵𝑍)
     ∑𝐻ₖ = Iterators.map(𝐹ₖ -> 𝐹ₖ * bondmap * 𝐹ₖ', ∑𝐹ₖ)
     fockmap::FockMap = focksum([∑𝐻ₖ...])
-    return FockMap(FockSpace(fockmap.outspace, T=CrystalFock), FockSpace(fockmap.inspace, T=CrystalFock), rep(fockmap))
+    return FockMap(FockSpace(fockmap.outspace, reflected=crystal), FockSpace(fockmap.inspace, reflected=crystal), rep(fockmap))
 end
 
 function groundstates(hamiltonian::FockMap)::FockMap
@@ -50,14 +50,16 @@ function groundstates(hamiltonian::FockMap)::FockMap
         ∑𝑈₀[n] = 𝑈₀
     end
     𝔘₀::FockMap = focksum(∑𝑈₀)
-    return FockMap(FockSpace(𝔘₀.outspace, T=CrystalFock), 𝔘₀.inspace, rep(𝔘₀))
+    crystal::Crystal = crystalof(hamiltonian.inspace)
+    return FockMap(FockSpace(𝔘₀.outspace, reflected=crystal), 𝔘₀.inspace, rep(𝔘₀))
 end
 
 function groundstatecorrelations(hamiltonian::FockMap)::FockMap
     𝔘₀::FockMap = groundstates(hamiltonian)
     𝐼::FockMap = idmap(𝔘₀.outspace, 𝔘₀.outspace)
     𝐶::FockMap = 𝐼 - 𝔘₀ * 𝔘₀'
-    return FockMap(FockSpace(𝐶.outspace, T=CrystalFock), FockSpace(𝐶.inspace, T=CrystalFock), rep(𝐶))
+    crystal::Crystal = crystalof(hamiltonian.inspace)
+    return FockMap(FockSpace(𝐶.outspace, reflected=crystal), FockSpace(𝐶.inspace, reflected=crystal), rep(𝐶))
 end
 
 end

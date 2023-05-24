@@ -52,7 +52,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     basismodes::Subset{Mode} = crystalfock |> rep |> first
     newBZ::Subset{Point} = brillouinzone(newcrystal)
     # Generate the Dict which keys each crystal fockspace partition by its momentum.
-    momentumtopartition::Dict{Point, Subset{Mode}} = Dict(getattr(first(part), :offset) => part for part in rep(fockspace))
+    momentumtopartition::Dict{Point, Subset{Mode}} = Dict(commonattr(part, :offset) => part for part in rep(crystalfock))
     momentummappings::Vector{Pair{Point, Point}} = [basispoint(scale * p) => p for p in BZ]
     mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point,Vector{Point}}()) do d,(k,v)
         mergewith!(append!, d, LittleDict(k=>[v]))

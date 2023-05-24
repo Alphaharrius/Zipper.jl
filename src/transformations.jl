@@ -111,6 +111,10 @@ struct Symmetry <: Transformation{Vector{Matrix{Float64}}}
     center::Point
     irreps::Dict{Symbol, Irrep}
 
+    Symmetry(; group::Symbol, firstorderrep::Matrix{Float64}, order::Integer, center::Point, irreps::Vector{Pair{Symbol, Irrep}}) = new(
+        group, firstorderrep, order, center, Dict(irreps...))
+end
+
 groupreps(symmetry::Symmetry)::Vector{Matrix{Float64}} = [symmetry.firstorderrep ^ n for n in 0:symmetry.order - 1]
 
 function irrepof(symmetry::Symmetry, orbital::Symbol)::Irrep

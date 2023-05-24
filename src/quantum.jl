@@ -84,12 +84,12 @@ getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 """
     getattr(key::Symbol)
 
-Shorthand of `getattr(mode::Mode, key::Symbol)` with the pipe operator `|>`.
+Shorthand of `getattr(v, key::Symbol)` with the pipe operator `|>`.
 
 ### Examples
 The line `mode |> getattr(:flavor)` is equal to `getattr(mode, :flavor)`.
 """
-getattr(key::Symbol) = mode::Mode -> getattr(mode, key)
+getattr(key::Symbol) = v -> getattr(v, key)
 
 """
     removeattr(mode::Mode, keys::Symbol...)::Mode
@@ -104,12 +104,12 @@ removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first 
 """
     removeattr(keys::Symbol...)
 
-Shorthand of `removeattr(mode::Mode, keys::Symbol...)::Mode` with the pipe operator `|>`.
+Shorthand of `removeattr(v, keys::Symbol...)::Mode` with the pipe operator `|>`.
 
 ### Examples
 The line `mode |> removeattr(:flavor, :index)` is equal to `removeattr(mode, :flavor, :index)`.
 """
-removeattr(keys::Symbol...) = mode::Mode -> removeattr(mode, keys...)
+removeattr(keys::Symbol...) = v -> removeattr(v, keys...)
 
 """
     removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode}
@@ -136,12 +136,12 @@ setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., att
 """
     setattr(attrs::Pair{Symbol}...)
 
-Shorthand of `setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode` with the pipe operator `|>`.
+Shorthand of `setattr(v, attrs::Pair{Symbol}...)::Mode` with the pipe operator `|>`.
 
 ### Examples
 The line `mode |> setattr(:flavor => 1)` is equal to `setattr(mode, :flavor => 1)`.
 """
-setattr(attrs::Pair{Symbol}...) = mode::Mode -> setattr(mode, attrs...)
+setattr(attrs::Pair{Symbol}...) = v -> setattr(v, attrs...)
 
 """
     setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode}

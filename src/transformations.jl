@@ -111,6 +111,8 @@ struct Symmetry <: Transformation{Vector{Matrix{Float64}}}
     center::Point
     irreps::Dict{Symbol, Irrep}
 
+groupreps(symmetry::Symmetry)::Vector{Matrix{Float64}} = [symmetry.firstorderrep ^ n for n in 0:symmetry.order - 1]
+
 function irrepof(symmetry::Symmetry, orbital::Symbol)::Irrep
     @assert(haskey(symmetry.irreps, orbital), "Symmetry `$(symmetry.group)` does not have orbital `$(orbital)`!")
     return symmetry.irreps[orbital]

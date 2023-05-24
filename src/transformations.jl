@@ -193,7 +193,7 @@ function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{Fo
             FockSpace(fockmap.inspace, reflected=crystalof(crystalfock)),
             rep(fockmap))
     end
-    
+
     return map(computesymmetrizetransformer, homemaps)
 end
 

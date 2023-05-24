@@ -710,8 +710,8 @@ function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix
     values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), size(momentummatrix, 2), dimension(inspace))
     for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(orderedmodes(inspace)))
         if removeattr(inmode, :offset) != basismode continue end
-        𝑟ₑ::Point = euclidean(getattr(inmode, :offset))
-        values[n, :, m] = exp.(-1im * momentummatrix' * pos(𝑟ₑ))
+        offset::Point = inmode |> getattr(:offset) |> euclidean
+        values[n, :, m] = exp.(-1im * momentummatrix' * pos(offset))
     end
     spmat::SparseMatrixCSC = SparseMatrixCSC(reshape(values, (length(basismodes) * size(momentummatrix, 2), dimension(inspace))))
     return FockMap(outspace, inspace, spmat)

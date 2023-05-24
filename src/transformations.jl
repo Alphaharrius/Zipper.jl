@@ -146,7 +146,7 @@ function Base.:*(symmetry::Symmetry, mode::Mode)::Vector{FockMap}
     # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
     # which the basis point set might not include the symmetrized :pos. Thus we would like to set
     # the :pos to its corresponding basis point, and offload the difference to :offset.
-    function correctsymmetrizedmode(mode::Mode)
+    function correctsymmetrizedmode(mode::Mode)::Mode
         currentoffset::Point = getattr(mode, :offset)
         currentpos::Point = getattr(mode, :pos)
         actualpos::Point = basispoint(currentpos)

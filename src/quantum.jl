@@ -31,8 +31,8 @@ Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
 
-    Mode(attrs::Dict{Symbol}; orbitals::Dict{Symbol, Symbol} = Dict{Symbol, Symbol}()) = new(Dict(:orbitals => orbitals, attrs...))
-    Mode(datas::Vector{Pair{Symbol, T}}; orbitals::Dict{Symbol, Symbol} = Dict{Symbol, Symbol}()) where {T} = Mode(Dict(datas...), orbitals=orbitals)
+    Mode(attrs::Dict{Symbol}) = new(Dict(:orbitals => Dict(), attrs...))
+    Mode(attrs::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(attrs...))
 end
 
 """ Display the number of attributes that identifies this `Mode`. """

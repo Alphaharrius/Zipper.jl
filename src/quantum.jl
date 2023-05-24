@@ -301,6 +301,17 @@ function commonattr(fockspace::FockSpace, key::Symbol)
 end
 
 """
+    unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
+
+Retrieve the unit cell fockspace of the system from a `FockSpace{Crystal}`, positioned at the origin of the parent `AffineSpace`.
+"""
+function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
+    firstpartition::Subset{Mode} = crystalfock |> rep |> first
+    originpoint::Point = firstpartition |> first |> getattr(:pos) |> spaceof |> origin
+    return FockSpace(firstpartition |> setattr(:offset => originpoint))
+end
+
+"""
     subspaces(fockspace::FockSpace)::Vector{FockSpace}
 
 Retrieve the sub-fockspaces of the `fockspace`.
@@ -313,6 +324,13 @@ subspaces(fockspace::FockSpace)::Vector{FockSpace} = [FockSpace(partition) for p
 Get the number of sub-fockspaces of this `fockspace`.
 """
 subspacecount(fockspace::FockSpace)::Integer = fockspace |> rep |> length
+
+"""
+    flattensubspaces(fockspace::FockSpace)::FockSpace
+
+Merge all subspaces within the `fockspace`.
+"""
+flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mode in orderedmodes(fockspace)))
 
 """
     order(fockspace::FockSpace, mode::Mode)::Int64

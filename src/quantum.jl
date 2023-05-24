@@ -290,12 +290,15 @@ Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
 """
 crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
 
+"""
+    commonattr(subset::Subset{Mode}, key::Symbol)
+
 Retrieve the common attribute associated to `key` of all the child modes of the `fockspace`, and throws assertion error if the attribute
 is not unique within the `fockspace`.
 """
-function commonattr(fockspace::FockSpace, key::Symbol)
+function commonattr(subset::Subset{Mode}, key::Symbol)
     set::Set = Set()
-    foreach(m -> push!(set, getattr(m, key)), orderedmodes(fockspace))
+    foreach(m -> push!(set, getattr(m, key)), subset)
     @assert(length(set) == 1, "The modes in this fockspace does not share the same attr `$(key)`!")
     return first(set)
 end

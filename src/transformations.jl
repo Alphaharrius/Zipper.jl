@@ -132,4 +132,67 @@ Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point} = Subset(
 
 Base.:*(symmetry::Symmetry, point::Point)::Subset{Point} = symmetry * Subset(point)
 
+function Base.:*(symmetry::Symmetry, mode::Mode)::Vector{FockMap}
+    newattrs::Dict{Symbol, Any} = Dict()
+    
+    for (key, attr) in mode.attrs
+        if hasmethod(*, Tuple{Symmetry, typeof(attr)}) newattrs[key] = symmetry * attr
+        else newattrs[key] = [attr] end
+    end
+    newmodes::Vector{Mode} = [Mode(Dict(key => newattrs[key][n % length(newattrs[key]) + 1] for key in newattrs |> keys)) for n in 0:symmetry.order - 1]
+    
+    # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
+    # which the basis point set might not include the symmetrized :pos. Thus we would like to set
+    # the :pos to its corresponding basis point, and offload the difference to :offset.
+    function correctsymmetrizedmode(mode::Mode)
+        currentoffset::Point = getattr(mode, :offset)
+        currentpos::Point = getattr(mode, :pos)
+        actualpos::Point = basispoint(currentpos)
+        adjustoffset::Point = currentpos - actualpos
+        return setattr(mode, :offset => currentoffset + adjustoffset, :pos => basispoint(currentpos))
+    end
+
+    correctedmodes::Vector{Mode} = map(correctsymmetrizedmode, newmodes)
+    irreps::Vector{Irrep} = [irrepof(symmetry, orbital(symmetry.group, mode)) ^ n for n in 0:symmetry.order - 1]
+    return [FockMap(
+        FockSpace(newmode),
+        FockSpace(mode),
+        Dict((newmode, mode) => irreps[n] |> rep)) for (n, newmode) in enumerate(correctedmodes)]
+end
+
+function Base.:*(symmetry::Symmetry, modes::Subset{Mode})::Vector{FockMap}
+    data::Matrix{FockMap} = Matrix(undef, length(modes), symmetry.order)
+    for (n, mode) in enumerate(modes)
+        data[n, :] = [(symmetry * mode)...]
+    end
+    fockmaps = Iterators.map(n -> focksum(data[:, n]), 1:symmetry.order)
+    return [FockMap(fockmap.outspace |> flattensubspaces, fockmap.inspace |> flattensubspaces, fockmap |> rep) for fockmap in fockmaps]
+end
+
+function Base.:*(symmetry::Symmetry, fockspace::FockSpace)::Vector{FockMap}
+    data::Matrix{FockMap} = Matrix(undef, fockspace |> rep |> length, symmetry.order)
+    for (n, partition) in fockspace |> rep |> enumerate
+        data[n, :] = [(symmetry * partition)...]
+    end
+    return [focksum(data[:, n]) for n in 1:symmetry.order]
+end
+
+function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{FockMap}
+    homefock::FockSpace = unitcellfock(crystalfock)
+    homemaps::Vector{FockMap} = symmetry * homefock
+
+    function computesymmetrizetransformer(homemap::FockMap)::FockMap
+        fouriermap::FockMap = fourier(crystalfock, homefock)
+        symmetrizedfouriermap::FockMap = fourier(crystalfock, homemap.outspace)
+        fockmap::FockMap = focksum(
+            [rows(symmetrizedfouriermap, subspace) * homemap * rows(fouriermap, subspace)' for subspace in crystalfock |> subspaces])
+        return FockMap(
+            FockSpace(fockmap.outspace, reflected=crystalof(crystalfock)),
+            FockSpace(fockmap.inspace, reflected=crystalof(crystalfock)),
+            rep(fockmap))
+    end
+    
+    return map(computesymmetrizetransformer, homemaps)
+end
+
 end

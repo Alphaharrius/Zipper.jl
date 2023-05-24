@@ -37,7 +37,7 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     snf = smith(vcat(rep(scale), diagm(crystal.sizes)))
     boundarysnf = smith(snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)])
     Δ::Matrix{Float64} = diagm(snf)
-    newbasiscoords::Matrix{Float64} = boundarysnf.T * diagm(diag(Δ)) * snf.T
+    newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
     blockingpoints::Vector{Point} = [Point(collect(coord), oldspace) for coord in [Iterators.product([0:size - 1 for size in diag(Δ)]...)...]]
     relativescale::Scale = Scale(newbasiscoords)
     scaledunitcell::Subset{Point} = Subset(relativescale * (a + b) for (a, b) in [Iterators.product(blockingpoints, crystal.unitcell)...])

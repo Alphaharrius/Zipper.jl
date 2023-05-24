@@ -13,7 +13,7 @@ using ..Plotting
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
-unitcell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
+unitcell = union(triangular & [1/3, 2/3], triangular & [2/3, 1/3])
 crystal = Crystal(unitcell, [32, 32])
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 
@@ -27,6 +27,17 @@ modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 tₙ = ComplexF64(-1.)
 m0, m1 = members(modes)
 
+c3 = Symmetry(
+    group=:c3,
+    firstorderrep=[cos(2π/3) -sin(2π/3); sin(2π/3) cos(2π/3)],
+    order=3,
+    center=origin(triangular),
+    irreps=[
+        :s => Irrep(exp(0im)),
+        :pplus => Irrep(exp(1im * 2π/3)),
+        :pminus => Irrep(exp(2im * 2π/3))
+    ])
+
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
@@ -34,6 +45,17 @@ bonds::FockMap = bondmap([
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
 𝐶::FockMap = groundstatecorrelations(𝐻)
+
+crystalfock = 𝐻.inspace
+homefock::FockSpace = unitcellfock(crystalfock)
+homemaps::Vector{FockMap} = c3 * homefock
+fourier::FockMap = Quantum.fourier(crystalfock, homefock)
+symmetrizedfourier::FockMap = Quantum.fourier(crystalfock, homemaps[2].outspace)
+visualize(symmetrizedfourier)
+ret = focksum([rows(symmetrizedfourier, subspace) * homemaps[2] * rows(fourier, subspace)' for subspace in crystalfock |> subspaces])
+visualize(ret, rowrange=1:64, colrange=1:64)
+
+visualize(ret' * ret * 𝐶 * ret' * ret, rowrange=1:64, colrange=1:64)
 
 blocked = blocking(:scale => Scale([2. 0.; 0. 2.]), :correlations => 𝐶, :crystal => crystal)
 blockedcorrelations::FockMap = blocked[:correlations]

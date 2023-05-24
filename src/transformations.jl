@@ -99,6 +99,8 @@ end
 
 Base.:show(io::IO, irrep::Irrep) = print(io, string("$(typeof(irrep))($(rep(irrep)))"))
 
+Base.:^(irrep::Irrep, n)::Irrep = Irrep(rep(irrep) ^ n)
+
 Base.:(==)(a::Irrep, b::Irrep)::Bool = isapprox(rep(a), rep(b))
 
 Base.:*(a::Irrep, b::Irrep)::Irrep = Irrep(rep(a) * rep(b))

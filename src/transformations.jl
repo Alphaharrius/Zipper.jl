@@ -7,7 +7,8 @@ module Transformations
 using LinearAlgebra, SmithNormalForm, OrderedCollections
 using ..Spaces, ..Geometries, ..Quantum
 
-export Recipient, Scale, Symmetry, Irrep
+export Scale, Symmetry, Irrep
+export irrepof
 
 abstract type Transformation{T} <: Element{T} end
 

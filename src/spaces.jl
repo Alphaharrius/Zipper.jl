@@ -63,6 +63,9 @@ This is a less general subtype of `AbstractSpace` that is spanned by `Vector` in
 """
 abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
 
+""" Shorthand for creating a `Point` within the specified space. """
+Base.:&(space::AffineSpace, position::Vector{Float64})::Point = Point(position, space)
+
 """
     hassamespan(a::T, b::F) where {T <: AffineSpace, F <: AffineSpace}
 

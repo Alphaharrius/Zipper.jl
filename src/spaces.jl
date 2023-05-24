@@ -282,7 +282,7 @@ Base.:isequal(a::Subset, b::Subset)::Bool = a == b
 
 # Overloads for iterators.
 Base.:iterate(subset::T, i...) where {T <: Subset} = iterate(rep(subset), i...)
-Base.:length(subset::T) where {T <: Subset} = length(rep(subset))
+Base.:length(subset::T) where {T <: Subset} = subset |> rep |> length
 Base.:lastindex(subset::T) where {T <: Subset} = length(subset)
 Base.:getindex(subset::T, index) where {T <: Subset} = rep(subset)[index]
 Base.:getindex(subset::T, inds...) where {T <: Subset} = Subset([rep(subset)...][inds...])

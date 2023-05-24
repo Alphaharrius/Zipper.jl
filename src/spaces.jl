@@ -105,7 +105,7 @@ Get the dimension of the `AffineSpace`, the dimension will be the row / column l
 """
 dimension(space::T) where {T <: AffineSpace} = size(basis(space), 1)
 
-Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 1000000007)) // 1000000007, basis(space)))
+Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, basis(space)))
 
 """
 Subset of element type `T <: AbstractSubset` defined within a full set.

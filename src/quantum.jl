@@ -9,9 +9,9 @@ using ..Spaces, ..Geometries
 export quantized, transformed, symmetrized
 export Mode, FockSpace, FockMap
 export hasattr, getattr, setattr, removeattr, setorbital, orbital, quantize, flavorcount, spanoffset
-export dimension, crystalof, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
+export dimension, crystalof, crystalsubspaces, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
 export order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
-export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, onesmap, colmap, columnspec
+export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, onesmap, colmap, columnspec
 
 """
     Mode(attrs::Dict{Symbol})
@@ -291,6 +291,13 @@ Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
 crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
 
 """
+    crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Point, FockSpace}
+
+Retrieve mappings from the crystal momentums to the corresponding fockspaces.
+"""
+crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Point, FockSpace} = Dict(subspace |> commonattr(:offset) => subspace for subspace in crystalfock |> subspaces)
+
+"""
     commonattr(subset::Subset{Mode}, key::Symbol)
 
 Retrieve the common attribute associated to `key` of all the child modes of the `fockspace`, and throws assertion error if the attribute
@@ -541,6 +548,20 @@ function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
     return FockMap(restrictspace, fockmap.inspace, spmat)
 end
+
+"""
+    rowsubmaps(fockmap::FockMap)::Vector{FockMap}
+
+Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `outspace`.
+"""
+rowsubmaps(fockmap::FockMap)::Vector{FockMap} = [rows(fockmap, subspace) for subspace in fockmap.outspace |> subspaces]
+
+"""
+    colsubmaps(fockmap::FockMap)::Vector{FockMap}
+
+Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `inspace`.
+"""
+colsubmaps(fockmap::FockMap)::Vector{FockMap} = [columns(fockmap, subspace) for subspace in fockmap.inspace |> subspaces]
 
 """
     restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap

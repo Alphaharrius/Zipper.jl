@@ -452,6 +452,7 @@ quantize(identifier::Symbol, subset::Subset{Point}, count::Int64)::Subset{Mode} 
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})
     FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})
+    FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)
 
 Represents an mapping between two fockspaces with the same span of the underlying Hilbert space.
 
@@ -467,7 +468,8 @@ Represents an mapping between two fockspaces with the same span of the underlyin
 - `FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})` is used when every ingredients are precomputed.
 - `FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})` is used when the `rep` is an arbitary array like object.
 - `FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})` is used when the values of the map have to be specified
-  for a distinct 2-point pair
+  for a distinct 2-point pair.
+- `FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)` is for updating attributes of `outspace` and `inspace`.
 """
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     outspace::FockSpace
@@ -484,6 +486,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
         end
         return new(outspace, inspace, rep)
     end
+
+    FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace) = FockMap(outspace, inspace, rep(fockmap))
 end
 
 Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(typeof(fockmap))(in=$(fockmap.inspace), out=$(fockmap.outspace))"))

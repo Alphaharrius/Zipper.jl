@@ -26,9 +26,9 @@ end
 
 function localfrozenisometries(correlations::FockMap, restrictedfock::FockSpace;
                                selectionstrategy = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap}
-    𝐹ₖ::FockMap = fourier(correlations.inspace, restrictedfock) / sqrt(subspacecount(correlations.inspace))
-    𝐶ᵣ::FockMap = 𝐹ₖ' * correlations * 𝐹ₖ
-    return selectionstrategy(𝐶ᵣ)
+    fouriermap::FockMap = fourier(correlations.inspace, restrictedfock) / (correlations.inspace |> subspacecount |> sqrt)
+    restrictedcorrelations::FockMap = fouriermap' * correlations * fouriermap
+    return selectionstrategy(restrictedcorrelations)
 end
 
 blocking(parameters::Pair{Symbol}...)::Dict{Symbol} = blocking(Dict(parameters...))

@@ -761,7 +761,11 @@ function focksum(fockmaps::Vector{FockMap})::FockMap
             spmat[order(outfock, outmode), order(infock, inmode)] += source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
         end
     end
-    return FockMap(outfock, infock, spmat)
+    firstmap::FockMap = first(fockmaps)
+    return FockMap(
+        hassamespan(outfock, firstmap.outspace) ? firstmap.outspace : outfock,
+        hassamespan(infock, firstmap.inspace) ? firstmap.inspace : infock,
+        spmat)
 end
 
 """

@@ -128,11 +128,11 @@ Base.:convert(::Type{Matrix{Float64}}, source::Symmetry) = [symmetry.firstorderr
 
 Spaces.:dimension(symmetry::Symmetry)::Integer = size(symmetry.firstorderrep, 1)
 
-Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point} = Subset(
-    Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center
-    for sym in groupreps(symmetry) for p in region)
+Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Subset{Point}} = Subset([
+    Subset(Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center for p in region)
+    for sym in groupreps(symmetry)])
 
-Base.:*(symmetry::Symmetry, point::Point)::Subset{Point} = symmetry * Subset(point)
+Base.:*(symmetry::Symmetry, point::Point)::Subset{Point} = flatten(symmetry * Subset(point))
 
 function Base.:*(symmetry::Symmetry, mode::Mode)::Vector{FockMap}
     newattrs::Dict{Symbol, Any} = Dict()
@@ -182,10 +182,13 @@ end
 function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{FockMap}
     homefock::FockSpace = unitcellfock(crystalfock)
     homemaps::Vector{FockMap} = symmetry * homefock
+    momentumsubspaces::Dict{Point, FockSpace} = crystalsubspaces(crystalfock)
+    symmetrizedbzs::Subset{Subset{Point}} = symmetry * (crystalfock |> crystalof |> brillouinzone)
 
-    function computesymmetrizetransformer(homemap::FockMap)::FockMap
+    function computesymmetrizetransformer(homemap::FockMap, symmetrizedsubspaces::Vector{FockSpace})::FockMap
         fouriermap::FockMap = fourier(crystalfock, homefock)
         symmetrizedfouriermap::FockMap = fourier(crystalfock, homemap.outspace)
+        symmetrizedfockpairs::Vector{Pair{FockSpace, FockSpace}} = [subspace => symmetrizedsubspaces[n] for (n, subspace) in enumerate(crystalfock |> subspaces)]
         fockmap::FockMap = focksum(
             [rows(symmetrizedfouriermap, subspace) * homemap * rows(fouriermap, subspace)' for subspace in crystalfock |> subspaces])
         return FockMap(

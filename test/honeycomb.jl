@@ -3,8 +3,8 @@ include("../src/geometries.jl")
 include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
-include("../src/zer.jl")
 include("../src/transformations.jl")
+include("../src/zer.jl")
 
 using LinearAlgebra, PlotlyJS, OrderedCollections, SparseArrays, ColorTypes, SmithNormalForm
 using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Plotting, ..Zer, ..Transformations

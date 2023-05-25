@@ -17,13 +17,6 @@ unitcell = union(triangular & [1/3, 2/3], triangular & [2/3, 1/3])
 crystal = Crystal(unitcell, [32, 32])
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 
-# m::Mode = modes[1]
-# m.attrs
-# setattr(m, :edge => (Point([1, 0], triangular), Point([1, 1], triangular))).attrs
-
-# c6::Symmetry = Symmetry(:c6, [cos(π/3) -sin(π/3); sin(π/3) cos(π/3)], 6, triangular |> origin)
-# visualize(Subset(p |> euclidean for p in c6 * unitcell))
-
 tₙ = ComplexF64(-1.)
 m0, m1 = members(modes)
 
@@ -47,15 +40,15 @@ bonds::FockMap = bondmap([
 𝐶::FockMap = groundstatecorrelations(𝐻)
 
 crystalfock = 𝐻.inspace
-homefock::FockSpace = unitcellfock(crystalfock)
-homemaps::Vector{FockMap} = c3 * homefock
-fourier::FockMap = Quantum.fourier(crystalfock, homefock)
-symmetrizedfourier::FockMap = Quantum.fourier(crystalfock, homemaps[2].outspace)
-visualize(symmetrizedfourier)
-ret = focksum([rows(symmetrizedfourier, subspace) * homemaps[2] * rows(fourier, subspace)' for subspace in crystalfock |> subspaces])
-visualize(ret, rowrange=1:64, colrange=1:64)
+# homefock::FockSpace = unitcellfock(crystalfock)
+# homemaps::Vector{FockMap} = c3 * homefock
+# fourier::FockMap = Quantum.fourier(crystalfock, homefock)
+# symmetrizedfourier::FockMap = Quantum.fourier(crystalfock, homemaps[2].outspace)
+# visualize(symmetrizedfourier)
+# ret = focksum([rows(symmetrizedfourier, subspace) * homemaps[2] * rows(fourier, subspace)' for subspace in crystalfock |> subspaces])
+# visualize(ret, rowrange=1:64, colrange=1:64)
 
-visualize(ret' * ret * 𝐶 * ret' * ret, rowrange=1:64, colrange=1:64)
+# visualize(ret' * ret * 𝐶 * ret' * ret, rowrange=1:64, colrange=1:64)
 
 blocked = blocking(:scale => Scale([2. 0.; 0. 2.]), :correlations => 𝐶, :crystal => crystal)
 blockedcorrelations::FockMap = blocked[:correlations]
@@ -73,6 +66,87 @@ restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpac
 restrictedfock::FockSpace = FockSpace(restrictedregion)
 
 isometries = localfrozenisometries(blocked[:correlations], restrictedfock, selectionstrategy=frozenselectionbycount(3))
+
+function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::Dict{Point, FockMap}
+    crystal::Crystal = crystalof(crystalfock)
+    fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
+    momentumfouriers::Vector{FockMap} = rowsubmaps(fouriermap)
+    bz::Subset{Point} = brillouinzone(crystal)
+    return Dict(k => fourier_k * localisometry for (k, fourier_k) in zip(bz, momentumfouriers))
+end
+
+function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
+    momentuisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
+    crystal::Crystal = crystalof(crystalfock)
+    bz::Subset{Point} = brillouinzone(crystal)
+    globalprojector::FockMap = focksum(map(k -> momentuisometries[k] * momentuisometries[k]', bz))
+    return FockMap(
+        globalprojector,
+        outspace=FockSpace(globalprojector.outspace, reflected=crystal),
+        inspace=FockSpace(globalprojector.inspace, reflected=crystal))
+end
+
+filledglobalprojector = isometryglobalprojector(localisometry=isometries[:filled], crystalfock=blockedcorrelations.inspace)
+visualize(filledglobalprojector, rowrange=1:64, colrange=1:64)
+emptyglobalprojector = isometryglobalprojector(localisometry=isometries[:empty], crystalfock=blockedcorrelations.inspace)
+visualize(emptyglobalprojector, rowrange=1:64, colrange=1:64)
+
+globalprojector = emptyglobalprojector - filledglobalprojector
+visualize(globalprojector, rowrange=1:64, colrange=1:64)
+
+kprojectors = [restrict(globalprojector, subspace, subspace) for subspace in globalprojector.inspace |> subspaces]
+
+spectrum = Dict()
+
+for (k, proj) in zip(globalprojector.inspace |> crystalof |> brillouinzone, kprojectors)
+    kspec = map(p -> p.second, eigvalsh(proj)) |> sort
+    spectrum[k] = kspec
+end
+
+specmat = hcat([v for (k, v) in spectrum]...)
+plot([scatter(y=specmat[n, :]) for n in 1:size(specmat, 1)])
+
+function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{FockMap}
+    homefock::FockSpace = unitcellfock(crystalfock)
+    homemaps::Vector{FockMap} = symmetry * homefock
+    momentumsubspaces::Dict{Point, FockSpace} = crystalsubspaces(crystalfock)
+    symmetrizedbzs::Subset{Subset{Point}} = symmetry * (crystalfock |> crystalof |> brillouinzone)
+
+    function computesymmetrizetransformer(homemap::FockMap, symmetrizedbz::Subset{Point})::FockMap
+        fouriermap::FockMap = fourier(crystalfock, homefock)
+        symmetrizedfouriermap::FockMap = fourier(crystalfock, homemap.outspace)
+        symmetrizedfockpairs::Vector{Pair{FockSpace, FockSpace}} = [subspace => momentumsubspaces[symmetrizedbz[n]] for (n, subspace) in enumerate(crystalfock |> subspaces)]
+        fockmap::FockMap = focksum(
+            [rows(symmetrizedfouriermap, subspace) * homemap * rows(fouriermap, subspace)' for subspace in crystalfock |> subspaces])
+        return FockMap(
+            FockSpace(fockmap.outspace, reflected=crystalof(crystalfock)),
+            FockSpace(fockmap.inspace, reflected=crystalof(crystalfock)),
+            rep(fockmap))
+    end
+
+    return map(computesymmetrizetransformer, homemaps)
+end
+
+Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point} = Subset(
+    Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center for p in region
+    for sym in Transformations.groupreps(symmetry))
+
+c3 * (crystal |> brillouinzone)
+
+symmetrymaps = c3 * globalprojector.outspace
+visualize(symmetrymaps[2], rowrange=1:64, colrange=1:64)
+
+ss = symmetrymaps[2]
+
+sg = ss * globalprojector * ss'
+
+symmetrizedglobalprojector = focksum([s * globalprojector * s' for s in symmetrymaps])
+visualize(sg, rowrange=1:64, colrange=1:64)
+
+globaldistillspec = eigvalsh(sg)
+filter(p -> -1e-3 < p.second < 1e-3, globaldistillspec)
+plot(scatter(y=map(p -> p.second, globaldistillspec), mode="markers"))
+
 emptyprojector::FockMap = isometries[:empty] * isometries[:empty]'
 filledprojector::FockMap = isometries[:filled] * isometries[:filled]'
 projector::FockMap = emptyprojector - filledprojector

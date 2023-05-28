@@ -60,10 +60,10 @@ function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
 end
 
 function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
-    momentuisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
+    momentumisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = crystalof(crystalfock)
     bz::Subset{Momentum} = brillouinzone(crystal)
-    globalprojector::FockMap = focksum(map(k -> momentuisometries[k] * momentuisometries[k]', bz))
+    globalprojector::FockMap = focksum(map(k -> momentumisometries[k] * momentumisometries[k]', bz))
     return FockMap(
         globalprojector,
         outspace=FockSpace(globalprojector.outspace, reflected=crystal),

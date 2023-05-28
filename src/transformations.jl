@@ -124,7 +124,7 @@ Spaces.spaceof(symmetry::Symmetry) = symmetry.shift |> spaceof
 
 function groupelement(generator::Symmetry, index::Integer = 0)::Symmetry
     @assert(generator.index == 1, "The argument is not a generator!")
-    pointgrouprep::Matrix{Float64} = generator.pointgrouprep ^ order
+    pointgrouprep::Matrix{Float64} = generator.pointgrouprep ^ index
     irreps::Dict{Symbol, Irrep} = Dict(orbital => irrep ^ index for (orbital, irrep) in generator.irreps)
     return Symmetry(generator.group, pointgrouprep, generator.order, index, generator.shift, irreps)
 end

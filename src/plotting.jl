@@ -17,8 +17,8 @@ function visualize(fockmap::FockMap; title::String = "", rowrange = :, colrange 
     subplots
 end
 
-function visualize(region::Subset{Point}; title::String = "")
-    positions::Array{Vector} = [pos(point) for point in region]
+function visualize(region::Subset{<: Point}; title::String = "", visualspace::AffineSpace = region |> spaceof)
+    positions::Array{Vector} = [lineartransform(visualspace, point) |> pos for point in region]
     visualize_vector_positions(title, positions)
 end
 

@@ -28,7 +28,7 @@ origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), spac
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 
 struct Crystal <: AbstractSubset{Crystal}
-    unitcell::Subset{Point}
+    unitcell::Subset{Position}
     sizes::Vector{Int64}
 end
 
@@ -46,7 +46,7 @@ mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 
-function latticepoints(crystal::Crystal)::Subset{Point}
+function latticepoints(crystal::Crystal)::Subset{Position}
     real_space::RealSpace = spaceof(crystal.unitcell)
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
@@ -54,10 +54,10 @@ function latticepoints(crystal::Crystal)::Subset{Point}
     return Subset(Point(pos, real_space) for pos in eachcol(recentered_mesh))
 end
 
-sitepoints(crystal::Crystal)::Subset{Point} = Subset(
+sitepoints(crystal::Crystal)::Subset{Position} = Subset(
     latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
 
-function brillouinzone(crystal::Crystal)::Subset{Point}
+function brillouinzone(crystal::Crystal)::Subset{Momentum}
     momentum_space::MomentumSpace = convert(MomentumSpace, spaceof(crystal.unitcell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)

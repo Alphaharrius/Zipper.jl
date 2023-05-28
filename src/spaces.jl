@@ -2,7 +2,7 @@ module Spaces
 
 using LinearAlgebra, OrderedCollections
 
-export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
+export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Position, Momentum, Subset
 export rep, euclidean, basis, dimension, spaceof, rpos, pos, lineartransform, fourier_coef, distance, flatten, members
 
 """
@@ -163,10 +163,17 @@ A point in an `AffineSpace`.
 - `pos` The vector representation of the point in the spacial unit of the parent `AffineSpace`.
 - `space` The parent `AffineSpace`.
 """
-struct Point <: AbstractSubset{Point}
+struct Point{T <: AffineSpace} <: AbstractSubset{Point}
     pos::Vector{Float64}
-    space::AbstractSpace
+    space::T
+
+    Point(pos, space::T) where {T <: AffineSpace} = new{space |> typeof}([pos...], space)
 end
+
+""" Alias of a real space point. """
+Position = Point{RealSpace}
+""" Alias of a momentum space point. """
+Momentum = Point{MomentumSpace}
 
 Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)]) ∈ $(point |> spaceof |> typeof)"))
 

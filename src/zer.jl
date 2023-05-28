@@ -55,14 +55,14 @@ function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
     crystal::Crystal = crystalof(crystalfock)
     fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
     momentumfouriers::Vector{FockMap} = colsubmaps(fouriermap)
-    bz::Subset{Point} = brillouinzone(crystal)
+    bz::Subset{Momentum} = brillouinzone(crystal)
     return Dict(k => fourier_k * localisometry for (k, fourier_k) in zip(bz, momentumfouriers))
 end
 
 function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
     momentuisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = crystalof(crystalfock)
-    bz::Subset{Point} = brillouinzone(crystal)
+    bz::Subset{Momentum} = brillouinzone(crystal)
     globalprojector::FockMap = focksum(map(k -> momentuisometries[k] * momentuisometries[k]', bz))
     return FockMap(
         globalprojector,

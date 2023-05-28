@@ -40,17 +40,17 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
     blockingpoints::Vector{Point} = [Point(collect(coord), oldspace) for coord in [Iterators.product([0:size - 1 for size in diag(Δ)]...)...]]
     relativescale::Scale = Scale(newbasiscoords)
-    scaledunitcell::Subset{Point} = Subset(relativescale * (a + b) for (a, b) in [Iterators.product(blockingpoints, crystal.unitcell)...])
+    scaledunitcell::Subset{Position} = Subset(relativescale * (a + b) for (a, b) in [Iterators.product(blockingpoints, crystal.unitcell)...])
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
 end
 
 function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     crystal::Crystal = crystalof(crystalfock)
     newcrystal::Crystal = scale * crystal
-    blockedregion::Subset{Point} = inv(scale) * newcrystal.unitcell
-    BZ::Subset{Point} = brillouinzone(crystal)
+    blockedregion::Subset{Position} = inv(scale) * newcrystal.unitcell
+    BZ::Subset{Momentum} = brillouinzone(crystal)
     basismodes::Subset{Mode} = crystalfock |> rep |> first
-    newBZ::Subset{Point} = brillouinzone(newcrystal)
+    newBZ::Subset{Momentum} = brillouinzone(newcrystal)
     # Generate the Dict which keys each crystal fockspace partition by its momentum.
     momentumtopartition::Dict{Point, Subset{Mode}} = Dict(commonattr(part, :offset) => part for part in rep(crystalfock))
     momentummappings::Vector{Pair{Point, Point}} = [basispoint(scale * p) => p for p in BZ]
@@ -62,7 +62,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     blockedcrystalordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(flatten(blockedcrystalpartitions)))
     blockedcrystalfock::FockSpace = FockSpace(blockedcrystalpartitions, blockedcrystalordering)
 
-    blockedoffsets::Subset{Point} = Subset(pbc(crystal, p) |> latticeoff for p in blockedregion)
+    blockedoffsets::Subset{Position} = Subset(pbc(crystal, p) |> latticeoff for p in blockedregion)
     blockedfock::FockSpace = FockSpace(spanoffset(basismodes, blockedoffsets))
 
     restrictedfourier::FockMap = fourier(BZ, blockedfock)

@@ -182,12 +182,12 @@ function orbital(group::Symbol, mode::Mode)::Symbol
 end
 
 """
-    spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode}
+    spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode}
 
 Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset`, the primary ordering will be
 the ordering of `points`, then follows the ordering of `basismodes`.
 """
-spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
 
 """
     flavorcount(basismodes::Subset{Mode})::Integer
@@ -198,13 +198,13 @@ is just the number of distinct attribute `:flavor` within the given parameter se
 flavorcount(basismodes::Subset{Mode})::Integer = trunc(Integer, length(basismodes)) / length(removeattr(basismodes, :flavor))
 
 """
-    sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
+    sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
 
 Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset` and form a `FockSpace`. Not to
 be mistakened with `spanoffset`, this method will partition the modes by the generator points.
 Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
 """
-function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
+function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
     partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
     modes::Subset{Mode} = spanoffset(basismodes, points)
     orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
@@ -432,7 +432,7 @@ function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
 end
 
 """
-    quantize(identifier::Symbol, subset::Subset{Point}, count::Integer)::Subset{Mode}
+    quantize(identifier::Symbol, subset::Subset{Position}, count::Integer)::Subset{Mode}
 
 Quantizing a set of mode from a given set of `Point`.
 
@@ -445,7 +445,7 @@ Quantizing a set of mode from a given set of `Point`.
 ### Output
 The quantized set of `Mode` objects.
 """
-quantize(identifier::Symbol, subset::Subset{Point}, count::Int64)::Subset{Mode} = (
+quantize(identifier::Symbol, subset::Subset{Position}, count::Int64)::Subset{Mode} = (
     Subset(quantize(identifier, point, flavor) for point in subset for flavor in 1:count))
 
 """
@@ -687,7 +687,7 @@ function eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode,
 end
 
 """
-    fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
+    fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
 
 Create a `FockMap` corresponds to a Fourier transform of a `FockSpace`. This map assumed orthogonality of modes with the attribute `:offset` dropped, which means
 entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
@@ -702,7 +702,7 @@ The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` wh
 within the translational invariant unit cell, supplied by `inmodes`; `M = length(inmodes)`. The `inspace` of the returned `FockMap` will equates to `FockSpace(inmodes)`;
 the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """
-function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
+function fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
     ∑𝑘::Matrix{Float64} = hcat([𝑘 |> euclidean |> pos for 𝑘 in momentums]...)
     inmodes::Subset{Mode} = orderedmodes(inspace)
     basismodes::Subset{Mode} = removeattr(inmodes, :offset)

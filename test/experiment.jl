@@ -22,19 +22,32 @@ m0, m1 = members(modes)
 
 c3 = Symmetry(
     group=:c3,
-    firstorderrep=[cos(2π/3) -sin(2π/3); sin(2π/3) cos(2π/3)],
+    pointgrouprep=[cos(2π/3) -sin(2π/3); sin(2π/3) cos(2π/3)],
     order=3,
-    center=origin(triangular),
-    irreps=[
+    shift=(euclidean(RealSpace, 2) |> origin),
+    irreps=Dict(
         :s => Irrep(exp(0im)),
         :pplus => Irrep(exp(1im * 2π/3)),
         :pminus => Irrep(exp(2im * 2π/3))
-    ])
+    ))
+
+c6 = Symmetry(
+    group=:c6,
+    pointgrouprep=[cos(2π/6) -sin(2π/6); sin(2π/6) cos(2π/6)],
+    order=6,
+    shift=(euclidean(RealSpace, 2) |> origin),
+    irreps=Dict(:s => Irrep(exp(0im))))
 
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
+
+
+p = kspace & [0., 0.03125]
+c6 * p
+
+visualize(c6 * bonds.outspace)
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
 𝐶::FockMap = groundstatecorrelations(𝐻)
@@ -87,9 +100,9 @@ function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpac
 end
 
 filledglobalprojector = isometryglobalprojector(localisometry=isometries[:filled], crystalfock=blockedcorrelations.inspace)
-visualize(filledglobalprojector, rowrange=1:64, colrange=1:64)
+visualize(filledglobalprojector, rowrange=1:128, colrange=1:128)
 emptyglobalprojector = isometryglobalprojector(localisometry=isometries[:empty], crystalfock=blockedcorrelations.inspace)
-visualize(emptyglobalprojector, rowrange=1:64, colrange=1:64)
+visualize(emptyglobalprojector, rowrange=1:128, colrange=1:128)
 
 globalprojector = emptyglobalprojector - filledglobalprojector
 visualize(globalprojector, rowrange=1:64, colrange=1:64)
@@ -143,7 +156,7 @@ sg = ss * globalprojector * ss'
 symmetrizedglobalprojector = focksum([s * globalprojector * s' for s in symmetrymaps])
 visualize(sg, rowrange=1:64, colrange=1:64)
 
-globaldistillspec = eigvalsh(sg)
+globaldistillspec = eigvalsh(globalprojector)
 filter(p -> -1e-3 < p.second < 1e-3, globaldistillspec)
 plot(scatter(y=map(p -> p.second, globaldistillspec), mode="markers"))
 

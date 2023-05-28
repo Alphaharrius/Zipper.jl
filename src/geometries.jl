@@ -27,7 +27,7 @@ origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), spac
 
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 
-struct Crystal
+struct Crystal <: AbstractSubset{Crystal}
     unitcell::Subset{Point}
     sizes::Vector{Int64}
 end

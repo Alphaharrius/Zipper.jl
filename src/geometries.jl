@@ -6,7 +6,7 @@ using LinearAlgebra, OrderedCollections
 using ..Spaces
 
 export Crystal
-export distance, interpolate, origin, radius, pbc, basispoint, latticeoff, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, geometricalfilter, circularfilter
+export distance, interpolate, origin, radius, pbc, basispoint, latticeoff, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, brillouinmesh, geometricalfilter, circularfilter
 
 """
     distance(a::Point, b::Point)::Float64
@@ -63,6 +63,11 @@ function brillouinzone(crystal::Crystal)::Subset{Point}
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = crystal_mesh ./ tiled_sizes
     return Subset(Point(pos, momentum_space) for pos in eachcol(recentered_mesh))
+end
+
+function brillouinmesh(crystal::Crystal)::Array{Point}
+    kspace::MomentumSpace = spaceof(crystal)
+    return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
 end
 
 geometricalfilter(f, center::Point) = input -> f(lineartransform(spaceof(center), convert(Point, input)), center)

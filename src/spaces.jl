@@ -120,7 +120,7 @@ abstract type AbstractSubset{T} <: Element{OrderedSet{T}} end
 Get the space of the parameter `subset`. If `subset isa Point`, then the output will be its parent space where its position is defined; if `subset isa Subset`, then
 the output will be the common space of all elements within the `subset`.
 """
-spaceof(subset::AbstractSubset) = subset.space
+spaceof(subset::AbstractSubset) = error("Method not defined for input type `$(subset |> typeof)`!")
 
 """
     RealSpace(rep::Matrix{Float64})
@@ -169,6 +169,13 @@ struct Point <: AbstractSubset{Point}
 end
 
 Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)]) ∈ $(point |> spaceof |> typeof)"))
+
+"""
+    spaceof(point::Point)
+
+Retrieve the `AffineSpace` of the `Point`.
+"""
+spaceof(point::Point) = point.space
 
 """
     rpos(point::Point, denominator::Int64)

@@ -291,11 +291,11 @@ Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
 crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
 
 """
-    crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Point, FockSpace}
+    crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace}
 
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
-crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Point, FockSpace} = Dict(subspace |> commonattr(:offset) => subspace for subspace in crystalfock |> subspaces)
+crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace} = Dict(commonattr(subspace, :offset) => subspace for subspace in crystalfock |> rep)
 
 """
     commonattr(subset::Subset{Mode}, key::Symbol)

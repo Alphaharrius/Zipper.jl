@@ -192,7 +192,7 @@ function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::FockMap
     fouriermap::FockMap = fourier(crystalfock, homefock)
     transformedfouriermap::FockMap = fourier(crystalfock, homefocktransform.outspace)
     transformer::FockMap = focksum([
-        rows(transformedfouriermap, momentumsubspaces[(symmetry * k) |> basispoint]) * homefocktransform * rows(fouriermap, fockspace)
+        rows(transformedfouriermap, momentumsubspaces[(symmetry * k) |> basispoint]) * homefocktransform * rows(fouriermap, fockspace)'
         for (k, fockspace) in momentumsubspaces])
     crystal::Crystal = crystalof(crystalfock)
     return FockMap(

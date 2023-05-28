@@ -106,98 +106,163 @@ end
 
 Base.:isequal(a::Irrep, b::Irrep)::Bool = a == b
 
-struct Symmetry <: Transformation{Vector{Matrix{Float64}}}
+struct Symmetry <: AbstractSubset{Symmetry}
     group::Symbol
-    firstorderrep::Matrix{Float64}
+    pointgrouprep::Matrix{Float64}
     order::Integer
-    center::Point
+    index::Integer
+    shift::Point
     irreps::Dict{Symbol, Irrep}
-
-    Symmetry(; group::Symbol, firstorderrep::Matrix{Float64}, order::Integer, center::Point, irreps::Vector{Pair{Symbol, Irrep}}) = new(
-        group, firstorderrep, order, center, Dict(irreps...))
 end
 
-groupreps(symmetry::Symmetry)::Vector{Matrix{Float64}} = [symmetry.firstorderrep ^ n for n in 0:symmetry.order - 1]
+Symmetry(; group::Symbol, pointgrouprep::Matrix{Float64}, order::Integer, shift::Point, irreps::Dict{Symbol, Irrep}) = Symmetry(
+    group, pointgrouprep, order,
+    1, # This symmetry element is assumed to be the generator of the group, thus making it the second element (The first is the identity, with index = 0).
+    shift, irreps)
 
-function irrepof(symmetry::Symmetry, orbital::Symbol)::Irrep
+Spaces.spaceof(symmetry::Symmetry) = symmetry.shift |> spaceof
+
+function groupelement(generator::Symmetry, index::Integer = 0)::Symmetry
+    @assert(generator.index == 1, "The argument is not a generator!")
+    pointgrouprep::Matrix{Float64} = generator.pointgrouprep ^ order
+    irreps::Dict{Symbol, Irrep} = Dict(orbital => irrep ^ index for (orbital, irrep) in generator.irreps)
+    return Symmetry(generator.group, pointgrouprep, generator.order, index, generator.shift, irreps)
+end
+
+groupelements(generator::Symmetry)::Vector{Symmetry} = [groupelement(generator, index) for index in 0:generator.order - 1]
+
+function getirrep(symmetry::Symmetry, orbital::Symbol)::Irrep
     @assert(haskey(symmetry.irreps, orbital), "Symmetry `$(symmetry.group)` does not have orbital `$(orbital)`!")
     return symmetry.irreps[orbital]
 end
 
-Base.:convert(::Type{Matrix{Float64}}, source::Symmetry) = [symmetry.firstorderrep ^ n for n in 0:symmetry.order - 1]
+function Base.:*(space::AffineSpace, symmetry::Symmetry)::Symmetry
+    realspace::RealSpace = convert(RealSpace, space)
+    relativebasis::Matrix{Float64} = (realspace |> basis |> inv) * (symmetry |> spaceof |> basis)
+    pointgrouprep::Matrix{Float64} = relativebasis * symmetry.pointgrouprep * inv(relativebasis)
+    shift::Point = Point(((symmetry.shift |> pos)' * (relativebasis |> inv))[1, :], space)
+    return Symmetry(symmetry.group, pointgrouprep, symmetry.order, symmetry.index, shift, symmetry.irreps)
+end
 
-Spaces.:dimension(symmetry::Symmetry)::Integer = size(symmetry.firstorderrep, 1)
+function Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point}
+    nativesymmetry::Symmetry = spaceof(region) * symmetry
+    if region |> spaceof isa RealSpace
+        shift::Point = nativesymmetry.shift
+        return Subset(Point(nativesymmetry.pointgrouprep * (point |> pos), point |> spaceof) + shift for point in region)
+    else
+        error("Symmetrizing momentum points is not available!")
+    end
+end
 
-Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Subset{Point}} = Subset([
-    Subset(Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center for p in region)
-    for sym in groupreps(symmetry)])
+Base.:*(symmetry::Symmetry, point::Point)::Point = (symmetry * Subset(point)) |> first
 
-Base.:*(symmetry::Symmetry, point::Point)::Subset{Point} = flatten(symmetry * Subset(point))
+function Base.:*(symmetry::Symmetry, mode::Mode)::FockMap
+    newattrs::Dict{Symbol, Any} = Dict(mode.attrs)
+    foreach(p -> newattrs[p.first] = symmetry * p.second, Iterators.filter(p -> hasmethod(*, Tuple{Symmetry, typeof(p.second)}), mode.attrs))
+    newmode::Mode = Mode(newattrs)
+    irrep::Irrep = getirrep(symmetry, orbital(symmetry.group, mode))
+    return FockMap(newmode |> FockSpace, mode |> FockSpace, Dict((newmode, mode) => irrep |> rep))
+end
 
-function Base.:*(symmetry::Symmetry, mode::Mode)::Vector{FockMap}
-    newattrs::Dict{Symbol, Any} = Dict()
+function Base.:*(symmetry::Symmetry, subset::Subset{Mode})::FockMap
+    fockmap::FockMap = focksum([symmetry * mode for mode in subset])
+    return FockMap(fockmap.outspace |> flattensubspaces, fockmap.inspace |> flattensubspaces, fockmap |> rep)
+end
+
+Base.:*(symmetry::Symmetry, fockspace::FockSpace{<: Any})::FockMap = focksum([symmetry * subspace for subspace in fockspace |> rep])
+
+# struct Symmetry_ <: Transformation{Vector{Matrix{Float64}}}
+#     group::Symbol
+#     firstorderrep::Matrix{Float64}
+#     order::Integer
+#     center::Point
+#     irreps::Dict{Symbol, Irrep}
+
+#     Symmetry(; group::Symbol, firstorderrep::Matrix{Float64}, order::Integer, center::Point, irreps::Vector{Pair{Symbol, Irrep}}) = new(
+#         group, firstorderrep, order, center, Dict(irreps...))
+# end
+
+# groupreps(symmetry::Symmetry)::Vector{Matrix{Float64}} = [symmetry.firstorderrep ^ n for n in 0:symmetry.order - 1]
+
+# function irrepof(symmetry::Symmetry, orbital::Symbol)::Irrep
+#     @assert(haskey(symmetry.irreps, orbital), "Symmetry `$(symmetry.group)` does not have orbital `$(orbital)`!")
+#     return symmetry.irreps[orbital]
+# end
+
+# Base.:convert(::Type{Matrix{Float64}}, source::Symmetry) = [symmetry.firstorderrep ^ n for n in 0:symmetry.order - 1]
+
+# Spaces.:dimension(symmetry::Symmetry)::Integer = size(symmetry.firstorderrep, 1)
+
+# Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Subset{Point}} = Subset([
+#     Subset(Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center for p in region)
+#     for sym in groupreps(symmetry)])
+
+# Base.:*(symmetry::Symmetry, point::Point)::Subset{Point} = flatten(symmetry * Subset(point))
+
+# function Base.:*(symmetry::Symmetry, mode::Mode)::Vector{FockMap}
+#     newattrs::Dict{Symbol, Any} = Dict()
     
-    for (key, attr) in mode.attrs
-        if hasmethod(*, Tuple{Symmetry, typeof(attr)}) newattrs[key] = symmetry * attr
-        else newattrs[key] = [attr] end
-    end
-    newmodes::Vector{Mode} = [Mode(Dict(key => newattrs[key][n % length(newattrs[key]) + 1] for key in newattrs |> keys)) for n in 0:symmetry.order - 1]
+#     for (key, attr) in mode.attrs
+#         if hasmethod(*, Tuple{Symmetry, typeof(attr)}) newattrs[key] = symmetry * attr
+#         else newattrs[key] = [attr] end
+#     end
+#     newmodes::Vector{Mode} = [Mode(Dict(key => newattrs[key][n % length(newattrs[key]) + 1] for key in newattrs |> keys)) for n in 0:symmetry.order - 1]
     
-    # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
-    # which the basis point set might not include the symmetrized :pos. Thus we would like to set
-    # the :pos to its corresponding basis point, and offload the difference to :offset.
-    function correctsymmetrizedmode(mode::Mode)::Mode
-        currentoffset::Point = getattr(mode, :offset)
-        currentpos::Point = getattr(mode, :pos)
-        actualpos::Point = basispoint(currentpos)
-        adjustoffset::Point = currentpos - actualpos
-        return setattr(mode, :offset => currentoffset + adjustoffset, :pos => basispoint(currentpos))
-    end
+#     # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
+#     # which the basis point set might not include the symmetrized :pos. Thus we would like to set
+#     # the :pos to its corresponding basis point, and offload the difference to :offset.
+#     function correctsymmetrizedmode(mode::Mode)::Mode
+#         currentoffset::Point = getattr(mode, :offset)
+#         currentpos::Point = getattr(mode, :pos)
+#         actualpos::Point = basispoint(currentpos)
+#         adjustoffset::Point = currentpos - actualpos
+#         return setattr(mode, :offset => currentoffset + adjustoffset, :pos => basispoint(currentpos))
+#     end
 
-    correctedmodes::Vector{Mode} = map(correctsymmetrizedmode, newmodes)
-    irreps::Vector{Irrep} = [irrepof(symmetry, orbital(symmetry.group, mode)) ^ n for n in 0:symmetry.order - 1]
-    return [FockMap(
-        FockSpace(newmode),
-        FockSpace(mode),
-        Dict((newmode, mode) => irreps[n] |> rep)) for (n, newmode) in enumerate(correctedmodes)]
-end
+#     correctedmodes::Vector{Mode} = map(correctsymmetrizedmode, newmodes)
+#     irreps::Vector{Irrep} = [irrepof(symmetry, orbital(symmetry.group, mode)) ^ n for n in 0:symmetry.order - 1]
+#     return [FockMap(
+#         FockSpace(newmode),
+#         FockSpace(mode),
+#         Dict((newmode, mode) => irreps[n] |> rep)) for (n, newmode) in enumerate(correctedmodes)]
+# end
 
-function Base.:*(symmetry::Symmetry, modes::Subset{Mode})::Vector{FockMap}
-    data::Matrix{FockMap} = Matrix(undef, length(modes), symmetry.order)
-    for (n, mode) in enumerate(modes)
-        data[n, :] = [(symmetry * mode)...]
-    end
-    fockmaps = Iterators.map(n -> focksum(data[:, n]), 1:symmetry.order)
-    return [FockMap(fockmap.outspace |> flattensubspaces, fockmap.inspace |> flattensubspaces, fockmap |> rep) for fockmap in fockmaps]
-end
+# function Base.:*(symmetry::Symmetry, modes::Subset{Mode})::Vector{FockMap}
+#     data::Matrix{FockMap} = Matrix(undef, length(modes), symmetry.order)
+#     for (n, mode) in enumerate(modes)
+#         data[n, :] = [(symmetry * mode)...]
+#     end
+#     fockmaps = Iterators.map(n -> focksum(data[:, n]), 1:symmetry.order)
+#     return [FockMap(fockmap.outspace |> flattensubspaces, fockmap.inspace |> flattensubspaces, fockmap |> rep) for fockmap in fockmaps]
+# end
 
-function Base.:*(symmetry::Symmetry, fockspace::FockSpace)::Vector{FockMap}
-    data::Matrix{FockMap} = Matrix(undef, fockspace |> rep |> length, symmetry.order)
-    for (n, partition) in fockspace |> rep |> enumerate
-        data[n, :] = [(symmetry * partition)...]
-    end
-    return [focksum(data[:, n]) for n in 1:symmetry.order]
-end
+# function Base.:*(symmetry::Symmetry, fockspace::FockSpace)::Vector{FockMap}
+#     data::Matrix{FockMap} = Matrix(undef, fockspace |> rep |> length, symmetry.order)
+#     for (n, partition) in fockspace |> rep |> enumerate
+#         data[n, :] = [(symmetry * partition)...]
+#     end
+#     return [focksum(data[:, n]) for n in 1:symmetry.order]
+# end
 
-function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{FockMap}
-    homefock::FockSpace = unitcellfock(crystalfock)
-    homemaps::Vector{FockMap} = symmetry * homefock
-    momentumsubspaces::Dict{Point, FockSpace} = crystalsubspaces(crystalfock)
-    symmetrizedbzs::Subset{Subset{Point}} = symmetry * (crystalfock |> crystalof |> brillouinzone)
+# function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{FockMap}
+#     homefock::FockSpace = unitcellfock(crystalfock)
+#     homemaps::Vector{FockMap} = symmetry * homefock
+#     momentumsubspaces::Dict{Point, FockSpace} = crystalsubspaces(crystalfock)
+#     symmetrizedbzs::Subset{Subset{Point}} = symmetry * (crystalfock |> crystalof |> brillouinzone)
 
-    function computesymmetrizetransformer(homemap::FockMap, symmetrizedsubspaces::Vector{FockSpace})::FockMap
-        fouriermap::FockMap = fourier(crystalfock, homefock)
-        symmetrizedfouriermap::FockMap = fourier(crystalfock, homemap.outspace)
-        symmetrizedfockpairs::Vector{Pair{FockSpace, FockSpace}} = [subspace => symmetrizedsubspaces[n] for (n, subspace) in enumerate(crystalfock |> subspaces)]
-        fockmap::FockMap = focksum(
-            [rows(symmetrizedfouriermap, subspace) * homemap * rows(fouriermap, subspace)' for subspace in crystalfock |> subspaces])
-        return FockMap(
-            FockSpace(fockmap.outspace, reflected=crystalof(crystalfock)),
-            FockSpace(fockmap.inspace, reflected=crystalof(crystalfock)),
-            rep(fockmap))
-    end
+#     function computesymmetrizetransformer(homemap::FockMap, symmetrizedsubspaces::Vector{FockSpace})::FockMap
+#         fouriermap::FockMap = fourier(crystalfock, homefock)
+#         symmetrizedfouriermap::FockMap = fourier(crystalfock, homemap.outspace)
+#         symmetrizedfockpairs::Vector{Pair{FockSpace, FockSpace}} = [subspace => symmetrizedsubspaces[n] for (n, subspace) in enumerate(crystalfock |> subspaces)]
+#         fockmap::FockMap = focksum(
+#             [rows(symmetrizedfouriermap, subspace) * homemap * rows(fouriermap, subspace)' for subspace in crystalfock |> subspaces])
+#         return FockMap(
+#             FockSpace(fockmap.outspace, reflected=crystalof(crystalfock)),
+#             FockSpace(fockmap.inspace, reflected=crystalof(crystalfock)),
+#             rep(fockmap))
+#     end
 
-    return map(computesymmetrizetransformer, homemaps)
-end
+#     return map(computesymmetrizetransformer, homemaps)
+# end
 
 end

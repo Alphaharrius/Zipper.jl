@@ -43,27 +43,10 @@ bonds::FockMap = bondmap([
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
-ks = Subset(s * p for s in groupelements(c6))
-visualize(ks, visualspace=euclidean(MomentumSpace, 2))
-
-pbc(crystal, ks[3])
-ks[3] - basispoint(ks[3])
-
-visualize(c6 * bonds.outspace)
-
 𝐻::FockMap = hamiltonian(crystal, bonds)
 𝐶::FockMap = groundstatecorrelations(𝐻)
 
 crystalfock = 𝐻.inspace
-# homefock::FockSpace = unitcellfock(crystalfock)
-# homemaps::Vector{FockMap} = c3 * homefock
-# fourier::FockMap = Quantum.fourier(crystalfock, homefock)
-# symmetrizedfourier::FockMap = Quantum.fourier(crystalfock, homemaps[2].outspace)
-# visualize(symmetrizedfourier)
-# ret = focksum([rows(symmetrizedfourier, subspace) * homemaps[2] * rows(fourier, subspace)' for subspace in crystalfock |> subspaces])
-# visualize(ret, rowrange=1:64, colrange=1:64)
-
-# visualize(ret' * ret * 𝐶 * ret' * ret, rowrange=1:64, colrange=1:64)
 
 blocked = blocking(:scale => Scale([2. 0.; 0. 2.]), :correlations => 𝐶, :crystal => crystal)
 blockedcorrelations::FockMap = blocked[:correlations]
@@ -109,23 +92,34 @@ visualize(emptyglobalprojector, rowrange=1:128, colrange=1:128)
 globalprojector = emptyglobalprojector - filledglobalprojector
 visualize(globalprojector, rowrange=1:64, colrange=1:64)
 
-kprojectors = [restrict(globalprojector, subspace, subspace) for subspace in globalprojector.inspace |> subspaces]
+visualize(groupelement(c6, 2) * globalprojector.outspace, rowrange=1:64, colrange=1:64)
+
+symmetrytransformers::Vector{FockMap} = [element * globalprojector.outspace for element in groupelements(c6)]
+
+symmetrizedglobalprojector = focksum([transformer * globalprojector * transformer' for transformer in symmetrytransformers])
+
+visualize(symmetrizedglobalprojector, rowrange=1:64, colrange=1:64)
+
+globaldistillspec = eigvalsh(symmetrizedglobalprojector)
+filter(p -> -1e-3 < p.second < 1e-3, globaldistillspec)
+plot(scatter(y=map(p -> p.second, globaldistillspec), mode="markers"))
+
+fouriersubspaces = crystalsubspaces(symmetrizedglobalprojector.inspace)
+
+kprojectors = [(k, restrict(symmetrizedglobalprojector, subspace, subspace)) for (k, subspace) in fouriersubspaces]
 
 spectrum = Dict()
 
-for (k, proj) in zip(globalprojector.inspace |> crystalof |> brillouinzone, kprojectors)
+for (k, proj) in kprojectors
     kspec = map(p -> p.second, eigvalsh(proj)) |> sort
     spectrum[k] = kspec
 end
 
-function brillouinmesh_(crystal::Crystal)::Array{Momentum}
-    kspace::MomentumSpace = spaceof(crystal)
-    return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
-end
+spectrum
 
 using Compat
 
-mesh = brillouinmesh_(newcrystal)
+mesh = brillouinmesh(newcrystal)
 
 spec3d = stack(map(k -> spectrum[k], mesh))
 

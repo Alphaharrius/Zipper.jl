@@ -54,7 +54,7 @@ end
 function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::Dict{Point, FockMap}
     crystal::Crystal = crystalof(crystalfock)
     fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
-    momentumfouriers::Vector{FockMap} = colsubmaps(fouriermap)
+    momentumfouriers::Vector{FockMap} = rowsubmaps(fouriermap)
     bz::Subset{Momentum} = brillouinzone(crystal)
     return Dict(k => fourier_k * localisometry for (k, fourier_k) in zip(bz, momentumfouriers))
 end

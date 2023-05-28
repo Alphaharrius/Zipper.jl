@@ -10,6 +10,8 @@ Simply means an distinct type of object that can be represented by a concrete ty
 """
 abstract type Element{R <: Any} end
 
+Base.:*(a::A, b::B) where {A <: Element, B <: Element} = error("Composition algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
+
 """ Restrict all print out of elements to just printing the type. """
 Base.:show(io::IO, element::Element) = print(io, string(typeof(element)))
 

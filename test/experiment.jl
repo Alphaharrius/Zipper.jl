@@ -13,7 +13,7 @@ using ..Plotting
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
-unitcell = union(triangular & [1/3, 2/3], triangular & [2/3, 1/3])
+unitcell = Subset([triangular & [1/3, 2/3], triangular & [2/3, 1/3]])
 crystal = Crystal(unitcell, [32, 32])
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 
@@ -43,9 +43,11 @@ bonds::FockMap = bondmap([
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
+ks = Subset(s * p for s in groupelements(c6))
+visualize(ks, visualspace=euclidean(MomentumSpace, 2))
 
-p = kspace & [0., 0.03125]
-c6 * p
+pbc(crystal, ks[3])
+ks[3] - basispoint(ks[3])
 
 visualize(c6 * bonds.outspace)
 
@@ -115,6 +117,19 @@ for (k, proj) in zip(globalprojector.inspace |> crystalof |> brillouinzone, kpro
     kspec = map(p -> p.second, eigvalsh(proj)) |> sort
     spectrum[k] = kspec
 end
+
+function brillouinmesh_(crystal::Crystal)::Array{Momentum}
+    kspace::MomentumSpace = spaceof(crystal)
+    return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
+end
+
+using Compat
+
+mesh = brillouinmesh_(newcrystal)
+
+spec3d = stack(map(k -> spectrum[k], mesh))
+
+plot([surface(z=spec3d[n, :, :]) for n in 1:size(spec3d, 1)])
 
 specmat = hcat([v for (k, v) in spectrum]...)
 plot([scatter(y=specmat[n, :]) for n in 1:size(specmat, 1)])

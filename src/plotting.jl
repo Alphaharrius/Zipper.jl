@@ -32,7 +32,9 @@ function visualize_vector_positions(title::String, positions::Array{Vector})
     # How to make all axis having the same scale:
     # https://stackoverflow.com/questions/52863305/plotly-scatter3d-how-can-i-force-3d-axes-to-have-the-same-scale-aspect-ratio
     layout = Layout(title=title, scene=attr(aspectmode="data"))
-    plot([trace], layout)
+    fig = plot([trace], layout)
+    relayout!(fig, template="simple_white")
+    fig
 end
 
 function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T <: Number}

@@ -8,7 +8,7 @@ using LinearAlgebra, SmithNormalForm, OrderedCollections
 using ..Spaces, ..Geometries, ..Quantum
 
 export Scale, Symmetry, Irrep
-export irrepof
+export getirrep, groupelement, groupelements
 
 abstract type Transformation{T} <: Element{T} end
 

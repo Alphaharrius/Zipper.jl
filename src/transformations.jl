@@ -144,17 +144,21 @@ function Base.:*(space::AffineSpace, symmetry::Symmetry)::Symmetry
     return Symmetry(symmetry.group, pointgrouprep, symmetry.order, symmetry.index, shift, symmetry.irreps)
 end
 
-function Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point}
+function Base.:*(symmetry::Symmetry, region::Subset{Position})::Subset{Position}
     nativesymmetry::Symmetry = spaceof(region) * symmetry
-    if region |> spaceof isa RealSpace
-        shift::Point = nativesymmetry.shift
-        return Subset(Point(nativesymmetry.pointgrouprep * (point |> pos), point |> spaceof) + shift for point in region)
-    else
-        error("Symmetrizing momentum points is not available!")
-    end
+    shift::Point = nativesymmetry.shift
+    return Subset(Point(nativesymmetry.pointgrouprep * (point |> pos), point |> spaceof) + shift for point in region)
 end
 
-Base.:*(symmetry::Symmetry, point::Point)::Point = (symmetry * Subset(point)) |> first
+function Base.:*(symmetry::Symmetry, zone::Subset{Momentum})::Subset{Momentum}
+    kspace::MomentumSpace = zone |> spaceof
+    realspace::RealSpace = convert(RealSpace, kspace)
+    pointgrouprep::Matrix{Float64} = (realspace * symmetry).pointgrouprep
+    kspacerep::Matrix{Float64} = Matrix(pointgrouprep |> transpose |> inv)
+    return Subset(Point(kspacerep * (k |> pos), kspace) for k in zone)
+end
+
+Base.:*(symmetry::Symmetry, point::P) where {P <: Point} = (symmetry * Subset(point)) |> first
 
 function Base.:*(symmetry::Symmetry, mode::Mode)::FockMap
     newattrs::Dict{Symbol, Any} = Dict(mode.attrs)

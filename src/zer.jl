@@ -37,12 +37,12 @@ localfrozenisometries(
 blocking(parameters::Pair{Symbol}...)::Dict{Symbol} = blocking(Dict(parameters...))
 
 function blocking(parameters::Dict{Symbol})::Dict{Symbol}
-    @assert(haskey(parameters, :scale))
+    @assert(haskey(parameters, :action))
     @assert(haskey(parameters, :correlations))
     @assert(haskey(parameters, :crystal))
     result::Dict{Symbol, Any} = Dict()
 
-    scale::Scale = parameters[:scale]
+    scale::Scale = parameters[:action]
     correlation::FockMap = parameters[:correlations]
     crystal::Crystal = parameters[:crystal]
 

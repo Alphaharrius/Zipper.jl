@@ -3,7 +3,7 @@ module Zer
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations
 export DistillRegion
 export localfrozenisometries, frozenselectionbythreshold, frozenselectionbycount
-export blocking
+export blocking, crystalisometries, crystalprojector
 
 function frozenselectionbythreshold(threshold::Float64)
     function frozenfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
@@ -51,7 +51,7 @@ function blocking(parameters::Dict{Symbol})::Dict{Symbol}
     return result
 end
 
-function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::Dict{Point, FockMap}
+function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::Dict{Momentum, FockMap}
     crystal::Crystal = crystalof(crystalfock)
     fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
     momentumfouriers::Vector{FockMap} = rowsubmaps(fouriermap)
@@ -59,8 +59,8 @@ function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
     return Dict(k => fourier_k * localisometry for (k, fourier_k) in zip(bz, momentumfouriers))
 end
 
-function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
-    momentumisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
+function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
+    momentumisometries::Dict{Momentum, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = crystalof(crystalfock)
     bz::Subset{Momentum} = brillouinzone(crystal)
     globalprojector::FockMap = focksum(map(k -> momentumisometries[k] * momentumisometries[k]', bz))

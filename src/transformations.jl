@@ -156,6 +156,7 @@ function Base.:*(symmetry::Symmetry, zone::Subset{Momentum})::Subset{Momentum}
     pointgrouprep::Matrix{Float64} = (realspace * symmetry).pointgrouprep
     kspacerep::Matrix{Float64} = Matrix(pointgrouprep |> transpose |> inv)
     return Subset(Point(kspacerep * (k |> pos), kspace) for k in zone)
+    # TODO: Anti-unitary is not handled.
 end
 
 Base.:*(symmetry::Symmetry, point::P) where {P <: Point} = (symmetry * Subset(point)) |> first

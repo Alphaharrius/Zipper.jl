@@ -24,12 +24,15 @@ function frozenselectionbycount(count::Integer)
     return frozenfockmaps
 end
 
-function localfrozenisometries(correlations::FockMap, restrictedfock::FockSpace;
-                               selectionstrategy = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap}
-    fouriermap::FockMap = fourier(correlations.inspace, restrictedfock) / (correlations.inspace |> subspacecount |> sqrt)
-    restrictedcorrelations::FockMap = fouriermap' * correlations * fouriermap
-    return selectionstrategy(restrictedcorrelations)
+function regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockMap
+    fouriermap::FockMap = fourier(correlations.inspace, regionfock) / (correlations.inspace |> subspacecount |> sqrt)
+    return fouriermap' * correlations * fouriermap
 end
+
+localfrozenisometries(
+    correlations::FockMap, regionfock::FockSpace;
+    selectionstrategy = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap} = (
+    regioncorrelations(correlations, regionfock) |> selectionstrategy)
 
 blocking(parameters::Pair{Symbol}...)::Dict{Symbol} = blocking(Dict(parameters...))
 

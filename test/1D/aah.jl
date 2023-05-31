@@ -15,7 +15,7 @@ quantized::Subset{Mode} = quantize(:pos, unitcell, 1)
 mode::Mode = first(quantized)
 
 # Generate all modes spanning the space.
-𝑁::Integer = 64 # Number of lattice sites.
+𝑁::Integer = 256 # Number of lattice sites.
 crystal::Crystal = Crystal(unitcell, [𝑁])
 modes::Subset{Mode} = spanoffset(Subset(mode), latticepoints(crystal))
 
@@ -71,9 +71,9 @@ rcvals, rcunitary = eigh(restrictedcorrelations)
 plot(scatter(y=map(p -> p.second, rcvals), mode="markers"), Layout(title="Local Distiller 𝑉 = $(𝑉)"))
 
 distillers::Vector{FockMap} = []
-for offset in [latticepoints(newcrystal)...][2:end]
+for offset in latticepoints(newcrystal)
     distillregion::Subset{Mode} = restrictedregion + offset
-    @show [euclidean(pos(m)) for m in distillregion]
+    if intersect(distillregion, blockedcorrelations.inspace |> orderedmodes) |> length != distillregion |> length continue end
     distillfock::FockSpace = FockSpace(distillregion)
     distillcorrelations::FockMap = restrict(blockedcorrelations, distillfock, distillfock)
     frozenfocks = frozenselectionbycount(1)(distillcorrelations)
@@ -91,12 +91,8 @@ visualize(globalcourierisometry)
 # modespec = columnspec(columns(globalunitary, FockSpace(Subset(mode))))
 # visualize(modespec)
 
-positions = [m |> pos |> euclidean for m in globalunitary.outspace |> orderedmodes]
-using SparseArrays
-
-mat = spzeros(positions |> length, positions |> length)
-foreach(enum -> mat[enum |> first, enum |> first] = (enum |> last |> pos)[1], enumerate(positions))
-x = FockMap(globalunitary.outspace, globalunitary.outspace, mat)
+x = FockMap(globalunitary.outspace, globalunitary.outspace, Dict((m, m) => ComplexF64((m |> pos |> euclidean |> pos |> first) + 𝑁/2) for m in globalunitary.outspace |> orderedmodes))
+visualize(x)
 courierprojector = globalcourierisometry * globalcourierisometry'
 visualize(courierprojector)
 wanniermap = courierprojector * x * courierprojector'
@@ -112,13 +108,14 @@ wcorrcals = eigvalsh(wanniercorrelations)
 visualize(wanniercorrelations, title="Wannier correlation 𝑉 = $(𝑉)")
 plot(scatter(y=map(p -> p.second, wcorrcals), mode="markers"), Layout(title="Wannier correlation spectrum 𝑉 = $(𝑉)"))
 
-plot(surface(z=Matrix(real(wannierunitary.rep))))
+modespec = [(wanniercourierisometry |> rep)[:, n] for n in 1:size(wanniercourierisometry |> rep, 2)]
+plot([scatter(y=[v |> abs for v in spec]) for spec in modespec[1:4:end]])
 
-mode = orderedmodes(wannierunitary.inspace)[6]
-modespec = columnspec(columns(wannierunitary, FockSpace(Subset(mode))))
-visualize(modespec)
+# mode = orderedmodes(wannierunitary.inspace)[6]
+# modespec = columnspec(columns(wannierunitary, FockSpace(Subset(mode))))
+# visualize(modespec)
 
-globalempty::Subset{Mode} = Subset(map(p -> p.first, filter(p -> -0.12 > p.second, gdvals)))
+globalempty::Subset{Mode} = Subset(map(p -> p.first, filter(p -> -1e-5 > p.second, gdvals)))
 globalemptyisometry::FockMap = columns(globalunitary, FockSpace(globalempty))
 emptyprojector = globalemptyisometry * globalemptyisometry'
 wanniermap = emptyprojector * x * emptyprojector'
@@ -126,5 +123,33 @@ visualize(wanniermap)
 wannierevals, wannierunitary = eigh(wanniermap)
 visualize(wannierunitary, title="Wannier unitary 𝑉 = $(𝑉)")
 plot(scatter(y=map(p -> p.second, wannierevals), mode="markers"), Layout(title="Wannier spectrum 𝑉 = $(𝑉)"))
+wanniermodes = Subset(map(p -> p.first, filter(p -> -1e-5 > p.second || p.second > 1e-5, wannierevals)))
+wannieremptyisometry = columns(wannierunitary, FockSpace(wanniermodes))
+visualize(wannieremptyisometry)
+emptycorrelations = wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
+visualize(emptycorrelations)
+wcorrcals = eigvalsh(emptycorrelations)
+plot(scatter(y=map(p -> p.second, wcorrcals), mode="markers"), Layout(title="Empty wannierized correlation spectrum 𝑉 = $(𝑉)"))
 
-plot(surface(z=Matrix(real(wannierunitary.rep))))
+modespec = [(wannieremptyisometry |> rep)[:, n] for n in 1:size(wannieremptyisometry |> rep, 2)]
+plot([scatter(y=[v |> abs for v in spec]) for spec in modespec[1:2:end]])
+
+
+globalfilled::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second > 1e-5, gdvals)))
+globalfilledisometry::FockMap = columns(globalunitary, FockSpace(globalfilled))
+filledprojector = globalfilledisometry * globalfilledisometry'
+wanniermap = filledprojector * x * filledprojector'
+visualize(wanniermap)
+wannierevals, wannierunitary = eigh(wanniermap)
+visualize(wannierunitary, title="Wannier unitary 𝑉 = $(𝑉)")
+plot(scatter(y=map(p -> p.second, wannierevals), mode="markers"), Layout(title="Wannier spectrum 𝑉 = $(𝑉)"))
+wanniermodes = Subset(map(p -> p.first, filter(p -> -1e-5 > p.second || p.second > 1e-5, wannierevals)))
+wannierfilledisometry = columns(wannierunitary, FockSpace(wanniermodes))
+visualize(wannierfilledisometry)
+filledcorrelations = wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
+visualize(filledcorrelations)
+wcorrcals = eigvalsh(filledcorrelations)
+plot(scatter(y=map(p -> p.second, wcorrcals), mode="markers"), Layout(title="Filled wannierized correlation spectrum 𝑉 = $(𝑉)"))
+
+modespec = [(wannierfilledisometry |> rep)[:, n] for n in 1:size(wannierfilledisometry |> rep, 2)]
+plot([scatter(y=[v |> abs for v in spec]) for spec in modespec[1:1:end]])

@@ -12,7 +12,8 @@ export bloch, bondmap, espec, hamiltonian, groundstates, groundstatecorrelations
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
     fockspace::FockSpace = FockSpace(Subset(mode for bond in bonds for mode in bond.first))
     half::FockMap = FockMap(fockspace, fockspace, Dict(bonds))
-    return half + half'
+    diag::FockMap = FockMap(fockspace, fockspace, Dict(filter(p -> p.first |> first == p.first |> last, bonds)))
+    return half + half' - diag
 end
 
 function espec(bonds::FockMap, momentums::Vector{Point})::Vector{Pair{Mode, Float64}}
@@ -29,6 +30,7 @@ function espec(bonds::FockMap, momentums::Vector{Point})::Vector{Pair{Mode, Floa
 end
 
 function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
+    # TODO: Missing filling data
     𝐵𝑍::Subset{Momentum} = brillouinzone(crystal)
     bondmodes::Subset{Mode} = flatten(rep(bondmap.outspace))
     ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset(𝑘), FockSpace(bondmodes)), 𝐵𝑍)

@@ -3,7 +3,7 @@ if !isdefined(Main, :Geometries) include("geometries.jl") end
 
 module Quantum
 
-using LinearAlgebra, SparseArrays, OrderedCollections
+using LinearAlgebra, SparseArrays, OrderedCollections, Base.Iterators
 using ..Spaces, ..Geometries
 
 export quantized, transformed, symmetrized

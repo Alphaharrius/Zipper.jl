@@ -340,18 +340,15 @@ Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, 
 Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(rep(source))
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
-function Base.:union(input::Subset...)::Subset
-    @assert(length(OrderedSet{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
-    return Subset(union([rep(subset) for subset in input]...))
-end
+subsetunion(subsets)::Subset = union((subset |> rep for subset in subsets)...) |> Subset
 
-Base.:union(input::T...) where {T <: AbstractSubset} = union((convert(Subset{T}, element) for element in input)...)
+Base.:union(subsets::Subset...)::Subset = subsetunion(subsets)
+Base.:intersect(subsets::Subset...)::Subset = Subset(intersect((subset |> rep for subset in subsets)...))
 
-function Base.:intersect(input::Subset...)::Subset
-    @assert(length(OrderedSet{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
-    return Subset(intersect([rep(subset) for subset in input]...))
-end
+Base.:+(a::Subset, b::Subset)::Subset = union(a, b)
 
-Base.:intersect(input::T...) where {T <: AbstractSubset} = intersect((convert(Subset{T}, element) for element in input)...)
+Base.:setdiff(a::Subset, b::Subset)::Subset = Subset(setdiff(a |> rep, b |> rep))
+
+Base.:-(a::Subset, b::Subset)::Subset = setdiff(a, b)
 
 end

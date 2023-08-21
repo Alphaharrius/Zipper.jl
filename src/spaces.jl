@@ -45,7 +45,7 @@ The dimension of a `AbstractSpace` is the number of objects that spans this spac
 The dimension of the `space`, since this method is arbitary to all types `<: AbstractSpace`, the top root returns `0` as `AbstractSpace` does not refer to any
 concrete space.
 """
-dimension(space::T) where {T <: AbstractSpace} = 0
+dimension(space::T) where {T <: AbstractSpace} = error("Dimension resolving is not defined for `$(space |> typeof)`!")
 
 """
     hassamespan(a::T, b::F)::Bool where {T <: AbstractSpace, F <: AbstractSpace}

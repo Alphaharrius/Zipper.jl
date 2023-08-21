@@ -477,7 +477,7 @@ Represents an mapping between two fockspaces with the same span of the underlyin
 - `FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})` is used when the `rep` is an arbitary array like object.
 - `FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})` is used when the values of the map have to be specified
   for a distinct 2-point pair.
-- `FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)` is for updating attributes of `outspace` and `inspace`.
+- `FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)` is for using new `outspace` and `inspace`.
 """
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     outspace::FockSpace
@@ -495,7 +495,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
         return new(outspace, inspace, rep)
     end
 
-    FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace) = FockMap(outspace, inspace, rep(fockmap))
+    FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace) = (
+        FockMap(outspace, inspace, permute(fockmap, outspace=outspace, inspace=inspace) |> rep))
 end
 
 Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(typeof(fockmap))(in=$(fockmap.inspace), out=$(fockmap.outspace))"))

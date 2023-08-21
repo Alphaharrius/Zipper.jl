@@ -10,8 +10,8 @@ export quantized, transformed, symmetrized
 export Mode, FockSpace, FockMap
 export hasattr, getattr, setattr, removeattr, setorbital, orbital, quantize, flavorcount, spanoffset
 export dimension, crystalof, crystalsubspaces, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
-export order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
-export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, onesmap, colmap, columnspec
+export order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse, fockspaceunion
+export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh, fourier, fockaddsamespan, directsum, idmap, onesmap, colmap, columnspec
 
 """
     Mode(attrs::Dict{Symbol})
@@ -606,7 +606,7 @@ end
 
 Base.:-(target::FockMap)::FockMap = FockMap(target.outspace, target.inspace, -rep(target))
 
-Base.:+(a::FockMap, b::FockMap)::FockMap = focksum([a, b])
+Base.:+(a::FockMap, b::FockMap)::FockMap = fockadd(a, b)
 
 Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 
@@ -752,29 +752,105 @@ function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix
 end
 
 """
-    focksum(fockmaps::Vector{FockMap})::FockMap
-
-Perform summation of a set of `FockMap`, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
+Perform addition of two `FockMap`s, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
 non-overlapping `inspace` and `outspace`, this corresponds to a direct sum; if they have overlapping but different span of `inspace` or `outspace`, the result will
-be a `FockMap` with `outspace` and `inspace` with all sub-fockspaces of different span, with the corresponding representation summed. Please be noted that
-`focksum([a, b, c, d]) == a + b + c + d`.
+be a `FockMap` with `outspace` and `inspace` with 3 subspaces of (!intersect x 2, intersect x 1), with the corresponding representation summed. Noted that this
+function is accessed via `a::FockMap + b::FockMap`.
 """
-function focksum(fockmaps::Vector{FockMap})::FockMap
-    parts = [(fockmap, outpart, inpart) for fockmap in fockmaps for (outpart, inpart) in zip(rep(fockmap.outspace), rep(fockmap.inspace))]
-    outfock = union([fockmap.outspace for fockmap in fockmaps]...)
-    infock = union([fockmap.inspace for fockmap in fockmaps]...)
-    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outfock), dimension(infock))
-    for (fockmap, outpart, inpart) in parts
-        source::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
-        for (outmode, inmode) in Iterators.product(outpart, inpart)
-            spmat[order(outfock, outmode), order(infock, inmode)] += source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
-        end
+function fockadd(a::FockMap, b::FockMap)::FockMap
+    outspacesamespan::Bool = hassamespan(a.outspace, b.outspace)
+    inspacesamespan::Bool = hassamespan(a.inspace, b.inspace)
+
+    if outspacesamespan && inspacesamespan
+        return fockaddsamespan(a, b)
     end
-    firstmap::FockMap = first(fockmaps)
-    return FockMap(
-        hassamespan(outfock, firstmap.outspace) ? firstmap.outspace : outfock,
-        hassamespan(infock, firstmap.inspace) ? firstmap.inspace : infock,
-        spmat)
+
+    # FockMap: a   FockMap: b
+    # -----------  -----------
+    # | 11 | 12 |  | 22 | 23 |
+    # -----------  -----------
+    # | 21 | 22 |  | 32 | 33 |
+    # -----------  -----------
+
+    # Addition
+    # ----------------
+    # | 11 | 12 | -- |
+    # ----------------
+    # | 21 | 22 | 23 |
+    # ----------------
+    # | -- | 32 | 33 |
+    # ----------------
+
+    outspace2::FockSpace = intersect(a.outspace, b.outspace)
+    inspace2::FockSpace = intersect(a.inspace, b.inspace)
+
+    if outspace2 |> dimension == 0 && inspace2 |> dimension == 0
+        return directsum(a, b)
+    end
+
+    outspace1::FockSpace = a.outspace - b.outspace
+    outspace3::FockSpace = b.outspace - a.outspace
+
+    inspace1::FockSpace = a.inspace - b.inspace
+    inspace3::FockSpace = b.inspace - a.inspace
+
+    outspace::FockSpace = union(outspace1, outspace2, outspace3) # Orthogonal
+    inspace::FockSpace = union(inspace1, inspace2, inspace3) # Orthogonal
+
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
+
+    function internaladdition(source::FockMap, os::FockSpace, is::FockSpace)
+        if (os |> dimension) * (is |> dimension) == 0
+            return
+        end
+        outmodes::Subset{Mode} = os |> orderedmodes
+        inmodes::Subset{Mode} = is |> orderedmodes
+
+        restricted::FockMap = restrict(source, os, is)
+        data[order(outspace, outmodes |> first):order(outspace, outmodes |> last), order(inspace, inmodes |> first):order(inspace, inmodes |> last)] += (restricted |> rep)
+    end
+
+    internaladdition(a, outspace1, inspace1)
+    internaladdition(a, outspace1, inspace2)
+    internaladdition(a, outspace2, inspace1)
+    internaladdition(a, outspace2, inspace2)
+    internaladdition(b, outspace2, inspace2)
+    internaladdition(b, outspace2, inspace3)
+    internaladdition(b, outspace3, inspace2)
+    internaladdition(b, outspace3, inspace3)
+
+    return FockMap(outspace, inspace, data)
+end
+
+function fockaddsamespan(a::FockMap, b::FockMap)::FockMap
+    data::SparseMatrixCSC{ComplexF64, Int64} = (
+        (a |> rep) + (Quantum.permute(b, outspace=a.outspace, inspace=b.inspace) |> rep))
+    return FockMap(a.outspace, a.inspace, data)
+end
+
+function directsum(a::FockMap, b::FockMap)::FockMap
+    outspace::FockSpace = a.outspace + b.outspace
+    inspace::FockSpace = a.inspace + b.inspace
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
+    data[1:(a.outspace |> dimension), 1:(a.inspace |> dimension)] += a |> rep
+    data[(a.outspace |> dimension) + 1:end, (a.inspace |> dimension) + 1:end] += b |> rep
+    return FockMap(outspace, inspace, data)
+end
+
+function directsum(fockmaps)::FockMap
+    outspace::FockSpace = Iterators.map(fockmap -> fockmap.outspace, fockmaps) |> fockspaceunion
+    inspace::FockSpace = Iterators.map(fockmap -> fockmap.inspace, fockmaps) |> fockspaceunion
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
+    function filldata(fockmap::FockMap)
+        # The procedure beneath assumes that the fockspace elements are concatenated in order during union operations.
+        outmodes::Subset{Mode} = fockmap.outspace |> orderedmodes
+        outrange::UnitRange = order(outspace, outmodes |> first):order(outspace, outmodes |> last)
+        inmodes::Subset{Mode} = fockmap.inspace |> orderedmodes
+        inrange::UnitRange = order(inspace, inmodes |> first):order(inspace, inmodes |> last)
+        data[outrange, inrange] += fockmap |> rep
+    end
+    foreach(filldata, fockmaps)
+    return FockMap(outspace, inspace, data)
 end
 
 """

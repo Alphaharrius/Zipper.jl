@@ -577,15 +577,15 @@ Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `inspace
 colsubmaps(fockmap::FockMap)::Vector{FockMap} = [columns(fockmap, subspace) for subspace in fockmap.inspace |> subspaces]
 
 """
-    restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
+    restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
 
-Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `out_restrictspace` & `in_restrictspace` respectively.
+Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `outspace` & `inspace` respectively.
 """
-function restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
-    out_restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(out_restrictspace)]
-    in_restrictindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(in_restrictspace)]
-    spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), out_restrictindices, in_restrictindices))
-    return FockMap(out_restrictspace, in_restrictspace, spmat)
+function restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
+    outindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(outspace)]
+    inindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(inspace)]
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), outindices, inindices))
+    return FockMap(outspace, inspace, spmat)
 end
 
 """

@@ -1,9 +1,9 @@
 module Spaces
 
-using LinearAlgebra, OrderedCollections
+using LinearAlgebra, OrderedCollections, Base.Iterators
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Position, Momentum, Subset
-export rep, euclidean, basis, dimension, spaceof, rpos, pos, lineartransform, fourier_coef, distance, flatten, members
+export rep, euclidean, basis, dimension, spaceof, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
 
 """
 Simply means an distinct type of object that can be represented by a concrete type `R`.

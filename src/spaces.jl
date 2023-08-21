@@ -285,6 +285,7 @@ Subset(points::Point...) = Subset(p for p in points)
 Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
 
 """ Allows additions for a subset with another type. """
+# TODO: Requires revision.
 Base.:+(subset::Subset, val)::Subset = Subset(p + val for p in subset)
 Base.:-(subset::Subset, val)::Subset = subset + (-val)
 

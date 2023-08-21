@@ -267,9 +267,20 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     rep::OrderedSet{T}
 
     Subset(elements::OrderedSet{T}) where {T <: AbstractSubset} = new{T}(elements)
+    # Handles OrderedSet with arbitary types, assume that all elements has the same type.
+    Subset(elements::OrderedSet) = Subset(OrderedSet{elements |> first |> typeof}(elements))
     Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
-    Subset(input) = Subset(Base.isiterable(input |> typeof) && !(input isa Subset) ? [input...] : [input])
+    # For arbitary typed Vector, delegate to Subset(elements::OrderedSet).
+    Subset(elements::Vector) = Subset(OrderedSet(elements))
+
+    Subset(generator::Base.Generator) = Subset(OrderedSet{generator |> first |> typeof}(generator))
+    Subset(input::Base.Iterators.Flatten) = Subset(OrderedSet{input |> first |> typeof}(input))
+    Subset(subset::Subset) = Subset(OrderedSet([subset]))
+
+    # Subset(input) = Subset(Base.isiterable(input |> typeof) && !(input isa Subset) ? [input...] : [input])
 end
+
+Subset(points::Point...) = Subset(p for p in points)
 
 Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
 

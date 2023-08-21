@@ -327,7 +327,7 @@ Convert the `Subset` into a `Tuple` with all its elements for easier accessing.
 """
 members(subset::Subset)::Tuple = (rep(subset)...,)
 
-Base.:(==)(a::Subset, b::Subset)::Bool = spaceof(a) == spaceof(b) && Set(rep(a)) == Set(rep(b))
+Base.:(==)(a::Subset, b::Subset)::Bool = Set(rep(a)) == Set(rep(b))
 
 Base.:convert(::Type{OrderedSet{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
 """ Reflexive relation. """

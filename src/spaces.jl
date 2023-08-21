@@ -322,9 +322,9 @@ Base.:filter(f, subset::T) where {T <: Subset} = Subset(filter(f, rep(subset)))
 
 Flatten a higher order subset to order `1`, and preserves the element orderings of each order.
 """
-function flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
+function Iterators.flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
     if T <: Subset
-        return union([flatten(element) for element in rep(subset)]...)
+        return union((flatten(element) for element in rep(subset))...)
     end
     return subset
 end

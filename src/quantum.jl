@@ -267,12 +267,20 @@ end
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
 
-function Base.:union(focks::FockSpace...)::FockSpace
-    partitions::Subset{Subset{Mode}} = union([rep(fock) for fock in focks]...)
-    modes::Subset{Mode} = flatten(partitions)
+function fockspaceunion(fockspaces)::FockSpace
+    subspaces::Subset{Subset{Mode}} = subsetunion(fockspace |> rep for fockspace in fockspaces if fockspace |> dimension != 0)
+    modes::Subset{Mode} = subspaces |> Iterators.flatten
     ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(partitions::Subset{Subset{Mode}}, ordering)
+    return FockSpace(subspaces::Subset{Subset{Mode}}, ordering)
 end
+
+Base.:union(fockspaces::FockSpace...)::FockSpace = fockspaceunion(fockspaces)
+
+Base.:+(a::FockSpace, b::FockSpace)::FockSpace = union(a, b)
+
+Base.:-(a::FockSpace, b::FockSpace)::FockSpace = FockSpace(setdiff(a |> orderedmodes , b |> orderedmodes))
+
+Base.:intersect(a::FockSpace, b::FockSpace) = FockSpace(intersect(a |> orderedmodes, b |> orderedmodes))
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
 

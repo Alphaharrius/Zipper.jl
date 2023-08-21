@@ -255,7 +255,7 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     rep::Subset{Subset{Mode}}
     ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing) = new{typeof(reflected)}(reflected, subsets, ordering)
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = new{typeof(reflected)}(reflected, subsets, ordering)
     FockSpace(subset::Subset{Mode}; reflected=Nothing) = FockSpace(
         Subset(subset),
         Dict(mode => order for (order, mode) in enumerate(subset)),

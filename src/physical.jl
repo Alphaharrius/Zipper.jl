@@ -31,11 +31,11 @@ end
 
 function hamiltonian(crystal::Crystal, bondmap::FockMap)::FockMap
     # TODO: Missing filling data
-    𝐵𝑍::Subset{Momentum} = brillouinzone(crystal)
-    bondmodes::Subset{Mode} = flatten(rep(bondmap.outspace))
+    𝐵𝑍::Subset{Momentum} = crystal |> brillouinzone
+    bondmodes::Subset{Mode} = bondmap.outspace |> orderedmodes
     ∑𝐹ₖ = Iterators.map(𝑘 -> fourier(Subset(𝑘), FockSpace(bondmodes)), 𝐵𝑍)
     ∑𝐻ₖ = Iterators.map(𝐹ₖ -> 𝐹ₖ * bondmap * 𝐹ₖ', ∑𝐹ₖ)
-    fockmap::FockMap = focksum([∑𝐻ₖ...])
+    fockmap::FockMap = directsum(∑𝐻ₖ)
     return FockMap(FockSpace(fockmap.outspace, reflected=crystal), FockSpace(fockmap.inspace, reflected=crystal), rep(fockmap))
 end
 
@@ -51,7 +51,7 @@ function groundstates(hamiltonian::FockMap)::FockMap
         𝑈₀::FockMap = columns(𝔘, FockSpace(Subset(filledmodes)))
         ∑𝑈₀[n] = 𝑈₀
     end
-    𝔘₀::FockMap = focksum(∑𝑈₀)
+    𝔘₀::FockMap = directsum(∑𝑈₀)
     crystal::Crystal = crystalof(hamiltonian.inspace)
     return FockMap(FockSpace(𝔘₀.outspace, reflected=crystal), 𝔘₀.inspace, rep(𝔘₀))
 end

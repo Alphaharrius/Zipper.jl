@@ -1,5 +1,6 @@
 using Pkg
 
+Pkg.add("Combinatorics")
 Pkg.add("PlotlyJS")
 Pkg.add("OrderedCollections")
 Pkg.add("ColorTypes")

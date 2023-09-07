@@ -298,7 +298,7 @@ export crystalsubsets
 
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
-crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace} = Dict(commonattr(subspace, :offset) => subspace for subspace in crystalfock |> rep)
+crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace} = Dict(commonattr(subspace, :offset) => subspace |> FockSpace for subspace in crystalfock |> rep)
 
 """
     commonattr(subset::Subset{Mode}, key::Symbol)

@@ -15,6 +15,8 @@ export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh
 
 """
     Mode(attrs::Dict{Symbol})
+    Mode(generator::Base.Generator)
+    Mode(input::Base.Iterators.Flatten)
     Mode(datas::Vector{Pair{Symbol, T}}) where {T}
 
 Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
@@ -23,7 +25,7 @@ Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 - `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
 - `:pos` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
-- `:orbitals` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
+- `:orbital` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
 
 ### Input
 - `attrs` The attributes which uniquely identifies the `Mode` object.

@@ -584,7 +584,7 @@ function restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::Fo
 end
 
 """
-    permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
+    permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
 
 Permute the columns and rows of the representation of the `source` `FockMap` by `outspace` & `inspace` respectively.
 

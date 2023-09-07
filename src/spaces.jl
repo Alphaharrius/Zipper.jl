@@ -377,10 +377,11 @@ Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, 
 Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(rep(source))
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
-subsetunion(subsets)::Subset = union((subset |> rep for subset in subsets)...) |> Subset
+subsetunion(subsets)::Subset = union(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
+subsetintersect(subsets)::Subset = intersect(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
 
 Base.:union(subsets::Subset...)::Subset = subsetunion(subsets)
-Base.:intersect(subsets::Subset...)::Subset = Subset(intersect((subset |> rep for subset in subsets)...))
+Base.:intersect(subsets::Subset...)::Subset = subsetintersect(subsets)
 
 Base.:+(a::Subset, b::Subset)::Subset = union(a, b)
 

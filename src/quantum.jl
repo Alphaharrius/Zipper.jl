@@ -829,7 +829,7 @@ end
 
 function fockaddsamespan(a::FockMap, b::FockMap)::FockMap
     data::SparseMatrixCSC{ComplexF64, Int64} = (
-        (a |> rep) + (Quantum.permute(b, outspace=a.outspace, inspace=b.inspace) |> rep))
+        (a |> rep) + (Quantum.permute(b, outspace=a.outspace, inspace=a.inspace) |> rep))
     return FockMap(a.outspace, a.inspace, data)
 end
 

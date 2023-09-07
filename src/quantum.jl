@@ -31,7 +31,7 @@ Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
 
-    Mode(attrs::Dict{Symbol}) = new(Dict(:orbitals => Dict(), attrs...))
+    Mode(attrs::Dict{Symbol}) = new(Dict((:orbital => swave, attrs...)))
     Mode(attrs::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(attrs...))
 end
 
@@ -154,32 +154,13 @@ exists in the modes, the current record will be overwritten.
 """
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
-"""
-    setorbital(mode::Mode, orbitals::Pair{Symbol, Symbol}...)::Mode
+getorbital(mode::Mode, default::BasisFunction)::BasisFunction = hasattr(mode, :orbital) ? getattr(mode, :orbital) : default
 
-Create a **copy** of `mode` with new orbitals added to the current orbitals of `mode`.
-"""
-setorbital(mode::Mode, orbitals::Pair{Symbol, Symbol}...)::Mode = setattr(mode, :orbitals => Dict(getattr(mode, :orbitals)..., orbitals))
+getorbital(default::BasisFunction = swave) = mode -> getorbital(mode, default)
 
-"""
-    setorbital(orbitals::Pair{Symbol, Symbol}...)
+setorbital(mode::Mode, basis::BasisFunction)::Mode = setattr(mode, :orbital => basis)
 
-Shorthand of `setorbital(mode::Mode, orbitals::Pair{Symbol, Symbol}...)::Mode` with the pipe operator `|>`.
-
-### Examples
-The line `mode |> setorbital(:c3 => :s)` is equal to `setorbital(mode, :c3 => :s)`.
-"""
-setorbital(orbitals::Pair{Symbol, Symbol}...) = mode::Mode -> setorbital(mode, orbitals...)
-
-"""
-    orbital(group::Symbol, mode::Mode)::Symbol
-
-Get the orbital which the `mode` transforms like under the symmetry `group`, if no orbital is specified for symmetry `group`, s-orbital `:s` is returned.
-"""
-function orbital(group::Symbol, mode::Mode)::Symbol
-    orbitals::Dict{Symbol, Symbol} = getattr(mode, :orbitals)
-    return haskey(orbitals, group) ? orbitals[group] : :s # Return the s-orbital when no orbital of the symmetry is specified.
-end
+setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
 
 """
     spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode}

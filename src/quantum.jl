@@ -253,6 +253,9 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
 end
 
+CrystalFock = FockSpace{Crystal}
+export CrystalFock
+
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
 

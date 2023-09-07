@@ -325,11 +325,11 @@ function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
 end
 
 """
-    subspaces(fockspace::FockSpace)::Vector{FockSpace}
+    subspaces(fockspace::FockSpace)::Base.Generator
 
 Retrieve the sub-fockspaces of the `fockspace`.
 """
-subspaces(fockspace::FockSpace)::Vector{FockSpace} = [FockSpace(partition) for partition in rep(fockspace)]
+subspaces(fockspace::FockSpace)::Base.Generator = (FockSpace(partition) for partition in rep(fockspace))
 
 """
     subspacecount(fockspace::FockSpace)::Integer

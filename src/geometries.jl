@@ -32,6 +32,8 @@ struct Crystal <: AbstractSubset{Crystal}
     sizes::Vector{Int64}
 end
 
+Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
+
 pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(pos(point), crystal.sizes)], spaceof(point))
 
 latticeoff(point::Point)::Point = Point([trunc(v) for v in pos(point)], spaceof(point))

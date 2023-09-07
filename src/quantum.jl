@@ -558,18 +558,18 @@ function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
 end
 
 """
-    rowsubmaps(fockmap::FockMap)::Vector{FockMap}
+    rowsubmaps(fockmap::FockMap)::Base.Generator
 
 Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `outspace`.
 """
-rowsubmaps(fockmap::FockMap)::Vector{FockMap} = [rows(fockmap, subspace) for subspace in fockmap.outspace |> subspaces]
+rowsubmaps(fockmap::FockMap)::Base.Generator = (rows(fockmap, subspace) for subspace in fockmap.outspace |> subspaces)
 
 """
-    colsubmaps(fockmap::FockMap)::Vector{FockMap}
+    colsubmaps(fockmap::FockMap)::Base.Generator
 
 Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `inspace`.
 """
-colsubmaps(fockmap::FockMap)::Vector{FockMap} = [columns(fockmap, subspace) for subspace in fockmap.inspace |> subspaces]
+colsubmaps(fockmap::FockMap)::Base.Generator = (columns(fockmap, subspace) for subspace in fockmap.inspace |> subspaces)
 
 """
     restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap

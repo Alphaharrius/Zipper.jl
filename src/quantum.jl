@@ -32,6 +32,10 @@ struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
 
     Mode(attrs::Dict{Symbol}) = new(Dict((:orbital => swave, attrs...)))
+
+    Mode(generator::Base.Generator) = Mode(Dict(generator))
+    Mode(input::Base.Iterators.Flatten) = Mode(Dict(input))
+
     Mode(attrs::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(attrs...))
 end
 

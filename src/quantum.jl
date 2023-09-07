@@ -66,6 +66,8 @@ function Spaces.spaceof(mode::Mode)
     return euclidean(RealSpace, 1)
 end
 
+Spaces.Subset(modes::Mode...) = Subset(m for m in modes)
+
 """
     Spaces.pos(mode::Mode)::Point
 

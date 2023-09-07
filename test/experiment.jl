@@ -1,42 +1,25 @@
 include("../src/spaces.jl")
 include("../src/geometries.jl")
+include("../src/transformations.jl")
 include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
-include("../src/transformations.jl")
+include("../src/quantumtransformations.jl")
 include("../src/zer.jl")
 
 using PlotlyJS, LinearAlgebra, OrderedCollections, SparseArrays, ColorTypes, SmithNormalForm
-using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Transformations, ..Zer
+using ..Spaces, ..Geometries, ..Quantum, ..Physical, ..Transformations, ..Zer, ..QuantumTransformations
 using ..Plotting
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
 unitcell = Subset([triangular & [1/3, 2/3], triangular & [2/3, 1/3]])
-crystal = Crystal(unitcell, [32, 32])
+crystal = Crystal(unitcell, [64, 64])
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 
 tₙ = ComplexF64(-1.)
 m0, m1 = members(modes)
-
-c3 = Symmetry(
-    group=:c3,
-    pointgrouprep=[cos(2π/3) -sin(2π/3); sin(2π/3) cos(2π/3)],
-    order=3,
-    shift=(euclidean(RealSpace, 2) |> origin),
-    irreps=Dict(
-        :s => Irrep(exp(0im)),
-        :pplus => Irrep(exp(1im * 2π/3)),
-        :pminus => Irrep(exp(2im * 2π/3))
-    ))
-
-c6 = Symmetry(
-    group=:c6,
-    pointgrouprep=[cos(2π/6) -sin(2π/6); sin(2π/6) cos(2π/6)],
-    order=6,
-    shift=(euclidean(RealSpace, 2) |> origin),
-    irreps=Dict(:s => Irrep(exp(0im))))
 
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
@@ -48,7 +31,7 @@ bonds::FockMap = bondmap([
 
 crystalfock = 𝐻.inspace
 
-blocked = blocking(:scale => Scale([2. 0.; 0. 2.]), :correlations => 𝐶, :crystal => crystal)
+blocked = blocking(:action => Scale([2. 0.; 0. 2.]), :correlations => 𝐶, :crystal => crystal)
 blockedcorrelations::FockMap = blocked[:correlations]
 
 visualize(𝐻, title="Hamiltonian", rowrange=1:64, colrange=1:64)
@@ -57,7 +40,7 @@ visualize(blockedcorrelations, title="Correlation", rowrange=1:64, colrange=1:64
 
 newcrystal = blocked[:crystal]
 
-crystalpoints::Subset{Point} = latticepoints(newcrystal)
+crystalpoints::Subset{Position} = latticepoints(newcrystal)
 newmodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)
@@ -69,15 +52,15 @@ function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
     crystal::Crystal = crystalof(crystalfock)
     fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
     momentumfouriers::Vector{FockMap} = rowsubmaps(fouriermap)
-    bz::Subset{Point} = brillouinzone(crystal)
+    bz::Subset{Momentum} = brillouinzone(crystal)
     return Dict(k => fourier_k * localisometry for (k, fourier_k) in zip(bz, momentumfouriers))
 end
 
 function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
-    momentuisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
+    momentumisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = crystalof(crystalfock)
-    bz::Subset{Point} = brillouinzone(crystal)
-    globalprojector::FockMap = focksum(map(k -> momentuisometries[k] * momentuisometries[k]', bz))
+    bz::Subset{Momentum} = brillouinzone(crystal)
+    globalprojector::FockMap = map(k -> momentumisometries[k] * momentumisometries[k]', bz) |> directsum
     return FockMap(
         globalprojector,
         outspace=FockSpace(globalprojector.outspace, reflected=crystal),
@@ -92,21 +75,27 @@ visualize(emptyglobalprojector, rowrange=1:128, colrange=1:128)
 globalprojector = emptyglobalprojector - filledglobalprojector
 visualize(globalprojector, rowrange=1:64, colrange=1:64)
 
-visualize(groupelement(c6, 2) * globalprojector.outspace, rowrange=1:64, colrange=1:64)
+c6 = PointGroupTransformation([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
-symmetrytransformers::Vector{FockMap} = [element * globalprojector.outspace for element in groupelements(c6)]
+symmetrytransformers::Vector{FockMap} = [element * globalprojector.outspace for element in pointgroupelements(c6)]
 
-symmetrizedglobalprojector = focksum([transformer * globalprojector * transformer' for transformer in symmetrytransformers])
+function _fockaddsamespan(a::FockMap, b::FockMap)::FockMap
+    data::SparseMatrixCSC{ComplexF64, Int64} = (
+        (a |> rep) + (Quantum.permute(b, outspace=a.outspace, inspace=a.inspace) |> rep))
+    return FockMap(a.outspace, a.inspace, data)
+end
+
+symmetrizedglobalprojector = reduce(_fockaddsamespan, (transformer * globalprojector * transformer' for transformer in symmetrytransformers))
 
 visualize(symmetrizedglobalprojector, rowrange=1:64, colrange=1:64)
 
 globaldistillspec = eigvalsh(symmetrizedglobalprojector)
-filter(p -> -1e-3 < p.second < 1e-3, globaldistillspec)
+filter(p -> -1e-5 < p.second < 1e-5, globaldistillspec)
 plot(scatter(y=map(p -> p.second, globaldistillspec), mode="markers"))
 
-fouriersubspaces = crystalsubspaces(symmetrizedglobalprojector.inspace)
+fouriersubspaces = crystalsubspaces(globalprojector.inspace)
 
-kprojectors = [(k, restrict(symmetrizedglobalprojector, subspace, subspace)) for (k, subspace) in fouriersubspaces]
+kprojectors = [(k, restrict(globalprojector, subspace, subspace)) for (k, subspace) in fouriersubspaces]
 
 spectrum = Dict()
 

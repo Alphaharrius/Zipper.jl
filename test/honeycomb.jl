@@ -13,7 +13,7 @@ triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 
 k_space = convert(MomentumSpace, triangular)
 
-unitcell = union(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
+unitcell::Subset{Position} = Subset(Point([1/3, 2/3], triangular), Point([2/3, 1/3], triangular))
 unitcell[1]
 crystal = Crystal(unitcell, [32, 32])
 
@@ -23,6 +23,53 @@ m0, m1 = members(modes)
 tₙ = ComplexF64(-1.)
 
 reciprocalfock::FockSpace = crystalfock(modes, crystal)
+
+function createmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
+    fockspace::FockSpace = FockSpace(Subset(mode for bond in bonds for mode in bond.first))
+    return FockMap(fockspace, fockspace, Dict(bonds))
+end
+
+fockmap = createmap([
+    (m0, m1) => tₙ,
+    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
+    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
+
+visualize(fockmap, title="Test")
+
+function fockadd(a::FockMap, b::FockMap)::FockMap
+    if hassamespan(a.inspace, b.inspace) && hassamespan(a.outspace, b.outspace)
+        return fockaddsamespan(a, b)
+    end
+
+    complementresult::FockMap = directsum(
+        restrict(a, a.outspace - b.outspace, a.inspace - b.inspace), restrict(b, b.outspace - a.outspace, b.inspace - a.inspace))
+
+    commoninspace::FockSpace = intersect(a.inspace, b.inspace)
+    commonoutspace::FockSpace = intersect(a.outspace, b.outspace)
+    if commoninspace |> dimension * commonoutspace |> dimension != 0
+        commonresult::FockMap = fockaddsamespan(restrict(a, commonoutspace, commoninspace), restrict(b, commonoutspace, commoninspace))
+        return directsum(complementresult, commonresult)
+    end
+
+    return complementresult
+end
+
+function fockaddsamespan(a::FockMap, b::FockMap)::FockMap
+    data::SparseMatrixCSC{ComplexF64, Int64} = (
+        a |> rep + permute(b, outspace=a.outspace, inspace=b.inspace) |> rep)
+    return FockMap(a.outspace, a.inspace, data)
+end
+
+function directsum(a::FockMap, b::FockMap)::FockMap
+    outspace::FockSpace = union(a.outspace, b.outspace)
+    inspace::FockSpace = union(a.inspace, b.inspace)
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
+    data[0:(a.outspace |> dimension), 0:(a.inspace |> dimension)] += a |> rep
+    data[(a.outspace |> dimension) + 1:end, (a.inspace |> dimension) + 1:end] += b |> rep
+    return FockMap(outspace, inspace, data)
+end
+
+directsum(fockmap, fockmap)
 
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,

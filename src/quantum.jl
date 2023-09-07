@@ -1,67 +1,49 @@
 if !isdefined(Main, :Spaces) include("spaces.jl") end
 if !isdefined(Main, :Geometries) include("geometries.jl") end
+if !isdefined(Main, :Transformations) include("transformations.jl") end
 
 module Quantum
 
-using LinearAlgebra, SparseArrays, OrderedCollections
-using ..Spaces, ..Geometries
+using LinearAlgebra, SparseArrays, OrderedCollections, Base.Iterators
+using ..Spaces, ..Geometries, ..Transformations
 
 export quantized, transformed, symmetrized
-export ModeGroupType, ModeGroup, Mode, AnyFock, SparseFock, CrystalFock, FockSpace, FockMap
-export groupname, hasattr, getattr, setattr, removeattr, addgroup, quantize, flavorcount, spanoffset
-export dimension, commonattr, subspaces, subspacecount, order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse
-export columns, rows, restrict, eigvecsh, eigvalsh, eigh, fourier, focksum, idmap, onesmap, colmap, columnspec
-
-"""
-    ModeGroupType
-
-Classifiers of the type of a `ModeGroup`.
-- `quantized`   The mode is being quantized from some physical objects.
-- `transformed` The mode is being created by transforming existing set of modes.
-- `symmetrized` The mode is being created by symmetry-transforming existing set of modes.
-"""
-@enum ModeGroupType begin
-    quantized
-    transformed
-    symmetrized
-end
-
-"""
-    ModeGroup(type::ModeGroupType, name::String)
-
-A structure that holds the information of a specific group of mode.
-
-### Input
-- `type` The type of the group.
-- `name` The name of the group.
-"""
-struct ModeGroup
-    type::ModeGroupType
-    name::String
-end
+export Mode, FockSpace, FockMap
+export hasattr, getattr, setattr, removeattr, setorbital, getorbital, quantize, flavorcount, spanoffset
+export dimension, crystalof, crystalsubspaces, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
+export order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse, fockspaceunion
+export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh, fourier, fockaddsamespan, directsum, idmap, onesmap, colmap, columnspec
 
 """
     Mode(attrs::Dict{Symbol})
+    Mode(generator::Base.Generator)
+    Mode(input::Base.Iterators.Flatten)
     Mode(datas::Vector{Pair{Symbol, T}}) where {T}
 
 Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 
 ### Attributes to put in `attrs`
-- `:groups` stores a `Vector{ModeGroup}` which `ModeGroup` identifies a group of modes created by some action.
 - `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
 - `:pos` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
+- `:orbital` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
 
 ### Input
 - `attrs` The attributes which uniquely identifies the `Mode` object.
-
 """
 struct Mode <: AbstractSubset{Mode}
     attrs::Dict{Symbol}
 
-    Mode(attrs::Dict{Symbol}) = new(attrs)
-    Mode(datas::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(datas...))
+    Mode(attrs::Dict{Symbol}) = new(Dict((:orbital => swave, attrs...)))
+
+    Mode(generator::Base.Generator) = Mode(Dict(generator))
+    Mode(input::Base.Iterators.Flatten) = Mode(Dict(input))
+
+    Mode(attrs::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(attrs...))
 end
+
+""" Display the number of attributes that identifies this `Mode`. """
+Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
 
 """ Allow for offset the `:offset` attribute of a mode. """
 Base.:+(mode::Mode, offset::Point)::Mode = setattr(mode, :offset => getattr(mode, :offset) + offset)
@@ -85,6 +67,8 @@ function Spaces.spaceof(mode::Mode)
     return euclidean(RealSpace, 1)
 end
 
+Spaces.Subset(modes::Mode...) = Subset(m for m in modes)
+
 """
     Spaces.pos(mode::Mode)::Point
 
@@ -107,6 +91,16 @@ Retrieve the attribute value identified by `key` from `mode`.
 getattr(mode::Mode, key::Symbol) = mode.attrs[key]
 
 """
+    getattr(key::Symbol)
+
+Shorthand of `getattr(v, key::Symbol)` with the pipe operator `|>`.
+
+### Examples
+The line `mode |> getattr(:flavor)` is equal to `getattr(mode, :flavor)`.
+"""
+getattr(key::Symbol) = v -> getattr(v, key)
+
+"""
     removeattr(mode::Mode, keys::Symbol...)::Mode
 
 Create a **copy** of `mode` **without** the attributes identified by `keys`.
@@ -115,6 +109,16 @@ Create a **copy** of `mode` **without** the attributes identified by `keys`.
 - To remove the attribute of `:offset` and `:pos`, we use `removeattr(mode, :offset, :pos)`.
 """
 removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
+
+"""
+    removeattr(keys::Symbol...)
+
+Shorthand of `removeattr(v, keys::Symbol...)::Mode` with the pipe operator `|>`.
+
+### Examples
+The line `mode |> removeattr(:flavor, :index)` is equal to `removeattr(mode, :flavor, :index)`.
+"""
+removeattr(keys::Symbol...) = v -> removeattr(v, keys...)
 
 """
     removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode}
@@ -139,6 +143,16 @@ record will be overwritten.
 setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
 
 """
+    setattr(attrs::Pair{Symbol}...)
+
+Shorthand of `setattr(v, attrs::Pair{Symbol}...)::Mode` with the pipe operator `|>`.
+
+### Examples
+The line `mode |> setattr(:flavor => 1)` is equal to `setattr(mode, :flavor => 1)`.
+"""
+setattr(attrs::Pair{Symbol}...) = v -> setattr(v, attrs...)
+
+"""
     setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode}
 
 Create a **copy** of `modes` with the new attributes identified by `keys` added to the current attributes for each mode in `modes`, if the attribute
@@ -149,13 +163,21 @@ exists in the modes, the current record will be overwritten.
 """
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
+getorbital(mode::Mode, default::BasisFunction)::BasisFunction = hasattr(mode, :orbital) ? getattr(mode, :orbital) : default
+
+getorbital(default::BasisFunction = swave) = mode -> getorbital(mode, default)
+
+setorbital(mode::Mode, basis::BasisFunction)::Mode = setattr(mode, :orbital => basis)
+
+setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
+
 """
-    spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode}
+    spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode}
 
 Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset`, the primary ordering will be
 the ordering of `points`, then follows the ordering of `basismodes`.
 """
-spanoffset(basismodes::Subset{Mode}, points::Subset{Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
 
 """
     flavorcount(basismodes::Subset{Mode})::Integer
@@ -166,13 +188,13 @@ is just the number of distinct attribute `:flavor` within the given parameter se
 flavorcount(basismodes::Subset{Mode})::Integer = trunc(Integer, length(basismodes)) / length(removeattr(basismodes, :flavor))
 
 """
-    sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
+    sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
 
 Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset` and form a `FockSpace`. Not to
-be mistakened with `spanoffset`, this method will partition the modes by the generator points, in normal conditions the return type will be `FockSpace{SparseFock}`.
+be mistakened with `spanoffset`, this method will partition the modes by the generator points.
 Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
 """
-function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
+function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
     partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
     modes::Subset{Mode} = spanoffset(basismodes, points)
     orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
@@ -180,11 +202,11 @@ function sparsefock(basismodes::Subset{Mode}, points::Subset{Point})::FockSpace
 end
 
 """
-    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace{CrystalFock}
+    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace{CrystalFock} = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), T=CrystalFock)
+crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
 
 """ By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space. """
 Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
@@ -197,17 +219,11 @@ Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
 # ==================================================
 
-# =========================================
-# Types of different fockspaces
-abstract type AnyFock end
-abstract type SparseFock <: AnyFock end
-abstract type CrystalFock <: SparseFock end
-# =========================================
-
 """
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; T::Type{<: AnyFock})
-    FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock})
-    FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock)
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)
+    FockSpace(subset::Subset{Mode}; reflected=Nothing)
+    FockSpace(fockspace::FockSpace; reflected=Nothing)
+    FockSpace(mode::Mode) = FockSpace(Subset(mode); reflected=Nothing)
 
 A collection of `Modes` or `Mode` partitions in the case of sparse fockspace, implicit ordering of underlying modes is assumed.
 
@@ -215,43 +231,49 @@ The structure of fockspace is assume to hold partitions, a fockspace that **does
 all underlying modes. The design can be seen with the type of the representation `Subset{Subset{Mode}}`, which the higher order `Subset` holds partitions
 represented by `Subset{Mode}`.
 
-The type of the fockspace will be determined by the constructor with the structure of the representation, if there is more than one partition,
-`SparseFock` will be selected, else `AnyFock` is the default option.
-
-### `FockSpace` Types
-- `AnyFock`     An arbitary `FockSpace`.
-- `SparseFock`  A `FockSpace` that have multiple sub-fockspaces.
-- `CrystalFock` A `SparseFock` which the sub-fockspaces are the basismode fockspaces with different momentum from the brillouin zone.
+The `reflected` attribute is used to store the object this fockspace is reflected to, such as `Crystal` for a crystal fockspace, by default it will be `Nothing`.
 
 ### Examples
-- `FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; T::Type{<: AnyFock})` is used when all the components of the `FockSpace`
+- `FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)` is used when all the components of the `FockSpace`
   is already constructed prior instantiation.
-- `FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock})` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
-- `FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock)` is used to change the fockspace type to `AnyFock`, `SparseFock` or `CrystalFock`.
+- `FockSpace(subset::Subset{Mode}; reflected=Nothing)` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
+- `FockSpace(fockspace::FockSpace; reflected=Nothing)` is used to set the `reflected` attribute.
+- `FockSpace(mode::Mode; reflected=Nothing)` is used to create a fockspace with a single mode.
 """
 struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
+    reflected::T
     rep::Subset{Subset{Mode}}
     ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer};
-        T::Type{<: AnyFock} = (length(subsets) > 1 ? SparseFock : AnyFock)) = new{T}(subsets, ordering)
-    FockSpace(subset::Subset{Mode}; T::Type{<: AnyFock} = AnyFock) = FockSpace(
+    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = new{typeof(reflected)}(reflected, subsets, ordering)
+    FockSpace(subset::Subset{Mode}; reflected=Nothing) = FockSpace(
         Subset(subset),
         Dict(mode => order for (order, mode) in enumerate(subset)),
-        T=T)
-    FockSpace(fockspace::FockSpace; T::Type{<: AnyFock} = AnyFock) = FockSpace(rep(fockspace), fockspace.ordering, T=T)
+        reflected=reflected)
+    FockSpace(fockspace::FockSpace; reflected=Nothing) = FockSpace(rep(fockspace), fockspace.ordering, reflected=reflected)
+    FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
 end
 
-""" Displays the fock type, partition and dimension information of a `FockSpace`. """
-Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(part=$(length(rep(fockspace))), dim=$(dimension(fockspace)))"))
+CrystalFock = FockSpace{Crystal}
+export CrystalFock
 
-function Base.:union(focks::FockSpace...)::FockSpace
-    partitions::Subset{Subset{Mode}} = union([rep(fock) for fock in focks]...)
-    modes::Subset{Mode} = flatten(partitions)
+""" Displays the fock type, subspace count and dimension information of a `FockSpace`. """
+Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
+
+function fockspaceunion(fockspaces)::FockSpace
+    subspaces::Subset{Subset{Mode}} = subsetunion(fockspace |> rep for fockspace in fockspaces if fockspace |> dimension != 0)
+    modes::Subset{Mode} = subspaces |> Iterators.flatten
     ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    T::Type{<: AnyFock} = length(partitions) > 1 ? SparseFock : AnyFock
-    return FockSpace(partitions::Subset{Subset{Mode}}, ordering, T=T)
+    return FockSpace(subspaces::Subset{Subset{Mode}}, ordering)
 end
+
+Base.:union(fockspaces::FockSpace...)::FockSpace = fockspaceunion(fockspaces)
+
+Base.:+(a::FockSpace, b::FockSpace)::FockSpace = union(a, b)
+
+Base.:-(a::FockSpace, b::FockSpace)::FockSpace = FockSpace(setdiff(a |> orderedmodes , b |> orderedmodes))
+
+Base.:intersect(a::FockSpace, b::FockSpace) = FockSpace(intersect(a |> orderedmodes, b |> orderedmodes))
 
 Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
 
@@ -263,24 +285,52 @@ Returns the number of unique member modes within the `fockspace`, each of those 
 Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
 
 """
-    commonattr(fockspace::FockSpace, key::Symbol)
+    crystalof(crystalfock::FockSpace{Crystal})::Crystal
+
+Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
+"""
+crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
+
+crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :offset) => subspace for subspace in crystalfock |> rep)
+export crystalsubsets
+
+"""
+    crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace}
+
+Retrieve mappings from the crystal momentums to the corresponding fockspaces.
+"""
+crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace} = Dict(commonattr(subspace, :offset) => subspace |> FockSpace for subspace in crystalfock |> rep)
+
+"""
+    commonattr(subset::Subset{Mode}, key::Symbol)
 
 Retrieve the common attribute associated to `key` of all the child modes of the `fockspace`, and throws assertion error if the attribute
 is not unique within the `fockspace`.
 """
-function commonattr(fockspace::FockSpace, key::Symbol)
+function commonattr(subset::Subset{Mode}, key::Symbol)
     set::Set = Set()
-    foreach(m -> push!(set, getattr(m, key)), orderedmodes(fockspace))
+    foreach(m -> push!(set, getattr(m, key)), subset)
     @assert(length(set) == 1, "The modes in this fockspace does not share the same attr `$(key)`!")
     return first(set)
 end
 
 """
-    subspaces(fockspace::FockSpace)::Vector{FockSpace}
+    unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
+
+Retrieve the unit cell fockspace of the system from a `FockSpace{Crystal}`, positioned at the origin of the parent `AffineSpace`.
+"""
+function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
+    firstpartition::Subset{Mode} = crystalfock |> rep |> first
+    originpoint::Point = firstpartition |> first |> getattr(:pos) |> spaceof |> origin
+    return FockSpace(firstpartition |> setattr(:offset => originpoint))
+end
+
+"""
+    subspaces(fockspace::FockSpace)::Base.Generator
 
 Retrieve the sub-fockspaces of the `fockspace`.
 """
-subspaces(fockspace::FockSpace)::Vector{FockSpace} = [FockSpace(partition) for partition in rep(fockspace)]
+subspaces(fockspace::FockSpace)::Base.Generator = (FockSpace(partition) for partition in rep(fockspace))
 
 """
     subspacecount(fockspace::FockSpace)::Integer
@@ -288,6 +338,13 @@ subspaces(fockspace::FockSpace)::Vector{FockSpace} = [FockSpace(partition) for p
 Get the number of sub-fockspaces of this `fockspace`.
 """
 subspacecount(fockspace::FockSpace)::Integer = fockspace |> rep |> length
+
+"""
+    flattensubspaces(fockspace::FockSpace)::FockSpace
+
+Merge all subspaces within the `fockspace`.
+"""
+flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mode in orderedmodes(fockspace)))
 
 """
     order(fockspace::FockSpace, mode::Mode)::Int64
@@ -299,7 +356,8 @@ order(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
 """
     modes(fockspace::FockSpace)::Set{Mode}
 
-Returns an unordered set of modes of `fockspace`, this is a more efficient way to retrieve the underlying modes for a fockspace of type `SparseFock`.
+Returns an unordered set of modes of `fockspace`, this is a more efficient way to retrieve the underlying modes for a fockspace with
+more than one partitions.
 """
 modes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
 
@@ -341,7 +399,7 @@ hassamespan(a::FockSpace, b::FockSpace)::Bool = modes(a) == modes(b)
 
 Check if `fockspace` is a sparse fockspace.
 """
-issparse(fockspace::FockSpace)::Bool = length(rep(fockspace)) > 1
+issparse(fockspace::FockSpace)::Bool = subspacecount(fockspace) > 1
 
 """ Check if fockspaces of `a` and `b` has the exact same structure. """
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
@@ -356,7 +414,7 @@ Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset,
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source) # Added for completeness.
 
 """
-    quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup)::Mode
+    quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer)::Mode
 
 Quantizing a mode from a given `Point`.
 
@@ -364,23 +422,21 @@ Quantizing a mode from a given `Point`.
 - `identifier` The identifying atttibute key which the `point` object will be linked to.
 - `point` The `Point` as the physical attribute or object to be quantized.
 - `flavor` The flavor index of the `Mode`, don't mistaken this with the flavor count.
-- `group` Optional parameter that stores the information about the origins of the mode group, or the actions they have been through,
-  defaults to `ModeGroup(quantized, "physical")`.
 
 ### Output
 The quantized `Mode` object.
 """
-function quantize(identifier::Symbol, point::Point, flavor::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Mode
+function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
     @assert(identifier == :offset || identifier == :pos)
     home::Point = origin(spaceof(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
-    return Mode([:groups => [group], identifier => point, :flavor => flavor, couple])
+    return Mode([identifier => point, :flavor => flavor, couple])
 end
 
 """
-    quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup)::Subset{Mode}
+    quantize(identifier::Symbol, subset::Subset{Position}, count::Integer)::Subset{Mode}
 
 Quantizing a set of mode from a given set of `Point`.
 
@@ -389,19 +445,18 @@ Quantizing a set of mode from a given set of `Point`.
 - `subset` The set of `Point` provided as the physical attributes or objects to be quantized.
 - `count` The flavor count of the quantization, if it is greater than `1`, it means the given site defined by a `Point` in `subset` has more
   than one fermionic degree of freedom.
-- `group` Optional parameter that stores the information about the origins of the mode group, or the actions they have been through,
-  defaults to `ModeGroup(quantized, "physical")`.
 
 ### Output
 The quantized set of `Mode` objects.
 """
-quantize(identifier::Symbol, subset::Subset{Point}, count::Integer; group::ModeGroup = ModeGroup(quantized, "physical"))::Subset{Mode} = (
-    Subset(quantize(identifier, point, flavor, group=group) for point in subset for flavor in 1:count))
+quantize(identifier::Symbol, subset::Subset{Position}, count::Int64)::Subset{Mode} = (
+    Subset(quantize(identifier, point, flavor) for point in subset for flavor in 1:count))
 
 """
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})
     FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})
+    FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)
 
 Represents an mapping between two fockspaces with the same span of the underlying Hilbert space.
 
@@ -417,23 +472,27 @@ Represents an mapping between two fockspaces with the same span of the underlyin
 - `FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})` is used when every ingredients are precomputed.
 - `FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})` is used when the `rep` is an arbitary array like object.
 - `FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})` is used when the values of the map have to be specified
-  for a distinct 2-point pair
+  for a distinct 2-point pair.
+- `FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)` is for using new `outspace` and `inspace`.
 """
 struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     outspace::FockSpace
     inspace::FockSpace
     rep::SparseMatrixCSC{ComplexF64, Int64}
 
-    FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = new(outspace, inspace, rep)
-    FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number}) = new(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
+    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new(outspace, inspace, rep)
+    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
 
-    function FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})::FockMap
+    function FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})::FockMap
         rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
             rep[outspace.ordering[out_mode], inspace.ordering[in_mode]] = value
         end
         return new(outspace, inspace, rep)
     end
+
+    FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace, performpermute::Bool = true) = (
+        FockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
 end
 
 Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(typeof(fockmap))(in=$(fockmap.inspace), out=$(fockmap.outspace))"))
@@ -500,19 +559,33 @@ function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
 end
 
 """
-    restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
+    rowsubmaps(fockmap::FockMap)::Base.Generator
 
-Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `out_restrictspace` & `in_restrictspace` respectively.
+Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `outspace`.
 """
-function restrict(fockmap::FockMap, out_restrictspace::FockSpace, in_restrictspace::FockSpace)::FockMap
-    out_restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(out_restrictspace)]
-    in_restrictindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(in_restrictspace)]
-    spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), out_restrictindices, in_restrictindices))
-    return FockMap(out_restrictspace, in_restrictspace, spmat)
+rowsubmaps(fockmap::FockMap)::Base.Generator = (rows(fockmap, subspace) for subspace in fockmap.outspace |> subspaces)
+
+"""
+    colsubmaps(fockmap::FockMap)::Base.Generator
+
+Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `inspace`.
+"""
+colsubmaps(fockmap::FockMap)::Base.Generator = (columns(fockmap, subspace) for subspace in fockmap.inspace |> subspaces)
+
+"""
+    restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
+
+Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `outspace` & `inspace` respectively.
+"""
+function restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
+    outindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(outspace)]
+    inindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(inspace)]
+    spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), outindices, inindices))
+    return FockMap(outspace, inspace, spmat)
 end
 
 """
-    permute(source::FockMap, outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
+    permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
 
 Permute the columns and rows of the representation of the `source` `FockMap` by `outspace` & `inspace` respectively.
 
@@ -529,7 +602,7 @@ end
 
 Base.:-(target::FockMap)::FockMap = FockMap(target.outspace, target.inspace, -rep(target))
 
-Base.:+(a::FockMap, b::FockMap)::FockMap = focksum([a, b])
+Base.:+(a::FockMap, b::FockMap)::FockMap = fockadd(a, b)
 
 Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 
@@ -559,7 +632,7 @@ performing eigenvalue decomposition.
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     @assert(hassamespan(fockmap.inspace, fockmap.outspace))
     return Subset(
-        Mode([:groups => [ModeGroup(transformed, "eigh")], :flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
+        Mode([:flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
 end
 
 """
@@ -596,6 +669,16 @@ function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, F
     return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
 end
 
+function LinearAlgebra.eigvals(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
+    eigenvalues::Vector{Number} = fockmap |> rep |> Matrix |> eigvals
+    return (pair.first => pair.second for pair in Iterators.zip(eigmodes(fockmap, attrs...), eigenvalues))
+end
+
+function LinearAlgebra.eigvecs(fockmap::FockMap, attrs::Pair{Symbol}...):FockMap
+    eigenvectors::Matrix = fockmap |> rep |> Matrix |> eigvecs
+    return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), eigenvectors)
+end
+
 """
     eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
 
@@ -619,7 +702,7 @@ function eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode,
 end
 
 """
-    fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
+    fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
 
 Create a `FockMap` corresponds to a Fourier transform of a `FockSpace`. This map assumed orthogonality of modes with the attribute `:offset` dropped, which means
 entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
@@ -634,7 +717,7 @@ The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` wh
 within the translational invariant unit cell, supplied by `inmodes`; `M = length(inmodes)`. The `inspace` of the returned `FockMap` will equates to `FockSpace(inmodes)`;
 the `outspace` is the product of `momentums` and the supplied fermionic sites.
 """
-function fourier(momentums::Subset{Point}, inspace::FockSpace)::FockMap
+function fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
     ∑𝑘::Matrix{Float64} = hcat([𝑘 |> euclidean |> pos for 𝑘 in momentums]...)
     inmodes::Subset{Mode} = orderedmodes(inspace)
     basismodes::Subset{Mode} = removeattr(inmodes, :offset)
@@ -649,7 +732,7 @@ Create a `FockMap` corresponds to a Fourier transform of a physical fockspace `i
 attribute `:offset` dropped, which means entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
-- `outspace` The output space of the Fourier transform, which is the momentum `FockSpace`, most likely with type `FockSpace{CrystalFock}`, noted that the basis modes in
+- `outspace` The output space of the Fourier transform, which is the momentum `FockSpace`, most likely with type `FockSpace{Crystal}`, noted that the basis modes in
   each momentum subspace should matches with the possible basis modes within `inspace`.
 - `inspace`  The input space, all contituent modes must have the attribute `:offset` defined or result in errors.
 
@@ -667,34 +750,186 @@ function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix
     values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), size(momentummatrix, 2), dimension(inspace))
     for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(orderedmodes(inspace)))
         if removeattr(inmode, :offset) != basismode continue end
-        𝑟ₑ::Point = euclidean(getattr(inmode, :offset))
-        values[n, :, m] = exp.(-1im * momentummatrix' * pos(𝑟ₑ))
+        offset::Point = inmode |> getattr(:offset) |> euclidean
+        values[n, :, m] = exp.(-1im * momentummatrix' * pos(offset))
     end
     spmat::SparseMatrixCSC = SparseMatrixCSC(reshape(values, (length(basismodes) * size(momentummatrix, 2), dimension(inspace))))
     return FockMap(outspace, inspace, spmat)
 end
 
 """
-    focksum(fockmaps::Vector{FockMap})::FockMap
-
-Perform summation of a set of `FockMap`, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
+Perform addition of two `FockMap`s, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
 non-overlapping `inspace` and `outspace`, this corresponds to a direct sum; if they have overlapping but different span of `inspace` or `outspace`, the result will
-be a `FockMap` with `outspace` and `inspace` as a `SparseFock` with all sub-fockspaces of different span, with the corresponding representation summed. Please be
-noted that `focksum([a, b, c, d]) == a + b + c + d`.
+be a `FockMap` with `outspace` and `inspace` with 3 subspaces of (!intersect x 2, intersect x 1), with the corresponding representation summed. Noted that this
+function is accessed via `a::FockMap + b::FockMap`.
 """
-function focksum(fockmaps::Vector{FockMap})::FockMap
-    parts = [(fockmap, outpart, inpart) for fockmap in fockmaps for (outpart, inpart) in zip(rep(fockmap.outspace), rep(fockmap.inspace))]
-    outfock = union([fockmap.outspace for fockmap in fockmaps]...)
-    infock = union([fockmap.inspace for fockmap in fockmaps]...)
-    spmat::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outfock), dimension(infock))
-    for (fockmap, outpart, inpart) in parts
-        source::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
-        for (outmode, inmode) in Iterators.product(outpart, inpart)
-            spmat[order(outfock, outmode), order(infock, inmode)] += source[order(fockmap.outspace, outmode), order(fockmap.inspace, inmode)]
+function fockadd(a::FockMap, b::FockMap)::FockMap
+    outspacesamespan::Bool = hassamespan(a.outspace, b.outspace)
+    inspacesamespan::Bool = hassamespan(a.inspace, b.inspace)
+
+    if outspacesamespan && inspacesamespan
+        return fockaddsamespan(a, b)
+    end
+
+    # FockMap: a   FockMap: b
+    # -----------  -----------
+    # | 11 | 12 |  | 22 | 23 |
+    # -----------  -----------
+    # | 21 | 22 |  | 32 | 33 |
+    # -----------  -----------
+
+    # Addition
+    # ----------------
+    # | 11 | 12 | -- |
+    # ----------------
+    # | 21 | 22 | 23 |
+    # ----------------
+    # | -- | 32 | 33 |
+    # ----------------
+
+    outspace2::FockSpace = intersect(a.outspace, b.outspace)
+    inspace2::FockSpace = intersect(a.inspace, b.inspace)
+
+    if outspace2 |> dimension == 0 && inspace2 |> dimension == 0
+        return directsum(a, b)
+    end
+
+    outspace1::FockSpace = a.outspace - b.outspace
+    outspace3::FockSpace = b.outspace - a.outspace
+
+    inspace1::FockSpace = a.inspace - b.inspace
+    inspace3::FockSpace = b.inspace - a.inspace
+
+    outspace::FockSpace = union(outspace1, outspace2, outspace3) # Orthogonal
+    inspace::FockSpace = union(inspace1, inspace2, inspace3) # Orthogonal
+
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
+
+    function internaladdition(source::FockMap, os::FockSpace, is::FockSpace)
+        if (os |> dimension) * (is |> dimension) == 0
+            return
+        end
+        outmodes::Subset{Mode} = os |> orderedmodes
+        inmodes::Subset{Mode} = is |> orderedmodes
+
+        restricted::FockMap = restrict(source, os, is)
+        data[order(outspace, outmodes |> first):order(outspace, outmodes |> last), order(inspace, inmodes |> first):order(inspace, inmodes |> last)] += (restricted |> rep)
+    end
+
+    internaladdition(a, outspace1, inspace1)
+    internaladdition(a, outspace1, inspace2)
+    internaladdition(a, outspace2, inspace1)
+    internaladdition(a, outspace2, inspace2)
+    internaladdition(b, outspace2, inspace2)
+    internaladdition(b, outspace2, inspace3)
+    internaladdition(b, outspace3, inspace2)
+    internaladdition(b, outspace3, inspace3)
+
+    return FockMap(outspace, inspace, data)
+end
+
+function fockaddsamespan(a::FockMap, b::FockMap)::FockMap
+    data::SparseMatrixCSC{ComplexF64, Int64} = (
+        (a |> rep) + (Quantum.permute(b, outspace=a.outspace, inspace=a.inspace) |> rep))
+    return FockMap(a.outspace, a.inspace, data)
+end
+
+function directsum(a::FockMap, b::FockMap)::FockMap
+    outspace::FockSpace = a.outspace + b.outspace
+    inspace::FockSpace = a.inspace + b.inspace
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
+    data[1:(a.outspace |> dimension), 1:(a.inspace |> dimension)] += a |> rep
+    data[(a.outspace |> dimension) + 1:end, (a.inspace |> dimension) + 1:end] += b |> rep
+    return FockMap(outspace, inspace, data)
+end
+
+function directsum(fockmaps)::FockMap
+    outspace::FockSpace = Iterators.map(fockmap -> fockmap.outspace, fockmaps) |> fockspaceunion
+    inspace::FockSpace = Iterators.map(fockmap -> fockmap.inspace, fockmaps) |> fockspaceunion
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
+    function filldata(fockmap::FockMap)
+        # The procedure beneath assumes that the fockspace elements are concatenated in order during union operations.
+        outmodes::Subset{Mode} = fockmap.outspace |> orderedmodes
+        outrange::UnitRange = order(outspace, outmodes |> first):order(outspace, outmodes |> last)
+        inmodes::Subset{Mode} = fockmap.inspace |> orderedmodes
+        inrange::UnitRange = order(inspace, inmodes |> first):order(inspace, inmodes |> last)
+        data[outrange, inrange] += fockmap |> rep
+    end
+    foreach(filldata, fockmaps)
+    return FockMap(outspace, inspace, data)
+end
+
+function crystalsubmaps(fockmap::FockMap)
+    if !(fockmap.inspace isa FockSpace{Crystal} && fockmap.outspace isa FockSpace{Crystal})
+        @error("The in/out spaces of the fock map must be crystal fock-spaces!")
+    end
+    if !hassamespan(fockmap.inspace, fockmap.outspace)
+        @error("Not a Hermitian!")
+    end
+    return (k => restrict(fockmap, fockspace, fockspace) for (k, fockspace) in fockmap.inspace |> crystalsubspaces)
+end
+export crystalsubmaps
+
+struct CrystalSpectrum
+    crystal::Crystal
+    eigenmodes::Dict{Momentum, Vector{Mode}}
+    eigenvalues::Dict{Mode, Number}
+    unitaries::Dict{Momentum, FockMap}
+end
+export CrystalSpectrum
+
+Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenmodes |> length))"))
+
+function crystalspectrum(fockmap::FockMap)::CrystalSpectrum
+    blocks = fockmap |> crystalsubmaps
+    crystalemodes::Dict{Momentum, Vector{Mode}} = Dict()
+    crystalevals::Dict{Mode, Number} = Dict()
+    crystalevecs::Dict{Momentum, FockMap} = Dict()
+    for (k, submap) in blocks
+        eigenvalues, eigenvectors = eigh(submap, :offset => k)
+        crystalemodes[k] = [m for (m, _) in eigenvalues]
+        crystalevecs[k] = eigenvectors
+        for (m, v) in eigenvalues
+            crystalevals[m] = v
         end
     end
-    return FockMap(outfock, infock, spmat)
+    return CrystalSpectrum(fockmap.inspace |> crystalof, crystalemodes, crystalevals, crystalevecs)
 end
+export crystalspectrum
+
+struct EigenSpectrum
+    eigenvalues::Dict{Mode, Number}
+    eigenvectors::FockMap
+end
+export EigenSpectrum
+
+Base.:show(io::IO, spectrum::EigenSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
+
+function eigenspectrum(hermitian::FockMap, attrs::Pair{Symbol}...)::EigenSpectrum
+    evals, eigenvectors = eigh(hermitian, attrs...)
+    eigenvalues::Dict{Mode, Number} = Dict(evals)
+    return EigenSpectrum(eigenvalues, eigenvectors)
+end
+export eigenspectrum
+
+function groupbyeigenvalues(spectrum::EigenSpectrum; groupingthreshold::Number = 1e-2)
+    denominator::Integer = (1 / groupingthreshold) |> round |> Integer
+    actualvalues::Dict{Rational, Number} = Dict(hashablereal(v, denominator) => v for (_, v) in spectrum.eigenvalues)
+    items::Base.Generator = (hashablereal(v, denominator) => m for (m, v) in spectrum.eigenvalues)
+    groups::Dict{Rational, Vector{Mode}} = foldl(items; init=Dict{Rational, Vector{Mode}}()) do d, (k, v)
+        mergewith!(append!, d, LittleDict(k => [v]))
+    end
+    sortedrationals::Vector{Rational} = sort([(groups |> keys)...])
+    return (actualvalues[r] => groups[r] |> Subset for r in sortedrationals)
+end
+export groupbyeigenvalues
+
+function LinearAlgebra.log(fockmap::FockMap)::FockMap
+    mat::SparseMatrixCSC = fockmap |> rep |> Matrix |> log |> SparseMatrixCSC
+    return FockMap(fockmap.outspace, fockmap.inspace, mat)
+end
+
+Base.iszero(fockmap::FockMap)::Bool = siszero(fockmap |> rep)
 
 """
     columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}

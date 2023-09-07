@@ -6,7 +6,7 @@ using LinearAlgebra, OrderedCollections
 using ..Spaces
 
 export Crystal
-export distance, interpolate, origin, radius, pbc, basispoint, latticeoff, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, geometricalfilter, circularfilter
+export distance, interpolate, origin, radius, pbc, basispoint, latticeoff, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, brillouinmesh, geometricalfilter, circularfilter
 
 """
     distance(a::Point, b::Point)::Float64
@@ -27,10 +27,12 @@ origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), spac
 
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 
-struct Crystal
-    unitcell::Subset{Point}
+struct Crystal <: AbstractSubset{Crystal}
+    unitcell::Subset{Position}
     sizes::Vector{Int64}
 end
+
+Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
 
 pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(pos(point), crystal.sizes)], spaceof(point))
 
@@ -39,6 +41,7 @@ latticeoff(point::Point)::Point = Point([trunc(v) for v in pos(point)], spaceof(
 basispoint(point::Point)::Point = Point([mod(numerator(v), denominator(v)) / denominator(v) for v in rpos(point)], spaceof(point))
 
 Spaces.spaceof(crystal::Crystal) = spaceof(crystal.unitcell)
+Spaces.dimension(crystal::Crystal) = crystal.sizes |> length
 
 resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitcell, sizes)
 
@@ -46,7 +49,7 @@ mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 
-function latticepoints(crystal::Crystal)::Subset{Point}
+function latticepoints(crystal::Crystal)::Subset{Position}
     real_space::RealSpace = spaceof(crystal.unitcell)
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
@@ -54,15 +57,20 @@ function latticepoints(crystal::Crystal)::Subset{Point}
     return Subset(Point(pos, real_space) for pos in eachcol(recentered_mesh))
 end
 
-sitepoints(crystal::Crystal)::Subset{Point} = Subset(
+sitepoints(crystal::Crystal)::Subset{Position} = Subset(
     latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
 
-function brillouinzone(crystal::Crystal)::Subset{Point}
+function brillouinzone(crystal::Crystal)::Subset{Momentum}
     momentum_space::MomentumSpace = convert(MomentumSpace, spaceof(crystal.unitcell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
     recentered_mesh::Matrix{Float64} = crystal_mesh ./ tiled_sizes
     return Subset(Point(pos, momentum_space) for pos in eachcol(recentered_mesh))
+end
+
+function brillouinmesh(crystal::Crystal)::Array{Point}
+    kspace::MomentumSpace = spaceof(crystal)
+    return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
 end
 
 geometricalfilter(f, center::Point) = input -> f(lineartransform(spaceof(center), convert(Point, input)), center)

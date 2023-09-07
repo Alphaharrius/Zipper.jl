@@ -1,14 +1,16 @@
 module Spaces
 
-using LinearAlgebra, OrderedCollections
+using LinearAlgebra, OrderedCollections, Base.Iterators
 
-export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Subset
-export rep, euclidean, basis, dimension, spaceof, rpos, pos, lineartransform, fourier_coef, distance, flatten, members
+export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Position, Momentum, Subset
+export rep, euclidean, basis, dimension, spaceof, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
 
 """
 Simply means an distinct type of object that can be represented by a concrete type `R`.
 """
 abstract type Element{R <: Any} end
+
+Base.:*(a::A, b::B) where {A <: Element, B <: Element} = error("Composition algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
 
 """ Restrict all print out of elements to just printing the type. """
 Base.:show(io::IO, element::Element) = print(io, string(typeof(element)))
@@ -43,7 +45,7 @@ The dimension of a `AbstractSpace` is the number of objects that spans this spac
 The dimension of the `space`, since this method is arbitary to all types `<: AbstractSpace`, the top root returns `0` as `AbstractSpace` does not refer to any
 concrete space.
 """
-dimension(space::T) where {T <: AbstractSpace} = 0
+dimension(space::T) where {T <: AbstractSpace} = error("Dimension resolving is not defined for `$(space |> typeof)`!")
 
 """
     hassamespan(a::T, b::F)::Bool where {T <: AbstractSpace, F <: AbstractSpace}
@@ -62,6 +64,9 @@ hassamespan(a::T, b::F) where {T <: AbstractSpace, F <: AbstractSpace} = false
 This is a less general subtype of `AbstractSpace` that is spanned by `Vector` in a continuous manner.
 """
 abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
+
+""" Shorthand for creating a `Point` within the specified space. """
+Base.:&(space::AffineSpace, position::Vector{Float64})::Point = Point(position, space)
 
 """
     hassamespan(a::T, b::F) where {T <: AffineSpace, F <: AffineSpace}
@@ -102,7 +107,7 @@ Get the dimension of the `AffineSpace`, the dimension will be the row / column l
 """
 dimension(space::T) where {T <: AffineSpace} = size(basis(space), 1)
 
-Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 1000000007)) // 1000000007, basis(space)))
+Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, basis(space)))
 
 """
 Subset of element type `T <: AbstractSubset` defined within a full set.
@@ -115,7 +120,7 @@ abstract type AbstractSubset{T} <: Element{OrderedSet{T}} end
 Get the space of the parameter `subset`. If `subset isa Point`, then the output will be its parent space where its position is defined; if `subset isa Subset`, then
 the output will be the common space of all elements within the `subset`.
 """
-spaceof(subset::AbstractSubset) = subset.space
+spaceof(subset::AbstractSubset) = error("Method not defined for input type `$(subset |> typeof)`!")
 
 """
     RealSpace(rep::Matrix{Float64})
@@ -158,12 +163,32 @@ A point in an `AffineSpace`.
 - `pos` The vector representation of the point in the spacial unit of the parent `AffineSpace`.
 - `space` The parent `AffineSpace`.
 """
-struct Point <: AbstractSubset{Point}
+struct Point{T <: AffineSpace} <: AbstractSubset{Point}
     pos::Vector{Float64}
-    space::AbstractSpace
+    space::T
+
+    Point(pos, space::T) where {T <: AffineSpace} = new{space |> typeof}([pos...], space)
 end
 
+""" Alias of a real space point. """
+Position = Point{RealSpace}
+""" Alias of a momentum space point. """
+Momentum = Point{MomentumSpace}
+
 Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)]) ∈ $(point |> spaceof |> typeof)"))
+
+"""
+    spaceof(point::Point)
+
+Retrieve the `AffineSpace` of the `Point`.
+"""
+spaceof(point::Point) = point.space
+
+hashablereal(v::Real, denominator::Integer = 10000000)::Rational = ((v * denominator) |> round |> Integer) // denominator
+export hashablereal
+
+hashablecomplex(z::Complex, denominator::Integer = 10000000)::Tuple = (hashablereal(z |> real, denominator), hashablereal(z |> imag, denominator))
+export hashablecomplex
 
 """
     rpos(point::Point, denominator::Int64)
@@ -172,13 +197,14 @@ Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in
 
 ### Input
 - `point`       The source point.
-- `denominator` The denominator of the `Rational{Int64}` representation for each element of the position, defaults to `1000000007` which round all error with order
-                below or equals `10e-11`.
+- `denominator` The denominator of the `Rational{Int64}` representation for each element of the position, defaults to `10000000` which round all error with order
+                below or equals `10e-7`.
 
 ### Output
 A `Vector{Rational{Int64}}` which stores the rounded elements.
 """
-rpos(point::Point, denominator::Int64 = 10000000)::Vector{Rational{Int64}} = [Rational{Int64}(round(el * denominator)) // denominator for el in pos(point)]
+# TODO: Add a small deviation to the values if they landed within the error range of this rounding.
+rpos(point::Point, denominator::Int64 = 10000000)::Vector{Rational{Integer}} = map(v -> hashablereal(v, denominator), point |> pos)
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}
@@ -187,8 +213,25 @@ Get the dimension of the `Point`, which is the dimension of its vector represent
 """
 dimension(point::Point)::Integer = length(pos(point))
 
+# TODO: The second checking method is not required if the rpos is fixed.
+function pointcompare(a::Point, b::Point)::Bool
+    if spaceof(a) != spaceof(b)
+        return false
+    end
+    if rpos(a) == rpos(b)
+        return true
+    end
+    # The second denominator is used to fix the rounding problem, if D1 fails when the value sits right at the rounding cutoff,
+    # we will use a different cutoff that is not commensurate to test again.
+    D2::Int64 = 15003227 # A prime number that is near 1.5e7.
+    if rpos(a, D2) == rpos(b, D2)
+        return true
+    end
+    return false
+end
+
 # rpos is used to to equate the points to round off slight differences.
-Base.:(==)(a::Point, b::Point)::Bool = spaceof(a) == spaceof(b) && rpos(a) == rpos(b)
+Base.:(==)(a::Point, b::Point)::Bool = pointcompare(a, b)
 LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
 LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, pos(a)), collect(Float64, pos(b)))
@@ -247,14 +290,27 @@ to reside within a given `AbstractSpace`, which all of the elements also belongs
 struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     rep::OrderedSet{T}
 
-    Subset(elements::OrderedSet{T}) where {T <: AbstractSubset} = new{T}(elements)
+    Subset(elements::OrderedSet{T}) where {T} = new{T}(elements)
+    # Handles OrderedSet with arbitary types, assume that all elements has the same type.
+    Subset(elements::OrderedSet) = new{elements |> first |> typeof}(elements)
     Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
-    Subset(input) = Subset(Base.isiterable(input |> typeof) && !(input isa Subset) ? [input...] : [input])
+    # For arbitary typed Vector, delegate to Subset(elements::OrderedSet).
+    Subset(elements::Vector) = Subset(OrderedSet(elements))
+
+    Subset(generator::Base.Generator) = Subset(OrderedSet{generator |> first |> typeof}(generator))
+    Subset(input::Base.Iterators.Flatten) = Subset(OrderedSet{input |> first |> typeof}(input))
+    Subset(subset::Subset) = Subset(OrderedSet([subset]))
+
+    # Allows the creation of a empty subset.
+    Subset{T}() where {T} = new{T}(OrderedSet())
 end
+
+Subset(points::Point...) = Subset(p for p in points)
 
 Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
 
 """ Allows additions for a subset with another type. """
+# TODO: Requires revision.
 Base.:+(subset::Subset, val)::Subset = Subset(p + val for p in subset)
 Base.:-(subset::Subset, val)::Subset = subset + (-val)
 
@@ -279,7 +335,7 @@ Base.:isequal(a::Subset, b::Subset)::Bool = a == b
 
 # Overloads for iterators.
 Base.:iterate(subset::T, i...) where {T <: Subset} = iterate(rep(subset), i...)
-Base.:length(subset::T) where {T <: Subset} = length(rep(subset))
+Base.:length(subset::T) where {T <: Subset} = subset |> rep |> length
 Base.:lastindex(subset::T) where {T <: Subset} = length(subset)
 Base.:getindex(subset::T, index) where {T <: Subset} = rep(subset)[index]
 Base.:getindex(subset::T, inds...) where {T <: Subset} = Subset([rep(subset)...][inds...])
@@ -291,9 +347,9 @@ Base.:filter(f, subset::T) where {T <: Subset} = Subset(filter(f, rep(subset)))
 
 Flatten a higher order subset to order `1`, and preserves the element orderings of each order.
 """
-function flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
+function Iterators.flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
     if T <: Subset
-        return union([flatten(element) for element in rep(subset)]...)
+        return union((flatten(element) for element in rep(subset))...)
     end
     return subset
 end
@@ -308,7 +364,7 @@ Convert the `Subset` into a `Tuple` with all its elements for easier accessing.
 """
 members(subset::Subset)::Tuple = (rep(subset)...,)
 
-Base.:(==)(a::Subset, b::Subset)::Bool = spaceof(a) == spaceof(b) && Set(rep(a)) == Set(rep(b))
+Base.:(==)(a::Subset, b::Subset)::Bool = Set(rep(a)) == Set(rep(b))
 
 Base.:convert(::Type{OrderedSet{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
 """ Reflexive relation. """
@@ -321,18 +377,16 @@ Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, 
 Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(rep(source))
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
-function Base.:union(input::Subset...)::Subset
-    @assert(length(OrderedSet{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
-    return Subset(union([rep(subset) for subset in input]...))
-end
+subsetunion(subsets)::Subset = union(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
+subsetintersect(subsets)::Subset = intersect(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
 
-Base.:union(input::T...) where {T <: AbstractSubset} = union((convert(Subset{T}, element) for element in input)...)
+Base.:union(subsets::Subset...)::Subset = subsetunion(subsets)
+Base.:intersect(subsets::Subset...)::Subset = subsetintersect(subsets)
 
-function Base.:intersect(input::Subset...)::Subset
-    @assert(length(OrderedSet{AbstractSpace}([spaceof(subset) for subset in input])) == 1)
-    return Subset(intersect([rep(subset) for subset in input]...))
-end
+Base.:+(a::Subset, b::Subset)::Subset = union(a, b)
 
-Base.:intersect(input::T...) where {T <: AbstractSubset} = intersect((convert(Subset{T}, element) for element in input)...)
+Base.:setdiff(a::Subset, b::Subset)::Subset = Subset(setdiff(a |> rep, b |> rep))
+
+Base.:-(a::Subset, b::Subset)::Subset = setdiff(a, b)
 
 end

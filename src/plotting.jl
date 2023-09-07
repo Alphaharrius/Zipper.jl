@@ -4,7 +4,7 @@ if !isdefined(Main, :Quantum) include("quantum.jl") end
 
 module Plotting
 
-using PlotlyJS, ColorTypes, LinearAlgebra
+using PlotlyJS, ColorTypes, LinearAlgebra, Compat
 using ..Spaces, ..Geometries, ..Quantum
 
 export visualize
@@ -17,8 +17,8 @@ function visualize(fockmap::FockMap; title::String = "", rowrange = :, colrange 
     subplots
 end
 
-function visualize(region::Subset{Point}; title::String = "")
-    positions::Array{Vector} = [pos(point) for point in region]
+function visualize(region::Subset{<: Point}; title::String = "", visualspace::AffineSpace = region |> spaceof)
+    positions::Array{Vector} = [lineartransform(visualspace, point) |> pos for point in region]
     visualize_vector_positions(title, positions)
 end
 
@@ -32,7 +32,9 @@ function visualize_vector_positions(title::String, positions::Array{Vector})
     # How to make all axis having the same scale:
     # https://stackoverflow.com/questions/52863305/plotly-scatter3d-how-can-i-force-3d-axes-to-have-the-same-scale-aspect-ratio
     layout = Layout(title=title, scene=attr(aspectmode="data"))
-    plot([trace], layout)
+    fig = plot([trace], layout)
+    relayout!(fig, template="simple_white")
+    fig
 end
 
 function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T <: Number}
@@ -55,6 +57,25 @@ function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T
     fig = plot([trace], layout)
     relayout!(fig, template="simple_white")
     fig
+end
+
+function visualize_crystalspectrum_2d(spectrum::CrystalSpectrum)
+    kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
+    mesh = spectrum.crystal |> brillouinmesh
+    plottingspectrum = stack(map(k -> kspectrum[k], mesh))
+    return [surface(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)]
+end
+
+CRYSTALSPECPLOTTINGFUNCTIONS::Dict = Dict(2 => visualize_crystalspectrum_2d)
+
+function visualize(spectrum::CrystalSpectrum; title="")
+    plottingdimension::Integer = spectrum.crystal |> dimension
+    if !haskey(CRYSTALSPECPLOTTINGFUNCTIONS, plottingdimension)
+        @error("Plotting crystal spectrum of dimension $(plottingdimension) is not supported!")
+    end
+    surfaces = spectrum |> CRYSTALSPECPLOTTINGFUNCTIONS[plottingdimension]
+    layout::Layout = Layout(title=title)
+    plot(surfaces, layout)
 end
 
 end

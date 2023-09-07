@@ -290,9 +290,9 @@ to reside within a given `AbstractSpace`, which all of the elements also belongs
 struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     rep::OrderedSet{T}
 
-    Subset(elements::OrderedSet{T}) where {T <: AbstractSubset} = new{T}(elements)
+    Subset(elements::OrderedSet{T}) where {T} = new{T}(elements)
     # Handles OrderedSet with arbitary types, assume that all elements has the same type.
-    Subset(elements::OrderedSet) = Subset(OrderedSet{elements |> first |> typeof}(elements))
+    Subset(elements::OrderedSet) = new{elements |> first |> typeof}(elements)
     Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
     # For arbitary typed Vector, delegate to Subset(elements::OrderedSet).
     Subset(elements::Vector) = Subset(OrderedSet(elements))
@@ -301,7 +301,8 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     Subset(input::Base.Iterators.Flatten) = Subset(OrderedSet{input |> first |> typeof}(input))
     Subset(subset::Subset) = Subset(OrderedSet([subset]))
 
-    # Subset(input) = Subset(Base.isiterable(input |> typeof) && !(input isa Subset) ? [input...] : [input])
+    # Allows the creation of a empty subset.
+    Subset{T}() where {T} = new{T}(OrderedSet())
 end
 
 Subset(points::Point...) = Subset(p for p in points)

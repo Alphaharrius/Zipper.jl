@@ -41,6 +41,7 @@ latticeoff(point::Point)::Point = Point([trunc(v) for v in pos(point)], spaceof(
 basispoint(point::Point)::Point = Point([mod(numerator(v), denominator(v)) / denominator(v) for v in rpos(point)], spaceof(point))
 
 Spaces.spaceof(crystal::Crystal) = spaceof(crystal.unitcell)
+Spaces.dimension(crystal::Crystal) = crystal.sizes |> length
 
 resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitcell, sizes)
 

@@ -290,6 +290,9 @@ Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
 """
 crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
 
+crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :offset) => subspace for subspace in crystalfock |> rep)
+export crystalsubsets
+
 """
     crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace}
 

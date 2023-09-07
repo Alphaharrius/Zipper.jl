@@ -197,8 +197,8 @@ Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in
 
 ### Input
 - `point`       The source point.
-- `denominator` The denominator of the `Rational{Int64}` representation for each element of the position, defaults to `1000000007` which round all error with order
-                below or equals `10e-11`.
+- `denominator` The denominator of the `Rational{Int64}` representation for each element of the position, defaults to `10000000` which round all error with order
+                below or equals `10e-7`.
 
 ### Output
 A `Vector{Rational{Int64}}` which stores the rounded elements.

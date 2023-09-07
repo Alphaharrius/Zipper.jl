@@ -4,7 +4,7 @@ if !isdefined(Main, :Quantum) include("quantum.jl") end
 
 module Plotting
 
-using PlotlyJS, ColorTypes, LinearAlgebra
+using PlotlyJS, ColorTypes, LinearAlgebra, Compat
 using ..Spaces, ..Geometries, ..Quantum
 
 export visualize
@@ -57,6 +57,25 @@ function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T
     fig = plot([trace], layout)
     relayout!(fig, template="simple_white")
     fig
+end
+
+function visualize_crystalspectrum_2d(spectrum::CrystalSpectrum)
+    kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
+    mesh = spectrum.crystal |> brillouinmesh
+    plottingspectrum = stack(map(k -> kspectrum[k], mesh))
+    return [surface(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)]
+end
+
+CRYSTALSPECPLOTTINGFUNCTIONS::Dict = Dict(2 => visualize_crystalspectrum_2d)
+
+function visualize(spectrum::CrystalSpectrum; title="")
+    plottingdimension::Integer = spectrum.crystal |> dimension
+    if !haskey(CRYSTALSPECPLOTTINGFUNCTIONS, plottingdimension)
+        @error("Plotting crystal spectrum of dimension $(plottingdimension) is not supported!")
+    end
+    surfaces = spectrum |> CRYSTALSPECPLOTTINGFUNCTIONS[plottingdimension]
+    layout::Layout = Layout(title=title)
+    plot(surfaces, layout)
 end
 
 end

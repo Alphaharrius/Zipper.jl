@@ -858,6 +858,78 @@ function directsum(fockmaps)::FockMap
     return FockMap(outspace, inspace, data)
 end
 
+function crystalsubmaps(fockmap::FockMap)
+    if !(fockmap.inspace isa FockSpace{Crystal} && fockmap.outspace isa FockSpace{Crystal})
+        @error("The in/out spaces of the fock map must be crystal fock-spaces!")
+    end
+    if !hassamespan(fockmap.inspace, fockmap.outspace)
+        @error("Not a Hermitian!")
+    end
+    return (k => restrict(fockmap, fockspace, fockspace) for (k, fockspace) in fockmap.inspace |> crystalsubspaces)
+end
+export crystalsubmaps
+
+struct CrystalSpectrum
+    crystal::Crystal
+    eigenmodes::Dict{Momentum, Vector{Mode}}
+    eigenvalues::Dict{Mode, Number}
+    unitaries::Dict{Momentum, FockMap}
+end
+export CrystalSpectrum
+
+Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenmodes |> length))"))
+
+function crystalspectrum(fockmap::FockMap)::CrystalSpectrum
+    blocks = fockmap |> crystalsubmaps
+    crystalemodes::Dict{Momentum, Vector{Mode}} = Dict()
+    crystalevals::Dict{Mode, Number} = Dict()
+    crystalevecs::Dict{Momentum, FockMap} = Dict()
+    for (k, submap) in blocks
+        eigenvalues, eigenvectors = eigh(submap, :offset => k)
+        crystalemodes[k] = [m for (m, _) in eigenvalues]
+        crystalevecs[k] = eigenvectors
+        for (m, v) in eigenvalues
+            crystalevals[m] = v
+        end
+    end
+    return CrystalSpectrum(fockmap.inspace |> crystalof, crystalemodes, crystalevals, crystalevecs)
+end
+export crystalspectrum
+
+struct EigenSpectrum
+    eigenvalues::Dict{Mode, Number}
+    eigenvectors::FockMap
+end
+export EigenSpectrum
+
+Base.:show(io::IO, spectrum::EigenSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
+
+function eigenspectrum(hermitian::FockMap, attrs::Pair{Symbol}...)::EigenSpectrum
+    evals, eigenvectors = eigh(hermitian, attrs...)
+    eigenvalues::Dict{Mode, Number} = Dict(evals)
+    return EigenSpectrum(eigenvalues, eigenvectors)
+end
+export eigenspectrum
+
+function groupbyeigenvalues(spectrum::EigenSpectrum; groupingthreshold::Number = 1e-2)
+    denominator::Integer = (1 / groupingthreshold) |> round |> Integer
+    actualvalues::Dict{Rational, Number} = Dict(hashablereal(v, denominator) => v for (_, v) in spectrum.eigenvalues)
+    items::Base.Generator = (hashablereal(v, denominator) => m for (m, v) in spectrum.eigenvalues)
+    groups::Dict{Rational, Vector{Mode}} = foldl(items; init=Dict{Rational, Vector{Mode}}()) do d, (k, v)
+        mergewith!(append!, d, LittleDict(k => [v]))
+    end
+    sortedrationals::Vector{Rational} = sort([(groups |> keys)...])
+    return (actualvalues[r] => groups[r] |> Subset for r in sortedrationals)
+end
+export groupbyeigenvalues
+
+function LinearAlgebra.log(fockmap::FockMap)::FockMap
+    mat::SparseMatrixCSC = fockmap |> rep |> Matrix |> log |> SparseMatrixCSC
+    return FockMap(fockmap.outspace, fockmap.inspace, mat)
+end
+
+Base.iszero(fockmap::FockMap)::Bool = siszero(fockmap |> rep)
+
 """
     columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
 

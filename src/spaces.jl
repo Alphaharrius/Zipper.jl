@@ -184,6 +184,12 @@ Retrieve the `AffineSpace` of the `Point`.
 """
 spaceof(point::Point) = point.space
 
+hashablereal(v::Real, denominator::Integer = 10000000)::Rational = ((v * denominator) |> round |> Integer) // denominator
+export hashablereal
+
+hashablecomplex(z::Complex, denominator::Integer = 10000000)::Tuple = (hashablereal(z |> real, denominator), hashablereal(z |> imag, denominator))
+export hashablecomplex
+
 """
     rpos(point::Point, denominator::Int64)
 

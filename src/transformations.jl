@@ -1,205 +1,234 @@
 if !isdefined(Main, :Spaces) include("spaces.jl") end
 if !isdefined(Main, :Geometries) include("geometries.jl") end
-if !isdefined(Main, :Quantum) include("quantum.jl") end
 
 module Transformations
 
-using LinearAlgebra, SmithNormalForm, OrderedCollections
-using ..Spaces, ..Geometries, ..Quantum
-
-export Scale, Symmetry, Irrep
-export getirrep, groupelement, groupelements
+using LinearAlgebra, SmithNormalForm, OrderedCollections, Combinatorics, Statistics
+using ..Spaces, ..Geometries
 
 abstract type Transformation{T} <: Element{T} end
+export Transformation
 
-Base.:*(transformation::T, element::F) where {T <: Transformation, F <: Element} = error(
-    "Composition of `$(typeof(transformation))` with `$(typeof(element))` is not defined.")
+struct BasisFunction <: Element{Vector{Complex}}
+    rep::Vector{Complex}
+    dimension::Integer
+    rank::Integer
+end
+export BasisFunction
+
+Base.:(==)(a::BasisFunction, b::BasisFunction) = a.rank == b.rank && (a |> dimension) == (b |> dimension) && isapprox(a |> rep, b |> rep)
+
+Base.:hash(basisfunction::BasisFunction)::UInt = (map(hashablecomplex, basisfunction |> rep), basisfunction |> dimension, basisfunction.rank) |> hash
+Base.:isequal(a::BasisFunction, b::BasisFunction)::Bool = a == b
+
+swave::BasisFunction = BasisFunction([1], 0, 0)
+export swave
+
+function Base.:show(io::IO, basisfunction::BasisFunction)
+    if basisfunction.rank == 0 # Handles the case of rank 0 basis function.
+        print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(basisfunction |> rep |> first))"))
+        return
+    end
+
+    invindexmap::Dict{Integer, Tuple} = Dict(i => t for (t, i) in entryindexmap(basisfunction |> dimension, basisfunction.rank))
+    invindextable::Dict{Integer, String} = Dict(i => s for (s, i) in INDEXTABLE)
+    function generatesymbol(info::Tuple)::String
+        if isapprox(info |> last |> abs, 0, atol=1e-10) return "" end
+        coords::Tuple = invindexmap[info |> first]
+        return "($(info |> last))*" * reduce(*, Iterators.map(c -> invindextable[c], coords))
+    end
+    expression::String = join(filter(v -> v != "", map(generatesymbol, basisfunction |> rep |> enumerate)), " + ")
+    print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(expression))"))
+end
+
+Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
+
+Spaces.dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
+
+INDEXTABLE::Dict{String, Integer} = Dict("x" => 1, "y" => 2, "z" => 3) # The mappings for axis (x y z) in basis functions to tensor indicies.
+
+resolveentrycoords(expression::Symbol)::Vector{Integer} = map(v -> INDEXTABLE[v], split(expression |> string, ""))
+
+entryindexmap(dimension::Integer, rank::Integer)::Dict{Tuple, Integer} = Dict(v => n for (n, v) in Iterators.map(reverse, Iterators.product(repeat([1:dimension], rank)...)) |> enumerate)
+
+function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Integer)::BasisFunction
+    ranks::Tuple = map(expression -> expression |> first |> string |> length, expressions)
+    maxrank::Integer = max(ranks...)
+    if min(ranks...) != maxrank
+        error("Function with mixed order elements is not a valid basis function!")
+    end
+
+    indexmap::Dict{Tuple, Integer} = entryindexmap(dimension, maxrank)
+    data::Vector{Complex} = zeros(ComplexF64, indexmap |> length)
+
+    for expression in expressions
+        coords::Tuple = Tuple(expression |> first |> resolveentrycoords)
+        data[indexmap[coords]] = expression |> last
+    end
+
+    return BasisFunction(data, dimension, maxrank)
+end
+
+function Base.:+(a::BasisFunction, b::BasisFunction)::BasisFunction
+    @assert(a.dimension == b.dimension)
+    @assert(a.rank == b.rank)
+    return BasisFunction((a |> rep) + (b |> rep), a.dimension, a.rank)
+end
+
+function Base.:iszero(basisfunction::BasisFunction)::Bool
+    indexmap::Dict = entryindexmap(basisfunction.dimension, basisfunction.rank)
+
+    addtable::Dict{Set, Number} = Dict(Set(coords |> permutations) => 0 for coords in indexmap |> keys)
+    foreach(coords -> addtable[Set(coords |> permutations)] += (basisfunction |> rep)[indexmap[coords]], indexmap |> keys)
+    return isapprox(addtable |> values |> sum |> abs, 0; atol=1e-10)
+end
+
+struct PointGroupTransformation <: Transformation{Matrix{Float64}}
+    localspace::AffineSpace
+    center::Point
+    rep::Matrix{Float64}
+    eigenfunctions::Vector{Pair{BasisFunction, Complex}}
+    antiunitary::Bool
+end
+export PointGroupTransformation
+
+Spaces.:spaceof(transformation::PointGroupTransformation)::AffineSpace = transformation.localspace
+
+Base.:convert(::Type{Matrix{Float64}}, source::PointGroupTransformation) = source.rep
+
+Base.:(==)(a::PointGroupTransformation, b::PointGroupTransformation) = isapprox(a |> rep, b |> rep)
+# TODO: This multiplication is faulty.
+Base.:*(a::PointGroupTransformation, b::PointGroupTransformation)::PointGroupTransformation = PointGroupTransformation((a |> rep) * (b |> rep))
+Base.:*(transformation::PointGroupTransformation, space::RealSpace)::RealSpace = RealSpace((transformation |> rep) * (space |> rep))
+Base.:^(source::PointGroupTransformation, exponent::Number)::PointGroupTransformation = PointGroupTransformation(
+    (source |> rep) ^ exponent,
+    center=source.center,
+    localspace=source.localspace,
+    antiunitary=source.antiunitary)
+
+function Base.:*(space::AffineSpace, transformation::PointGroupTransformation)::PointGroupTransformation
+    realspace::RealSpace = convert(RealSpace, space)
+    relativebasis::Matrix{Float64} = (realspace |> basis |> inv) * (transformation |> spaceof |> basis)
+    newcenter::Point = lineartransform(space, transformation.center)
+    return PointGroupTransformation(relativebasis * (transformation |> rep) * (relativebasis |> inv), center=newcenter, localspace=realspace)
+end
+
+function Base.:*(transformation::PointGroupTransformation, region::Subset{Position})::Subset{Position}
+    nativetransformation::PointGroupTransformation = (region |> spaceof) * transformation
+    offsetted::Base.Generator = (point - nativetransformation.center for point in region)
+    transformed::Base.Generator = (Point((nativetransformation |> rep) * (point |> pos), point |> spaceof) for point in offsetted)
+    return Subset(point + nativetransformation.center for point in transformed)
+end
+
+function Base.:*(transformation::PointGroupTransformation, zone::Subset{Momentum})::Subset{Momentum}
+    kspace::MomentumSpace = zone |> spaceof
+    realspace::RealSpace = convert(RealSpace, kspace)
+    nativetransformation::PointGroupTransformation = realspace * transformation
+    kspacerep::Matrix = Matrix(nativetransformation |> rep |> transpose |> inv)
+    return Subset(Point(kspacerep * (k |> pos), kspace) for k in zone)
+end
+
+Base.:*(transformation::PointGroupTransformation, point::Point) = (transformation * Subset(point)) |> first
+
+Spaces.dimension(transformation::PointGroupTransformation)::Integer = transformation |> rep |> size |> first
+
+transformationmatrix(matrix::Matrix; rank::Integer = 1)::Matrix = reduce(kron, repeat([matrix], rank))
+transformationmatrix(transformation::PointGroupTransformation; rank::Integer = 1)::Matrix = transformationmatrix(transformation |> rep; rank=rank)
+export transformationmatrix
+
+function PointGroupTransformation(
+    matrix::Matrix;
+    dimension::Integer = matrix |> size |> first, antiunitary::Bool = false,
+    localspace::AffineSpace = euclidean(RealSpace, dimension),
+    center::Point = origin(localspace)
+    )::PointGroupTransformation
+
+    eigenfunctions::Vector = []
+    invariantfound::Bool = false
+    for rank in 1:2 # The maximum rank will be 2 since it is sufficient for the considered point groups.
+        rankmatrix::Matrix = transformationmatrix(matrix; rank=rank)
+        evals, evecs = rankmatrix |> eigen
+        invariantindexs = findall(v -> isapprox(v, 1), evals)
+        if invariantindexs isa Nothing continue end
+        invariantfound = true
+        for (n, eval) in enumerate(evals)
+            basis::BasisFunction = BasisFunction(antiunitary ? evecs[:, n] |> conj : evecs[:, n], dimension, rank)
+            if basis |> iszero continue end
+            push!(eigenfunctions, basis => eval)
+        end
+    end
+    if invariantfound
+        return PointGroupTransformation(localspace, center, matrix, eigenfunctions, antiunitary)
+    end
+    error("Invalid point group transformation, invariant basis is not found!")
+end
+
+function Base.:*(transformation::PointGroupTransformation, basisfunction::BasisFunction)::BasisFunction
+    if basisfunction.rank == 0
+        return basisfunction
+    end
+
+    if dimension(transformation) != dimension(basisfunction)
+        error("Dimension mismatch!")
+    end
+
+    matrix::Matrix = transformationmatrix(transformation; rank=basisfunction.rank)
+    functionrep::Vector = transformation.antiunitary ? basisfunction |> rep |> conj : basisfunction |> rep  # Handling anti-unitary.
+    transformed::Vector = matrix * functionrep
+
+    return BasisFunction(transformed, basisfunction |> dimension, basisfunction.rank)
+end
+
+function pointgroupelements(transformation::PointGroupTransformation; maxelements=128)::Vector{PointGroupTransformation}
+    elements::Vector{PointGroupTransformation} = [transformation]
+    for n in 2:maxelements
+        current = transformation ^ n
+        if current == transformation
+            break
+        end
+        push!(elements, current)
+    end
+    return elements
+end
+export pointgroupelements
+
+function relativephase(target::BasisFunction, ref::BasisFunction)::Complex
+    normalizedref::Vector = ref |> rep |> normalize
+    normalizedtarget::Vector = target |> rep |> normalize
+    trialphase::Number = dot(normalizedref, normalizedtarget)
+    if !isapprox(dot(normalizedtarget ./ trialphase, normalizedref), 1)
+        error("Target function is not a gauged version of the reference function.")
+    end
+    return trialphase
+end
+export relativephase
+
+relativephase(ref::BasisFunction) = target::BasisFunction -> relativephase(target, ref)
 
 struct Scale <: Transformation{Matrix{Float64}}
     rep::Matrix{Float64}
 end
-
-Base.:inv(scale::Scale)::Scale = Scale(inv(rep(scale)))
+export Scale
 
 Base.:convert(::Type{Matrix{Float64}}, source::Scale) = source.rep
 
-Base.:*(a::Scale, b::Scale)::Scale = Scale(rep(a) * rep(b))
-
-Base.:*(scale::Scale, space::RealSpace) = convert(typeof(space), rep(scale) * rep(space))
-Base.:*(scale::Scale, space::MomentumSpace) = convert(typeof(space), rep(inv(scale)) * rep(space))
-
-Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * spaceof(point), point)
-
-Base.:*(scale::Scale, subset::Subset{T}) where {T} = Subset(scale * element for element in subset)
+Base.:inv(scale::Scale)::Scale = scale |> rep |> inv |> Scale
+Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * (b |> rep))
+Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace((scale |> rep) * (space |> rep))
+Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace((scale |> inv |> rep) * (space |> rep))
+Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * (point |> spaceof), point)
+Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
 function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    oldspace::RealSpace = spaceof(crystal)
-    snf = smith(vcat(rep(scale), diagm(crystal.sizes)))
-    boundarysnf = smith(snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)])
-    Δ::Matrix{Float64} = diagm(snf)
+    oldspace::RealSpace = crystal |> spaceof
+    snf = vcat(scale |> rep, crystal.sizes |> diagm) |> smith
+    boundarysnf = snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)] |> smith
+    Δ::Matrix{Float64} = snf |> diagm
     newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
-    blockingpoints::Vector{Point} = [Point(collect(coord), oldspace) for coord in [Iterators.product([0:size - 1 for size in diag(Δ)]...)...]]
+    blockingpoints::Base.Generator = (Point(collect(coord), oldspace) for coord in Iterators.product((0:size - 1 for size in diag(Δ))...))
     relativescale::Scale = Scale(newbasiscoords)
-    scaledunitcell::Subset{Position} = Subset(relativescale * (a + b) for (a, b) in [Iterators.product(blockingpoints, crystal.unitcell)...])
+    scaledunitcell::Subset{Position} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
-end
-
-function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
-    crystal::Crystal = crystalof(crystalfock)
-    newcrystal::Crystal = scale * crystal
-    blockedregion::Subset{Position} = inv(scale) * newcrystal.unitcell
-    BZ::Subset{Momentum} = brillouinzone(crystal)
-    basismodes::Subset{Mode} = crystalfock |> rep |> first
-    newBZ::Subset{Momentum} = brillouinzone(newcrystal)
-    # Generate the Dict which keys each crystal fockspace partition by its momentum.
-    momentumtopartition::Dict{Point, Subset{Mode}} = Dict(commonattr(part, :offset) => part for part in rep(crystalfock))
-    momentummappings::Vector{Pair{Point, Point}} = [basispoint(scale * p) => p for p in BZ]
-    mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point,Vector{Point}}()) do d,(k,v)
-        mergewith!(append!, d, LittleDict(k=>[v]))
-    end
-    blockedcrystalpartitions::Subset{Subset{Mode}} = Subset(
-        union([momentumtopartition[k] for k in mappingpartitions[scaled_k]]...) for scaled_k in newBZ)
-    blockedcrystalordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(flatten(blockedcrystalpartitions)))
-    blockedcrystalfock::FockSpace = FockSpace(blockedcrystalpartitions, blockedcrystalordering)
-
-    blockedoffsets::Subset{Position} = Subset(pbc(crystal, p) |> latticeoff for p in blockedregion)
-    blockedfock::FockSpace = FockSpace(spanoffset(basismodes, blockedoffsets))
-
-    restrictedfourier::FockMap = fourier(BZ, blockedfock)
-    volumeratio::Float64 = sqrt(vol(crystal) / vol(newcrystal))
-    permutedmap::FockMap = Quantum.permute(restrictedfourier, outspace=blockedcrystalfock, inspace=restrictedfourier.inspace) / volumeratio
-
-    function repack_fourierblocks(sourcemap::FockMap, scaled_k::Point, partition::Subset{Mode})::FockMap
-        mappart::FockMap = rows(sourcemap, FockSpace(partition))
-        inmodes::Subset{Mode} = Subset(
-            setattr(m, :offset => scaled_k, :pos => scale * convert(Point, m))
-            for m in orderedmodes(mappart.inspace))
-        return FockMap(mappart.outspace, FockSpace(inmodes), rep(mappart))
-    end
-
-    mapblocks::Vector{FockMap} = [repack_fourierblocks(permutedmap, scaled_k, partition)
-                                  for (scaled_k, partition) in Iterators.zip(newBZ, rep(blockedcrystalfock))]
-    blockmap::FockMap = focksum(mapblocks)
-    return FockMap(blockmap.outspace, FockSpace(blockmap.inspace, reflected=newcrystal), rep(blockmap))'
-end
-
-struct Irrep <: Element{ComplexF64}
-    rep::ComplexF64
-end
-
-Base.:show(io::IO, irrep::Irrep) = print(io, string("$(typeof(irrep))($(rep(irrep)))"))
-
-Base.:^(irrep::Irrep, n)::Irrep = Irrep(rep(irrep) ^ n)
-
-Base.:(==)(a::Irrep, b::Irrep)::Bool = isapprox(rep(a), rep(b))
-
-Base.:*(a::Irrep, b::Irrep)::Irrep = Irrep(rep(a) * rep(b))
-
-Base.:convert(::Type{ComplexF64}, source::Irrep) = source.rep
-
-function Base.:hash(source::Irrep)::UInt
-    denom::Int64 = 10000000
-    rationalizedrep::Complex{Rational{Int64}} = (
-        Rational{Int64}(round((source |> rep |> real) * denom)) // denom + Rational{Int64}(round((source |> rep |> imag) * denom)) // denom * 1im)
-    return hash(rationalizedrep)
-end
-
-Base.:isequal(a::Irrep, b::Irrep)::Bool = a == b
-
-struct Symmetry <: AbstractSubset{Symmetry}
-    group::Symbol
-    pointgrouprep::Matrix{Float64}
-    order::Integer
-    index::Integer
-    shift::Point
-    irreps::Dict{Symbol, Irrep}
-end
-
-Symmetry(; group::Symbol, pointgrouprep::Matrix{Float64}, order::Integer, shift::Point, irreps::Dict{Symbol, Irrep}) = Symmetry(
-    group, pointgrouprep, order,
-    1, # This symmetry element is assumed to be the generator of the group, thus making it the second element (The first is the identity, with index = 0).
-    shift, irreps)
-
-Spaces.spaceof(symmetry::Symmetry) = symmetry.shift |> spaceof
-
-function groupelement(generator::Symmetry, index::Integer = 0)::Symmetry
-    @assert(generator.index == 1, "The argument is not a generator!")
-    pointgrouprep::Matrix{Float64} = generator.pointgrouprep ^ index
-    irreps::Dict{Symbol, Irrep} = Dict(orbital => irrep ^ index for (orbital, irrep) in generator.irreps)
-    return Symmetry(generator.group, pointgrouprep, generator.order, index, generator.shift, irreps)
-end
-
-groupelements(generator::Symmetry)::Vector{Symmetry} = [groupelement(generator, index) for index in 0:generator.order - 1]
-
-function getirrep(symmetry::Symmetry, orbital::Symbol)::Irrep
-    @assert(haskey(symmetry.irreps, orbital), "Symmetry `$(symmetry.group)` does not have orbital `$(orbital)`!")
-    return symmetry.irreps[orbital]
-end
-
-function Base.:*(space::AffineSpace, symmetry::Symmetry)::Symmetry
-    realspace::RealSpace = convert(RealSpace, space)
-    relativebasis::Matrix{Float64} = (realspace |> basis |> inv) * (symmetry |> spaceof |> basis)
-    pointgrouprep::Matrix{Float64} = relativebasis * symmetry.pointgrouprep * inv(relativebasis)
-    shift::Point = Point(((symmetry.shift |> pos)' * (relativebasis |> inv))[1, :], space)
-    return Symmetry(symmetry.group, pointgrouprep, symmetry.order, symmetry.index, shift, symmetry.irreps)
-end
-
-function Base.:*(symmetry::Symmetry, region::Subset{Position})::Subset{Position}
-    nativesymmetry::Symmetry = spaceof(region) * symmetry
-    shift::Point = nativesymmetry.shift
-    return Subset(Point(nativesymmetry.pointgrouprep * (point |> pos), point |> spaceof) + shift for point in region)
-end
-
-function Base.:*(symmetry::Symmetry, zone::Subset{Momentum})::Subset{Momentum}
-    kspace::MomentumSpace = zone |> spaceof
-    realspace::RealSpace = convert(RealSpace, kspace)
-    pointgrouprep::Matrix{Float64} = (realspace * symmetry).pointgrouprep
-    kspacerep::Matrix{Float64} = Matrix(pointgrouprep |> transpose |> inv)
-    return Subset(Point(kspacerep * (k |> pos), kspace) for k in zone)
-    # TODO: Anti-unitary is not handled.
-end
-
-Base.:*(symmetry::Symmetry, point::P) where {P <: Point} = (symmetry * Subset(point)) |> first
-
-function Base.:*(symmetry::Symmetry, mode::Mode)::FockMap
-    # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
-    # which the basis point set might not include the symmetrized :pos. Thus we would like to set
-    # the :pos to its corresponding basis point, and offload the difference to :offset.
-    function correctsymmetrizedmode(mode::Mode)::Mode
-        currentoffset::Point = getattr(mode, :offset)
-        currentpos::Point = getattr(mode, :pos)
-        actualpos::Point = basispoint(currentpos)
-        adjustoffset::Point = currentpos - actualpos
-        return setattr(mode, :offset => currentoffset + adjustoffset, :pos => basispoint(currentpos))
-    end
-    newattrs::Dict{Symbol, Any} = Dict(mode.attrs)
-    foreach(p -> newattrs[p.first] = symmetry * p.second, Iterators.filter(p -> hasmethod(*, Tuple{Symmetry, typeof(p.second)}), mode.attrs))
-    newmode::Mode = Mode(newattrs) |> correctsymmetrizedmode
-    irrep::Irrep = getirrep(symmetry, orbital(symmetry.group, mode))
-    return FockMap(newmode |> FockSpace, mode |> FockSpace, Dict((newmode, mode) => irrep |> rep))
-end
-
-function Base.:*(symmetry::Symmetry, subset::Subset{Mode})::FockMap
-    fockmap::FockMap = focksum([symmetry * mode for mode in subset])
-    return FockMap(fockmap.outspace |> flattensubspaces, fockmap.inspace |> flattensubspaces, fockmap |> rep)
-end
-
-Base.:*(symmetry::Symmetry, fockspace::FockSpace{<: Any})::FockMap = focksum([symmetry * subspace for subspace in fockspace |> rep])
-
-function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::FockMap
-    homefock::FockSpace = unitcellfock(crystalfock)
-    homefocktransform::FockMap = symmetry * homefock
-    momentumsubspaces::Dict{Momentum, FockSpace} = crystalsubspaces(crystalfock)
-    fouriermap::FockMap = fourier(crystalfock, homefock)
-    transformedfouriermap::FockMap = fourier(crystalfock, homefocktransform.outspace)
-    transformer::FockMap = focksum([
-        rows(transformedfouriermap, momentumsubspaces[(symmetry * k) |> basispoint]) * homefocktransform * rows(fouriermap, fockspace)'
-        for (k, fockspace) in momentumsubspaces])
-    crystal::Crystal = crystalof(crystalfock)
-    return FockMap(
-        transformer,
-        outspace=FockSpace(transformer.outspace, reflected=crystal),
-        inspace=FockSpace(transformer.inspace, reflected=crystal))
 end
 
 end

@@ -203,7 +203,8 @@ Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in
 ### Output
 A `Vector{Rational{Int64}}` which stores the rounded elements.
 """
-rpos(point::Point, denominator::Int64 = 10000000)::Vector{Rational{Int64}} = [Rational{Int64}(round(el * denominator)) // denominator for el in pos(point)]
+# TODO: Add a small deviation to the values if they landed within the error range of this rounding.
+rpos(point::Point, denominator::Int64 = 10000000)::Vector{Rational{Integer}} = map(v -> hashablereal(v, denominator), point |> pos)
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}
@@ -230,7 +231,7 @@ function pointcompare(a::Point, b::Point)::Bool
 end
 
 # rpos is used to to equate the points to round off slight differences.
-Base.:(==)(a::Point, b::Point)::Bool = spaceof(a) == spaceof(b) && rpos(a) == rpos(b)
+Base.:(==)(a::Point, b::Point)::Bool = pointcompare(a, b)
 LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
 LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, pos(a)), collect(Float64, pos(b)))

@@ -490,8 +490,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
         return new(outspace, inspace, rep)
     end
 
-    FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace) = (
-        FockMap(outspace, inspace, permute(fockmap, outspace=outspace, inspace=inspace) |> rep))
+    FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace, performpermute::Bool = true) = (
+        FockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
 end
 
 Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(typeof(fockmap))(in=$(fockmap.inspace), out=$(fockmap.outspace))"))

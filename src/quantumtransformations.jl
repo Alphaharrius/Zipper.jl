@@ -99,4 +99,5 @@ function Base.:*(transformation::PointGroupTransformation, crystalfock::FockSpac
     crystal::Crystal = crystalfock |> crystalof
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))
 end
+
 end

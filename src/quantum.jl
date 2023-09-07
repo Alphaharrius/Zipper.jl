@@ -1,14 +1,15 @@
 if !isdefined(Main, :Spaces) include("spaces.jl") end
 if !isdefined(Main, :Geometries) include("geometries.jl") end
+if !isdefined(Main, :Transformations) include("transformations.jl") end
 
 module Quantum
 
 using LinearAlgebra, SparseArrays, OrderedCollections, Base.Iterators
-using ..Spaces, ..Geometries
+using ..Spaces, ..Geometries, ..Transformations
 
 export quantized, transformed, symmetrized
 export Mode, FockSpace, FockMap
-export hasattr, getattr, setattr, removeattr, setorbital, orbital, quantize, flavorcount, spanoffset
+export hasattr, getattr, setattr, removeattr, setorbital, getorbital, quantize, flavorcount, spanoffset
 export dimension, crystalof, crystalsubspaces, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
 export order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse, fockspaceunion
 export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh, fourier, fockaddsamespan, directsum, idmap, onesmap, colmap, columnspec

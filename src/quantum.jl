@@ -669,12 +669,12 @@ function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, F
     return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
 end
 
-function LinearAlgebra.eigvals(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
+function LinearAlgebra.:eigvals(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
     eigenvalues::Vector{Number} = fockmap |> rep |> Matrix |> eigvals
     return (pair.first => pair.second for pair in Iterators.zip(eigmodes(fockmap, attrs...), eigenvalues))
 end
 
-function LinearAlgebra.eigvecs(fockmap::FockMap, attrs::Pair{Symbol}...):FockMap
+function LinearAlgebra.:eigvecs(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
     eigenvectors::Matrix = fockmap |> rep |> Matrix |> eigvecs
     return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), eigenvectors)
 end

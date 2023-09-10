@@ -939,6 +939,15 @@ end
 
 Base.iszero(fockmap::FockMap)::Bool = iszero(fockmap |> rep)
 
+function LinearAlgebra.:svd(fockmap::FockMap)::Tuple{FockMap, Base.Generator, FockMap}
+    leftmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap.inspace))
+    rightmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap.outspace))
+    U, Σ, Vt = fockmap |> rep |> Matrix |> svd
+    svdvalues::Base.Generator = (
+        (Mode([:svdindex => n]), Mode([:svdindex => n])) => Σ[n] for n in 1:min(leftmodes |> length, rightmodes |> length))
+    return FockMap(fockmap.outspace, leftmodes |> FockSpace, U), svdvalues, FockMap(rightmodes |> FockSpace, fockmap.inspace, Vt')
+end
+
 """
     columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
 

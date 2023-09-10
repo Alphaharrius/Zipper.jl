@@ -937,7 +937,7 @@ function LinearAlgebra.log(fockmap::FockMap)::FockMap
     return FockMap(fockmap.outspace, fockmap.inspace, mat)
 end
 
-Base.iszero(fockmap::FockMap)::Bool = siszero(fockmap |> rep)
+Base.iszero(fockmap::FockMap)::Bool = iszero(fockmap |> rep)
 
 """
     columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}

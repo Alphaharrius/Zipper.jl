@@ -24,6 +24,16 @@ Base.:isequal(a::BasisFunction, b::BasisFunction)::Bool = a == b
 swave::BasisFunction = BasisFunction([1], 0, 0)
 export swave
 
+function LinearAlgebra.normalize(basis::BasisFunction)::BasisFunction
+    indexmap::Dict{Tuple, Integer} = Transformations.entryindexmap(basis.dimension, basis.rank)
+    contractionmatrix::Matrix = zeros(ComplexF64, basis |> rep |> length, basis |> rep |> length)
+    foreach(
+        indices -> contractionmatrix[indices |> first, indices |> last] = 1 + 0im,
+        (i, indexmap[p |> Tuple]) for (coords, i) in indexmap for p in coords |> permutations)
+    contractedrep::Vector = contractionmatrix * (basis |> rep)
+    return BasisFunction(contractedrep |> normalize, basis.dimension, basis.rank)
+end
+
 function Base.:show(io::IO, basisfunction::BasisFunction)
     if basisfunction.rank == 0 # Handles the case of rank 0 basis function.
         print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(basisfunction |> rep |> first))"))

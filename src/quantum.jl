@@ -880,22 +880,22 @@ export crystalsubmaps
 
 struct CrystalSpectrum
     crystal::Crystal
-    eigenmodes::Dict{Momentum, Vector{Mode}}
+    eigenmodes::Dict{Momentum, Subset{Mode}}
     eigenvalues::Dict{Mode, Number}
-    unitaries::Dict{Momentum, FockMap}
+    eigenvectors::Dict{Momentum, FockMap}
 end
 export CrystalSpectrum
 
-Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenmodes |> length))"))
+Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
 function crystalspectrum(fockmap::FockMap)::CrystalSpectrum
     blocks = fockmap |> crystalsubmaps
-    crystalemodes::Dict{Momentum, Vector{Mode}} = Dict()
+    crystalemodes::Dict{Momentum, Subset{Mode}} = Dict()
     crystalevals::Dict{Mode, Number} = Dict()
     crystalevecs::Dict{Momentum, FockMap} = Dict()
     for (k, submap) in blocks
         eigenvalues, eigenvectors = eigh(submap, :offset => k)
-        crystalemodes[k] = [m for (m, _) in eigenvalues]
+        crystalemodes[k] = Subset(m for (m, _) in eigenvalues)
         crystalevecs[k] = eigenvectors
         for (m, v) in eigenvalues
             crystalevals[m] = v

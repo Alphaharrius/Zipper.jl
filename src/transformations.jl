@@ -79,6 +79,12 @@ function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Intege
     return BasisFunction(data, dimension, maxrank)
 end
 
+eigenfunctionsignature(eigenfunction::BasisFunction, eigenvalue::Number)::Tuple = eigenfunctionsignature(
+    eigenfunction.rank, eigenfunction.dimension, eigenvalue)
+
+eigenfunctionsignature(rank::Integer, dimension::Integer, eigenvalue::Number)::Tuple = (
+    rank, dimension, eigenvalue |> ComplexF64 |> hashablecomplex)
+
 function Base.:+(a::BasisFunction, b::BasisFunction)::BasisFunction
     @assert(a.dimension == b.dimension)
     @assert(a.rank == b.rank)
@@ -97,7 +103,7 @@ struct PointGroupTransformation <: Transformation{Matrix{Float64}}
     localspace::AffineSpace
     center::Point
     rep::Matrix{Float64}
-    eigenfunctions::Vector{Pair{BasisFunction, Complex}}
+    eigenfunctions::Dict{Tuple, BasisFunction}
     antiunitary::Bool
 end
 export PointGroupTransformation
@@ -146,6 +152,22 @@ transformationmatrix(matrix::Matrix; rank::Integer = 1)::Matrix = reduce(kron, r
 transformationmatrix(transformation::PointGroupTransformation; rank::Integer = 1)::Matrix = transformationmatrix(transformation |> rep; rank=rank)
 export transformationmatrix
 
+function findeigenfunction(transformation::PointGroupTransformation;
+    rankrange::UnitRange = 0:2, dimensionrange::UnitRange = 0:3, eigenvalue::Number = 1)::BasisFunction
+
+    lookupsignatures::Base.Generator = (
+        eigenfunctionsignature(rank, dimension, eigenvalue) for (rank, dimension) in Iterators.product(rankrange, dimensionrange))
+
+    for signature in lookupsignatures
+        if haskey(transformation.eigenfunctions, signature)
+            return transformation.eigenfunctions[signature]
+        end
+    end
+
+    error("No eigenfunction is found for the provided constraints!")
+end
+export findeigenfunction
+
 function PointGroupTransformation(
     matrix::Matrix;
     dimension::Integer = matrix |> size |> first, antiunitary::Bool = false,
@@ -153,7 +175,7 @@ function PointGroupTransformation(
     center::Point = origin(localspace)
     )::PointGroupTransformation
 
-    eigenfunctions::Vector = []
+    eigenfunctions::Dict{Tuple, BasisFunction} = Dict(eigenfunctionsignature(swave, 1) => swave)
     invariantfound::Bool = false
     for rank in 1:2 # The maximum rank will be 2 since it is sufficient for the considered point groups.
         rankmatrix::Matrix = transformationmatrix(matrix; rank=rank)
@@ -162,11 +184,12 @@ function PointGroupTransformation(
         if invariantindexs isa Nothing continue end
         invariantfound = true
         for (n, eval) in enumerate(evals)
-            basis::BasisFunction = BasisFunction(antiunitary ? evecs[:, n] |> conj : evecs[:, n], dimension, rank)
+            basis::BasisFunction = BasisFunction(antiunitary ? evecs[:, n] |> conj : evecs[:, n], dimension, rank) |> normalize
             if basis |> iszero continue end
-            push!(eigenfunctions, basis => eval)
+            eigenfunctions[eigenfunctionsignature(basis, eval)] = basis
         end
     end
+
     if invariantfound
         return PointGroupTransformation(localspace, center, matrix, eigenfunctions, antiunitary)
     end

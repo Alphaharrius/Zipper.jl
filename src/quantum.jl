@@ -679,6 +679,14 @@ function LinearAlgebra.:eigvecs(fockmap::FockMap, attrs::Pair{Symbol}...)::FockM
     return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), eigenvectors)
 end
 
+function LinearAlgebra.:eigen(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Base.Generator, FockMap}
+    eigenvalues, eigenvectors = fockmap |> rep |> Matrix |> eigen
+    modes::Subset{Mode} = eigmodes(fockmap, attrs...)
+    return (
+        (pair |> first => pair |> last for pair in Iterators.zip(eigmodes(fockmap, attrs...), eigenvalues)),
+        FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), eigenvectors))
+end
+
 """
     eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
 

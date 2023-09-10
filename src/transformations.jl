@@ -91,13 +91,7 @@ function Base.:+(a::BasisFunction, b::BasisFunction)::BasisFunction
     return BasisFunction((a |> rep) + (b |> rep), a.dimension, a.rank)
 end
 
-function Base.:iszero(basisfunction::BasisFunction)::Bool
-    indexmap::Dict = entryindexmap(basisfunction.dimension, basisfunction.rank)
-
-    addtable::Dict{Set, Number} = Dict(Set(coords |> permutations) => 0 for coords in indexmap |> keys)
-    foreach(coords -> addtable[Set(coords |> permutations)] += (basisfunction |> rep)[indexmap[coords]], indexmap |> keys)
-    return isapprox(addtable |> values |> sum |> abs, 0; atol=1e-10)
-end
+Base.:iszero(basis::BasisFunction)::Bool = basis |> normalize |> rep |> iszero
 
 struct PointGroupTransformation <: Transformation{Matrix{Float64}}
     localspace::AffineSpace

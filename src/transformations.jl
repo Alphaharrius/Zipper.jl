@@ -219,6 +219,9 @@ function pointgroupelements(transformation::PointGroupTransformation; maxelement
 end
 export pointgroupelements
 
+pointgrouporder(transformation::PointGroupTransformation; maxorder=128)::Integer = pointgroupelements(transformation; maxelements=maxorder) |> length
+export pointgrouporder
+
 function relativephase(target::BasisFunction, ref::BasisFunction)::Complex
     normalizedref::Vector = ref |> rep |> normalize
     normalizedtarget::Vector = target |> rep |> normalize

@@ -25,6 +25,9 @@ end
 
 origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
 
+center(region::Subset{<:Point})::Point = sum(p for p in region) / length(region)
+export center
+
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 
 struct Crystal <: AbstractSubset{Crystal}

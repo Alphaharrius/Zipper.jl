@@ -5,18 +5,18 @@ include("../src/quantum.jl")
 include("../src/physical.jl")
 include("../src/plotting.jl")
 include("../src/quantumtransformations.jl")
-include("../src/zer.jl")
+include("../src/renormalization.jl")
 
 using PlotlyJS, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Zer
+using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Renormalization
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
-c6 = PointGroupTransformation([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)], center=(euclidean(RealSpace, 2) & [0., 0.]))
+c6 = triangular * isometrictransformation([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(triangular & [1/3, 2/3], triangular & [2/3, 1/3])
-crystal = Crystal(unitcell, [32, 32])
+crystal = Crystal(unitcell, [64, 64])
 
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 m0, m1 = members(modes)
@@ -54,54 +54,63 @@ physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)
 restrictedfock::FockSpace = FockSpace(restrictedregion)
 
-dH = globaldistillerhamiltonian(;correlations=blockresult[:correlations], restrictspace=restrictedfock, localisometryselectionstrategy=frozenselectionbycount(3), symmetries=[c6])
+dH = globaldistillerhamiltonian(;
+    correlations=blockresult[:correlations],
+    restrictspace=restrictedfock,
+    localisometryselectionstrategy=frozenselectionbycount(3),
+    symmetry=c6)
 
 gdspectrum = dH |> crystalspectrum
 
-visualize(c6 * dH.outspace, colrange=1:128, rowrange=1:128)
+gdspectrum |> visualize
 
-visualize(gdspectrum, title="Global Distiller Hamiltonian")
-
-function regionalwannierseeding(correlations::FockMap, regionspace::FockSpace;
-    symmetry::PointGroupTransformation,
-    seedingthreshold::Number = 1e-2, linearindependencethreshold::Number = 5e-2)
-
-    localcorrelations::FockMap = Zer.regioncorrelations(correlations, regionspace)
-    localspectrum::EigenSpectrum = localcorrelations |> eigenspectrum
-    validgroups = Iterators.filter(p -> p.first <= seedingthreshold, localspectrum |> groupbyeigenvalues)
-
-    function symmetrizeseed(seedisometry::FockMap)::FockMap
-        transform::FockMap = symmetry * seedisometry.outspace
-        eigensymmetryrep::FockMap = seedisometry' * transform * seedisometry
-        eigensymmetrgenerator::FockMap = (eigensymmetryrep |> log) * 1im
-        hermitiangenerator::FockMap = (eigensymmetrgenerator + eigensymmetrgenerator') / 2
-        unitary::FockMap = hermitiangenerator |> eigvecsh
-        return seedisometry * unitary
-    end
-
-    function extractglobalseed(group::Pair{<:Number, Subset{Mode}})
-        seed::FockMap = columns(localspectrum.eigenvectors, group.second |> FockSpace) |> symmetrizeseed
-        seedcrystalprojectors::Dict{Momentum, FockMap} = crystalisometries(localisometry=seed, crystalfock=correlations.inspace)
-        seedcrystalprojector::FockMap = directsum(v for (_, v) in seedcrystalprojectors)
-
-        # Check if linear independent.
-        pseudoidentity::FockMap = (seedcrystalprojector' * seedcrystalprojector)
-        mineigenvalue = min(map(p -> p.second, pseudoidentity |> eigvalsh)...)
-        if mineigenvalue < linearindependencethreshold
-            return nothing
-        end
-
-        return seed
-    end
-
-    return Iterators.filter(v -> !(v isa Nothing), extractglobalseed(group) for group in validgroups)
-end
+distillresult = dH |> distillation
 
 seed = [regionalwannierseeding(blockresult[:correlations], restrictedfock, symmetry=c6)...][1]
-columns(seed, (seed.inspace |> orderedmodes)[1] |> Subset |> FockSpace) |> columnspec |> visualize
 
-((c6 * seed.outspace) * seed) |> visualize
-(((c6 * seed.outspace) * seed) - seed) |> visualize
+function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, seed::FockMap, svdorthothreshold::Number = 1e-1)
+    wannierunitcell::Subset{Position} = Subset(mode |> getattr(:pos) for mode in seed.inspace |> orderedmodes)
+    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
+    overlaps = ((k, isometry, isometry' * rows(seed, isometry.outspace)) for (k, isometry) in crystalisometries)
+    function approximateisometry(k::Momentum, isometry::FockMap, overlap::FockMap)::FockMap
+        U, Σ, Vt = overlap |> svd
+        minsvdvalue::Number = minimum(v for (_, v) in Σ)
+        if minsvdvalue < svdorthothreshold
+            # @warn("Precarious Wannierization with a minimum overlap svd value of $(minsvdvalue)!")
+        end
+        unitary::FockMap = U * Vt
+        approximated::FockMap = isometry * unitary
+
+        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:offset => k)), performpermute=false)
+    end
+    wannierisometry::FockMap = directsum(approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
+    inspace::FockSpace = FockSpace(wannierisometry.inspace, reflected=wanniercrystal)
+    outspace::FockSpace = FockSpace(wannierisometry.outspace, reflected=crystal)
+    return FockMap(wannierisometry, inspace=inspace, outspace=outspace, performpermute=false)
+end
+
+filledwannierisometry = wannierprojection(crystalisometries=distillresult[:filled].eigenvectors, crystal=newcrystal, seed=seed)
+
+filledH = filledwannierisometry' * blockedH * filledwannierisometry
+
+filledH |> crystalspectrum |> visualize
+
+emptywannierisometry = wannierprojection(crystalisometries=distillresult[:empty].eigenvectors, crystal=newcrystal, seed=seed)
+emptyH = emptywannierisometry' * blockedH * emptywannierisometry
+emptyH |> crystalspectrum |> visualize
+
+bigregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)
+bigregionfock::FockSpace = FockSpace(bigregion)
+Ft = fourier(blockedH.outspace, bigregionfock)
+
+filledisometries = Ft' * filledwannierisometry
+columns(filledisometries, (filledisometries.inspace |> orderedmodes)[1] |> Subset |> FockSpace) |> columnspec |> visualize
+
+overlaps = [unitary' * rows(seed, unitary.outspace) for (k, unitary) in distillresult[:filled].eigenvectors]
+u, s, vt = overlaps[1] |> svd
+[s...]
+
+visualize(u * vt)
 
 seedoutspace = FockSpace(seed.outspace, reflected=blockresult[:crystal])
 checker = (c6 * seedoutspace) * seed - seed

@@ -1,5 +1,3 @@
-if !isdefined(Main, :Spaces) include("spaces.jl") end
-
 module Geometries
 
 using LinearAlgebra, OrderedCollections

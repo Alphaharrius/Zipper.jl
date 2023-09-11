@@ -1,7 +1,3 @@
-if !isdefined(Main, :Spaces) include("spaces.jl") end
-if !isdefined(Main, :Geometries) include("geometries.jl") end
-if !isdefined(Main, :Transformations) include("transformations.jl") end
-
 module Quantum
 
 using LinearAlgebra, SparseArrays, OrderedCollections, Base.Iterators

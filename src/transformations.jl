@@ -1,6 +1,3 @@
-if !isdefined(Main, :Spaces) include("spaces.jl") end
-if !isdefined(Main, :Geometries) include("geometries.jl") end
-
 module Transformations
 
 using LinearAlgebra, SmithNormalForm, OrderedCollections, Combinatorics, Statistics

@@ -1,7 +1,3 @@
-if !isdefined(Main, :Spaces) include("spaces.jl") end
-if !isdefined(Main, :Geometries) include("geometries.jl") end
-if !isdefined(Main, :Quantum) include("quantum.jl") end
-
 module Plotting
 
 using PlotlyJS, ColorTypes, LinearAlgebra, Compat

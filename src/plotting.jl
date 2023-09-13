@@ -13,24 +13,27 @@ function visualize(fockmap::FockMap; title::String = "", rowrange = :, colrange 
     subplots
 end
 
-function visualize(region::Subset{<: Point}; title::String = "", visualspace::AffineSpace = region |> spaceof)
-    positions::Array{Vector} = [lineartransform(visualspace, point) |> pos for point in region]
-    visualize_vector_positions(title, positions)
+function visualize(regions::Subset{<: Point}...; title::String = "", visualspace::AffineSpace)
+    function generateregionplot(region::Subset{<: Point})
+        positions::Array{Vector} = [lineartransform(visualspace, point) |> pos for point in region]
+        return visualizevectorpositions(positions)
+    end
+    # How to make all axis having the same scale:
+    # https://stackoverflow.com/questions/52863305/plotly-scatter3d-how-can-i-force-3d-axes-to-have-the-same-scale-aspect-ratio
+    layout = Layout(title=title, scene=attr(aspectmode="data"))
+    fig = plot([region |> generateregionplot for region in regions], layout)
+    relayout!(fig, template="simple_white")
+    fig
 end
 
-function visualize_vector_positions(title::String, positions::Array{Vector})
+function visualizevectorpositions(positions::Array{Vector})
     values::Matrix = hcat(positions...)
     @assert(0 < size(values, 1) <= 3)
     # Pad all positions to 3-dimensional to generalize all cases.
     padded_values::Matrix = zeros(3, size(values, 2))
     copyto!(view(padded_values, 1:size(values, 1), :), values)
     trace = scatter3d(x=padded_values[1,:], y=padded_values[2,:], z=padded_values[3,:], mode="markers")
-    # How to make all axis having the same scale:
-    # https://stackoverflow.com/questions/52863305/plotly-scatter3d-how-can-i-force-3d-axes-to-have-the-same-scale-aspect-ratio
-    layout = Layout(title=title, scene=attr(aspectmode="data"))
-    fig = plot([trace], layout)
-    relayout!(fig, template="simple_white")
-    fig
+    return trace
 end
 
 function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T <: Number}

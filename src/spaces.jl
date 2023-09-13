@@ -227,6 +227,8 @@ export reciprocalhashcalibration
     rpos(momentum::Momentum)
 
 Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in a fixed precision, this method can be used for hashing `Point`.
+Noted that `rpos` cannot be used for computation since the denominators defined globally are not intented to provide a precise representation of the `Point`,
+this method is preserved for hashing purposes only.
 
 ### Input
 - `position`    The source position.

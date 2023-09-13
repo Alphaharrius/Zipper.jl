@@ -399,14 +399,27 @@ Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(re
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
 subsetunion(subsets)::Subset = union(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
-subsetintersect(subsets)::Subset = intersect(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
+
+function subsetintersect(subsets)::Subset
+    intersections::OrderedSet = intersect((subset |> rep for subset in subsets)...)
+    if intersections |> isempty
+        return Subset{subsets |> first |> first |> typeof}()
+    end
+    return Subset(intersections)
+end
 
 Base.:union(subsets::Subset...)::Subset = subsetunion(subsets)
 Base.:intersect(subsets::Subset...)::Subset = subsetintersect(subsets)
 
 Base.:+(a::Subset, b::Subset)::Subset = union(a, b)
 
-Base.:setdiff(a::Subset, b::Subset)::Subset = Subset(setdiff(a |> rep, b |> rep))
+function Base.:setdiff(a::Subset, b::Subset)::Subset
+    diffresult::OrderedSet = setdiff(a |> rep, b |> rep)
+    if diffresult |> isempty
+        return Subset{a |> first |> typeof}()
+    end
+    return Subset(diffresult)
+end
 
 Base.:-(a::Subset, b::Subset)::Subset = setdiff(a, b)
 

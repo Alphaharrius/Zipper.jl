@@ -247,25 +247,12 @@ Get the dimension of the `Point`, which is the dimension of its vector represent
 """
 dimension(point::Point)::Integer = length(pos(point))
 
-# TODO: The second checking method is not required if the rpos is fixed.
-function pointcompare(a::Point, b::Point)::Bool
-    if spaceof(a) != spaceof(b)
-        return false
-    end
-    if rpos(a) == rpos(b)
-        return true
-    end
-    # The second denominator is used to fix the rounding problem, if D1 fails when the value sits right at the rounding cutoff,
-    # we will use a different cutoff that is not commensurate to test again.
-    D2::Int64 = 15003227 # A prime number that is near 1.5e7.
-    if rpos(a, D2) == rpos(b, D2)
-        return true
-    end
-    return false
+# rpos is used to to equate the points to round off slight differences.
+function Base.:(==)(a::Point, b::Point)::Bool
+    @assert(typeof(a |> spaceof) == typeof(b |> spaceof))
+    return rpos(a) == rpos(b)
 end
 
-# rpos is used to to equate the points to round off slight differences.
-Base.:(==)(a::Point, b::Point)::Bool = pointcompare(a, b)
 LinearAlgebra.:norm(point::Point) = norm(pos(point))
 
 LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, pos(a)), collect(Float64, pos(b)))

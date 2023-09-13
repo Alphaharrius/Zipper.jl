@@ -829,7 +829,11 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
     internaladdition(b, outspace3, inspace2)
     internaladdition(b, outspace3, inspace3)
 
-    return FockMap(outspace, inspace, data)
+    # Prioritize the fockspaces of `a`.
+    returnoutspace::FockSpace = hassamespan(outspace, a.outspace) ? a.outspace : hassamespan(outspace, b.outspace) ? b.outspace : outspace
+    returninspace::FockSpace = hassamespan(inspace, a.inspace) ? a.inspace : hassamespan(inspace, b.inspace) ? b.inspace : inspace
+
+    return FockMap(returnoutspace, returninspace, data)
 end
 
 function fockaddsamespan(a::FockMap, b::FockMap)::FockMap

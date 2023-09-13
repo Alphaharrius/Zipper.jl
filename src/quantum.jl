@@ -148,6 +148,9 @@ The line `mode |> setattr(:flavor => 1)` is equal to `setattr(mode, :flavor => 1
 """
 setattr(attrs::Pair{Symbol}...) = v -> setattr(v, attrs...)
 
+""" A shorthand for setting an attribute to a mode. """
+Base.:&(mode::Mode, attr::Pair{Symbol}) = setattr(mode, attr)
+
 """
     setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode}
 

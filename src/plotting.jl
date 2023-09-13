@@ -77,4 +77,15 @@ function visualize(spectrum::CrystalSpectrum; title="")
     plot(surfaces, layout)
 end
 
+function visualize(source::SnappingResult; title::String = "")
+    layout::Layout = Layout(title=title)
+    plot([
+        scatter(x=LinRange(0, 1, source.denominator + 1), y=zeros(source.denominator + 1), mode="markers", name="markers", marker=attr(
+            symbol=:square,
+            line=attr(width=2, color="midnightblue"),
+            color="lightskyblue", size=10
+        )),
+        scatter(x=source.forvalues, y=zeros(source.forvalues |> length), mode="markers", name="values")], layout)
+end
+
 end

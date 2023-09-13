@@ -240,7 +240,7 @@ this method is preserved for hashing purposes only.
 A `Vector{Rational{Int64}}` which stores the rounded elements.
 """
 rpos(position::Position)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(position |> euclidean |> pos, spatialhashdenominators[1:dimension(position)])]
-rpos(momentum::Momentum)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(momentum |> pos, reciprocalhashde[1:dimension(momentum)])]
+rpos(momentum::Momentum)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(momentum |> pos, reciprocalhashdenominators[1:dimension(momentum)])]
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}

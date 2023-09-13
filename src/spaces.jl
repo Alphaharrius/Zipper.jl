@@ -222,19 +222,23 @@ function reciprocalhashcalibration(crystalsizes::Vector{<:Integer})
 end
 export reciprocalhashcalibration
 
+"""
+    rpos(position::Position)
+    rpos(momentum::Momentum)
 
 Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in a fixed precision, this method can be used for hashing `Point`.
 
 ### Input
-- `point`       The source point.
+- `position`    The source position.
+- `momentum`    The source momentum.
 - `denominator` The denominator of the `Rational{Int64}` representation for each element of the position, defaults to `10000000` which round all error with order
                 below or equals `10e-7`.
 
 ### Output
 A `Vector{Rational{Int64}}` which stores the rounded elements.
 """
-# TODO: Add a small deviation to the values if they landed within the error range of this rounding.
-rpos(point::Point, denominator::Int64 = 10000000)::Vector{Rational{Integer}} = map(v -> hashablereal(v, denominator), point |> pos)
+rpos(position::Position)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(position |> euclidean |> pos, spatialhashdenominators[1:dimension(position)])]
+rpos(momentum::Momentum)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(momentum |> pos, reciprocalhashde[1:dimension(momentum)])]
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}

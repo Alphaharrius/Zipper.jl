@@ -658,11 +658,14 @@ eigenvalues in ascending order.
 ### Input
 - `fockmap` The source of the decomposition.
 - `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
+
+### Output
+The returned value will be a generator yielding `Pair` of eigen `Mode` to eigenvalue ordered by the attribute `:flavor`, ordered by the eigenvalues in ascending order.
 """
-function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, Float64}}
+function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
     @assert(fockmap.inspace == fockmap.outspace)
     evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
-    return [first(tup) => last(tup) for tup in Iterators.zip(eigmodes(fockmap, attrs...), evs)]
+    return (t |> first => t |> last for t in Iterators.zip(eigmodes(fockmap, attrs...), evs))
 end
 
 function LinearAlgebra.:eigvals(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator

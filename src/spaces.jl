@@ -190,8 +190,38 @@ export hashablereal
 hashablecomplex(z::Complex, denominator::Integer = 10000000)::Tuple = (hashablereal(z |> real, denominator), hashablereal(z |> imag, denominator))
 export hashablecomplex
 
+spatialhashdenominators::Vector{Integer} = [128, 128, 128] # Default to 128 for each dimension.
+reciprocalhashdenominators::Vector{Integer} = [128, 128, 128]
+
 """
-    rpos(point::Point, denominator::Int64)
+    spatialsnappingcalibration(positions)
+
+Analyse the given `positions` to determine the spatial denominators for each dimension to be used for hashing.
+
+### Input
+- `positions` The set of positions to be analysed that is iterable.
+"""
+function spatialsnappingcalibration(positions)
+    values::Matrix = hcat(map(p -> p |> euclidean |> pos, positions)...)
+    foreach(n -> spatialhashdenominators[n] = snappingdenominator(values[n, :]).denominator, axes(values, 1))
+    @warn "Updated position hash denominators to $spatialhashdenominators."
+end
+export spatialsnappingcalibration
+
+"""
+    reciprocalhashcalibration(crystalsizes::Vector{<:Integer})
+
+Analyse the given `crystalsizes` to determine the reciprocal denominators for each dimension to be used for hashing.
+
+### Input
+- `crystalsizes` The maximum crystal sizes.
+"""
+function reciprocalhashcalibration(crystalsizes::Vector{<:Integer})
+    foreach(e -> reciprocalhashdenominators[e |> first] = e |> last, crystalsizes |> enumerate)
+    @warn "Updated momentum hash denominators to $reciprocalhashdenominators."
+end
+export reciprocalhashcalibration
+
 
 Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in a fixed precision, this method can be used for hashing `Point`.
 
@@ -388,5 +418,65 @@ Base.:+(a::Subset, b::Subset)::Subset = union(a, b)
 Base.:setdiff(a::Subset, b::Subset)::Subset = Subset(setdiff(a |> rep, b |> rep))
 
 Base.:-(a::Subset, b::Subset)::Subset = setdiff(a, b)
+
+struct SnappingResult
+    forvalues::Vector{Number}
+    denominator::Integer
+end
+export SnappingResult
+
+"""
+    snappingdenominator(values; denominatorrange::UnitRange = 2:128, tolerantscalepercent::Number = 1/4)::SnappingResult
+
+Find the smallest denominator that yield a measurement scale `1/denominator` that every value in `values` can be snapped to.
+
+### Input
+- `values`               The values to be snapped.
+- `denominatorrange`     The range of denominator to be searched.
+- `tolerantscalepercent` The tolerance of the snapping, the denominator will be accepted iff all values are at max `measurementscale * tolerantscalepercent` away from
+                         the nearest marker defined by `n * measurementscale` where `n` ∈ ℝ.
+
+### Output
+A `SnappingResult` that contains the `forvalues` which contains the decimal part of `values`, and the `denominator` which is the denominator used to snap the values.
+"""
+function snappingdenominator(values; denominatorrange::UnitRange = 2:128, tolerantscalepercent::Number = 1/4)::SnappingResult
+    unitvalues::Base.Generator = (abs(v % 1) for v in values)
+
+    function trydenominator(denominator::Integer)::Bool
+        measurementscale::Number = 1 / denominator
+        markers::LinRange = LinRange(0, 1, denominator + 1)
+        tolerance::Number = measurementscale * abs(tolerantscalepercent)
+        checker::Function = v -> findall(v -> v, abs(marker - v) < tolerance for marker in markers) |> length == 1 # Make sure that all values can be snapped to a marker.
+        return all(checker, unitvalues)
+    end
+
+    for denominator in denominatorrange
+        if trydenominator(denominator) return SnappingResult([unitvalues...], denominator) end
+    end
+
+    error("No denominator found for values $(values)!")
+end
+export snappingdenominator
+
+"""
+    findcomplexdenominator(values; denominatorrange::UnitRange = 2:128, tolerantscalepercent::Number = 1/4)::SnappingResult
+
+Find the smallest denominator that yield a measurement scale `1/denominator` that every complex value in `values` can be snapped to.
+
+### Input
+- `values`               The values to be snapped.
+- `denominatorrange`     The range of denominator to be searched.
+- `tolerantscalepercent` The tolerance of the snapping, the denominator will be accepted iff all values are at max `measurementscale * tolerantscalepercent` away from
+                         the nearest marker defined by `n * measurementscale` where `n` ∈ ℝ.
+
+### Output
+A `SnappingResult` that contains the `forvalues` which contains the decimal part of each complex real & imaginary part in `values`, and the `denominator`
+which is the denominator used to snap the values.
+"""
+function findcomplexdenominator(values; denominatorrange::UnitRange = 2:128, tolerantscalepercent::Number = 1/4)::SnappingResult
+    flattenvalues::Base.Iterators.Flatten = (r for v in values for r in (v |> real, v |> imag)) # Flatten the complex values into real & imaginary parts.
+    return snappingdenominator(flattenvalues; denominatorrange=denominatorrange, tolerantscalepercent=tolerantscalepercent)
+end
+export findcomplexdenominator
 
 end

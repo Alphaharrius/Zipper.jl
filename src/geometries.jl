@@ -39,7 +39,10 @@ pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(
 
 latticeoff(point::Point)::Point = Point([trunc(v) for v in pos(point)], spaceof(point))
 
-basispoint(point::Point)::Point = Point([mod(numerator(v), denominator(v)) / denominator(v) for v in rpos(point)], spaceof(point))
+function basispoint(point::Point)::Point
+    rationalized::Vector = [hashablereal(v) for v in point |> pos]
+    return Point([mod(v |> numerator, v |> denominator) / denominator(v) for v in rationalized], point |> spaceof)
+end
 
 Spaces.spaceof(crystal::Crystal) = spaceof(crystal.unitcell)
 Spaces.dimension(crystal::Crystal) = crystal.sizes |> length

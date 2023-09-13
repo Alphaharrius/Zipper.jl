@@ -682,8 +682,8 @@ function LinearAlgebra.:eigen(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{B
     eigenvalues, eigenvectors = fockmap |> rep |> Matrix |> eigen
     modes::Subset{Mode} = eigmodes(fockmap, attrs...)
     return (
-        (pair |> first => pair |> last for pair in Iterators.zip(eigmodes(fockmap, attrs...), eigenvalues)),
-        FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), eigenvectors))
+        (pair |> first => pair |> last for pair in Iterators.zip(modes, eigenvalues)),
+        FockMap(fockmap.outspace, modes |> FockSpace, eigenvectors))
 end
 
 """

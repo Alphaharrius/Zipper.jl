@@ -1,6 +1,6 @@
 module Plotting
 
-using PlotlyJS, ColorTypes, LinearAlgebra, Compat
+using Plotly, ColorTypes, LinearAlgebra, Compat
 using ..Spaces, ..Geometries, ..Quantum
 
 export visualize

@@ -650,7 +650,7 @@ function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
 end
 
 """
-    eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Vector{Pair{Mode, Float64}}
+    eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
 
 Perform eigenvalue decomposition to find the eigenvalues as pairs of eigenmode to eigenvalue ordered by the eigenmode attribute `index`, ordered by the
 eigenvalues in ascending order.

@@ -379,12 +379,12 @@ Since the fockspace have implicit ordering, this function returns the order inde
 fockorder(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
 
 """
-    modes(fockspace::FockSpace)::Set{Mode}
+    getmodes(fockspace::FockSpace)::Set{Mode}
 
 Returns an unordered set of modes of `fockspace`, this is a more efficient way to retrieve the underlying modes for a fockspace with
 more than one partitions.
 """
-modes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
+getmodes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
 
 
 """

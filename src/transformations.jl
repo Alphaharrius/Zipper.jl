@@ -140,7 +140,7 @@ function computeeigenfunctions(pointgroupmatrix::Matrix; functionorderrange::Uni
 end
 
 functionsignature(basis::BasisFunction, eigenvalue::Complex; denominator::Integer = 128)::Tuple = functionsignature(
-    basis |> dimension, basis.rank, eigenvalue; denominator=denominator)
+    basis.rank, basis |> dimension, eigenvalue; denominator=denominator)
 functionsignature(rank::Integer, dimension::Integer, eigenvalue::Complex; denominator::Integer = 128)::Tuple = (dimension, rank, hashablecomplex(eigenvalue, denominator))
 
 function AffineTransform(

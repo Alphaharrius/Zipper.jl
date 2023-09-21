@@ -334,6 +334,10 @@ function commonattr(subset::Subset{Mode}, key::Symbol)
     @assert(length(set) == 1, "The modes in this fockspace does not share the same attr `$(key)`!")
     return first(set)
 end
+""" Shorthand for accessing the attribute information of all modes within the `FockSpace` for visualization. """
+modeattrs(fockspace::FockSpace)::OrderedSet{Dict} = OrderedSet(mode |> getattrs for mode in fockspace |> orderedmodes)
+modeattrs(subset::Subset{Mode})::OrderedSet{Dict} = OrderedSet(mode |> getattrs for mode in subset)
+export modeattrs
 
 """
     unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace

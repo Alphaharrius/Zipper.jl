@@ -1070,6 +1070,47 @@ function LinearAlgebra.:svd(fockmap::FockMap)::Tuple{FockMap, Base.Generator, Fo
 end
 
 """
+    makezero(fockmap::FockMap, eps::Number = 1e-7)::FockMap
+
+Round all numerical zeros within the `FockMap` to actual zero with a given tolerance `eps`.
+"""
+makezero(fockmap::FockMap, eps::Number = 1e-7)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, map(v -> abs(v |> real) < eps && abs(v |> imag) < eps ? 0im : v, fockmap |> rep))
+""" Shorthand returning a function that performs `makezero` with a given tolerance `eps` on parameter `fockmap`. """
+makezero(eps::Number = 1e-7)::Function = fockmap -> makezero(fockmap, eps)
+export makezero
+
+"""
+    isapproxzero(fockmap::FockMap, eps::Number = 1e-7)::Bool
+
+Check if all data within the `FockMap` is numerical zero within a given tolerance `eps`.
+"""
+isapproxzero(fockmap::FockMap, eps::Number = 1e-7)::Bool = fockmap |> makezero(eps) |> iszero
+""" Shorthand returning a function that performs `isapproxzero` with a given tolerance `eps` on parameter `fockmap`. """
+isapproxzero(eps::Number = 1e-7)::Function = fockmap::FockMap -> approxzero(fockmap, eps)
+export isapproxzero
+
+""" Get the maximum data from the `FockMap` by absolute value. """
+Base.:maximum(fockmap::FockMap)::Complex = (fockmap |> rep)[map(v -> v |> abs, fockmap |> rep) |> findmax |> last]
+""" Get the minimum data from the `FockMap` by absolute value. """
+Base.:minimum(fockmap::FockMap)::Complex = (fockmap |> rep)[map(v -> v |> abs, fockmap |> rep) |> findmin |> last]
+
+"""
+    commutation(a::FockMap, b::FockMap)::FockMap
+
+Get the commutator of two `FockMap` objects, which is defined as `a * b - b * a`. 
+"""
+commutation(a::FockMap, b::FockMap)::FockMap = (a * b - b * a)
+export commutation
+
+"""
+    commutation(a::FockMap, b::FockMap; eps::Number = 1e-7)::Bool
+
+Check if two `FockMap` objects commutes with each other, up to a numerical zero tolerance `eps`.
+"""
+commute(a::FockMap, b::FockMap; eps::Number = 1e-7)::Bool = commutation(a, b) |> makezero(eps) |> iszero
+export commute
+
+"""
     columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
 
 Extract the column values as a `Mode` to `ComplexF64` pair from a `N×1` `FockMap`, this is used when you need to visualize the column spectrum.

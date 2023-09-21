@@ -185,9 +185,9 @@ function regionalwannierseeding(statecorrelations::FockMap, regionspace::FockSpa
             return nothing
         end
 
-        dimension::Integer = correlations.inspace |> crystalof |> dimension
+        dim::Integer = statecorrelations.inspace |> getcrystal |> dimension
         seedfock::FockSpace = Subset(
-            mode |> setattr(:orbital => findeigenfunction(symmetry; dimensionrange=0:dimension, eigenvalue=phase))
+            mode |> setattr(:orbital => findeigenfunction(symmetry; dimensionrange=0:dim, eigenvalue=phase))
                  |> setattr(:pos => regioncenter)
                  |> setattr(:offset => regioncenter |> getspace |> origin)
             for (mode, phase) in phases) |> FockSpace

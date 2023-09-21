@@ -28,6 +28,7 @@ function regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockM
     fouriermap::FockMap = fourier(correlations.inspace, regionfock) / (correlations.inspace |> subspacecount |> sqrt)
     return fouriermap' * correlations * fouriermap
 end
+export regioncorrelations
 
 localfrozenisometries(
     correlations::FockMap, regionfock::FockSpace;

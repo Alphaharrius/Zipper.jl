@@ -554,6 +554,7 @@ function idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
     @assert(dimension(outspace) == dimension(inspace))
     FockMap(outspace, inspace, SparseMatrixCSC(Matrix{Float64}(I(dimension(outspace)))))
 end
+idmap(fockspace::FockSpace) = idmap(fockspace, fockspace)
 
 """
     onesmap(outspace::FockSpace, inspace::FockSpace)::FockMap

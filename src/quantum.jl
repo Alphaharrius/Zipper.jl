@@ -214,6 +214,7 @@ crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace = FockSpace(s
 """ By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space. """
 Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
 
+""" Two `Mode` objects are equivalent if they held the same informations. """
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
 
 # ==================================================
@@ -257,12 +258,21 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
 end
 
+""" Shorthand alias for `FockSpace{Crystal}`. """
 CrystalFock = FockSpace{Crystal}
 export CrystalFock
 
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
 
+"""
+    fockspaceunion(fockspaces::FockSpace)::FockSpace
+
+Union of fockspaces, the resulting fockspace will have the same span as the union of the underlying modes of the fockspaces.
+
+### Input
+- `fockspaces` An iterable of fockspaces to be unioned.
+"""
 function fockspaceunion(fockspaces)::FockSpace
     subspaces::Subset{Subset{Mode}} = subsetunion(fockspace |> rep for fockspace in fockspaces if fockspace |> dimension != 0)
     modes::Subset{Mode} = subspaces |> Iterators.flatten
@@ -294,6 +304,11 @@ Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
 """
 crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
 
+"""
+    crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}}
+
+    Retrieve mappings from the crystal momentums to the corresponding `Subset{Mode}`.
+"""
 crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :offset) => subspace for subspace in crystalfock |> rep)
 export crystalsubsets
 
@@ -846,12 +861,22 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
     return FockMap(returnoutspace, returninspace, data)
 end
 
+""" Addition of two `FockMap` objects with the same `inspace` and `outspace`. """
 function fockaddsamespan(a::FockMap, b::FockMap)::FockMap
     data::SparseMatrixCSC{ComplexF64, Int64} = (
         (a |> rep) + (Quantum.permute(b, outspace=a.outspace, inspace=a.inspace) |> rep))
     return FockMap(a.outspace, a.inspace, data)
 end
 
+"""
+    directsum(a::FockMap, b::FockMap)::FockMap
+
+Given two `FockMap` objects with orthogonal span of `inspace` and `outspace`, perform direct sum of the two.
+
+### Output
+The direct summed `FockMap`, with both `inspace` and `outspace` as the union of the spaces from both `FockMap` objects,
+each forming a subspace within the new `inspace` and `outspace`.
+"""
 function directsum(a::FockMap, b::FockMap)::FockMap
     outspace::FockSpace = a.outspace + b.outspace
     inspace::FockSpace = a.inspace + b.inspace
@@ -860,7 +885,14 @@ function directsum(a::FockMap, b::FockMap)::FockMap
     data[(a.outspace |> dimension) + 1:end, (a.inspace |> dimension) + 1:end] += b |> rep
     return FockMap(outspace, inspace, data)
 end
+"""
+    directsum(fockmaps)::FockMap
 
+Given a collection of `FockMap` objects, and perform direct sum of the `FockMap` objects.
+
+### Input
+- `fockmaps` An iterable of `FockMap` objects.
+"""
 function directsum(fockmaps)::FockMap
     outspace::FockSpace = Iterators.map(fockmap -> fockmap.outspace, fockmaps) |> fockspaceunion
     inspace::FockSpace = Iterators.map(fockmap -> fockmap.inspace, fockmaps) |> fockspaceunion
@@ -877,17 +909,28 @@ function directsum(fockmaps)::FockMap
     return FockMap(outspace, inspace, data)
 end
 
-function crystalsubmaps(fockmap::FockMap)
-    if !(fockmap.inspace isa FockSpace{Crystal} && fockmap.outspace isa FockSpace{Crystal})
-        @error("The in/out spaces of the fock map must be crystal fock-spaces!")
-    end
-    if !hassamespan(fockmap.inspace, fockmap.outspace)
-        @error("Not a Hermitian!")
-    end
+"""
+    crystalsubmaps(fockmap::FockMap)
+
+Given a `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span, partition the `FockMap`
+into smaller `FockMap` objects by the subspaces indexed by the `Momentum` attribute.
+
+### Output
+A generator yielding `Pair{Momentum, FockMap}` objects, with the momentums corresponds to thw brillouin zone.
+"""
     return (k => restrict(fockmap, fockspace, fockspace) for (k, fockspace) in fockmap.inspace |> crystalsubspaces)
 end
 export crystalsubmaps
 
+"""
+Decomposition of `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span,
+and store the underlying information into eigen value decomposed form indexed by the `Momentum` of the
+brillouin zone of the crystal. The number of eigenmodes per `Momentum` is allowed to be different from
+the amount of modes in the unit cell `FockSpace` of the `CrystalFock`, which corresponds to a projector
+if being converted back to a `FockMap`, and the corresponding eigenvalues are `1`.
+
+Packing information into a `CrystalSpectrum` allows visualization of eigen spectrum in a band diagram.
+"""
 struct CrystalSpectrum
     crystal::Crystal
     eigenmodes::Dict{Momentum, Subset{Mode}}
@@ -898,15 +941,12 @@ export CrystalSpectrum
 
 Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
-function crystalspectrum(fockmap::FockMap)::CrystalSpectrum
-    blocks = fockmap |> crystalsubmaps
-    crystalemodes::Dict{Momentum, Subset{Mode}} = Dict()
-    crystalevals::Dict{Mode, Number} = Dict()
-    crystalevecs::Dict{Momentum, FockMap} = Dict()
-    for (k, submap) in blocks
-        eigenvalues, eigenvectors = eigh(submap, :offset => k)
-        crystalemodes[k] = Subset(m for (m, _) in eigenvalues)
-        crystalevecs[k] = eigenvectors
+"""
+    crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
+
+Given a collection of Hermitian `FockMap` objects each associated with a specific `Momentum` from the brillouin zone, pack into a
+`CrystalSpectrum` object.
+"""
         for (m, v) in eigenvalues
             crystalevals[m] = v
         end
@@ -923,14 +963,19 @@ export EigenSpectrum
 
 Base.:show(io::IO, spectrum::EigenSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
-function eigenspectrum(hermitian::FockMap, attrs::Pair{Symbol}...)::EigenSpectrum
+""" This function is the same as calling `eigh` but with a packaged return type. """
     evals, eigenvectors = eigh(hermitian, attrs...)
     eigenvalues::Dict{Mode, Number} = Dict(evals)
     return EigenSpectrum(eigenvalues, eigenvectors)
 end
-export eigenspectrum
+"""
+    groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-2)
 
-function groupbyeigenvalues(spectrum::EigenSpectrum; groupingthreshold::Number = 1e-2)
+Given a spectrum, attempt to group the eigenmodes based on their corresponding eigenvalues with a eigenvalue grouping threshold.
+
+### Output
+A generator yielding `Pair{Number, Subset{Mode}}` objects, with the eigenvalues as keys and the corresponding eigenmodes as values.
+"""
     denominator::Integer = (1 / groupingthreshold) |> round |> Integer
     actualvalues::Dict{Rational, Number} = Dict(hashablereal(v, denominator) => v for (_, v) in spectrum.eigenvalues)
     items::Base.Generator = (hashablereal(v, denominator) => m for (m, v) in spectrum.eigenvalues)

@@ -921,6 +921,10 @@ into smaller `FockMap` objects by the subspaces indexed by the `Momentum` attrib
 ### Output
 A generator yielding `Pair{Momentum, FockMap}` objects, with the momentums corresponds to thw brillouin zone.
 """
+function crystalsubmaps(fockmap::FockMap)::Base.Generator
+    (fockmap.inspace isa CrystalFock && fockmap.outspace isa CrystalFock && hassamespan(fockmap.inspace, fockmap.outspace) ||
+        error("The in/out spaces of the fock map must be the same crystal fock-spaces!"))
+    hassamespan(fockmap.inspace, fockmap.outspace) || error("Required a FockMap with the same in/out CrystalFock!")
     return (k => restrict(fockmap, fockspace, fockspace) for (k, fockspace) in fockmap.inspace |> crystalsubspaces)
 end
 export crystalsubmaps

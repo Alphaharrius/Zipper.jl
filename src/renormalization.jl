@@ -181,4 +181,30 @@ function regionalwannierseeding(correlations::FockMap, regionspace::FockSpace;
 end
 export regionalwannierseeding
 
+function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, FockMap}, svdorthothreshold::Number = 1e-1)
+    wannierunitcell::Subset{Position} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
+    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
+    overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
+    precarioussvdvalues::Vector = []
+    function approximateisometry(k::Momentum, isometry::FockMap, overlap::FockMap)::FockMap
+        U, Σ, Vt = overlap |> svd
+        minsvdvalue::Number = minimum(v for (_, v) in Σ)
+        if minsvdvalue < svdorthothreshold
+            push!(precarioussvdvalues, minsvdvalue)
+        end
+        unitary::FockMap = U * Vt
+        approximated::FockMap = isometry * unitary
+
+        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:offset => k)), performpermute=false)
+    end
+    if (precarioussvdvalues |> length) > 0
+        @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
+    end
+    wannierisometry::FockMap = directsum(approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
+    inspace::FockSpace = FockSpace(wannierisometry.inspace, reflected=wanniercrystal)
+    outspace::FockSpace = FockSpace(wannierisometry.outspace, reflected=crystal)
+    return FockMap(wannierisometry, inspace=inspace, outspace=outspace, performpermute=false)
+end
+export wannierprojection
+
 end

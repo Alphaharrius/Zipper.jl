@@ -743,7 +743,7 @@ end
 """
     eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
 
-Perform eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously.
+Perform Hermitian eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously.
 
 ### Input
 - `fockmap` The source of the decomposition.

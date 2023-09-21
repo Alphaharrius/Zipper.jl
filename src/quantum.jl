@@ -3,13 +3,6 @@ module Quantum
 using LinearAlgebra, SparseArrays, OrderedCollections, Statistics, Base.Iterators
 using ..Spaces, ..Geometries, ..Transformations
 
-export quantized, transformed, symmetrized
-export Mode, FockSpace, FockMap
-export hasattr, getattr, setattr, removeattr, setorbital, getorbital, quantize, flavorcount, spanoffset
-export dimension, getcrystal, crystalsubspaces, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
-export orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse, fockspaceunion
-export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh, fourier, fockaddsamespan, directsum, idmap, onesmap, colmap, columnspec
-
 """
     Mode(attrs::Dict{Symbol})
     Mode(generator::Base.Generator)
@@ -37,6 +30,7 @@ struct Mode <: AbstractSubset{Mode}
 
     Mode(attrs::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(attrs...))
 end
+export Mode
 
 """ Display the number of attributes that identifies this `Mode`. """
 Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
@@ -63,6 +57,7 @@ function Spaces.getspace(mode::Mode)
     return euclidean(RealSpace, 1)
 end
 
+""" Shorthand to create a one element `Subset{Mode}`. """
 Spaces.Subset(modes::Mode...) = Subset(m for m in modes)
 
 """
@@ -78,6 +73,7 @@ Spaces.pos(mode::Mode)::Point = convert(Point, mode)
 Check if the `mode` has the attribute identified by `key`.
 """
 hasattr(mode::Mode, key::Symbol)::Bool = haskey(mode.attrs, key)
+export hasattr
 
 """
     getattr(mode::Mode, key::Symbol)
@@ -85,6 +81,7 @@ hasattr(mode::Mode, key::Symbol)::Bool = haskey(mode.attrs, key)
 Retrieve the attribute value identified by `key` from `mode`.
 """
 getattr(mode::Mode, key::Symbol) = mode.attrs[key]
+export getattr
 
 """
     getattr(key::Symbol)
@@ -109,6 +106,7 @@ Create a **copy** of `mode` **without** the attributes identified by `keys`.
 - To remove the attribute of `:offset` and `:pos`, we use `removeattr(mode, :offset, :pos)`.
 """
 removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
+export removeattr
 
 """
     removeattr(keys::Symbol...)
@@ -141,6 +139,7 @@ record will be overwritten.
 - To add `:offset` and `:flavor`, we use `newmode = setattr(mode, :offset => point, :flavor => 1)`
 """
 setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
+export setattr
 
 """
     setattr(attrs::Pair{Symbol}...)
@@ -167,10 +166,12 @@ exists in the modes, the current record will be overwritten.
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
 getorbital(mode::Mode, default::BasisFunction)::BasisFunction = hasattr(mode, :orbital) ? getattr(mode, :orbital) : default
+export getorbital
 
 getorbital(default::BasisFunction = swave) = mode -> getorbital(mode, default)
 
 setorbital(mode::Mode, basis::BasisFunction)::Mode = setattr(mode, :orbital => basis)
+export setorbital
 
 setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
 
@@ -181,14 +182,7 @@ Given a set of `basismodes`, and the generator `points`, span the basis modes to
 the ordering of `points`, then follows the ordering of `basismodes`.
 """
 spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
-
-"""
-    flavorcount(basismodes::Subset{Mode})::Integer
-
-Determines the number of flavor with the information provided within `basismodes`, if the provided parameter is not actually the basismodes, the return value
-is just the number of distinct attribute `:flavor` within the given parameter set.
-"""
-flavorcount(basismodes::Subset{Mode})::Integer = trunc(Integer, length(basismodes)) / length(removeattr(basismodes, :flavor))
+export spanoffset
 
 """
     sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
@@ -203,13 +197,15 @@ function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpa
     orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
     return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
 end
+export sparsefock
 
 """
     crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
+crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
+export crystalfock
 
 """ By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space. """
 Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
@@ -282,6 +278,7 @@ function fockspaceunion(fockspaces)::FockSpace
     ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
     return FockSpace(subspaces::Subset{Subset{Mode}}, ordering)
 end
+export fockspaceunion
 
 Base.:union(fockspaces::FockSpace...)::FockSpace = fockspaceunion(fockspaces)
 
@@ -321,6 +318,7 @@ export crystalsubsets
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
 crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace} = Dict(commonattr(subspace, :offset) => subspace |> FockSpace for subspace in crystalfock |> rep)
+export crystalsubspaces
 
 """
     commonattr(subset::Subset{Mode}, key::Symbol)
@@ -334,6 +332,8 @@ function commonattr(subset::Subset{Mode}, key::Symbol)
     @assert(length(set) == 1, "The modes in this fockspace does not share the same attr `$(key)`!")
     return first(set)
 end
+export commonattr
+
 """ Shorthand for accessing the attribute information of all modes within the `FockSpace` for visualization. """
 modeattrs(fockspace::FockSpace)::OrderedSet{Dict} = OrderedSet(mode |> getattrs for mode in fockspace |> orderedmodes)
 modeattrs(subset::Subset{Mode})::OrderedSet{Dict} = OrderedSet(mode |> getattrs for mode in subset)
@@ -349,6 +349,7 @@ function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
     originpoint::Point = firstpartition |> first |> getattr(:pos) |> getspace |> origin
     return FockSpace(firstpartition |> setattr(:offset => originpoint))
 end
+export unitcellfock
 
 """
     subspaces(fockspace::FockSpace)::Base.Generator
@@ -356,6 +357,7 @@ end
 Retrieve the sub-fockspaces of the `fockspace`.
 """
 subspaces(fockspace::FockSpace)::Base.Generator = (FockSpace(partition) for partition in rep(fockspace))
+export subspaces
 
 """
     subspacecount(fockspace::FockSpace)::Integer
@@ -363,6 +365,7 @@ subspaces(fockspace::FockSpace)::Base.Generator = (FockSpace(partition) for part
 Get the number of sub-fockspaces of this `fockspace`.
 """
 subspacecount(fockspace::FockSpace)::Integer = fockspace |> rep |> length
+export subspacecount
 
 """
     flattensubspaces(fockspace::FockSpace)::FockSpace
@@ -370,6 +373,7 @@ subspacecount(fockspace::FockSpace)::Integer = fockspace |> rep |> length
 Merge all subspaces within the `fockspace`.
 """
 flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mode in orderedmodes(fockspace)))
+export flattensubspaces
 
 """
     fockorder(fockspace::FockSpace, mode::Mode)::Int64
@@ -377,6 +381,7 @@ flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mo
 Since the fockspace have implicit ordering, this function returns the order index of the `mode` in the `fockspace`.
 """
 fockorder(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
+export fockorder
 
 """
     getmodes(fockspace::FockSpace)::Set{Mode}
@@ -385,7 +390,7 @@ Returns an unordered set of modes of `fockspace`, this is a more efficient way t
 more than one partitions.
 """
 getmodes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
-
+export getmodes
 
 """
     orderedmodes(fockspace::FockSpace)::Subset{Mode}
@@ -393,6 +398,7 @@ getmodes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This
 Returns an ordered `Subset` of modes of `fockspace`.
 """
 orderedmodes(fockspace::FockSpace)::Subset{Mode} = flatten(rep(fockspace))
+export orderedmodes
 
 """
     orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
@@ -411,6 +417,7 @@ function orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
     @assert(hassamespan(fromspace, tospace))
     return [fromspace.ordering[mode] for mode in orderedmodes(tospace)]
 end
+export orderingrule
 
 """
     hassamespan(a::FockSpace, b::FockSpace)::Bool
@@ -418,6 +425,7 @@ end
 Check if fockspaces of `a` and `b` shares the same set of underlying modes regardless of partitions.
 """
 hassamespan(a::FockSpace, b::FockSpace)::Bool = getmodes(a) == getmodes(b)
+export hassamespan
 
 """
     issparse(fockspace::FockSpace)::Bool
@@ -425,6 +433,7 @@ hassamespan(a::FockSpace, b::FockSpace)::Bool = getmodes(a) == getmodes(b)
 Check if `fockspace` is a sparse fockspace.
 """
 issparse(fockspace::FockSpace)::Bool = subspacecount(fockspace) > 1
+export issparse
 
 """ Check if fockspaces of `a` and `b` has the exact same structure. """
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
@@ -459,6 +468,7 @@ function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
     # The new mode will take a group of q:$(name).
     return Mode([identifier => point, :flavor => flavor, couple])
 end
+export quantize
 
 """
     quantize(identifier::Symbol, subset::Subset{Position}, count::Integer)::Subset{Mode}
@@ -519,6 +529,8 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace, performpermute::Bool = true) = (
         FockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
 end
+export FockMap
+
 getoutspace(fockmap::FockMap)::FockSpace = fockmap.outspace
 export getoutspace
 
@@ -554,6 +566,8 @@ function idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
     @assert(dimension(outspace) == dimension(inspace))
     FockMap(outspace, inspace, SparseMatrixCSC(Matrix{Float64}(I(dimension(outspace)))))
 end
+export idmap
+
 idmap(fockspace::FockSpace) = idmap(fockspace, fockspace)
 
 """
@@ -562,6 +576,7 @@ idmap(fockspace::FockSpace) = idmap(fockspace, fockspace)
 Generate a `FockMap` full of `1`s from `inspace` to `outspace`.
 """
 onesmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(outspace, inspace, spzeros(dimension(outspace), dimension(inspace)) .+ 1)
+export onesmap
 
 """
     colmap(inmode::Mode, rowdata::Vector{Pair{Mode, ComplexF64}})::FockMap
@@ -581,6 +596,7 @@ function colmap(inmode::Mode, rowdata::Vector{Pair{Mode, ComplexF64}})::FockMap
     foreach(n -> spmat[n, 1] += rowdata[n].second, 1:dimension(outfock))
     return FockMap(outfock, FockSpace(Subset(inmode)), spmat)
 end
+export colmap
 
 """
     columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
@@ -592,6 +608,7 @@ function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), :, restrictindices))
     return FockMap(fockmap.outspace, restrictspace, spmat)
 end
+export columns
 
 """
     rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
@@ -603,6 +620,7 @@ function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
     return FockMap(restrictspace, fockmap.inspace, spmat)
 end
+export rows
 
 """
     rowsubmaps(fockmap::FockMap)::Base.Generator
@@ -610,6 +628,7 @@ end
 Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `outspace`.
 """
 rowsubmaps(fockmap::FockMap)::Base.Generator = (rows(fockmap, subspace) for subspace in fockmap.outspace |> subspaces)
+export rowsubmaps
 
 """
     colsubmaps(fockmap::FockMap)::Base.Generator
@@ -617,6 +636,7 @@ rowsubmaps(fockmap::FockMap)::Base.Generator = (rows(fockmap, subspace) for subs
 Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `inspace`.
 """
 colsubmaps(fockmap::FockMap)::Base.Generator = (columns(fockmap, subspace) for subspace in fockmap.inspace |> subspaces)
+export colsubmaps
 
 """
     restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
@@ -629,6 +649,7 @@ function restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::Fo
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), outindices, inindices))
     return FockMap(outspace, inspace, spmat)
 end
+export restrict
 
 """
     permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
@@ -645,6 +666,7 @@ function permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::
     col_rule::Vector{Int64} = orderingrule(source.inspace, inspace)
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), row_rule, col_rule))
 end
+export permute
 
 """ Shorthand for creating a function with single parameter `FockMap` to perform `permute`. """
 permute(; outspace::FockSpace, inspace::FockSpace)::Function = fockmap::FockMap -> Quantum.permute(fockmap, outspace=outspace, inspace=inspace)
@@ -684,6 +706,7 @@ function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     return Subset(
         Mode([:flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
 end
+export eigmodes
 
 """
     eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
@@ -702,6 +725,7 @@ function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
     evecs::Matrix{ComplexF64} = eigvecs(Hermitian(Matrix(rep(fockmap))))
     return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), SparseMatrixCSC{ComplexF64, Int64}(evecs))
 end
+export eigvecsh
 
 """
     eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
@@ -721,6 +745,7 @@ function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
     evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
     return (t |> first => t |> last for t in Iterators.zip(eigmodes(fockmap, attrs...), evs))
 end
+export eigvalsh
 
 function LinearAlgebra.:eigvals(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
     eigenvalues::Vector{Number} = fockmap |> rep |> Matrix |> eigvals
@@ -761,6 +786,7 @@ function eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode,
     evecs::FockMap = FockMap(fockmap.outspace, FockSpace(modes), decomposed.vectors)
     return evals, evecs
 end
+export eigh
 
 """
     fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
@@ -785,6 +811,7 @@ function fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
     outspace::FockSpace = sparsefock(basismodes, momentums)
     return fourier(outspace, inspace, ∑𝑘, basismodes)
 end
+export fourier
 
 """
     fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
@@ -917,6 +944,8 @@ function directsum(a::FockMap, b::FockMap)::FockMap
     data[(a.outspace |> dimension) + 1:end, (a.inspace |> dimension) + 1:end] += b |> rep
     return FockMap(outspace, inspace, data)
 end
+export directsum
+
 """
     directsum(fockmaps)::FockMap
 

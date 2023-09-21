@@ -1,6 +1,6 @@
 module Transformations
 
-using LinearAlgebra, SmithNormalForm, OrderedCollections, Combinatorics, Statistics
+using LinearAlgebra, SmithNormalForm, OrderedCollections, Combinatorics, Statistics, Base.Iterators
 using ..Spaces, ..Geometries
 
 abstract type Transformation{T} <: Element{T} end

@@ -190,8 +190,8 @@ export hashablereal
 hashablecomplex(z::Complex, denominator::Integer = 10000000)::Tuple = (hashablereal(z |> real, denominator), hashablereal(z |> imag, denominator))
 export hashablecomplex
 
-spatialhashdenominators::Vector{Integer} = [128, 128, 128] # Default to 128 for each dimension.
-reciprocalhashdenominators::Vector{Integer} = [128, 128, 128]
+global spatialhashdenominators::Vector{Integer} = [128, 128, 128] # Default to 128 for each dimension.
+global reciprocalhashdenominators::Vector{Integer} = [128, 128, 128]
 
 """
     spatialsnappingcalibration(positions)

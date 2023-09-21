@@ -71,7 +71,7 @@ function Base.:*(transformation::PointGroupTransformation, subset::Subset{Mode})
     function rebaseorbital(mode::Mode)::Mode
         frommode::Mode = modemapping[mode]
         tomode::Mode = mode |> setattr(:orbital => (frommode |> getorbital()))
-        connections[(tomode, frommode)] = (mode |> getorbital()) |> relativephase(mode |> getorbital())
+        connections[(tomode, frommode)] = (mode |> getorbital()) |> relativephase(frommode |> getorbital())
         return tomode
     end
 

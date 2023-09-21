@@ -253,6 +253,7 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(fockspace::FockSpace; reflected=Nothing) = FockSpace(rep(fockspace), fockspace.ordering, reflected=reflected)
     FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
 end
+export FockSpace
 
 """ Shorthand alias for `FockSpace{Crystal}`. """
 CrystalFock = FockSpace{Crystal}

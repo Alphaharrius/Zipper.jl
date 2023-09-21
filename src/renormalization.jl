@@ -89,6 +89,12 @@ function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Cryst
 end
 export crystalprojector
 
+function crystalprojector(spectrum::CrystalSpectrum)::FockMap
+    fockmap::FockMap = directsum(spectrum.eigenvectors[k] * spectrum.eigenvectors[k]' for (k, _) in spectrum.eigenmodes)
+    crystalfock::FockSpace = FockSpace(fockmap.inspace, reflected=spectrum.crystal)
+    return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
+end
+
 function globaldistillerhamiltonian(;
     correlations::FockMap, restrictspace::FockSpace, localisometryselectionstrategy, manualeigenenergies::Dict{Symbol, <:Number} = Dict(:filled => -1, :empty => 1),
     symmetry::AffineTransform)

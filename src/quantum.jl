@@ -417,7 +417,7 @@ end
 
 Check if fockspaces of `a` and `b` shares the same set of underlying modes regardless of partitions.
 """
-hassamespan(a::FockSpace, b::FockSpace)::Bool = modes(a) == modes(b)
+hassamespan(a::FockSpace, b::FockSpace)::Bool = getmodes(a) == getmodes(b)
 
 """
     issparse(fockspace::FockSpace)::Bool

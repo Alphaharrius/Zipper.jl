@@ -1,13 +1,13 @@
 module Quantum
 
-using LinearAlgebra, SparseArrays, OrderedCollections, Base.Iterators
+using LinearAlgebra, SparseArrays, OrderedCollections, Statistics, Base.Iterators
 using ..Spaces, ..Geometries, ..Transformations
 
 export quantized, transformed, symmetrized
 export Mode, FockSpace, FockMap
 export hasattr, getattr, setattr, removeattr, setorbital, getorbital, quantize, flavorcount, spanoffset
-export dimension, crystalof, crystalsubspaces, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
-export order, orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse, fockspaceunion
+export dimension, getcrystal, crystalsubspaces, commonattr, unitcellfock, subspaces, subspacecount, flattensubspaces
+export orderedmodes, orderingrule, modes, hassamespan, sparsefock, crystalfock, issparse, fockspaceunion
 export columns, rows, colsubmaps, rowsubmaps, restrict, eigvecsh, eigvalsh, eigh, fourier, fockaddsamespan, directsum, idmap, onesmap, colmap, columnspec
 
 """

@@ -208,6 +208,13 @@ function spatialsnappingcalibration(positions)
 end
 export spatialsnappingcalibration
 
+function spatialsnappingcalibration(; x::Integer = 128, y::Integer = 128, z::Integer = 128)
+    spatialhashdenominators[1] = x
+    spatialhashdenominators[2] = y
+    spatialhashdenominators[3] = z
+    @warn "Updated position hash denominators to $spatialhashdenominators."
+end
+
 """
     reciprocalhashcalibration(crystalsizes::Vector{<:Integer})
 
@@ -221,6 +228,13 @@ function reciprocalhashcalibration(crystalsizes::Vector{<:Integer})
     @warn "Updated momentum hash denominators to $reciprocalhashdenominators."
 end
 export reciprocalhashcalibration
+
+function reciprocalhashcalibration(; x::Integer = 128, y::Integer = 128, z::Integer = 128)
+    reciprocalhashdenominators[1] = x
+    reciprocalhashdenominators[2] = y
+    reciprocalhashdenominators[3] = z
+    @warn "Updated momentum hash denominators to $reciprocalhashdenominators."
+end
 
 """
     rpos(position::Position)

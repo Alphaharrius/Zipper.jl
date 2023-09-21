@@ -20,11 +20,8 @@ spatialsnappingcalibration((pa, pb, pc))
 
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
-bf = findeigenfunction(c6, eigenvalue=(cos(π/3) - sin(π/3)im))
-(c6 * bf) |> relativephase(bf)
-
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [24, 24])
+crystal = Crystal(unitcell, [48, 48])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
@@ -44,7 +41,7 @@ groundstateprojector = groundstates |> crystalprojector
 
 C = idmap(groundstateprojector.outspace) - groundstateprojector
 
-correlations = couriercorrelations
+correlations = C
 
 crystalfock = correlations.outspace
 
@@ -116,10 +113,16 @@ wannierfilledisometry = wannierprojection(
 
 blockedemptyprojector = distillresult[:empty] |> crystalprojector
 blockedemptycorrelation = idmap(blockedemptyprojector.outspace, blockedemptyprojector.outspace) - blockedemptyprojector
-emptyseed = [_regionalwannierseeding(blockedemptycorrelation, frozenseedingfock, symmetry=c6, seedsgroupingprecision=1e-3)...][1]
+emptyseed = [regionalwannierseeding(blockedemptycorrelation, frozenseedingfock, symmetry=c6, seedsgroupingprecision=1e-3)...][1]
 
-filledH = wannierfilledisometry' * blockedhamiltonian * wannierfilledisometry
-filledH |> crystalspectrum |> visualize
+crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
+wannieremptyisometry = wannierprojection(
+    crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
+
+filledC = wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
+filledC |> crystalspectrum |> visualize
+emptyC = wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
+emptyC |> crystalspectrum |> visualize
 
 filledP = wannierfilledisometry * wannierfilledisometry'
 courierP = wanniercourierisometry * wanniercourierisometry'

@@ -304,6 +304,7 @@ Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a
 Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
 """
 getcrystal(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
+export getcrystal
 
 """
     crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}}

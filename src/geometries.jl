@@ -35,7 +35,19 @@ end
 
 Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
 
+"""
+    pbc(crystal::Crystal, point::Point)::Point
+
+Apply periodic boundary conditions to a point `point` within a `Crystal`.
+"""
 pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(pos(point), crystal.sizes)], getspace(point))
+
+"""
+    pbc(crystal::Crystal)::Function
+
+Return a function that applies periodic boundary conditions to a point within a `Crystal`.
+"""
+pbc(crystal::Crystal)::Function = p -> pbc(crystal, p)
 
 latticeoff(point::Point)::Point = Point([trunc(v) for v in pos(point)], getspace(point))
 

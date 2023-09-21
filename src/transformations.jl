@@ -83,53 +83,27 @@ end
 
 Base.:iszero(basis::BasisFunction)::Bool = basis |> normalize |> rep |> iszero
 
-struct PointGroupTransformation <: Transformation{Matrix{Float64}}
+struct AffineTransform <: Transformation{Matrix{Float64}}
     localspace::AffineSpace
     shiftvector::Vector{Float64}
-    pointgroupmatrix::Matrix{Float64}
+    transformmatrix::Matrix{Float64}
     eigenfunctions::Dict{Tuple, BasisFunction}
+    eigenvaluehashdenominator::Integer
     antiunitary::Bool
 end
-export PointGroupTransformation
-
-function PointGroupTransformation(
-    pointgroupmatrix::Matrix, shiftvector::Vector = zeros(Float64, pointgroupmatrix |> size |> first);
-    dimension::Integer = pointgroupmatrix |> size |> first, antiunitary::Bool = false,
-    localspace::AffineSpace = euclidean(RealSpace, dimension))::PointGroupTransformation
-
-    eigenfunctions::Dict{Tuple, BasisFunction} = Dict(eigenfunctionsignature(swave, 1) => swave)
-    invariantfound::Bool = false
-    for rank in 1:2 # The maximum rank will be 2 since it is sufficient for the considered point groups.
-        rankmatrix::Matrix = pointgrouprepresentation(pointgroupmatrix; rank=rank)
-        evals, evecs = rankmatrix |> eigen
-        invariantindexs = findall(v -> isapprox(v, 1), evals)
-        if invariantindexs isa Nothing continue end
-        invariantfound = true
-        for (n, eval) in enumerate(evals)
-            basis::BasisFunction = BasisFunction(antiunitary ? evecs[:, n] |> conj : evecs[:, n], dimension, rank) |> normalize
-            if basis |> iszero continue end
-            eigenfunctions[eigenfunctionsignature(basis, eval)] = basis
-        end
-    end
-
-    if invariantfound
-        return PointGroupTransformation(localspace, shiftvector, pointgroupmatrix, eigenfunctions, antiunitary)
-    end
-    error("Invalid point group transformation, invariant basis is not found!")
-end
-
-isometrictransformation(
+export AffineTransform
+pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,
     localspace::RealSpace = euclidean(RealSpace, dimension),
     referencepoint::Position = localspace |> origin,
-    antiunitary::Bool = false)::PointGroupTransformation = PointGroupTransformation(pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
-    dimension=dimension, localspace=localspace, antiunitary=antiunitary)
-export isometrictransformation
+    antiunitary::Bool = false)::AffineTransform = AffineTransform(pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
+    localspace=localspace, antiunitary=antiunitary)
+export pointgrouptransform
 
-recenter(transformation::PointGroupTransformation, center::Position)::PointGroupTransformation = PointGroupTransformation(
-    transformation.pointgroupmatrix, transformationshift(transformation.pointgroupmatrix, transformation.localspace, center);
-    dimension=transformation |> dimension, localspace=transformation |> spaceof, antiunitary=transformation.antiunitary)
+recenter(transformation::AffineTransform, center::Position)::AffineTransform = AffineTransform(
+    transformation.transformmatrix, transformationshift(transformation.transformmatrix, transformation.localspace, center);
+    localspace=transformation |> getspace, antiunitary=transformation.antiunitary)
 export recenter
 
 recenter(center::Position) = transformation::PointGroupTransformation -> recenter(transformation, center)
@@ -138,88 +112,95 @@ translation(
     shiftvector::Vector;
     dimension::Integer = shiftvector |> length,
     localspace::RealSpace = euclidean(RealSpace, dimension),
-    antiunitary::Bool = false)::PointGroupTransformation = PointGroupTransformation(
-    Matrix{Float64}(I, dimension, dimension), shiftvector; dimension=dimension, localspace=localspace, antiunitary=antiunitary)
+    antiunitary::Bool = false)::AffineTransform = AffineTransform(
+    Matrix{Float64}(I, dimension, dimension), shiftvector; localspace=localspace, antiunitary=antiunitary)
 export translation
 
-function affinematrix(transformation::PointGroupTransformation)::Matrix{Float64}
+function affinematrix(transformation::AffineTransform)::Matrix{Float64}
     shiftrow::Vector = vcat(transformation.shiftvector, [1])
     leftcolumns::Matrix = vcat(
-        transformation.pointgroupmatrix, zeros(Float64, transformation.pointgroupmatrix |> size |> first, 1) |> transpose)
+        transformation.transformmatrix, zeros(Float64, transformation.transformmatrix |> size |> first, 1) |> transpose)
     return hcat(leftcolumns, shiftrow)
 end
 export affinematrix
 
-function transformationshift(pointgroupmatrix::Matrix, localspace::AffineSpace, reference::Point)::Vector
-    return (reference |> pos) - (pointgroupmatrix * (lineartransform(localspace, reference) |> pos))
+function transformationshift(transformmatrix::Matrix, localspace::AffineSpace, reference::Point)::Vector
+    localreference::Point = lineartransform(localspace, reference)
+    return (localreference |> pos) - (transformmatrix * (localreference |> pos))
 end
 
-Spaces.:spaceof(transformation::PointGroupTransformation)::AffineSpace = transformation.localspace
+Spaces.:getspace(transformation::AffineTransform)::AffineSpace = transformation.localspace
 
-Base.:convert(::Type{Matrix{Float64}}, source::PointGroupTransformation) = source |> affinematrix
+Base.:convert(::Type{Matrix{Float64}}, source::AffineTransform) = source |> affinematrix
 
-Base.:(==)(a::PointGroupTransformation, b::PointGroupTransformation) = isapprox(a |> rep, b |> rep)
+function Base.:(==)(a::AffineTransform, b::AffineTransform)::Bool
+    localb::AffineTransform = (a |> getspace) * b
+    return isapprox(a |> rep, localb |> rep) && a.antiunitary == localb.antiunitary
+end
 
-function Base.:*(space::RealSpace, transformation::PointGroupTransformation)::PointGroupTransformation
+function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTransform
     if space |> dimension != transformation |> dimension
         error("Dimension mismatch!")
     end
     relativebasis::Matrix = (space |> basis |> inv) * (transformation |> getspace |> basis)
-    pointgroupmatrix::Matrix = relativebasis * (transformation.pointgroupmatrix) * (relativebasis |> inv)
+    transformmatrix::Matrix = relativebasis * (transformation.transformmatrix) * (relativebasis |> inv)
     shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> pos
-    return PointGroupTransformation(
-        pointgroupmatrix, shiftvector;
-        localspace=space, dimension=(transformation |> dimension), antiunitary=transformation.antiunitary)
+    return AffineTransform(
+        transformmatrix, shiftvector;
+        localspace=space, antiunitary=transformation.antiunitary)
 end
 
-function Base.:*(a::PointGroupTransformation, b::PointGroupTransformation)::PointGroupTransformation
+function Base.:*(a::AffineTransform, b::AffineTransform)::AffineTransform
     dim::Integer = a |> dimension
     if dim != b |> dimension
         error("Dimension mismatch!")
     end
-    localb::PointGroupTransformation = (a |> spaceof) * b
+    localb::AffineTransform = (a |> getspace) * b
     affinematrix::Matrix = (a |> rep) * (localb |> rep)
-    pointgroupmatrix::Matrix = affinematrix[1:dim, 1:dim]
+    transformmatrix::Matrix = affinematrix[1:dim, 1:dim]
     shiftvector::Vector = affinematrix[1:dim, end]
     antiunitary::Bool = a.antiunitary ⊻ localb.antiunitary
-    return PointGroupTransformation(
-        pointgroupmatrix, shiftvector;
-        localspace=(a |> spaceof), dimension=dim, antiunitary=antiunitary)
+    return AffineTransform(
+        transformmatrix, shiftvector;
+        localspace=a |> getspace, antiunitary=antiunitary)
+end
+Base.:*(transformation::AffineTransform, space::RealSpace)::RealSpace = RealSpace((transformation.transformmatrix) * (space |> rep))
+
+function Base.:^(source::AffineTransform, exponent::Number)::AffineTransform
+    if exponent == 0
+        return AffineTransform(Matrix{Float64}(I, source |> dimension, source |> dimension))
+    end
+    return reduce(*, repeat([source], exponent))
 end
 
-Base.:*(transformation::PointGroupTransformation, space::RealSpace)::RealSpace = RealSpace((transformation.pointgroupmatrix) * (space |> rep))
-
-Base.:^(source::PointGroupTransformation, exponent::Number)::PointGroupTransformation = reduce(*, repeat([source], exponent))
-
-function Base.:*(transformation::PointGroupTransformation, region::Subset{Position})::Subset{Position}
-    nativetransformation::PointGroupTransformation = (region |> spaceof) * transformation
+function Base.:*(transformation::AffineTransform, region::Subset{Position})::Subset{Position}
+    nativetransformation::AffineTransform = (region |> getspace) * transformation
     transformed::Base.Generator = (
-        Point(((nativetransformation |> rep) * vcat(point |> pos, [1]))[1:end - 1], point |> spaceof)
+        Point(((nativetransformation |> rep) * vcat(point |> pos, [1]))[1:end - 1], point |> getspace)
         for point in region)
     return Subset(transformed)
 end
 
-function Base.:*(transformation::PointGroupTransformation, zone::Subset{Momentum})::Subset{Momentum}
+function Base.:*(transformation::AffineTransform, zone::Subset{Momentum})::Subset{Momentum}
     kspace::MomentumSpace = zone |> getspace
     realspace::RealSpace = convert(RealSpace, kspace)
-    nativetransformation::PointGroupTransformation = realspace * transformation
-    kspacerep::Matrix = Matrix(nativetransformation.pointgroupmatrix |> transpose |> inv)
+    nativetransformation::AffineTransform = realspace * transformation
+    kspacerep::Matrix = Matrix(nativetransformation.transformmatrix |> transpose |> inv)
     return Subset(Point(kspacerep * (k |> pos), kspace) for k in zone)
 end
 
-Base.:*(transformation::PointGroupTransformation, point::Point) = (transformation * Subset(point)) |> first
+Base.:*(transformation::AffineTransform, point::Point) = (transformation * Subset(point)) |> first
 
-Spaces.dimension(transformation::PointGroupTransformation)::Integer = transformation.pointgroupmatrix |> size |> first
+Spaces.dimension(transformation::AffineTransform)::Integer = transformation.transformmatrix |> size |> first
 
-pointgrouprepresentation(matrix::Matrix; rank::Integer = 1)::Matrix = reduce(kron, repeat([matrix], rank))
-pointgrouprepresentation(transformation::PointGroupTransformation; rank::Integer = 1)::Matrix = pointgrouprepresentation(transformation.pointgroupmatrix; rank=rank)
-export pointgrouprepresentation
+pointgrouprepresentation(transformation::AffineTransform; rank::Integer = 1)::Matrix = pointgrouprepresentation(transformation.transformmatrix; rank=rank)
 
-function findeigenfunction(transformation::PointGroupTransformation;
-    rankrange::UnitRange = 0:2, dimensionrange::UnitRange = 0:3, eigenvalue::Number = 1)::BasisFunction
+function findeigenfunction(transformation::AffineTransform;
+    rankrange::UnitRange = 0:3, dimensionrange::UnitRange = 0:3, eigenvalue::Number = 1)::BasisFunction
 
     lookupsignatures::Base.Generator = (
-        eigenfunctionsignature(rank, dimension, eigenvalue) for (rank, dimension) in Iterators.product(rankrange, dimensionrange))
+        functionsignature(rank, dimension, eigenvalue |> Complex; denominator=transformation.eigenvaluehashdenominator)
+        for (rank, dimension) in Iterators.product(rankrange, dimensionrange))
 
     for signature in lookupsignatures
         if haskey(transformation.eigenfunctions, signature)
@@ -231,7 +212,7 @@ function findeigenfunction(transformation::PointGroupTransformation;
 end
 export findeigenfunction
 
-function Base.:*(transformation::PointGroupTransformation, basisfunction::BasisFunction)::BasisFunction
+function Base.:*(transformation::AffineTransform, basisfunction::BasisFunction)::BasisFunction
     if basisfunction.rank == 0
         return basisfunction
     end
@@ -241,17 +222,19 @@ function Base.:*(transformation::PointGroupTransformation, basisfunction::BasisF
     end
 
     matrix::Matrix = pointgrouprepresentation(transformation; rank=basisfunction.rank)
+    # TODO: Is this really the case?
     functionrep::Vector = transformation.antiunitary ? basisfunction |> rep |> conj : basisfunction |> rep  # Handling anti-unitary.
     transformed::Vector = matrix * functionrep
 
     return BasisFunction(transformed, basisfunction |> dimension, basisfunction.rank)
 end
 
-function pointgroupelements(transformation::PointGroupTransformation; maxelements=128)::Vector{PointGroupTransformation}
-    elements::Vector{PointGroupTransformation} = [transformation]
-    for n in 2:maxelements
-        current = transformation ^ n
-        if current == transformation
+function pointgroupelements(pointgroup::AffineTransform; maxelements=128)::Vector{AffineTransform}
+    identity::AffineTransform = pointgroup ^ 0
+    elements::Vector{AffineTransform} = [identity]
+    for n in 1:(maxelements - 1)
+        current = pointgroup ^ n
+        if current == identity
             break
         end
         push!(elements, current)
@@ -260,7 +243,7 @@ function pointgroupelements(transformation::PointGroupTransformation; maxelement
 end
 export pointgroupelements
 
-pointgrouporder(transformation::PointGroupTransformation; maxorder=128)::Integer = pointgroupelements(transformation; maxelements=maxorder) |> length
+pointgrouporder(pointgroup::AffineTransform; maxorder=128)::Integer = pointgroupelements(pointgroup; maxelements=maxorder) |> length
 export pointgrouporder
 
 function relativephase(target::BasisFunction, ref::BasisFunction)::Complex

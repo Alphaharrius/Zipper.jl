@@ -519,6 +519,16 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace, performpermute::Bool = true) = (
         FockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
 end
+getoutspace(fockmap::FockMap)::FockSpace = fockmap.outspace
+export getoutspace
+
+getinspace(fockmap::FockMap)::FockSpace = fockmap.inspace
+export getinspace
+
+Base.:size(fockmap::FockMap)::Tuple{Int64, Int64} = (dimension(fockmap.outspace), dimension(fockmap.inspace))
+
+Base.:&(fockspace::FockSpace, fockmap::FockMap)::FockMap = FockMap(fockmap, outspace=fockspace)
+Base.:&(fockmap::FockMap, fockspace::FockSpace)::FockMap = FockMap(fockmap, inspace=fockspace)
 
 Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(typeof(fockmap))(in=$(fockmap.inspace), out=$(fockmap.outspace))"))
 

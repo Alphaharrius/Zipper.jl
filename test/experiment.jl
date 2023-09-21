@@ -49,7 +49,7 @@ restrictedfock::FockSpace = FockSpace(restrictedregion)
 isometries = localfrozenisometries(blocked[:correlations], restrictedfock, selectionstrategy=frozenselectionbycount(3))
 
 function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::Dict{Point, FockMap}
-    crystal::Crystal = crystalof(crystalfock)
+    crystal::Crystal = getcrystal(crystalfock)
     fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
     momentumfouriers::Vector{FockMap} = rowsubmaps(fouriermap)
     bz::Subset{Momentum} = brillouinzone(crystal)
@@ -58,7 +58,7 @@ end
 
 function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
     momentumisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
-    crystal::Crystal = crystalof(crystalfock)
+    crystal::Crystal = getcrystal(crystalfock)
     bz::Subset{Momentum} = brillouinzone(crystal)
     globalprojector::FockMap = map(k -> momentumisometries[k] * momentumisometries[k]', bz) |> directsum
     return FockMap(
@@ -75,7 +75,7 @@ visualize(emptyglobalprojector, rowrange=1:128, colrange=1:128)
 globalprojector = emptyglobalprojector - filledglobalprojector
 visualize(globalprojector, rowrange=1:64, colrange=1:64)
 
-c6 = PointGroupTransformation([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+c6 = AffineTransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 symmetrytransformers::Vector{FockMap} = [element * globalprojector.outspace for element in pointgroupelements(c6)]
 
@@ -121,7 +121,7 @@ function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{Fo
     homefock::FockSpace = unitcellfock(crystalfock)
     homemaps::Vector{FockMap} = symmetry * homefock
     momentumsubspaces::Dict{Point, FockSpace} = crystalsubspaces(crystalfock)
-    symmetrizedbzs::Subset{Subset{Point}} = symmetry * (crystalfock |> crystalof |> brillouinzone)
+    symmetrizedbzs::Subset{Subset{Point}} = symmetry * (crystalfock |> getcrystal |> brillouinzone)
 
     function computesymmetrizetransformer(homemap::FockMap, symmetrizedbz::Subset{Point})::FockMap
         fouriermap::FockMap = fourier(crystalfock, homefock)
@@ -130,8 +130,8 @@ function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{Fo
         fockmap::FockMap = focksum(
             [rows(symmetrizedfouriermap, subspace) * homemap * rows(fouriermap, subspace)' for subspace in crystalfock |> subspaces])
         return FockMap(
-            FockSpace(fockmap.outspace, reflected=crystalof(crystalfock)),
-            FockSpace(fockmap.inspace, reflected=crystalof(crystalfock)),
+            FockSpace(fockmap.outspace, reflected=getcrystal(crystalfock)),
+            FockSpace(fockmap.inspace, reflected=getcrystal(crystalfock)),
             rep(fockmap))
     end
 
@@ -139,7 +139,7 @@ function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{Fo
 end
 
 Base.:*(symmetry::Symmetry, region::Subset{Point})::Subset{Point} = Subset(
-    Point((p |> spaceof |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), spaceof(p)) + symmetry.center for p in region
+    Point((p |> getspace |> rep |> inv) * sym * ((p - symmetry.center) |> euclidean |> pos), getspace(p)) + symmetry.center for p in region
     for sym in Transformations.groupreps(symmetry))
 
 c3 * (crystal |> brillouinzone)

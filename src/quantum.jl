@@ -646,6 +646,9 @@ function permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), row_rule, col_rule))
 end
 
+""" Shorthand for creating a function with single parameter `FockMap` to perform `permute`. """
+permute(; outspace::FockSpace, inspace::FockSpace)::Function = fockmap::FockMap -> Quantum.permute(fockmap, outspace=outspace, inspace=inspace)
+
 Base.:-(target::FockMap)::FockMap = FockMap(target.outspace, target.inspace, -rep(target))
 
 Base.:+(a::FockMap, b::FockMap)::FockMap = fockadd(a, b)

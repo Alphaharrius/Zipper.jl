@@ -47,20 +47,27 @@ function Base.:*(transformation::AffineTransform, subset::Subset{Mode})::FockMap
     # which the basis point set might not include the symmetrized :pos. Thus we would like to set
     # the :pos to its corresponding basis point, and offload the difference to :offset.
     function correctsymmetrizedmode(mode::Mode)::Mode
-        currentoffset::Point = getattr(mode, :offset)
-        currentpos::Point = getattr(mode, :pos)
-        actualpos::Point = basispoint(currentpos)
-        adjustoffset::Point = currentpos - actualpos
-        return setattr(mode, :offset => currentoffset + adjustoffset, :pos => basispoint(currentpos))
+        actualposition::Position = mode |> getattr(:pos)
+        basisposition::Position = actualposition |> basispoint
+        offset::Position = actualposition - basisposition
+        return mode |> setattr(:pos => basisposition) |> setattr(:offset => offset)
     end
 
     modemapping::Dict{Mode, Mode} = Dict()
 
+    function mergepositions(mode::Mode)::Mode
+        latticeoffset::Point = mode |> getattr(:offset)
+        latticeoffset isa Position || error("Transforming a mode based on momentum must be done with crystal fockspace!")
+        actualposition::Position = getattr(mode, :pos) + latticeoffset
+        return mode |> setattr(:pos => actualposition) |> removeattr(:offset)
+    end
+
     function modesymmetrize(mode::Mode)::Mode
-        newattrs::Dict{Symbol, Any} = Dict(mode.attrs)
+        fixedmode = mode |> mergepositions
+        newattrs::Dict{Symbol, Any} = Dict(fixedmode.attrs)
         # TODO: There are some attributes that are not meant to be transformed with the mode.
         filterpredicate = p -> hasmethod(*, Tuple{AffineTransform, p.second |> typeof})
-        foreach(p -> newattrs[p.first] = transformation * p.second, Iterators.filter(filterpredicate, mode.attrs))
+        foreach(p -> newattrs[p.first] = transformation * p.second, Iterators.filter(filterpredicate, fixedmode.attrs))
         newmode::Mode = Mode(newattrs) |> correctsymmetrizedmode
         modemapping[newmode] = mode
         return newmode

@@ -301,11 +301,11 @@ Returns the number of unique member modes within the `fockspace`, each of those 
 Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
 
 """
-    crystalof(crystalfock::FockSpace{Crystal})::Crystal
+    getcrystal(crystalfock::FockSpace{Crystal})::Crystal
 
 Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
 """
-crystalof(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
+getcrystal(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
 
 """
     crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}}

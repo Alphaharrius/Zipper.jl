@@ -950,14 +950,77 @@ Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> 
 Given a collection of Hermitian `FockMap` objects each associated with a specific `Momentum` from the brillouin zone, pack into a
 `CrystalSpectrum` object.
 """
+function crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
+    crystaleigenmodes::Dict{Momentum, Subset{Mode}} = Dict()
+    crystaleigenvalues::Dict{Mode, Number} = Dict()
+    crystaleigenvectors::Dict{Momentum, FockMap} = Dict()
+    for (k, fockmap) in momentumfockmaps
+        eigenvalues, eigenvectors = eigh(fockmap, :offset => k)
+        crystaleigenmodes[k] = Subset(m for (m, _) in eigenvalues)
+        crystaleigenvectors[k] = eigenvectors
         for (m, v) in eigenvalues
-            crystalevals[m] = v
+            crystaleigenvalues[m] = v
         end
     end
-    return CrystalSpectrum(fockmap.inspace |> crystalof, crystalemodes, crystalevals, crystalevecs)
+    return CrystalSpectrum(crystal, crystaleigenmodes, crystaleigenvalues, crystaleigenvectors)
 end
 export crystalspectrum
 
+"""
+    crystalspectrum(fockmap::FockMap)::CrystalSpectrum
+
+Given a Hermitian `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span, pack into a `CrystalSpectrum` object.
+"""
+crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(fockmap |> crystalsubmaps, crystal=fockmap.inspace |> getcrystal)
+
+""" Get the associated crystal of a `CrystalSpectrum` object. """
+getcrystal(spectrum::CrystalSpectrum)::Crystal = spectrum.crystal
+
+"""
+    geteigenmodes(spectrum::CrystalSpectrum)::Dict{Momentum, Subset{Mode}}
+
+Get the eigenmodes of a `CrystalSpectrum` object, indexed by the `Momentum` of the brillouin zone of the crystal.
+
+### Output
+A dictionary with keys of `Momentum` and values of `Subset{Mode}` which contains the momentum indexed unitcell modes within the crystal.
+"""
+geteigenmodes(spectrum::CrystalSpectrum)::Dict{Momentum, Subset{Mode}} = spectrum.eigenmodes
+export geteigenmodes
+
+"""
+    geteigenvalues(spectrum::CrystalSpectrum)::Dict{Mode, Number}
+
+Get the eigenvalues of a `CrystalSpectrum` object, indexed by all the momentum indexed `Mode` objects of the `CrystalFock`.
+"""
+geteigenvalues(spectrum::CrystalSpectrum)::Dict{Mode, Number} = spectrum.eigenvalues
+export geteigenvalues
+
+"""
+    geteigenvectors(spectrum::CrystalSpectrum)::Dict{Momentum, FockMap}
+
+Get the eigenvectors associated with each indexing `Momentum` within the brillouin zone, each with `inspace` corresponds to the
+returned `Subset{Mode}` of the same indexing `Momentum` from `geteigenmodes(spectrum)`.
+"""
+geteigenvectors(spectrum::CrystalSpectrum)::Dict{Momentum, FockMap} = spectrum.eigenvectors
+export geteigenvectors
+
+"""
+    Fockmap(spectrum::CrystalSpectrum)::FockMap
+
+Pack the `CrystalSpectrum` into a `FockMap` with `outspace` and `inspace` of type `CrystalFock` of same span, the unitcell fockspace
+of the packed `FockMap` should corresponds directly to the `outspace` of individual engenvectors in the `CrystalSpectrum`.
+"""
+function FockMap(crystalspectrum::CrystalSpectrum)::FockMap
+    function momentumfockmap(k::Momentum)
+        modes::Subset{Mode} = crystalspectrum.eigenmodes[k]
+        eigenfock::FockSpace = modes |> FockSpace
+        diagonal::FockMap = FockMap(eigenfock, eigenfock, Dict((m, m) => crystalspectrum.eigenvalues[m] |> ComplexF64 for m in modes))
+        return crystalspectrum.eigenvectors[k] * diagonal * crystalspectrum.eigenvectors[k]'
+    end
+    fockmap::FockMap = directsum(k |> momentumfockmap for (k, _) in crystalspectrum.eigenmodes)
+    crystalfock::FockSpace = FockSpace(fockmap.inspace, reflected=crystalspectrum.crystal)
+    return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
+end
 struct EigenSpectrum
     eigenvalues::Dict{Mode, Number}
     eigenvectors::FockMap

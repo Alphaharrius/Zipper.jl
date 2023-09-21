@@ -4,7 +4,7 @@ using OrderedCollections
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations
 
 function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
-    crystal::Crystal = crystalfock |> crystalof
+    crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
     unscaledblockedregion::Subset{Position} = (scale |> inv) * scaledcrystal.unitcell
     bz::Subset{Momentum} = crystal |> brillouinzone
@@ -91,7 +91,7 @@ function Base.:*(transformation::PointGroupTransformation, crystalfock::FockSpac
     transform::FockMap = directsum(
         rows(transformedfourier, ksubspaces[(transformation * k) |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
         for (k, fockspace) in ksubspaces)
-    crystal::Crystal = crystalfock |> crystalof
+    crystal::Crystal = crystalfock |> getcrystal
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))
 end
 

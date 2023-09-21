@@ -265,6 +265,9 @@ export CrystalFock
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
 
+""" Allow the retrieval of `Mode` at a given `order` index with syntax `fockspace[order]`. """
+Base.:getindex(fockspace::FockSpace, order::Integer)::Mode = (fockspace |> orderedmodes)[order]
+
 """
     fockspaceunion(fockspaces::FockSpace)::FockSpace
 

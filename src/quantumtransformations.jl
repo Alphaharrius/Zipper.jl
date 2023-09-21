@@ -80,9 +80,9 @@ function Base.:*(transformation::PointGroupTransformation, subset::Subset{Mode})
     return FockMap(outmodes |> FockSpace, subset |> FockSpace, connections)
 end
 
-Base.:*(transformation::PointGroupTransformation, fockspace::FockSpace)::FockMap = transformation * (fockspace |> orderedmodes)
+Base.:*(transformation::AffineTransform, fockspace::FockSpace)::FockMap = transformation * (fockspace |> orderedmodes)
 
-function Base.:*(transformation::PointGroupTransformation, crystalfock::FockSpace{Crystal})::FockMap
+function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap
     homefock::FockSpace = crystalfock |> unitcellfock
     homefocktransform::FockMap = transformation * homefock
     ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces

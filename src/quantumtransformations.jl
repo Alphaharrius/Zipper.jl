@@ -89,7 +89,7 @@ function Base.:*(transformation::PointGroupTransformation, crystalfock::FockSpac
     fouriertransform::FockMap = fourier(crystalfock, homefock)
     transformedfourier::FockMap = fourier(crystalfock, homefocktransform.outspace)
     transform::FockMap = directsum(
-        rows(transformedfourier, ksubspaces[(transformation * k) |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
+        rows(transformedfourier, ksubspaces[transformation * k |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
         for (k, fockspace) in ksubspaces)
     crystal::Crystal = crystalfock |> getcrystal
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))

@@ -91,7 +91,7 @@ export crystalprojector
 
 function globaldistillerhamiltonian(;
     correlations::FockMap, restrictspace::FockSpace, localisometryselectionstrategy, manualeigenenergies::Dict{Symbol, <:Number} = Dict(:filled => -1, :empty => 1),
-    symmetry::PointGroupTransformation)
+    symmetry::AffineTransform)
 
     localisometries::Dict{Symbol} = localfrozenisometries(correlations, restrictspace, selectionstrategy=localisometryselectionstrategy)
     crystalprojectors::Dict{Symbol, FockMap} = Dict(

@@ -59,7 +59,7 @@ function Base.:*(transformation::PointGroupTransformation, subset::Subset{Mode})
     function modesymmetrize(mode::Mode)::Mode
         newattrs::Dict{Symbol, Any} = Dict(mode.attrs)
         # TODO: There are some attributes that are not meant to be transformed with the mode.
-        filterpredicate = p -> hasmethod(*, Tuple{PointGroupTransformation, p.second |> typeof})
+        filterpredicate = p -> hasmethod(*, Tuple{AffineTransform, p.second |> typeof})
         foreach(p -> newattrs[p.first] = transformation * p.second, Iterators.filter(filterpredicate, mode.attrs))
         newmode::Mode = Mode(newattrs) |> correctsymmetrizedmode
         modemapping[newmode] = mode

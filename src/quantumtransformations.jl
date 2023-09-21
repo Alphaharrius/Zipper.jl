@@ -12,8 +12,8 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     scaledbz::Subset{Momentum} = scaledcrystal |> brillouinzone
 
     momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
-    mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point, Vector{Point}}()) do d,(k,v)
-        mergewith!(append!, d, LittleDict(k=>[v]))
+    mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point, Vector{Point}}()) do d, (k, v)
+        mergewith!(append!, d, LittleDict(k => [v]))
     end
 
     ksubsets::Dict{Momentum, Subset{Mode}} = crystalfock |> crystalsubsets

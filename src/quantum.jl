@@ -291,7 +291,7 @@ Base.:-(a::FockSpace, b::FockSpace)::FockSpace = FockSpace(setdiff(a |> orderedm
 
 Base.:intersect(a::FockSpace, b::FockSpace) = FockSpace(intersect(a |> orderedmodes, b |> orderedmodes))
 
-Base.:iterate(fock_space::FockSpace, i...) = iterate(flatten(rep(fock_space)), i...)
+Base.:iterate(fockspace::FockSpace, i...) = iterate(flatten(rep(fockspace)), i...)
 
 """
     Spaces.:dimension(fockspace::FockSpace)

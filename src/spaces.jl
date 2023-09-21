@@ -292,6 +292,18 @@ Perform linear transformation on the point from the original space `getspace(poi
 lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(basis(newspace)) * basis(getspace(point)) * pos(point), newspace)
 
 """
+    orthogonalspace(space::AffineSpace)::AffineSpace
+
+Given a affine space, get it't corresponding orthogonal space of the same scale.
+"""
+function orthogonalspace(space::AffineSpace)::AffineSpace
+    basisvectors::Base.Generator = ((space |> rep)[:, d] for d in axes(space |> rep, 2))
+    scalings::Vector = [norm(v) for v in basisvectors]
+    return (space |> typeof)(scalings |> diagm)
+end
+export orthogonalspace
+
+"""
     euclidean(point::Point)::Point
 
 Perform linear transformation on the point from the original space `getspace(point)` to Euclidean space.

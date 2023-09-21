@@ -96,6 +96,10 @@ The line `mode |> getattr(:flavor)` is equal to `getattr(mode, :flavor)`.
 """
 getattr(key::Symbol) = v -> getattr(v, key)
 
+""" A shorthand for getting the mode attributes for visualization in the REPL. """
+getattrs(mode::Mode) = mode.attrs
+export getattrs
+
 """
     removeattr(mode::Mode, keys::Symbol...)::Mode
 

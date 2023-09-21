@@ -79,7 +79,7 @@ export crystalisometries
 
 function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
     momentumisometries::Dict{Point, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
-    crystal::Crystal = crystalof(crystalfock)
+    crystal::Crystal = getcrystal(crystalfock)
     bz::Subset{Momentum} = brillouinzone(crystal)
     globalprojector::FockMap = map(k -> momentumisometries[k] * momentumisometries[k]', bz) |> directsum
     return FockMap(

@@ -174,7 +174,7 @@ function regionalwannierseeding(correlations::FockMap, regionspace::FockSpace;
                  |> setattr(:offset => regioncenter |> getspace |> origin)
             for (mode, phase) in phases) |> FockSpace
 
-        return FockMap(crystalseed; inspace=seedfock, performpermute=false)
+        return FockMap(seed; inspace=seedfock, performpermute=false)
     end
 
     return Iterators.filter(v -> !(v isa Nothing), extractglobalseed(group) for group in validgroups)

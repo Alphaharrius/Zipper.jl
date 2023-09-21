@@ -666,6 +666,7 @@ Base.:*(number::Number, fockmap::FockMap)::FockMap = fockmap * number
 Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) / number)
 
 Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, transpose(rep(source)))
+""" Corresponds to the Hermitian adjoint. """
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
 """

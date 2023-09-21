@@ -138,13 +138,13 @@ function distillation(globaldistiller::FockMap; courierenergythreshold::Number =
 end
 export distillation
 
-function regionalwannierseeding(correlations::FockMap, regionspace::FockSpace;
-    symmetry::PointGroupTransformation,
-    seedingthreshold::Number = 1e-2, linearindependencethreshold::Number = 5e-2)
+function regionalwannierseeding(statecorrelations::FockMap, regionspace::FockSpace;
+    symmetry::AffineTransform,
+    seedingthreshold::Number = 1e-2, seedsgroupingprecision::Number = 1e-5, linearindependencethreshold::Number = 5e-2)
 
-    localcorrelations::FockMap = regioncorrelations(correlations, regionspace)
-    localspectrum::EigenSpectrum = localcorrelations |> eigenspectrum
-    validgroups = Iterators.filter(p -> p.first <= seedingthreshold, localspectrum |> groupbyeigenvalues)
+    localcorrelations::FockMap = regioncorrelations(statecorrelations, regionspace)
+    localspectrum::EigenSpectrum = localcorrelations |> eigspech
+    validgroups = Iterators.filter(p -> p.first <= seedingthreshold, groupbyeigenvalues(localspectrum, groupingthreshold=seedsgroupingprecision))
 
     function symmetrizeseed(seedisometry::FockMap)::Tuple{Base.Generator, FockMap}
         transform::FockMap = symmetry * seedisometry.outspace
@@ -153,11 +153,11 @@ function regionalwannierseeding(correlations::FockMap, regionspace::FockSpace;
         return (eigenvalues, seedisometry * unitary)
     end
 
-    regioncenter::Point = Subset(mode |> pos for mode in regionspace |> modes) |> center
+    regioncenter::Point = Subset(mode |> pos for mode in regionspace |> getmodes) |> center
 
     function extractglobalseed(group::Pair{<:Number, Subset{Mode}})
         phases, seed = columns(localspectrum.eigenvectors, group.second |> FockSpace) |> symmetrizeseed
-        crystalseeds::Dict{Momentum, FockMap} = crystalisometries(localisometry=seed, crystalfock=correlations.inspace)
+        crystalseeds::Dict{Momentum, FockMap} = crystalisometries(localisometry=seed, crystalfock=statecorrelations.inspace)
         crystalseed::FockMap = directsum(v for (_, v) in crystalseeds)
 
         # Check if linear independent.
@@ -167,7 +167,7 @@ function regionalwannierseeding(correlations::FockMap, regionspace::FockSpace;
             return nothing
         end
 
-        dimension::Integer = correlations.inspace |> crystalof |> Spaces.dimension
+        dimension::Integer = correlations.inspace |> crystalof |> dimension
         seedfock::FockSpace = Subset(
             mode |> setattr(:orbital => findeigenfunction(symmetry; dimensionrange=0:dimension, eigenvalue=phase))
                  |> setattr(:pos => regioncenter)

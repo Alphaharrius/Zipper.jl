@@ -106,7 +106,7 @@ recenter(transformation::AffineTransform, center::Position)::AffineTransform = A
     localspace=transformation |> getspace, antiunitary=transformation.antiunitary)
 export recenter
 
-recenter(center::Position) = transformation::PointGroupTransformation -> recenter(transformation, center)
+recenter(center::Position) = transformation -> recenter(transformation, center)
 
 translation(
     shiftvector::Vector;

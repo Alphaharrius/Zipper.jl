@@ -77,6 +77,17 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
 end
 export crystalisometries
 
+function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
+    isometries::Dict{Momentum, FockMap} = crystalisometries(
+        localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
+    isometryunitcell::Subset{Position} = Subset(mode |> getattr(:pos) for mode in localisometry.inspace |> orderedmodes)
+    isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
+    isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
+    isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
+    return FockMap(isometry, inspace=isometrycrystalfock, outspace=crystalfock)
+end
+export crystalisometry
+
 function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
     momentumisometries::Dict{Point, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)

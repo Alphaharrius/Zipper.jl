@@ -3,7 +3,7 @@ module Spaces
 using LinearAlgebra, OrderedCollections, Base.Iterators
 
 export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Position, Momentum, Subset
-export rep, euclidean, basis, dimension, spaceof, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
+export rep, euclidean, basis, dimension, getspace, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
 
 """
 Simply means an distinct type of object that can be represented by a concrete type `R`.
@@ -115,12 +115,12 @@ Subset of element type `T <: AbstractSubset` defined within a full set.
 abstract type AbstractSubset{T} <: Element{OrderedSet{T}} end
 
 """
-    spaceof(subset::AbstractSubset)
+    getspace(subset::AbstractSubset)
 
 Get the space of the parameter `subset`. If `subset isa Point`, then the output will be its parent space where its position is defined; if `subset isa Subset`, then
 the output will be the common space of all elements within the `subset`.
 """
-spaceof(subset::AbstractSubset) = error("Method not defined for input type `$(subset |> typeof)`!")
+getspace(subset::AbstractSubset) = error("Method not defined for input type `$(subset |> typeof)`!")
 
 """
     RealSpace(rep::Matrix{Float64})
@@ -175,14 +175,14 @@ Position = Point{RealSpace}
 """ Alias of a momentum space point. """
 Momentum = Point{MomentumSpace}
 
-Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)]) ∈ $(point |> spaceof |> typeof)"))
+Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)]) ∈ $(point |> getspace |> typeof)"))
 
 """
-    spaceof(point::Point)
+    getspace(point::Point)
 
 Retrieve the `AffineSpace` of the `Point`.
 """
-spaceof(point::Point) = point.space
+getspace(point::Point) = point.space
 
 hashablereal(v::Real, denominator::Integer = 10000000)::Rational = ((v * denominator) |> round |> Integer) // denominator
 export hashablereal
@@ -251,7 +251,7 @@ dimension(point::Point)::Integer = length(pos(point))
 
 # rpos is used to to equate the points to round off slight differences.
 function Base.:(==)(a::Point, b::Point)::Bool
-    @assert(typeof(a |> spaceof) == typeof(b |> spaceof))
+    @assert(typeof(a |> getspace) == typeof(b |> getspace))
     return rpos(a) == rpos(b)
 end
 
@@ -273,31 +273,31 @@ pos(point::Point)::Vector{Float64} = point.pos
 """
     lineartransform(new_space::AffineSpace, point::Point)::Point
 
-Perform linear transformation on the point from the original space `spaceof(point)` to `newspace`, the vector representation of the `point` will be transformed.
+Perform linear transformation on the point from the original space `getspace(point)` to `newspace`, the vector representation of the `point` will be transformed.
 """
-lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(basis(newspace)) * basis(spaceof(point)) * pos(point), newspace)
+lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(basis(newspace)) * basis(getspace(point)) * pos(point), newspace)
 
 """
     euclidean(point::Point)::Point
 
-Perform linear transformation on the point from the original space `spaceof(point)` to Euclidean space.
+Perform linear transformation on the point from the original space `getspace(point)` to Euclidean space.
 """
-euclidean(point::Point)::Point = Point(basis(spaceof(point)) * pos(point), euclidean(typeof(spaceof(point)), dimension(point)))
+euclidean(point::Point)::Point = Point(basis(getspace(point)) * pos(point), euclidean(typeof(getspace(point)), dimension(point)))
 
-Base.:-(point::Point)::Point = Point(-pos(point), spaceof(point))
+Base.:-(point::Point)::Point = Point(-pos(point), getspace(point))
 
 function Base.:+(a::Point, b::Point)::Point
-    @assert(typeof(spaceof(a)) == typeof(spaceof(b)))
-    return Point(pos(a) + pos(b), spaceof(a))
+    @assert(typeof(getspace(a)) == typeof(getspace(b)))
+    return Point(pos(a) + pos(b), getspace(a))
 end
 
 function Base.:-(a::Point, b::Point)::Point
-    @assert(typeof(spaceof(a)) == typeof(spaceof(b)))
-    return Point(pos(a) - pos(b), spaceof(a))
+    @assert(typeof(getspace(a)) == typeof(getspace(b)))
+    return Point(pos(a) - pos(b), getspace(a))
 end
 
-Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) * val, spaceof(point))
-Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) / val, spaceof(point))
+Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) * val, getspace(point))
+Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) / val, getspace(point))
 
 """
     Subset(elements::OrderedSet{T})
@@ -338,17 +338,17 @@ Base.:+(subset::Subset, val)::Subset = Subset(p + val for p in subset)
 Base.:-(subset::Subset, val)::Subset = subset + (-val)
 
 """
-    spaceof(subset::Subset)::AbstractSpace
+    getspace(subset::Subset)::AbstractSpace
 
 The space of a `Subset` have to be determined by all of it's underlying elements.
 
 ### Error
-If the underlying elements of `subset` does not belongs to the same space from `spaceof(element)`.
+If the underlying elements of `subset` does not belongs to the same space from `getspace(element)`.
 """
-function spaceof(subset::Subset)
+function getspace(subset::Subset)
     @assert(length(subset) > 0, "Cannot be determine the space of an empty set.")
-    space = spaceof(first(subset))
-    @assert(all(Iterators.map(el -> spaceof(el) == space, subset)))
+    space = getspace(first(subset))
+    @assert(all(Iterators.map(el -> getspace(el) == space, subset)))
     return space
 end
 

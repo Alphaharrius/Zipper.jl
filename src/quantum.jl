@@ -46,7 +46,7 @@ Base.:+(mode::Mode, offset::Point)::Mode = setattr(mode, :offset => getattr(mode
 Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)
 
 """
-    spaceof(mode::Mode)
+    getspace(mode::Mode)
 
 The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:pos`, if none of those are defined,
 it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
@@ -54,10 +54,10 @@ it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be
 ### Output
 The space of the attribute `:offset` if available, fall back to `:pos` if otherwise; returns a Euclidean space of dimension `1` if both `:offset` & `:pos` is missing.
 """
-function Spaces.spaceof(mode::Mode)
+function Spaces.getspace(mode::Mode)
     # :offset have a higher priority in determining the space of the mode.
-    if hasattr(mode, :offset) return spaceof(getattr(mode, :offset)) end
-    if hasattr(mode, :pos) return spaceof(getattr(mode, :pos)) end
+    if hasattr(mode, :offset) return getspace(getattr(mode, :offset)) end
+    if hasattr(mode, :pos) return getspace(getattr(mode, :pos)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
     return euclidean(RealSpace, 1)
@@ -320,7 +320,7 @@ Retrieve the unit cell fockspace of the system from a `FockSpace{Crystal}`, posi
 """
 function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
     firstpartition::Subset{Mode} = crystalfock |> rep |> first
-    originpoint::Point = firstpartition |> first |> getattr(:pos) |> spaceof |> origin
+    originpoint::Point = firstpartition |> first |> getattr(:pos) |> getspace |> origin
     return FockSpace(firstpartition |> setattr(:offset => originpoint))
 end
 
@@ -427,7 +427,7 @@ The quantized `Mode` object.
 """
 function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
     @assert(identifier == :offset || identifier == :pos)
-    home::Point = origin(spaceof(point))
+    home::Point = origin(getspace(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).
@@ -718,7 +718,7 @@ Create a `FockMap` corresponds to a Fourier transform of a `FockSpace`. This map
 entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
-- `momentums` The momentums which spans the output reciprocal subspace, for `spaceof(momentum) isa MomentumSpace`.
+- `momentums` The momentums which spans the output reciprocal subspace, for `getspace(momentum) isa MomentumSpace`.
 - `inspace` The input space, all contituent modes must have the attribute `:offset` defined or result in errors. The `inspace` should include all possible basis modes
   so that they can be identified and span the momentum `FockSpace`.
 

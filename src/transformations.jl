@@ -171,7 +171,7 @@ function Base.:*(space::RealSpace, transformation::PointGroupTransformation)::Po
     if space |> dimension != transformation |> dimension
         error("Dimension mismatch!")
     end
-    relativebasis::Matrix = (space |> basis |> inv) * (transformation |> spaceof |> basis)
+    relativebasis::Matrix = (space |> basis |> inv) * (transformation |> getspace |> basis)
     pointgroupmatrix::Matrix = relativebasis * (transformation.pointgroupmatrix) * (relativebasis |> inv)
     shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> pos
     return PointGroupTransformation(
@@ -207,7 +207,7 @@ function Base.:*(transformation::PointGroupTransformation, region::Subset{Positi
 end
 
 function Base.:*(transformation::PointGroupTransformation, zone::Subset{Momentum})::Subset{Momentum}
-    kspace::MomentumSpace = zone |> spaceof
+    kspace::MomentumSpace = zone |> getspace
     realspace::RealSpace = convert(RealSpace, kspace)
     nativetransformation::PointGroupTransformation = realspace * transformation
     kspacerep::Matrix = Matrix(nativetransformation.pointgroupmatrix |> transpose |> inv)
@@ -294,11 +294,11 @@ Base.:inv(scale::Scale)::Scale = scale |> rep |> inv |> Scale
 Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * (b |> rep))
 Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace((scale |> rep) * (space |> rep))
 Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace((scale |> inv |> rep) * (space |> rep))
-Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * (point |> spaceof), point)
+Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * (point |> getspace), point)
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
 function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    oldspace::RealSpace = crystal |> spaceof
+    oldspace::RealSpace = crystal |> getspace
     snf = vcat(scale |> rep, crystal.sizes |> diagm) |> smith
     boundarysnf = snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)] |> smith
     Δ::Matrix{Float64} = snf |> diagm

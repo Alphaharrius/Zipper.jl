@@ -368,11 +368,11 @@ Merge all subspaces within the `fockspace`.
 flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mode in orderedmodes(fockspace)))
 
 """
-    order(fockspace::FockSpace, mode::Mode)::Int64
+    fockorder(fockspace::FockSpace, mode::Mode)::Int64
 
 Since the fockspace have implicit ordering, this function returns the order index of the `mode` in the `fockspace`.
 """
-order(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
+fockorder(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
 
 """
     modes(fockspace::FockSpace)::Set{Mode}
@@ -563,7 +563,7 @@ end
 Restrict the `inspace` of the `fockmap` by a sub-fockspace `restrictspace`.
 """
 function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    restrictindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(restrictspace)]
+    restrictindices::Vector{Integer} = [fockorder(fockmap.inspace, mode) for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), :, restrictindices))
     return FockMap(fockmap.outspace, restrictspace, spmat)
 end
@@ -574,7 +574,7 @@ end
 Restrict the `outspace` of the `fockmap` by a sub-fockspace `restrictspace`.
 """
 function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    restrictindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(restrictspace)]
+    restrictindices::Vector{Integer} = [fockorder(fockmap.outspace, mode) for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
     return FockMap(restrictspace, fockmap.inspace, spmat)
 end
@@ -599,8 +599,8 @@ colsubmaps(fockmap::FockMap)::Base.Generator = (columns(fockmap, subspace) for s
 Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `outspace` & `inspace` respectively.
 """
 function restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
-    outindices::Vector{Integer} = [order(fockmap.outspace, mode) for mode in orderedmodes(outspace)]
-    inindices::Vector{Integer} = [order(fockmap.inspace, mode) for mode in orderedmodes(inspace)]
+    outindices::Vector{Integer} = [fockorder(fockmap.outspace, mode) for mode in orderedmodes(outspace)]
+    inindices::Vector{Integer} = [fockorder(fockmap.inspace, mode) for mode in orderedmodes(inspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), outindices, inindices))
     return FockMap(outspace, inspace, spmat)
 end
@@ -845,7 +845,7 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
         inmodes::Subset{Mode} = is |> orderedmodes
 
         restricted::FockMap = restrict(source, os, is)
-        data[order(outspace, outmodes |> first):order(outspace, outmodes |> last), order(inspace, inmodes |> first):order(inspace, inmodes |> last)] += (restricted |> rep)
+        data[fockorder(outspace, outmodes |> first):fockorder(outspace, outmodes |> last), fockorder(inspace, inmodes |> first):fockorder(inspace, inmodes |> last)] += (restricted |> rep)
     end
 
     internaladdition(a, outspace1, inspace1)
@@ -903,9 +903,9 @@ function directsum(fockmaps)::FockMap
     function filldata(fockmap::FockMap)
         # The procedure beneath assumes that the fockspace elements are concatenated in order during union operations.
         outmodes::Subset{Mode} = fockmap.outspace |> orderedmodes
-        outrange::UnitRange = order(outspace, outmodes |> first):order(outspace, outmodes |> last)
+        outrange::UnitRange = fockorder(outspace, outmodes |> first):fockorder(outspace, outmodes |> last)
         inmodes::Subset{Mode} = fockmap.inspace |> orderedmodes
-        inrange::UnitRange = order(inspace, inmodes |> first):order(inspace, inmodes |> last)
+        inrange::UnitRange = fockorder(inspace, inmodes |> first):fockorder(inspace, inmodes |> last)
         data[outrange, inrange] += fockmap |> rep
     end
     foreach(filldata, fockmaps)
@@ -1136,7 +1136,7 @@ Extract the column values as a `Mode` to `ComplexF64` pair from a `N×1` `FockMa
 function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     @assert(dimension(fockmap.inspace) == 1)
     mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
-    return [outmode => mat[order(fockmap.outspace, outmode), 1] for outmode in orderedmodes(fockmap.outspace)]
+    return [outmode => mat[fockorder(fockmap.outspace, outmode), 1] for outmode in orderedmodes(fockmap.outspace)]
 end
 
 end

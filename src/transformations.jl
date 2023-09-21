@@ -164,6 +164,17 @@ function Base.:*(a::AffineTransform, b::AffineTransform)::AffineTransform
         transformmatrix, shiftvector;
         localspace=a |> getspace, antiunitary=antiunitary)
 end
+
+function Base.:inv(transform::AffineTransform)::AffineTransform
+    dim::Integer = transform |> dimension
+    affinematrix::Matrix = transform |> rep |> inv
+    transformmatrix::Matrix = affinematrix[1:dim, 1:dim]
+    shiftvector::Vector = affinematrix[1:dim, end]
+    return AffineTransform(
+        transformmatrix, shiftvector;
+        localspace=transform |> getspace, antiunitary=transform.antiunitary)
+end
+
 Base.:*(transformation::AffineTransform, space::RealSpace)::RealSpace = RealSpace((transformation.transformmatrix) * (space |> rep))
 
 function Base.:^(source::AffineTransform, exponent::Number)::AffineTransform

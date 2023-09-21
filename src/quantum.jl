@@ -1021,19 +1021,32 @@ function FockMap(crystalspectrum::CrystalSpectrum)::FockMap
     crystalfock::FockSpace = FockSpace(fockmap.inspace, reflected=crystalspectrum.crystal)
     return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
 end
+
+""" Packaging the result computed from `eigh`. """
 struct EigenSpectrum
     eigenvalues::Dict{Mode, Number}
     eigenvectors::FockMap
 end
 export EigenSpectrum
 
+function geteigenmodes(spectrum::EigenSpectrum)::Subset{Mode}
+    return spectrum.eigenvectors.inspace |> orderedmodes
+end
+
+geteigenvalues(spectrum::EigenSpectrum)::Dict{Mode, Number} = spectrum.eigenvalues
+
+geteigenvectors(spectrum::EigenSpectrum)::FockMap = spectrum.eigenvectors
+
 Base.:show(io::IO, spectrum::EigenSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
 """ This function is the same as calling `eigh` but with a packaged return type. """
+function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...)::EigenSpectrum
     evals, eigenvectors = eigh(hermitian, attrs...)
     eigenvalues::Dict{Mode, Number} = Dict(evals)
     return EigenSpectrum(eigenvalues, eigenvectors)
 end
+export eigspech
+
 """
     groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-2)
 

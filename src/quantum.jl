@@ -688,7 +688,7 @@ end
 """
     eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
 
-Perform eigenvalue decomposition to find the eigenvectors horizontally concatenated into a `FockMap`, ordered by the eigenvalues in ascending order.
+Perform Hermitian eigenvalue decomposition to find the eigenvectors horizontally concatenated into a `FockMap`, ordered by the eigenvalues in ascending order.
 
 ### Input
 - `fockmap` The source of the decomposition.
@@ -706,7 +706,7 @@ end
 """
     eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
 
-Perform eigenvalue decomposition to find the eigenvalues as pairs of eigenmode to eigenvalue ordered by the eigenmode attribute `index`, ordered by the
+Perform Hermitian eigenvalue decomposition to find the eigenvalues as pairs of eigenmode to eigenvalue ordered by the eigenmode attribute `index`, ordered by the
 eigenvalues in ascending order.
 
 ### Input

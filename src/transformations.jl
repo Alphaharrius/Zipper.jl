@@ -22,6 +22,45 @@ swave::BasisFunction = BasisFunction([1], 0, 0)
 export swave
 
 LinearAlgebra.normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
+
+Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
+
+Spaces.dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
+
+NAMEINDEXTABLE::Dict{String, Integer} = Dict("x" => 1, "y" => 2, "z" => 3) # The mappings for axis (x y z) in basis functions to tensor indicies.
+
+resolveentrycoords(expression::Symbol)::Vector{Integer} = map(v -> NAMEINDEXTABLE[v], split(expression |> string, ""))
+
+tmatfullindexmappings(dimension::Integer, rank::Integer)::Base.Generator = (
+    v |> collect for v in map(reverse, product(repeat([1:dimension], rank)...)))
+
+function tmatcontractrules(dimension::Integer, rank::Integer)::Tuple{OrderedSet{Vector}, Dict{Vector, Set}}
+    fullindices = tmatfullindexmappings(dimension, rank)
+    ignoreset::Set = Set()
+    contracttable::Dict{Vector, Set} = Dict()
+    for entry in fullindices
+        if entry in ignoreset continue end
+        contract::Set = entry |> permutations |> Set
+        contracttable[entry] = contract
+        union!(ignoreset, Set(v for v in contract if v != entry))
+    end
+    return OrderedSet(v for v in fullindices if !(v in ignoreset)), contracttable
+end
+
+function tmatcontractmatrices(; rank::Integer, dimension::Integer)::Tuple{Matrix, Matrix}
+    fulltable::Dict{Vector, Integer} = Dict(v => n for (n, v) in tmatfullindexmappings(dimension, rank) |> enumerate)
+    indices::OrderedSet{Vector}, contracttable::Dict{Vector, Set} = tmatcontractrules(dimension, rank)
+    invtable::Dict{Integer, Vector} = Dict(n => v for (n, v) in indices |> enumerate)
+    contractmatrix::Matrix{Float64} = zeros(Float64, indices |> length, fulltable |> length)
+    selectmatrix::Matrix{Float64} = zeros(Float64, indices |> length, fulltable |> length)
+    for n in axes(contractmatrix, 1) 
+        index::Vector = invtable[n]
+        selectmatrix[n, fulltable[index]] = 1
+        for contractindex in contracttable[index]
+            contractmatrix[n, fulltable[contractindex]] = 1
+        end
+    end
+    return contractmatrix, selectmatrix
 end
 
 function Base.:show(io::IO, basisfunction::BasisFunction)
@@ -30,26 +69,17 @@ function Base.:show(io::IO, basisfunction::BasisFunction)
         return
     end
 
-    invindexmap::Dict{Integer, Tuple} = Dict(i => t for (t, i) in entryindexmap(basisfunction |> dimension, basisfunction.rank))
-    invindextable::Dict{Integer, String} = Dict(i => s for (s, i) in INDEXTABLE)
+    indices::OrderedSet{Vector}, _ = tmatcontractrules(basisfunction.dimension, basisfunction.rank)
+    invindexmap::Dict{Integer, Vector} = Dict(n => v for (n, v) in indices |> enumerate)
+    indexnametable::Dict{Integer, String} = Dict(i => s for (s, i) in NAMEINDEXTABLE)
     function generatesymbol(info::Tuple)::String
         if isapprox(info |> last |> abs, 0, atol=1e-10) return "" end
-        coords::Tuple = invindexmap[info |> first]
-        return "($(info |> last))*" * reduce(*, Iterators.map(c -> invindextable[c], coords))
+        coords::Vector = invindexmap[info |> first]
+        return "($(info |> last))*" * reduce(*, Iterators.map(c -> indexnametable[c], coords))
     end
     expression::String = join(filter(v -> v != "", map(generatesymbol, basisfunction |> rep |> enumerate)), " + ")
     print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(expression))"))
 end
-
-Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
-
-Spaces.dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
-
-INDEXTABLE::Dict{String, Integer} = Dict("x" => 1, "y" => 2, "z" => 3) # The mappings for axis (x y z) in basis functions to tensor indicies.
-
-resolveentrycoords(expression::Symbol)::Vector{Integer} = map(v -> INDEXTABLE[v], split(expression |> string, ""))
-
-entryindexmap(dimension::Integer, rank::Integer)::Dict{Tuple, Integer} = Dict(v => n for (n, v) in Iterators.map(reverse, Iterators.product(repeat([1:dimension], rank)...)) |> enumerate)
 
 function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Integer)::BasisFunction
     ranks::Tuple = map(expression -> expression |> first |> string |> length, expressions)
@@ -58,22 +88,18 @@ function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Intege
         error("Function with mixed order elements is not a valid basis function!")
     end
 
-    indexmap::Dict{Tuple, Integer} = entryindexmap(dimension, maxrank)
+
+    indexmap::Dict{Vector, Integer} = Dict(n => v for (n, v) in tmatfullindexmappings(dimension, maxrank) |> enumerate)
     data::Vector{Complex} = zeros(ComplexF64, indexmap |> length)
 
-    for expression in expressions
-        coords::Tuple = Tuple(expression |> first |> resolveentrycoords)
-        data[indexmap[coords]] = expression |> last
+    for (symbol, value) in expressions
+        coords::Vector = symbol |> resolveentrycoords
+        data[indexmap[coords]] = value
     end
 
-    return BasisFunction(data, dimension, maxrank)
+    contractmatrix, _ = tmatcontractmatrices(dimension=dimension, rank=maxrank)
+    return BasisFunction(contractmatrix * data, dimension, maxrank)
 end
-
-eigenfunctionsignature(eigenfunction::BasisFunction, eigenvalue::Number)::Tuple = eigenfunctionsignature(
-    eigenfunction.rank, eigenfunction.dimension, eigenvalue)
-
-eigenfunctionsignature(rank::Integer, dimension::Integer, eigenvalue::Number)::Tuple = (
-    rank, dimension, eigenvalue |> ComplexF64 |> hashablecomplex)
 
 function Base.:+(a::BasisFunction, b::BasisFunction)::BasisFunction
     @assert(a.dimension == b.dimension)
@@ -92,6 +118,43 @@ struct AffineTransform <: Transformation{Matrix{Float64}}
     antiunitary::Bool
 end
 export AffineTransform
+
+fullpointgrouprepresentation(irrep::Matrix; rank::Integer = 1)::Matrix = reduce(kron, repeat([irrep], rank))
+export fullpointgrouprepresentation
+
+function pointgrouprepresentation(irrep::Matrix; rank::Integer = 1)::Matrix
+    contractmatrix, selectormatrix = tmatcontractmatrices(rank=rank, dimension=size(irrep, 1))
+    return contractmatrix * fullpointgrouprepresentation(irrep, rank=rank) * selectormatrix'
+end
+
+function computeeigenfunctions(pointgroupmatrix::Matrix; functionorderrange::UnitRange = 1:3)::Base.Iterators.Flatten
+    dimension::Integer = pointgroupmatrix |> size |> first
+    function computeeigenfunctionsatorder(functionorder::Integer)
+        matrixatorder::Matrix = pointgrouprepresentation(pointgroupmatrix; rank=functionorder)
+        eigenvalues, eigenvectors = matrixatorder |> eigen
+        basisfunctions = (eigenvalue => BasisFunction(eigenvectors[:, n], dimension, functionorder) |> normalize for (n, eigenvalue) in eigenvalues |> enumerate)
+        return Iterators.filter(p -> !(p.second |> iszero), basisfunctions)
+    end
+
+    return (p for functionorder in functionorderrange for p in functionorder |> computeeigenfunctionsatorder)
+end
+
+functionsignature(basis::BasisFunction, eigenvalue::Complex; denominator::Integer = 128)::Tuple = functionsignature(
+    basis |> dimension, basis.rank, eigenvalue; denominator=denominator)
+functionsignature(rank::Integer, dimension::Integer, eigenvalue::Complex; denominator::Integer = 128)::Tuple = (dimension, rank, hashablecomplex(eigenvalue, denominator))
+
+function AffineTransform(
+    transformmatrix::Matrix, shiftvector::Vector = zeros(Float64, transformmatrix |> size |> first);
+    antiunitary::Bool = false,
+    localspace::AffineSpace = euclidean(RealSpace, transformmatrix |> size |> first))::AffineTransform
+
+    eigenfunctions = transformmatrix |> computeeigenfunctions
+    eigenvaluehashdenominator::Integer = findcomplexdenominator(v for (v, _) in eigenfunctions; denominatorrange=64:128).denominator
+    eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(functionsignature(f, v |> Complex, denominator=eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
+    eigenfunctiontable[functionsignature(swave, 1 + 0im, denominator=eigenvaluehashdenominator)] = swave
+    return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
+end
+
 pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,

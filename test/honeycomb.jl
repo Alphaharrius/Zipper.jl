@@ -21,7 +21,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [48, 48])
+crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
@@ -72,8 +72,10 @@ globaldistiller = globaldistillerhamiltonian(
     localisometryselectionstrategy=frozenselectionbycount(3),
     symmetry=c6)
 
-visualize(globaldistiller |> crystalspectrum, title="Global Distiller")
-distillresult = distillation(globaldistiller, courierenergythreshold=1e-5)
+globaldistillerspectrum = globaldistiller |> crystalspectrum
+visualize(globaldistillerspectrum, title="Global Distiller")
+
+distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
 
 courierseedingcenter::Position = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)

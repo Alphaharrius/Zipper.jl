@@ -22,7 +22,7 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [64, 64])
+crystal = Crystal(unitcell, [32, 32])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
@@ -38,14 +38,15 @@ bonds::FockMap = bondmap([
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => t_n,
     (m0, setattr(m1, :offset => Point([0, 1], triangular))) => t_n])
 
-bonds |> visualize
-H::FockMap = hamiltonian(crystal, bonds)
-C::FockMap = groundstatecorrelations(H)
+energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
+energyspectrum |> visualize
 
-energyspectrum = crystalspectrum(H)
+groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
+groundstates |> visualize
+groundstateprojector = groundstates |> crystalprojector
+
+C = idmap(groundstateprojector.outspace) - groundstateprojector
 correlationspectrum = C |> crystalspectrum
-
-visualize(energyspectrum, title="Physical Hamiltonian")
 visualize(correlationspectrum, title="Physical Correlation")
 
 correlations = C
@@ -57,11 +58,6 @@ blockresult = blocking(:action => scale, :correlations => correlations, :crystal
 
 blockedcrystal::Crystal = blockresult[:crystal]
 blockedcorrelations::FockMap = blockresult[:correlations]
-
-blockedhamiltonian = blockresult[:transformer] * H * blockresult[:transformer]'
-blockedhamiltonian |> crystalspectrum |> visualize
-
-commutation(c3 * blockedhamiltonian.outspace, blockedhamiltonian) |> maximum
 
 function circularregionmodes(origin::Position, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
     currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
@@ -84,10 +80,10 @@ globaldistiller = globaldistillerhamiltonian(
     localisometryselectionstrategy=frozenselectionbycount(6),
     symmetry=c3)
 
-commutation(c3 * globaldistiller.outspace, globaldistiller) |> maximum
+globaldistillerspectrum = globaldistiller |> crystalspectrum
+globaldistillerspectrum |> visualize
 
-visualize(globaldistiller |> crystalspectrum, title="Global Distiller")
-distillresult = distillation(globaldistiller, courierenergythreshold=1e-5)
+distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
 
 filledseedingcenter::Position = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)

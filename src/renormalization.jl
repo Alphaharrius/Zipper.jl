@@ -124,35 +124,35 @@ function globaldistillerhamiltonian(;
 end
 export globaldistillerhamiltonian
 
-function distillation(globaldistiller::FockMap; courierenergythreshold::Number = 1e-5)
-    spectrum::CrystalSpectrum = globaldistiller |> crystalspectrum
-    partitionrule = v -> v > courierenergythreshold ? :empty : v < -courierenergythreshold ? :filled : :courier
-    labelled::Base.Generator = ((mode |> getattr(:offset), v |> partitionrule) => mode for (mode, v) in spectrum.eigenvalues)
-    isometrygroups::Dict{Tuple, Vector{Mode}} = foldl(labelled; init=Dict{Tuple, Vector{Mode}}()) do d,(k, v)
+function generategroupingfunction(grouppredicates)
+    labels::Vector{Symbol} = [label for (label, _) in grouppredicates]
+    predicates::Vector{Function} = [predicate for (_, predicate) in grouppredicates]
+    function f(value::Number)::Symbol
+        return labels[findfirst(p -> value |> p, predicates)]
+    end
+    return f
+end
+
+function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol, CrystalSpectrum}
+    groupingfunction::Function = bandpredicates |> Renormalization.generategroupingfunction
+    labeled::Base.Generator = ((mode |> getattr(:offset), v |> groupingfunction) => mode for (mode, v) in spectrum |> geteigenvalues)
+    momentumgroups::Dict{Tuple, Vector{Mode}} = foldl(labeled; init=Dict{Tuple, Vector{Mode}}()) do d,(k, v)
         mergewith!(append!, d, LittleDict(k => [v]))
     end
-    filledcrystalisometries::Dict{Momentum, FockMap} = Dict()
-    emptycrystalisometries::Dict{Momentum, FockMap} = Dict()
-    couriercrystalisometries::Dict{Momentum, FockMap} = Dict()
-    for (k, unitary) in spectrum.eigenvectors
-        filledfock::FockSpace = isometrygroups[(k, :filled)] |> Subset |> FockSpace
-        filledcrystalisometries[k] = columns(unitary, filledfock)
-        emptyfock::FockSpace = isometrygroups[(k, :empty)] |> Subset |> FockSpace
-        emptycrystalisometries[k] = columns(unitary, emptyfock)
-        courierfock::FockSpace = isometrygroups[(k, :courier)] |> Subset |> FockSpace
-        couriercrystalisometries[k] = columns(unitary, courierfock)
+
+    bands::Dict{Symbol, Dict{Momentum, FockMap}} = Dict()
+    for ((k, band), modes) in momentumgroups
+        !haskey(bands, band) && (bands[band] = Dict())
+        bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> Subset |> FockSpace)
     end
 
     function repacktospectrum(isometries::Dict{Momentum, FockMap})::CrystalSpectrum
-        eigenmodes::Dict{Momentum, Subset{Mode}} = Dict(k => fockmap.inspace |> orderedmodes for (k, fockmap) in isometries)
-        eigenvalues::Dict{Mode, Number} = Dict(mode => spectrum.eigenvalues[mode] for (_, modes) in eigenmodes for mode in modes)
+        eigenmodes::Dict{Momentum, Subset{Mode}} = Dict(k => fockmap |> getinspace |> orderedmodes for (k, fockmap) in isometries)
+        eigenvalues::Dict{Mode, Number} = Dict(mode => (spectrum |> geteigenvalues)[mode] for (_, modes) in eigenmodes for mode in modes)
         return CrystalSpectrum(spectrum.crystal, eigenmodes, eigenvalues, isometries)
     end
 
-    return Dict(
-        :empty => emptycrystalisometries |> repacktospectrum,
-        :filled => filledcrystalisometries |> repacktospectrum,
-        :courier => couriercrystalisometries |> repacktospectrum)
+    return Dict(band => isometries |> repacktospectrum for (band, isometries) in bands)
 end
 export distillation
 

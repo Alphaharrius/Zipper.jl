@@ -66,12 +66,12 @@ spectrum by filling all fermionic degrees of freedom below the Fermi energy.
 ### Output
 The `CrystalSpectrum` object that contains the ground state energy spectrum.
 """
-function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Integer, energyresolution::Real = 1e-7)::CrystalSpectrum
+function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-7)::CrystalSpectrum
     perunitcellfillings > 0 || error("Filling must be positive!")
     
     unitcellvacancies::Integer = energyspectrum |> geteigenvectors |> values |> first |> getinspace |> dimension
     perunitcellfillings <= unitcellvacancies || error("Unable to fill more than $unitcellvacancies per unit cell!")
-    totalfillings::Integer = perunitcellfillings * (energyspectrum |> getcrystal |> vol)
+    totalfillings::Integer = (perunitcellfillings * (energyspectrum |> getcrystal |> vol)) |> round |> Int
 
     groupedeigenvalues::Base.Generator = groupbyeigenvalues(energyspectrum, groupingthreshold=energyresolution)
     cumfillings::Vector = cumsum(modeset |> length for (_, modeset) in groupedeigenvalues)

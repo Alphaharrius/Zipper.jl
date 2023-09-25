@@ -323,8 +323,22 @@ export crystalsubsets
 
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
-crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace} = Dict(commonattr(subspace, :offset) => subspace |> FockSpace for subspace in crystalfock |> rep)
+function crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace}
+    function subsettofockspace(subset::Subset{Mode})::Pair{Momentum, FockSpace}
+        k::Momentum = commonattr(subset, :offset)
+        return k => FockSpace(subset, reflected=k)
+    end
+    return Dict(subspace |> subsettofockspace for subspace in crystalfock |> rep)
+end
 export crystalsubspaces
+
+"""
+    getmomentum(subspace::FockSpace{Momentum})::Momentum
+
+Shorthand for retrieving the `Momentum` of a `FockSpace{Momentum}`.
+"""
+getmomentum(subspace::FockSpace{Momentum})::Momentum = subspace.reflected
+export getmomentum
 
 """
     commonattr(subset::Subset{Mode}, key::Symbol)

@@ -3,6 +3,20 @@ module Renormalization
 using LinearAlgebra, OrderedCollections
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations
 
+"""
+    frozenselectionbythreshold(threshold::Float64)
+
+A selection strategy for `localfrozenisometries` and `globaldistillerhamiltonian` that selects the modes with correlation eigenvalues γ
+that is localized within the local region ∀ γ ≈ 0 or γ ≈ 1 up to a `threshold`.
+
+### Input
+- `threshold::Float64`: The threshold for the correlation eigenvalues.
+
+### Output
+A function representing the selection strategy with an input of the local correlations 𝐶ᵣ `FockMap` and outputs a `Dict{Symbol, FockMap}`
+keyed by two grouping symbols with their associated local isometries selected from the unitary that diagonalizes 𝐶ᵣ. The grouping symbol
+`:filled` represents the eigenmodes that corresponds to γ ≈ 0; `:empty` represents the eigenmodes that corresponds to γ ≈ 1.
+"""
 function frozenselectionbythreshold(threshold::Float64)::Function
     function frozenfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
         spectrum, 𝑈ᵣ::FockMap = eigh(𝐶ᵣ)
@@ -24,6 +38,18 @@ function frozenselectionbycount(count::Integer)
 end
 export frozenselectionbycount
 
+"""
+    regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockMap
+
+Restrict the crystal correlations to a real space regional local correlations.
+
+### Input
+- `correlations::FockMap`: The crystal correlations.
+- `regionfock::FockSpace`: The real space regional `FockSpace`.
+
+### Output
+The real space local correlation with `inspace` and `outspace` as the `regionfock`.
+"""
 function regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockMap
     fouriermap::FockMap = fourier(correlations.inspace, regionfock) / (correlations.inspace |> subspacecount |> sqrt)
     return fouriermap' * correlations * fouriermap

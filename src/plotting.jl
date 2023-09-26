@@ -1,7 +1,7 @@
 module Plotting
 
 using Plotly, ColorTypes, LinearAlgebra, Compat
-using ..Spaces, ..Geometries, ..Quantum
+using ..Spaces, ..Geometries, ..Quantum, ..Renormalization
 
 export visualize
 
@@ -58,10 +58,39 @@ function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T
     fig
 end
 
-function visualize_crystalspectrum_2d(spectrum::CrystalSpectrum)
+function visualize(state::RegionState{2}; title::String = "")
+    function generatestateplot(spstate::FockMap)
+        columnspectrum::Base.Generator = (
+            outmode => mat[fockorder(spstate |> getoutspace, outmode), 1] for outmode in spstate |> getoutspace |> orderedmodes)
+        positions::Vector{Position} = [v.first |> pos for v in columnspectrum]
+        mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
+        markermesh::Matrix{Float64} = zeros(3, positions |> length)
+        copyto!(view(markermesh, 1:size(mesh, 1), :), mesh)
+        markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
+        normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * 120
+        markercolors::Vector = [convert(RGB{Float64}, HSV(angle(v.second) / 2π * 360, 1, 1)) for v in columnspectrum]
+        return scatter3d(
+            x=markermesh[1, :], y=markermesh[2, :], z=markermesh[3, :], mode="markers",
+            marker=attr(
+                symbol="circle",
+                size=normalizedmarkersizes,
+                color=markercolors))
+    end
+    subplots = [spstate |> generatestateplot for spstate in state]
+    relayout!(subplots, title_text=title)
+    subplots
+end
+
+function visualize_crystalspectrum_2d(spectrum::CrystalSpectrum; toppadding::Bool = true)
     kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
-    mesh = spectrum.crystal |> brillouinmesh
-    plottingspectrum = stack(map(k -> kspectrum[k], mesh))
+    mesh::Matrix{Momentum} = spectrum.crystal |> brillouinmesh
+    plottingdata::Matrix{Vector} = map(k -> haskey(kspectrum, k) ? kspectrum[k] : [], mesh)
+    bandcount::Integer = map(v -> v |> length, plottingdata) |> maximum
+    function padding(v::Vector)::Vector
+        return toppadding ? vcat(v, repeat([NaN], bandcount - length(v))) : vcat(repeat([NaN], bandcount - length(v)), v)
+    end
+    paddeddata::Matrix{Vector} = map(v -> v |> padding, plottingdata)
+    plottingspectrum::Array = paddeddata |> stack
     return [surface(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)]
 end
 

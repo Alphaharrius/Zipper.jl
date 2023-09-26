@@ -3,7 +3,7 @@ module Renormalization
 using LinearAlgebra, OrderedCollections
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations
 
-function frozenselectionbythreshold(threshold::Float64)
+function frozenselectionbythreshold(threshold::Float64)::Function
     function frozenfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
         spectrum, 𝑈ᵣ::FockMap = eigh(𝐶ᵣ)
         filledmodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second < threshold, spectrum)))

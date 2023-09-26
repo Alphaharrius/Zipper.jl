@@ -3,9 +3,10 @@ include("../src/geometries.jl")
 include("../src/transformations.jl")
 include("../src/quantum.jl")
 include("../src/physical.jl")
-include("../src/plotting.jl")
 include("../src/quantumtransformations.jl")
 include("../src/renormalization.jl")
+
+include("../src/plotting.jl")
 
 using PlotlyJS, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Renormalization
@@ -37,6 +38,7 @@ energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize
 
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
+groundstates |> visualize
 groundstateprojector = groundstates |> crystalprojector
 
 C = idmap(groundstateprojector.outspace) - groundstateprojector
@@ -103,6 +105,35 @@ purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
 purifiedcorrelationspectrum |> visualize
 couriercorrelations = purifiedcorrelationspectrum |> FockMap
 
+using ColorTypes
+function visualizeregionstate2d(state::RegionState{2}; title::String = "")
+    mapdata::SparseMatrixCSC = state |> rep |> rep
+
+    function generatestateplot(spstate::FockMap)
+        spmode::Mode = spstate |> getinspace |> first
+        columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
+        positions::Vector{Position} = [v.first |> pos for v in columnspectrum]
+        mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
+        markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
+        normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * 120
+        markercolors::Vector = [convert(RGB{Float64}, HSV(angle(v.second) / 2π * 360, 1, 1)) for v in columnspectrum]
+        return scatter(
+            x=mesh[1, :], y=mesh[2, :], mode="markers",
+            marker=attr(
+                symbol="circle",
+                size=normalizedmarkersizes,
+                color=markercolors))
+    end
+
+    scatters::Vector = [spstate |> generatestateplot for spstate in state]
+    fig = make_subplots(rows=1, cols=scatters |> length)
+    for (n, scatter) in enumerate(scatters)
+        add_trace!(fig, scatter, row=1, col=n)
+    end
+    relayout!(fig, title_text=title)
+    fig
+end
+
 commutation(c6 * couriercorrelations.outspace, couriercorrelations) |> maximum
 
 blockedfilledprojector = distillresult[:filled] |> crystalprojector
@@ -112,6 +143,9 @@ filledseed = [regionalwannierseeding(blockedfilledcorrelation, frozenseedingfock
 crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
 wannierfilledisometry = wannierprojection(
     crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
+
+state = regionalrestriction(wannierfilledisometry, frozenseedingfock, frozenseedingfock, frozenseedingfock)
+state |> visualizeregionstate2d
 
 blockedemptyprojector = distillresult[:empty] |> crystalprojector
 blockedemptycorrelation = idmap(blockedemptyprojector.outspace, blockedemptyprojector.outspace) - blockedemptyprojector

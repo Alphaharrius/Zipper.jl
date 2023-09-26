@@ -389,7 +389,8 @@ Base.:lastindex(subset::T) where {T <: Subset} = length(subset)
 Base.:getindex(subset::T, index) where {T <: Subset} = rep(subset)[index]
 Base.:getindex(subset::T, inds...) where {T <: Subset} = Subset([rep(subset)...][inds...])
 
-Base.:filter(f, subset::T) where {T <: Subset} = Subset(filter(f, rep(subset)))
+Base.:filter(f, subset::T) where {T <: Subset} = Subset(Iterators.filter(f, rep(subset)))
+Iterators.:filter.:filter(f, subset::T) where {T <: Subset} = Base.filter(f, subset)
 
 """
     flatten(subset::Subset{T})::Subset

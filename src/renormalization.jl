@@ -143,7 +143,7 @@ function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol
     bands::Dict{Symbol, Dict{Momentum, FockMap}} = Dict()
     for ((k, band), modes) in momentumgroups
         !haskey(bands, band) && (bands[band] = Dict())
-        bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> Subset |> FockSpace)
+        bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> FockSpace)
     end
 
     function repacktospectrum(isometries::Dict{Momentum, FockMap})::CrystalSpectrum

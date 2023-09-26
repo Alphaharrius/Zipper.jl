@@ -32,7 +32,7 @@ export regioncorrelations
 
 localfrozenisometries(
     correlations::FockMap, regionfock::FockSpace;
-    selectionstrategy = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap} = (
+    selectionstrategy::Function = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap} = (
     regioncorrelations(correlations, regionfock) |> selectionstrategy)
 export localfrozenisometries
 

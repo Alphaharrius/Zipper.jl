@@ -6,7 +6,7 @@ using ..Spaces, ..Geometries, ..Quantum, ..Transformations
 function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
-    unscaledblockedregion::Subset{Position} = (scale |> inv) * scaledcrystal.unitcell
+    unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
     bz::Subset{Momentum} = crystal |> brillouinzone
     basismodes::Subset{Mode} = crystalfock |> rep |> first
     scaledbz::Subset{Momentum} = scaledcrystal |> brillouinzone
@@ -20,7 +20,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     scaledfock::FockSpace = ((ksubsets[k] for k in mappingpartitions[kscaled]) |> subsetunion |> FockSpace
         for kscaled in scaledbz) |> fockspaceunion
 
-    unscaledblockedlatticeoffsets::Subset{Position} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
+    unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
     unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
 
     restrictedfourier::FockMap = fourier(bz, unscaledblockedunitcellfock)
@@ -47,9 +47,9 @@ function Base.:*(transformation::AffineTransform, subset::Subset{Mode})::FockMap
     # which the basis point set might not include the symmetrized :pos. Thus we would like to set
     # the :pos to its corresponding basis point, and offload the difference to :offset.
     function correctsymmetrizedmode(mode::Mode)::Mode
-        actualposition::Position = mode |> getattr(:pos)
-        basisposition::Position = actualposition |> basispoint
-        offset::Position = actualposition - basisposition
+        actualposition::Offset = mode |> getattr(:pos)
+        basisposition::Offset = actualposition |> basispoint
+        offset::Offset = actualposition - basisposition
         return mode |> setattr(:pos => basisposition) |> setattr(:offset => offset)
     end
 
@@ -57,8 +57,8 @@ function Base.:*(transformation::AffineTransform, subset::Subset{Mode})::FockMap
 
     function mergepositions(mode::Mode)::Mode
         latticeoffset::Point = mode |> getattr(:offset)
-        latticeoffset isa Position || error("Transforming a mode based on momentum must be done with crystal fockspace!")
-        actualposition::Position = getattr(mode, :pos) + latticeoffset
+        latticeoffset isa Offset || error("Transforming a mode based on momentum must be done with crystal fockspace!")
+        actualposition::Offset = getattr(mode, :pos) + latticeoffset
         return mode |> setattr(:pos => actualposition) |> removeattr(:offset)
     end
 

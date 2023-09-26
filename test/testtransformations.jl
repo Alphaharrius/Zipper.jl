@@ -51,7 +51,7 @@ end
 
 Base.convert(::Type{AffineTransform}, source::QuantumAffine)::AffineTransform = source.affine
 
-Transformations.recenter(quantumaffine::QuantumAffine, center::Position)::QuantumAffine = QuantumAffine(
+Transformations.recenter(quantumaffine::QuantumAffine, center::Offset)::QuantumAffine = QuantumAffine(
     quantumaffine.affine |> recenter(center), quantumaffine.eigenfunctions, quantumaffine.charactertable, quantumaffine.eigenvaluehashdenominator)
 Transformations.affinematrix(quantumaffine::QuantumAffine)::Matrix = quantumaffine.affine |> affinematrix
 Spaces.getspace(quantumaffine::QuantumAffine)::Space = quantumaffine.affine |> getspace
@@ -62,7 +62,7 @@ Base.:*(space::RealSpace, quantumaffine::QuantumAffine)::QuantumAffine = Quantum
 Base.:*(a::QuantumAffine, b::QuantumAffine)::QuantumAffine = QuantumAffine(a.affine * b.affine)
 Base.:*(quantumaffine::QuantumAffine, space::RealSpace)::QuantumAffine = quantumaffine.affine * space
 Base.:^(source::QuantumAffine, exponent::Integer)::QuantumAffine = QuantumAffine(source.affine ^ exponent)
-Base.:*(quantumaffine::QuantumAffine, region::Subset{Position}) = quantumaffine.affine * region
+Base.:*(quantumaffine::QuantumAffine, region::Subset{Offset}) = quantumaffine.affine * region
 Base.:*(quantumaffine::QuantumAffine, zone::Subset{Momentum}) = quantumaffine.affine * zone
 Base.:*(quantumaffine::QuantumAffine, point::Point) = quantumaffine.affine * point
 Spaces.dimension(quantumaffine::QuantumAffine)::Integer = quantumaffine.affine |> dimension

@@ -53,18 +53,18 @@ blockresult = blocking(:action => scale, :correlations => correlations, :crystal
 blockedcrystal::Crystal = blockresult[:crystal]
 blockedcorrelations::FockMap = blockresult[:correlations]
 
-function circularregionmodes(origin::Position, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
+function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
     currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
     physicalnorm = m -> lineartransform(currentspace, m |> pos) |> norm
     return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
 end
 
-crystalpoints::Subset{Position} = latticepoints(blockedcrystal)
+crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
 blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 
 frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> origin, physicalmodes, 2.0)
-frozenseedingregion::Subset{Position} = Subset(m |> pos for m in frozenseedingmodes)
+frozenseedingregion::Subset{Offset} = Subset(m |> pos for m in frozenseedingmodes)
 visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
 frozenseedingfock::FockSpace = FockSpace(frozenseedingmodes)
 
@@ -79,9 +79,9 @@ visualize(globaldistillerspectrum, title="Global Distiller")
 
 distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
 
-courierseedingcenter::Position = (blockedmodes |> getspace) & [2/3, 1/3]
+courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
-courierseedingregion::Subset{Position} = Subset(m |> pos for m in courierseedingmodes)
+courierseedingregion::Subset{Offset} = Subset(m |> pos for m in courierseedingmodes)
 visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))
 courierseedingfock::FockSpace = FockSpace(courierseedingmodes)
 
@@ -112,7 +112,7 @@ function visualizeregionstate2d(state::RegionState{2}; title::String = "")
     function generatestateplot(spstate::FockMap)
         spmode::Mode = spstate |> getinspace |> first
         columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
-        positions::Vector{Position} = [v.first |> pos for v in columnspectrum]
+        positions::Vector{Offset} = [v.first |> pos for v in columnspectrum]
         mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
         markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
         normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * 120

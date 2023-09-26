@@ -107,7 +107,7 @@ export crystalisometries
 function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
     isometries::Dict{Momentum, FockMap} = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
-    isometryunitcell::Subset{Position} = Subset(mode |> getattr(:pos) for mode in localisometry.inspace |> orderedmodes)
+    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in localisometry.inspace |> orderedmodes)
     isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
     isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
     isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
@@ -226,7 +226,7 @@ end
 export regionalwannierseeding
 
 function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, FockMap}, svdorthothreshold::Number = 1e-1)
-    wannierunitcell::Subset{Position} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
+    wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
     overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
     precarioussvdvalues::Vector = []
@@ -259,11 +259,11 @@ export RegionState
 Base.:convert(::Type{FockMap}, source::RegionState)::FockMap = source.rep
 
 function regionalrestriction(crystalstate::FockMap, regionfocks::FockSpace...)::RegionState
-    positionmodes::Dict{Position, Mode} = Dict(
+    positionmodes::Dict{Offset, Mode} = Dict(
         getattr(mode, :pos) => mode for mode in crystalstate |> getinspace |> unitcellfock |> orderedmodes)
 
     function regionstate(regionfock::FockSpace)::FockMap
-        statecenter::Position = Subset(mode |> pos for mode in regionfock |> orderedmodes) |> center
+        statecenter::Offset = Subset(mode |> pos for mode in regionfock |> orderedmodes) |> center
         haskey(positionmodes, statecenter) || error("Region center $statecenter is not a center in the crystal state!")
         mode::Mode = positionmodes[statecenter]
         rightfourier::FockMap = fourier(crystalstate |> getinspace, mode |> FockSpace)

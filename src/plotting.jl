@@ -62,7 +62,7 @@ function visualize(state::RegionState{2}; title::String = "")
     function generatestateplot(spstate::FockMap)
         columnspectrum::Base.Generator = (
             outmode => mat[fockorder(spstate |> getoutspace, outmode), 1] for outmode in spstate |> getoutspace |> orderedmodes)
-        positions::Vector{Position} = [v.first |> pos for v in columnspectrum]
+        positions::Vector{Offset} = [v.first |> pos for v in columnspectrum]
         mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
         markermesh::Matrix{Float64} = zeros(3, positions |> length)
         copyto!(view(markermesh, 1:size(mesh, 1), :), mesh)

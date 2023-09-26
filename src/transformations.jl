@@ -159,17 +159,17 @@ pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,
     localspace::RealSpace = euclidean(RealSpace, dimension),
-    referencepoint::Position = localspace |> origin,
+    referencepoint::Offset = localspace |> origin,
     antiunitary::Bool = false)::AffineTransform = AffineTransform(pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
     localspace=localspace, antiunitary=antiunitary)
 export pointgrouptransform
 
-recenter(transformation::AffineTransform, center::Position)::AffineTransform = AffineTransform(
+recenter(transformation::AffineTransform, center::Offset)::AffineTransform = AffineTransform(
     transformation.transformmatrix, transformationshift(transformation.transformmatrix, transformation.localspace, center);
     localspace=transformation |> getspace, antiunitary=transformation.antiunitary)
 export recenter
 
-recenter(center::Position) = transformation -> recenter(transformation, center)
+recenter(center::Offset) = transformation -> recenter(transformation, center)
 
 translation(
     shiftvector::Vector;
@@ -247,7 +247,7 @@ function Base.:^(source::AffineTransform, exponent::Number)::AffineTransform
     return reduce(*, repeat([source], exponent))
 end
 
-function Base.:*(transformation::AffineTransform, region::Subset{Position})::Subset{Position}
+function Base.:*(transformation::AffineTransform, region::Subset{Offset})::Subset{Offset}
     nativetransformation::AffineTransform = (region |> getspace) * transformation
     transformed::Base.Generator = (
         Point(((nativetransformation |> rep) * vcat(point |> pos, [1]))[1:end - 1], point |> getspace)
@@ -355,7 +355,7 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
     blockingpoints::Base.Generator = (Point(collect(coord), oldspace) for coord in Iterators.product((0:size - 1 for size in diag(Δ))...))
     relativescale::Scale = Scale(newbasiscoords)
-    scaledunitcell::Subset{Position} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
+    scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
 end
 

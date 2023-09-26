@@ -40,7 +40,7 @@ visualize(blockedcorrelations, title="Correlation", rowrange=1:64, colrange=1:64
 
 newcrystal = blocked[:crystal]
 
-crystalpoints::Subset{Position} = latticepoints(newcrystal)
+crystalpoints::Subset{Offset} = latticepoints(newcrystal)
 newmodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)

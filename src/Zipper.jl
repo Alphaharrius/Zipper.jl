@@ -4,7 +4,7 @@ using LinearAlgebra, SparseArrays, OrderedCollections, Base.Iterators, SmithNorm
 
 include("spaces.jl")
 using .Spaces
-export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Position, Momentum, Subset
+export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Offset, Momentum, Subset
 export rep, euclidean, basis, dimension, getspace, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
 
 include("geometries.jl")

@@ -2,7 +2,7 @@ module Spaces
 
 using LinearAlgebra, OrderedCollections, Base.Iterators
 
-export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Position, Momentum, Subset
+export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Offset, Momentum, Subset
 export rep, euclidean, basis, dimension, getspace, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
 
 """
@@ -171,7 +171,7 @@ struct Point{T <: AffineSpace} <: AbstractSubset{Point}
 end
 
 """ Alias of a real space point. """
-Position = Point{RealSpace}
+Offset = Point{RealSpace}
 """ Alias of a momentum space point. """
 Momentum = Point{MomentumSpace}
 
@@ -237,7 +237,7 @@ function reciprocalhashcalibration(; x::Integer = 128, y::Integer = 128, z::Inte
 end
 
 """
-    rpos(position::Position)
+    rpos(position::Offset)
     rpos(momentum::Momentum)
 
 Generates a `Vector{Rational{Int64}}` that round the position of the `Vector` in a fixed precision, this method can be used for hashing `Point`.
@@ -253,7 +253,7 @@ this method is preserved for hashing purposes only.
 ### Output
 A `Vector{Rational{Int64}}` which stores the rounded elements.
 """
-rpos(position::Position)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(position |> euclidean |> pos, spatialhashdenominators[1:dimension(position)])]
+rpos(position::Offset)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(position |> euclidean |> pos, spatialhashdenominators[1:dimension(position)])]
 rpos(momentum::Momentum)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(momentum |> pos, reciprocalhashdenominators[1:dimension(momentum)])]
 
 """

@@ -58,12 +58,12 @@ commutation(a::FockMap, b::FockMap)::FockMap = (a * b - b * a)
 
 commute(c6 * blockedH.outspace, blockedH; eps=5e-7)
 
-function circularregionmodes(origin::Position, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
+function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
     physicalnorm = m -> m |> pos |> euclidean |> norm
     return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
 end
 
-crystalpoints::Subset{Position} = latticepoints(newcrystal)
+crystalpoints::Subset{Offset} = latticepoints(newcrystal)
 newmodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 
@@ -71,7 +71,7 @@ frozenseedingregion::Subset{Mode} = circularregionmodes(triangular |> origin, ph
 frozenseedingfock::FockSpace = FockSpace(frozenseedingregion)
 visualize(Subset(m |> pos |> euclidean for m in frozenseedingregion), visualspace=euclidean(RealSpace, 2))
 
-courierseedingcenter::Position = (newcrystal |> getspace) & [2/3, 1/3]
+courierseedingcenter::Offset = (newcrystal |> getspace) & [2/3, 1/3]
 courierseedingregion::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
 courierseedingfock::FockSpace = FockSpace(courierseedingregion)
 visualize(Subset(m |> pos |> euclidean for m in courierseedingregion), visualspace=euclidean(RealSpace, 2))
@@ -123,7 +123,7 @@ symmetrizedseed = reduce(+, (t * fullcourierseed.outspace) * fullcourierseed for
 function Renormalization.crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
     isometries::Dict{Momentum, FockMap} = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
-    isometryunitcell::Subset{Position} = Subset(mode |> getattr(:pos) for mode in localisometry.inspace |> orderedmodes)
+    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in localisometry.inspace |> orderedmodes)
     isometrycrystal::Crystal = Crystal(isometryunitcell, (crystalfock |> getcrystal).sizes)
     isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
     isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
@@ -263,7 +263,7 @@ commutation(c6 * courierseedproj.outspace, courierseedproj) |> maximum
 
 
 function Renormalization.wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, FockMap}, svdorthothreshold::Number = 1e-1)
-    wannierunitcell::Subset{Position} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
+    wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
     overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
     precarioussvdvalues::Vector = []
@@ -407,7 +407,7 @@ c62C |> crystalspectrum |> visualize
 
 crystal2 = block2[:crystal]
 
-crystalpoints2::Subset{Position} = latticepoints(crystal2)
+crystalpoints2::Subset{Offset} = latticepoints(crystal2)
 newmodes2::Subset{Mode} = quantize(:pos, crystal2.unitcell, 1)
 physicalmodes2::Subset{Mode} = spanoffset(newmodes2, crystalpoints2)
 Subset(m |> pos |> euclidean for m in newmodes2) |> visualize

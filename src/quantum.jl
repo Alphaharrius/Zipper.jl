@@ -491,7 +491,7 @@ end
 export quantize
 
 """
-    quantize(identifier::Symbol, subset::Subset{Position}, count::Integer)::Subset{Mode}
+    quantize(identifier::Symbol, subset::Subset{Offset}, count::Integer)::Subset{Mode}
 
 Quantizing a set of mode from a given set of `Point`.
 
@@ -504,7 +504,7 @@ Quantizing a set of mode from a given set of `Point`.
 ### Output
 The quantized set of `Mode` objects.
 """
-quantize(identifier::Symbol, subset::Subset{Position}, count::Int64)::Subset{Mode} = (
+quantize(identifier::Symbol, subset::Subset{Offset}, count::Int64)::Subset{Mode} = (
     Subset(quantize(identifier, point, flavor) for point in subset for flavor in 1:count))
 
 """

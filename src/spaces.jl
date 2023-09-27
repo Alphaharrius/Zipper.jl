@@ -349,6 +349,7 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     Subset(generator::Base.Generator) = Subset(OrderedSet{generator |> first |> typeof}(generator))
     Subset(input::Base.Iterators.Flatten) = Subset(OrderedSet{input |> first |> typeof}(input))
     Subset(subset::Subset) = Subset(OrderedSet([subset]))
+    Subset(input::Base.Iterators.Filter) = Subset(OrderedSet{input |> first |> typeof}(input))
 
     # Allows the creation of a empty subset.
     Subset{T}() where {T} = new{T}(OrderedSet())

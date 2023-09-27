@@ -388,7 +388,7 @@ Base.:iterate(subset::T, i...) where {T <: Subset} = iterate(rep(subset), i...)
 Base.:length(subset::T) where {T <: Subset} = subset |> rep |> length
 Base.:lastindex(subset::T) where {T <: Subset} = length(subset)
 Base.:getindex(subset::T, index) where {T <: Subset} = rep(subset)[index]
-Base.:getindex(subset::T, inds...) where {T <: Subset} = Subset([rep(subset)...][inds...])
+Base.:getindex(subset::T, range::UnitRange) where {T <: Subset} = Subset([rep(subset)...][range])
 
 Base.:filter(f, subset::T) where {T <: Subset} = Subset(Iterators.filter(f, rep(subset)))
 Iterators.:filter(f, subset::T) where {T <: Subset} = Base.filter(f, subset)

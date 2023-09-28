@@ -269,6 +269,10 @@ function FockSpace{Region}(input)
     return FockSpace(input, reflected=region)
 end
 
+""" Get the reflected region of the regional `FockSpace`. """
+getregion(regionfock::FockSpace{Region})::Region = regionfock |> getreflected
+export getregion
+
 """ Shorthand alias for `FockSpace{Crystal}`. """
 CrystalFock = FockSpace{Crystal}
 export CrystalFock

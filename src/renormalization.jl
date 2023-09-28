@@ -216,7 +216,7 @@ function regionalwannierseeding(statecorrelations::FockMap, regionspace::FockSpa
             mode |> setattr(:orbital => findeigenfunction(symmetry; dimensionrange=0:dim, eigenvalue=phase))
                  |> setattr(:pos => regioncenter)
                  |> setattr(:offset => regioncenter |> getspace |> origin)
-            for (mode, phase) in phases) |> FockSpace
+            for (mode, phase) in phases) |> FockSpace{Region}
 
         return FockMap(seed; inspace=seedfock, performpermute=false)
     end

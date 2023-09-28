@@ -42,7 +42,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     return FockMap(blocking.outspace, FockSpace(blocking.inspace, reflected=scaledcrystal), blocking |> rep)'
 end
 
-function Base.:*(transformation::AffineTransform, subset::Subset{Mode})::FockMap
+function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})::FockMap
     # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
     # which the basis point set might not include the symmetrized :pos. Thus we would like to set
     # the :pos to its corresponding basis point, and offload the difference to :offset.
@@ -82,12 +82,10 @@ function Base.:*(transformation::AffineTransform, subset::Subset{Mode})::FockMap
         return tomode
     end
 
-    outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in subset)
+    outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in regionfock)
     
-    return FockMap(outmodes |> FockSpace, subset |> FockSpace, connections)
+    return FockMap(outmodes |> FockSpace, regionfock, connections)
 end
-
-Base.:*(transformation::AffineTransform, fockspace::FockSpace)::FockMap = transformation * (fockspace |> orderedmodes)
 
 function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap
     homefock::FockSpace = crystalfock |> unitcellfock

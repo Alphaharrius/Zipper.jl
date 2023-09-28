@@ -259,6 +259,12 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
 end
 export FockSpace
 
+""" To create a regional `FockSpace`."""
+function FockSpace{Region}(input)
+    region::Region = Subset(m |> pos for m in input)
+    return FockSpace(input, reflected=region)
+end
+
 """ Shorthand alias for `FockSpace{Crystal}`. """
 CrystalFock = FockSpace{Crystal}
 export CrystalFock
@@ -364,10 +370,10 @@ export modeattrs
 
 Retrieve the unit cell fockspace of the system from a `FockSpace{Crystal}`, positioned at the origin of the parent `AffineSpace`.
 """
-function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
+function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace{Region}
     firstpartition::Subset{Mode} = crystalfock |> rep |> first
     originpoint::Point = firstpartition |> first |> getattr(:pos) |> getspace |> origin
-    return FockSpace(firstpartition |> setattr(:offset => originpoint))
+    return FockSpace{Region}(firstpartition |> setattr(:offset => originpoint))
 end
 export unitcellfock
 

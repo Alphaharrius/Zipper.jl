@@ -6,6 +6,9 @@ using ..Spaces
 export Crystal
 export distance, interpolate, origin, radius, pbc, basispoint, latticeoff, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, brillouinmesh, geometricalfilter, circularfilter
 
+Region = Subset{Offset}
+export Region
+
 """
     distance(a::Point, b::Point)::Float64
 

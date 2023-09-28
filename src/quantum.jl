@@ -259,6 +259,10 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
 end
 export FockSpace
 
+""" To retrieve the reflected property this `FockSpace` is reflected to. """
+getreflected(fockspace::FockSpace) = fockspace.reflected
+export getreflected
+
 """ To create a regional `FockSpace`."""
 function FockSpace{Region}(input)
     region::Region = Subset(m |> pos for m in input)
@@ -310,11 +314,11 @@ Returns the number of unique member modes within the `fockspace`, each of those 
 Spaces.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
 
 """
-    getcrystal(crystalfock::FockSpace{Crystal})::Crystal
+    getcrystal(crystalfock::CrystalFock)::Crystal
 
-Shorthand for retrieving the `Crystal` of a `FockSpace{Crystal}`.
+Shorthand for retrieving the `Crystal` of a `CrystalFock`.
 """
-getcrystal(crystalfock::FockSpace{Crystal})::Crystal = crystalfock.reflected
+getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock |> getreflected
 export getcrystal
 
 """

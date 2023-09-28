@@ -177,6 +177,8 @@ Momentum = Point{MomentumSpace}
 
 Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)]) ∈ $(point |> getspace |> typeof)"))
 
+Base.:*(space::AffineSpace, point::Point) = lineartransform(space, point)
+
 """
     getspace(point::Point)
 
@@ -184,11 +186,21 @@ Retrieve the `AffineSpace` of the `Point`.
 """
 getspace(point::Point) = point.space
 
+function basisvectors(space::AffineSpace)
+    euclideanspace::AffineSpace = euclidean(space |> typeof, space |> dimension)
+    return Subset(euclideanspace & (space |> basis)[:, n] for n in axes(space |> basis, 2))
+end
+export basisvectors
+
 hashablereal(v::Real, denominator::Integer = 10000000)::Rational = ((v * denominator) |> round |> Integer) // denominator
 export hashablereal
 
 hashablecomplex(z::Complex, denominator::Integer = 10000000)::Tuple = (hashablereal(z |> real, denominator), hashablereal(z |> imag, denominator))
 export hashablecomplex
+
+hashablenumber(v::Real, denominator::Integer = 10000000) = hashablereal(v, denominator)
+hashablenumber(z::Complex, denominator::Integer = 10000000) = hashablecomplex(z, denominator)
+export hashablenumber
 
 global spatialhashdenominators::Vector{Integer} = [128, 128, 128] # Default to 128 for each dimension.
 global reciprocalhashdenominators::Vector{Integer} = [128, 128, 128]
@@ -324,6 +336,7 @@ end
 
 Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) * val, getspace(point))
 Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) / val, getspace(point))
+Base.:*(val::T, point::Point) where {T <: Real} = point * val
 
 """
     Subset(elements::OrderedSet{T})

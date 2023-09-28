@@ -1,10 +1,13 @@
 module Geometries
 
-using LinearAlgebra, OrderedCollections
+using LinearAlgebra, OrderedCollections, Base.Iterators
 using ..Spaces
 
 export Crystal
 export distance, interpolate, origin, radius, pbc, basispoint, latticeoff, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, brillouinmesh, geometricalfilter, circularfilter
+
+Region = Subset{Offset}
+export Region
 
 """
     distance(a::Point, b::Point)::Float64
@@ -29,7 +32,7 @@ export center
 radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
 
 struct Crystal <: AbstractSubset{Crystal}
-    unitcell::Subset{Offset}
+    unitcell::Region
     sizes::Vector{Int64}
 end
 
@@ -58,6 +61,11 @@ end
 
 Spaces.getspace(crystal::Crystal) = getspace(crystal.unitcell)
 Spaces.dimension(crystal::Crystal) = crystal.sizes |> length
+
+Base.size(crystal::Crystal)::Vector = crystal.sizes
+
+getunitcell(crystal::Crystal)::Region = crystal.unitcell
+export getunitcell
 
 resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitcell, sizes)
 
@@ -89,8 +97,15 @@ function brillouinmesh(crystal::Crystal)::Array{Point}
     return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
 end
 
-geometricalfilter(f, center::Point) = input -> f(lineartransform(getspace(center), convert(Point, input)), center)
+function crosssectionrestriction(; sourceunitregion::Subset{Offset}, normalvector::Offset, regionpredicate::Function)::Region
+    normallength::Real = norm(normalvector)
+    normaldirection::Offset = normalvector / normallength
+    planarpredicate::Function = p -> isless(dot(p, normaldirection) |> abs, normallength)
+    return filter(planarpredicate ∘ regionpredicate, sourceunitregion)
+end
 
-circularfilter(center::Point, radius::Float64) = geometricalfilter((point, center) -> norm(point - center) <= radius, center)
+function crystalextension(crystal::Crystal, generatingvectors::Subset{Offset})
+    regions::Subset{Region} = Subset(crosssectionrestriction() for vec in generatingvectors)
+end
 
 end

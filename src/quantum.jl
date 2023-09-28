@@ -29,6 +29,7 @@ struct Mode <: AbstractSubset{Mode}
     Mode(input::Base.Iterators.Flatten) = Mode(Dict(input))
 
     Mode(attrs::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(attrs...))
+    Mode(attrs::Pair{Symbol, <:Any}...) = Mode(Dict(attrs))
 end
 export Mode
 
@@ -259,6 +260,12 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
 end
 export FockSpace
 
+""" To create a regional `FockSpace`."""
+function FockSpace{Region}(input)
+    region::Region = Subset(m |> pos for m in input)
+    return FockSpace(input, reflected=region)
+end
+
 """ Shorthand alias for `FockSpace{Crystal}`. """
 CrystalFock = FockSpace{Crystal}
 export CrystalFock
@@ -293,7 +300,8 @@ Base.:-(a::FockSpace, b::FockSpace)::FockSpace = FockSpace(setdiff(a |> orderedm
 
 Base.:intersect(a::FockSpace, b::FockSpace) = FockSpace(intersect(a |> orderedmodes, b |> orderedmodes))
 
-Base.:iterate(fockspace::FockSpace, i...) = iterate(flatten(rep(fockspace)), i...)
+Base.:iterate(fockspace::FockSpace, i...) = iterate(fockspace |> orderedmodes, i...)
+Base.:length(fockspace::FockSpace) = fockspace |> dimension # Added to support iterating FockSpace
 
 """
     Spaces.:dimension(fockspace::FockSpace)
@@ -364,10 +372,11 @@ export modeattrs
 
 Retrieve the unit cell fockspace of the system from a `FockSpace{Crystal}`, positioned at the origin of the parent `AffineSpace`.
 """
-function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
+function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace{Region}
     firstpartition::Subset{Mode} = crystalfock |> rep |> first
     originpoint::Point = firstpartition |> first |> getattr(:pos) |> getspace |> origin
-    return FockSpace(firstpartition |> setattr(:offset => originpoint))
+    region::Region = Subset(m |> getattr(:pos) for m in firstpartition)
+    return FockSpace(firstpartition |> setattr(:offset => originpoint), reflected=region)
 end
 export unitcellfock
 
@@ -724,7 +733,7 @@ performing eigenvalue decomposition.
 function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
     @assert(hassamespan(fockmap.inspace, fockmap.outspace))
     return Subset(
-        Mode([:flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
+        Mode([:eigenindex => index, attrs...]) for index in 1:dimension(fockmap.inspace))
 end
 export eigmodes
 
@@ -1122,22 +1131,49 @@ geteigenvectors(spectrum::EigenSpectrum)::FockMap = spectrum.eigenvectors
 Base.:show(io::IO, spectrum::EigenSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
 """ This function is the same as calling `eigh` but with a packaged return type. """
-function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...)::EigenSpectrum
-    evals, eigenvectors = eigh(hermitian, attrs...)
-    eigenvalues::Dict{Mode, Number} = Dict(evals)
-    return EigenSpectrum(eigenvalues, eigenvectors)
+# TODO: Making this the only method to perform eigenvalue decomposition, and assign same eigenindex to degenerate modes, but with different flavor.
+function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
+    eigenvalues, eigenvectors = hermitian |> rep |> Matrix |> Hermitian |> eigen
+    eigenvaluetable::Dict{Mode, Number} = digesteigenvalues(eigenvalues, groupingthreshold)
+    unitary::FockMap = FockMap(hermitian |> getoutspace, FockSpace(m for m in eigenvaluetable |> keys), eigenvectors)
+
+    return EigenSpectrum(eigenvaluetable, unitary)
 end
 export eigspech
 
+function eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)
+    eigenvalues, eigenvectors = fockmap |> rep |> Matrix |> eigen
+    eigenvaluetable::Dict{Mode, Number} = digesteigenvalues(eigenvalues, groupingthreshold)
+    unitary::FockMap = FockMap(fockmap |> getoutspace, FockSpace(m for m in eigenvaluetable |> keys), eigenvectors)
+
+    return EigenSpectrum(eigenvaluetable, unitary)
+end
+export eigspec
+
+""" Internal function. """
+function digesteigenvalues(eigenvalues, groupingthreshold::Real, attrs::Pair{Symbol}...)::Dict{Mode, Number}
+    denominator::Integer = (1 / groupingthreshold) |> round |> Integer
+    valuetable::Dict{Any, Real} = Dict(hashablenumber(v, denominator) => v for v in eigenvalues)
+    items::Base.Generator = (hashablenumber(v, denominator) => n for (n, v) in eigenvalues |> enumerate)
+    groups::Dict{Any, Vector} = foldl(items; init=Dict{Any, Vector}()) do d, (k, v)
+        mergewith!(append!, d, LittleDict(k => [v]))
+    end
+    sortedgroups::Vector = sort([groups...], by=g -> g.first)
+
+    return Dict(
+        Mode(:eigenindex => n, :flavor => f, attrs...) => valuetable[group.first]
+        for (n, group) in sortedgroups |> enumerate for f in group.second |> eachindex)
+end
+
 """
-    groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-2)
+    groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-7)
 
 Given a spectrum, attempt to group the eigenmodes based on their corresponding eigenvalues with a eigenvalue grouping threshold.
 
 ### Output
 A generator yielding `Pair{Number, Subset{Mode}}` objects, with the eigenvalues as keys and the corresponding eigenmodes as values.
 """
-function groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-2)::Base.Generator
+function groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-7)::Base.Generator
     denominator::Integer = (1 / groupingthreshold) |> round |> Integer
     actualvalues::Dict{Rational, Number} = Dict(hashablereal(v, denominator) => v for (_, v) in spectrum |> geteigenvalues)
     items::Base.Generator = (hashablereal(v, denominator) => m for (m, v) in spectrum |> geteigenvalues)
@@ -1215,6 +1251,33 @@ function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     @assert(dimension(fockmap.inspace) == 1)
     mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
     return [outmode => mat[fockorder(fockmap.outspace, outmode), 1] for outmode in orderedmodes(fockmap.outspace)]
+end
+
+columns(fockmap::FockMap)::Base.Generator = (columns(fockmap, mode |> FockSpace) for mode in fockmap |> getinspace |> orderedmodes)
+
+"""
+    addspatialinfo(fockmap::FockMap)::FockMap
+
+Given a `fockmap`, based on its `outspace` which contains spatial informations in attributes `:offset` and `:pos`,
+with the coefficient given in each column of the `FockMap` data, compute the actual center of each column vector and
+store into the attributes `:offset` and `:pos`. Be noted that the center might not be snapped to the actual lattice
+space.
+"""
+function addspatialinfo(fockmap::FockMap)::FockMap
+    inmodes::Subset{Mode} = fockmap |> getinspace |> orderedmodes
+    inmodes |> removeattr(:offset, :pos) |> length == inmodes |> length || error("Mode degenerates without spatial informations!")
+
+    function addcolumnspatialinfo(colmap::FockMap)::FockMap
+        indexmode::Mode = colmap |> getinspace |> first
+        weights::Base.Generator = ((mode |> pos) * (colmap[mode, indexmode] |> abs) for mode in colmap |> getoutspace |> orderedmodes)
+        center::Position = reduce(+, weights)
+        basis::Position = center |> basispoint
+        offset::Position = center - basis
+        inspace::FockSpace = indexmode |> setattr(:offset => offset) |> setattr(:pos => basis) |> FockSpace
+        return FockMap(colmap, inspace=inspace, performpermute=false)
+    end
+
+    return reduce(+, colmap |> addcolumnspatialinfo for colmap in fockmap |> columns)
 end
 
 end

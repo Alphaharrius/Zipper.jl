@@ -155,6 +155,10 @@ function AffineTransform(
     return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
 end
 
+# function AffineTransform(transformmatrix::Matrix, shiftvector::Vector; basisfunctions::Dict{})::AffineTransform
+#     return AffineTransform(transformmatrix, shiftvector; antiunitary=false)
+# end
+
 pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,
@@ -358,5 +362,8 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
 end
+
+uniformscale(scalefactor::Real; dimension::Integer)::Scale = Scale(scalefactor * Matrix{Float64}(I, dimension, dimension))
+export uniformscale
 
 end

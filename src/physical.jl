@@ -66,6 +66,7 @@ spectrum by filling all fermionic degrees of freedom below the Fermi energy.
 ### Output
 The `CrystalSpectrum` object that contains the ground state energy spectrum.
 """
+# TODO: This function requires revisit as the performance is bad, but the results are correct.
 function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-7)::CrystalSpectrum
     perunitcellfillings > 0 || error("Filling must be positive!")
     

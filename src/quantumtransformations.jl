@@ -42,7 +42,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     return FockMap(blocking.outspace, FockSpace(blocking.inspace, reflected=scaledcrystal), blocking |> rep)'
 end
 
-function Base.:*(transformation::AffineTransform, subset::Subset{Mode})::FockMap
+function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})::FockMap
     # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
     # which the basis point set might not include the symmetrized :pos. Thus we would like to set
     # the :pos to its corresponding basis point, and offload the difference to :offset.
@@ -82,12 +82,10 @@ function Base.:*(transformation::AffineTransform, subset::Subset{Mode})::FockMap
         return tomode
     end
 
-    outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in subset)
+    outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in regionfock |> orderedmodes)
     
-    return FockMap(outmodes |> FockSpace, subset |> FockSpace, connections)
+    return FockMap(outmodes |> FockSpace, regionfock, connections)
 end
-
-Base.:*(transformation::AffineTransform, fockspace::FockSpace)::FockMap = transformation * (fockspace |> orderedmodes)
 
 function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap
     homefock::FockSpace = crystalfock |> unitcellfock
@@ -102,7 +100,45 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))
 end
 
-Base.:(>>)(transform::AffineTransform, fockmap::FockMap)::FockMap = transform * (fockmap |> getoutspace)
-Base.:(<<)(fockmap::FockMap, transform::AffineTransform)::FockMap = transform * (fockmap |> getinspace)
+Base.:*(transform::AffineTransform, fockmap::FockMap)::FockMap = transform * (fockmap |> getoutspace)
+Base.:*(fockmap::FockMap, transform::AffineTransform)::FockMap = transform * (fockmap |> getinspace)
+
+"""
+    getinspacerep(fockmap::FockMap, transform::AffineTransform)::FockMap
+
+Given a `transform`, find its representation which acts on the `inspace` of the `fockmap`, if the representation which acts on the `outspace` exists.
+"""
+function getinspacerep(transform::AffineTransform, fockmap::FockMap)::FockMap
+    outspacerep::FockMap = transform * fockmap
+    hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The transformation is not closed in the outspace of the fockmap!")
+    return fockmap' * outspacerep * fockmap
+end
+export getinspacerep
+
+getinspacerep(fockmap)::Function = transform -> getinspacerep(transform, fockmap)
+
+"""
+    symmetrizeunitary(unitary::FockMap, transform::AffineTransform)::FockMap
+
+Perform symmetrization on a given `unitary` with a `symmetry` and yield a set of symmetrized eigenvectors.
+
+### Input
+- `unitary`     The unitary to be symmetrized.
+- `symmetry`    The symmetry to be used for symmetrization.
+
+### Output
+A unitary that is symmetric under the action by `symmetry`, the `inspace` of the new unitary is defined only by the attributes `:orbital` and `:flavor`,
+which the `:flavor` can have values `>1` iff more than one mode degenerates at the same orbital.
+"""
+function symmetrizeunitary(unitary::FockMap, symmetry::AffineTransform)::FockMap
+    inspacerep::FockMap = symmetry |> getinspacerep(unitary)
+    phasespectrum::EigenSpectrum = inspacerep |> eigspech
+    phasetable::Dict{Mode} = phasespectrum |> geteigenvalues |> Dict
+    inspace::FockSpace = FockSpace(
+        m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=phasetable[m]))
+        for m in zip(eigenvectors |> getinspace |> orderedmodes))
+    return unitary * FockMap(eigenvectors, inspace=inspace)
+end
+export symmetrizeunitary
 
 end

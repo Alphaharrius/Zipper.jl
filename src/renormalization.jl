@@ -28,7 +28,21 @@ function frozenselectionbythreshold(threshold::Float64)::Function
 end
 export frozenselectionbythreshold
 
-function frozenselectionbycount(count::Integer)
+"""
+    frozenselectionbycount(count::Integer)
+
+A selection strategy for `localfrozenisometries` and `globaldistillerhamiltonian` that selects the modes by count from the maximum and minimum
+of the sorted local eigenspectrum.
+
+### Input
+- `count::Integer`: The number of modes to select from both ends of the sorted local eigenspectrum.
+
+### Output
+A function representing the selection strategy with an input of the local correlations 𝐶ᵣ `FockMap` and outputs a `Dict{Symbol, FockMap}`
+keyed by two grouping symbols with their associated local isometries selected from the unitary that diagonalizes 𝐶ᵣ. The grouping symbol
+`:filled` represents the `N=count` eigenmodes with the smallest eigenvalues; `:empty` represents the eigenmodes that corresponds to γ ≈ 1.
+"""
+function frozenselectionbycount(count::Integer)::Function
     function frozenfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
         𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
         modes::Vector{Mode} = [orderedmodes(𝑈ᵣ.inspace)...]
@@ -50,12 +64,25 @@ Restrict the crystal correlations to a real space regional local correlations.
 ### Output
 The real space local correlation with `inspace` and `outspace` as the `regionfock`.
 """
-function regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockMap
+function regioncorrelations(correlations::FockMap, regionfock::FockSpace{Region})::FockMap
     fouriermap::FockMap = fourier(correlations.inspace, regionfock) / (correlations.inspace |> subspacecount |> sqrt)
     return fouriermap' * correlations * fouriermap
 end
 export regioncorrelations
 
+"""
+    localfrozenisometries(correlations::FockMap, regionfock::FockSpace; selectionstrategy::Function)::Dict{Symbol, FockMap}
+
+Based on the local correlations restricted from the crystal `correlations` by `regionfock`, select local isometries based on the `selectionstrategy`.
+
+### Input
+- `correlations::FockMap`: The crystal correlations.
+- `regionfock::FockSpace`: The real space regional `FockSpace`.
+- `selectionstrategy::Function`: The selection strategy for the local isometries for example `frozenselectionbythreshold` or `frozenselectionbycount`.
+
+### Output
+Depends on `selectionstrategy`.
+"""
 localfrozenisometries(
     correlations::FockMap, regionfock::FockSpace;
     selectionstrategy::Function = frozenselectionbythreshold(1e-3))::Dict{Symbol, FockMap} = (
@@ -134,10 +161,10 @@ function crystalprojector(spectrum::CrystalSpectrum)::FockMap
 end
 
 function globaldistillerhamiltonian(;
-    correlations::FockMap, restrictspace::FockSpace, localisometryselectionstrategy::Function, manualeigenenergies::Dict{Symbol, <:Number} = Dict(:filled => -1, :empty => 1),
+    correlations::FockMap, regionfock::FockSpace{Region}, localisometryselectionstrategy::Function, manualeigenenergies::Dict{Symbol, <:Number} = Dict(:filled => -1, :empty => 1),
     symmetry::AffineTransform)
 
-    localisometries::Dict{Symbol} = localfrozenisometries(correlations, restrictspace, selectionstrategy=localisometryselectionstrategy)
+    localisometries::Dict{Symbol} = localfrozenisometries(correlations, regionfock, selectionstrategy=localisometryselectionstrategy)
     crystalprojectors::Dict{Symbol, FockMap} = Dict(
         name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations.inspace)
         for (name, isometry) in localisometries)
@@ -216,7 +243,7 @@ function regionalwannierseeding(statecorrelations::FockMap, regionspace::FockSpa
             mode |> setattr(:orbital => findeigenfunction(symmetry; dimensionrange=0:dim, eigenvalue=phase))
                  |> setattr(:pos => regioncenter)
                  |> setattr(:offset => regioncenter |> getspace |> origin)
-            for (mode, phase) in phases) |> FockSpace
+            for (mode, phase) in phases) |> FockSpace{Region}
 
         return FockMap(seed; inspace=seedfock, performpermute=false)
     end

@@ -66,11 +66,11 @@ physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> origin, physicalmodes, 2.0)
 frozenseedingregion::Subset{Offset} = Subset(m |> pos for m in frozenseedingmodes)
 visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
-frozenseedingfock::FockSpace = FockSpace(frozenseedingmodes)
+frozenseedingfock::FockSpace{Region} = FockSpace{Region}(frozenseedingmodes)
 
 globaldistiller = globaldistillerhamiltonian(
     correlations=blockresult[:correlations],
-    restrictspace=frozenseedingfock,
+    regionfock=frozenseedingfock,
     localisometryselectionstrategy=frozenselectionbycount(3),
     symmetry=c6)
 
@@ -83,12 +83,117 @@ courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
 courierseedingregion::Subset{Offset} = Subset(m |> pos for m in courierseedingmodes)
 visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))
-courierseedingfock::FockSpace = FockSpace(courierseedingmodes)
+courierseedingfock::FockSpace{Region} = FockSpace{Region}(courierseedingmodes)
 
 c3 = c6^2 |> recenter(courierseedingcenter)
 
 blockedcourierprojector = distillresult[:courier] |> crystalprojector
 blockedcouriercorrelation = idmap(blockedcourierprojector.outspace, blockedcourierprojector.outspace) - blockedcourierprojector
+
+# function _symmetrizeunitary(unitary::FockMap, symmetry::AffineTransform)::FockMap
+#     inspacerep::FockMap = symmetry |> getinspacerep(unitary)
+#     phasespectrum::EigenSpectrum = inspacerep |> eigspec
+#     phasetable::Dict{Mode} = phasespectrum |> geteigenvalues |> Dict
+#     phasetable |> println
+#     inspace::FockSpace = FockSpace(
+#         m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=phasetable[m]))
+#         for m in phasespectrum |> geteigenvectors |> getinspace |> orderedmodes)
+#     return unitary * FockMap(eigenvectors, inspace=inspace)
+# end
+
+# function symmetrizeseed(seedisometry::FockMap, symmetry)::Tuple{Base.Generator, FockMap}
+#     transform::FockMap = symmetry * seedisometry.outspace
+#     eigensymmetryrep::FockMap = seedisometry' * transform * seedisometry
+#     eigenvalues, unitary = eigensymmetryrep |> eigen
+#     return (eigenvalues, seedisometry * unitary)
+# end
+
+# function regionalwannierseeding(statecorrelations::FockMap, regionspace::FockSpace;
+#     symmetry::AffineTransform,
+#     seedingthreshold::Number = 1e-2, seedsgroupingprecision::Number = 1e-5, linearindependencethreshold::Number = 5e-2)
+
+#     localcorrelations::FockMap = regioncorrelations(statecorrelations, regionspace)
+#     localspectrum::EigenSpectrum = localcorrelations |> eigspech
+#     validgroups = Iterators.filter(p -> p.first <= seedingthreshold, groupbyeigenvalues(localspectrum, groupingthreshold=seedsgroupingprecision))
+
+#     return validgroups
+
+#     regioncenter::Point = Subset(mode |> pos for mode in regionspace |> getmodes) |> center
+
+#     function extractglobalseed(group::Pair{<:Number, Subset{Mode}})
+#         seed = _symmetrizeunitary(columns(localspectrum.eigenvectors, group.second |> FockSpace), symmetry)
+#         crystalseeds::Dict{Momentum, FockMap} = crystalisometries(localisometry=seed, crystalfock=statecorrelations.inspace)
+#         crystalseed::FockMap = directsum(v for (_, v) in crystalseeds)
+
+#         # Check if linear independent.
+#         pseudoidentity::FockMap = (crystalseed' * crystalseed)
+#         mineigenvalue = min(map(p -> p.second, pseudoidentity |> eigvalsh)...)
+#         if mineigenvalue < linearindependencethreshold
+#             return nothing
+#         end
+
+#         seedfock::FockSpace = Subset(
+#             mode |> setattr(:pos => regioncenter)
+#                  |> setattr(:offset => regioncenter |> getspace |> origin)
+#             for mode in seed) |> FockSpace{Region}
+
+#         return FockMap(seed; inspace=seedfock, performpermute=false)
+#     end
+
+#     return Iterators.filter(v -> !(v isa Nothing), extractglobalseed(group) for group in validgroups)
+# end
+
+# function regionalwannierseeding(statecorrelations::FockMap, regionspace::FockSpace;
+#     symmetry::AffineTransform,
+#     seedingthreshold::Number = 1e-2, seedsgroupingprecision::Number = 1e-5, linearindependencethreshold::Number = 5e-2)
+
+#     localcorrelations::FockMap = regioncorrelations(statecorrelations, regionspace)
+#     localspectrum::EigenSpectrum = localcorrelations |> eigspech
+#     validgroups = Iterators.filter(p -> p.first <= seedingthreshold, groupbyeigenvalues(localspectrum, groupingthreshold=seedsgroupingprecision))
+
+#     function symmetrizeseed(seedisometry::FockMap)::Tuple{Base.Generator, FockMap}
+#         transform::FockMap = symmetry * seedisometry.outspace
+#         eigensymmetryrep::FockMap = seedisometry' * transform * seedisometry
+#         eigenvalues, unitary = eigensymmetryrep |> eigen
+#         return (eigenvalues, seedisometry * unitary)
+#     end
+
+#     regioncenter::Point = Subset(mode |> pos for mode in regionspace |> getmodes) |> center
+
+#     function extractglobalseed(group::Pair{<:Number, Subset{Mode}})
+#         phases, seed = columns(localspectrum.eigenvectors, group.second |> FockSpace) |> symmetrizeseed
+#         crystalseeds::Dict{Momentum, FockMap} = crystalisometries(localisometry=seed, crystalfock=statecorrelations.inspace)
+#         crystalseed::FockMap = directsum(v for (_, v) in crystalseeds)
+
+#         # Check if linear independent.
+#         pseudoidentity::FockMap = (crystalseed' * crystalseed)
+#         mineigenvalue = min(map(p -> p.second, pseudoidentity |> eigvalsh)...)
+#         if mineigenvalue < linearindependencethreshold
+#             return nothing
+#         end
+
+#         dim::Integer = statecorrelations.inspace |> getcrystal |> dimension
+#         seedfock::FockSpace = Subset(
+#             mode |> setattr(:orbital => findeigenfunction(symmetry; dimensionrange=0:dim, eigenvalue=phase))
+#                  |> setattr(:pos => regioncenter)
+#                  |> setattr(:offset => regioncenter |> getspace |> origin)
+#             for (mode, phase) in phases) |> FockSpace{Region}
+
+#         return FockMap(seed; inspace=seedfock, performpermute=false)
+#     end
+
+#     return Iterators.filter(v -> !(v isa Nothing), extractglobalseed(group) for group in validgroups)
+# end
+
+# groupfock = [regionalwannierseeding(blockedcouriercorrelation, courierseedingfock, symmetry=c3)...][1][2] |> FockSpace
+# localcorrelations::FockMap = regioncorrelations(blockedcouriercorrelation, courierseedingfock)
+# localspectrum::EigenSpectrum = localcorrelations |> eigspech
+# seed = columns(localspectrum |> geteigenvectors, groupfock)
+# seedrep = c3 |> getinspacerep(seed)
+# visualize(seedrep)
+
+# a, b = symmetrizeseed(seed, c3)
+# [a...]
 
 localcourierseed = [regionalwannierseeding(blockedcouriercorrelation, courierseedingfock, symmetry=c3)...][1]
 fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'

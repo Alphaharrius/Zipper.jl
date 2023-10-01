@@ -476,6 +476,27 @@ Check if `fockspace` is a sparse fockspace.
 issparse(fockspace::FockSpace)::Bool = subspacecount(fockspace) > 1
 export issparse
 
+"""
+    sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
+
+Grouping the modes within the `fockspace` by the attributes specified by `byattrs`, the resulting fockspace will have a sparse structure
+with the subspaces containing modes with the same specified attributes.
+"""
+function sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
+    getidentifier(mode)::Vector = [mode |> getattr(attr) for attr in byattrs]
+
+    identifiedmodes::Base.Generator = (m |> getidentifier => m for m in fockspace)
+    groups::Dict{Vector, Vector} = foldl(identifiedmodes; init=Dict{Vector, Vector}()) do d, (k, v)
+        mergewith!(append!, d, LittleDict(k => [v]))
+    end
+
+    return fockspaceunion(group |> FockSpace for group in groups |> values)
+end
+export sparsegrouping
+
+""" Shorthand for `sparsegrouping` which generates a function, that takes a `FockSpace` and returns the sparse grouped fockspace. """
+sparsegrouping(byattrs::Symbol...)::Function = fockspace -> sparsegrouping(fockspace, byattrs...)
+
 """ Check if fockspaces of `a` and `b` has the exact same structure. """
 Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
 

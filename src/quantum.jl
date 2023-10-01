@@ -290,7 +290,7 @@ Base.:getindex(fockspace::FockSpace, range::UnitRange)::FockSpace = (fockspace |
 Base.:getindex(fockspace::FockSpace, mode::Mode)::Mode = mode ∈ fockspace ? mode : error("The mode is not in the fockspace!")
 
 """
-    fockspaceunion(fockspaces::FockSpace)::FockSpace
+    fockspaceunion(fockspaces)::FockSpace
 
 Union of fockspaces, the resulting fockspace will have the same span as the union of the underlying modes of the fockspaces.
 

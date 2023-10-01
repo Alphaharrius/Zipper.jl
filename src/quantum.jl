@@ -286,6 +286,8 @@ Base.:in(mode::Mode, fockspace::FockSpace)::Bool = haskey(fockspace.ordering, mo
 
 """ Allow the retrieval of `Mode` at a given `order` index with syntax `fockspace[order]`. """
 Base.:getindex(fockspace::FockSpace, order::Integer)::Mode = (fockspace |> orderedmodes)[order]
+Base.:getindex(fockspace::FockSpace, range::UnitRange)::FockSpace = (fockspace |> orderedmodes)[range] |> FockSpace
+Base.:getindex(fockspace::FockSpace, mode::Mode)::Mode = mode ∈ fockspace ? mode : error("The mode is not in the fockspace!")
 
 """
     fockspaceunion(fockspaces::FockSpace)::FockSpace

@@ -29,6 +29,7 @@ struct Mode <: AbstractSubset{Mode}
     Mode(input::Base.Iterators.Flatten) = Mode(Dict(input))
 
     Mode(attrs::Vector{Pair{Symbol, T}}) where {T} = Mode(Dict(attrs...))
+    Mode(attrs::Pair{Symbol, <:Any}...) = Mode(Dict(attrs...))
 end
 export Mode
 

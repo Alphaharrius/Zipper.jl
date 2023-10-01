@@ -254,9 +254,9 @@ struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
     FockSpace(fockspace::FockSpace; reflected=Nothing) = FockSpace(rep(fockspace), fockspace.ordering, reflected=reflected)
     FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
     
-    FockSpace(modes::Vector{Mode}; reflected=Nothing) = FockSpace(Subset(modes), reflected=reflected)
-    FockSpace(modes::Base.Generator; reflected=Nothing) = FockSpace(Subset(modes), reflected=reflected)
-    FockSpace(modes::Base.Iterators.Flatten; reflected=Nothing) = FockSpace(Subset(modes), reflected=reflected)
+    FockSpace(input::Vector{Mode}; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
+    FockSpace(input::Base.Generator; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
+    FockSpace(input::Base.Iterators.Flatten; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
 end
 export FockSpace
 

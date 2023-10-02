@@ -187,48 +187,36 @@ function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol
 end
 export distillation
 
-function regionalwannierseeding(statecorrelations::FockMap, regionspace::FockSpace;
-    symmetry::AffineTransform,
-    seedingthreshold::Number = 1e-2, seedsgroupingprecision::Number = 1e-5, linearindependencethreshold::Number = 5e-2)
+function findlocalspstates(;
+    statecorrelations::FockMap, regionfock::FockSpace,
+    symmetry::AffineTransform = identitytransform(statecorrelations |> getcrystal |> dimension),
+    spectrumextractpredicate::Function = v -> v < 1e-2,
+    linearindependencethreshold::Real = 5e-2,
+    degeneracythreshold::Real = 1e-7)
 
-    localcorrelations::FockMap = regioncorrelations(statecorrelations, regionspace)
-    localspectrum::EigenSpectrum = localcorrelations |> eigspech
-    validgroups = Iterators.filter(p -> p.first <= seedingthreshold, groupbyeigenvalues(localspectrum, groupingthreshold=seedsgroupingprecision))
-
-    function symmetrizeseed(seedisometry::FockMap)::Tuple{Base.Generator, FockMap}
-        transform::FockMap = symmetry * seedisometry.outspace
-        eigensymmetryrep::FockMap = seedisometry' * transform * seedisometry
-        eigenvalues, unitary = eigensymmetryrep |> eigen
-        return (eigenvalues, seedisometry * unitary)
+    function lineardependencefilter(spstate::FockMap)::Bool
+        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecorrelations.outspace)
+        crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
+        pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
+        mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
+        return mineigenvalue > linearindependencethreshold
     end
 
-    regioncenter::Point = Subset(mode |> pos for mode in regionspace |> getmodes) |> center
+    localcorrelations::FockMap = regioncorrelations(statecorrelations, regionfock)
+    localspectrum::EigenSpectrum = eigspech(localcorrelations, groupingthreshold=degeneracythreshold)
+    groupeigenvalues::Base.Generator = (
+        subset => (localspectrum |> geteigenvalues)[subset |> first]
+        for subset in localspectrum |> geteigenvectors |> getinspace |> sparsegrouping(:eigenindex) |> rep)
+    selectedgroups = Iterators.filter(p -> p.second |> spectrumextractpredicate, groupeigenvalues)
 
-    function extractglobalseed(group::Pair{<:Number, Subset{Mode}})
-        phases, seed = columns(localspectrum.eigenvectors, group.second |> FockSpace) |> symmetrizeseed
-        crystalseeds::Dict{Momentum, FockMap} = crystalisometries(localisometry=seed, crystalfock=statecorrelations.inspace)
-        crystalseed::FockMap = directsum(v for (_, v) in crystalseeds)
+    selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
+    orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
+    symmetricspstates = (state * getsymmetrizer(symmetry, state) for state in orthogonalspstates)
+    spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
-        # Check if linear independent.
-        pseudoidentity::FockMap = (crystalseed' * crystalseed)
-        mineigenvalue = min(map(p -> p.second, pseudoidentity |> eigvalsh)...)
-        if mineigenvalue < linearindependencethreshold
-            return nothing
-        end
-
-        dim::Integer = statecorrelations.inspace |> getcrystal |> dimension
-        seedfock::FockSpace = Subset(
-            mode |> setattr(:orbital => findeigenfunction(symmetry; dimensionrange=0:dim, eigenvalue=phase))
-                 |> setattr(:pos => regioncenter)
-                 |> setattr(:offset => regioncenter |> getspace |> origin)
-            for (mode, phase) in phases) |> FockSpace{Region}
-
-        return FockMap(seed; inspace=seedfock, performpermute=false)
-    end
-
-    return Iterators.filter(v -> !(v isa Nothing), extractglobalseed(group) for group in validgroups)
+    return Dict(state |> getinspace |> dimension => state for state in spstates)
 end
-export regionalwannierseeding
+export findlocalspstates
 
 function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, FockMap}, svdorthothreshold::Number = 1e-1)
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)

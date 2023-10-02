@@ -20,6 +20,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     scaledfock::FockSpace = ((ksubsets[k] for k in mappingpartitions[kscaled]) |> subsetunion |> FockSpace
         for kscaled in scaledbz) |> fockspaceunion
 
+    # TODO: Use of latticeoff requires revisit, since latticeoff only truncates the decimals.
     unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
     unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
 

@@ -23,7 +23,6 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 addeigenfunction!(c6, eigenvalue=-1, eigenfunction=BasisFunction(:yyx => -3, :xxx => 1, dimension=2))
 addeigenfunction!(c6, eigenvalue=-exp(1im * π/3), eigenfunction=BasisFunction(:xx => -1im, :xy => 2, :yy => 1im, dimension=2))
 addeigenfunction!(c6, eigenvalue=-exp(-1im * π/3), eigenfunction=BasisFunction(:xx => 1im, :xy => 2, :yy => -1im, dimension=2))
-c6.eigenfunctions
 
 unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [24, 24])
@@ -119,38 +118,8 @@ purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
 purifiedcorrelationspectrum |> visualize
 couriercorrelations = purifiedcorrelationspectrum |> FockMap
 
-commutation(c6 * couriercorrelations, couriercorrelations) |> maximum
-
-using ColorTypes
-function visualizeregionstate2d(state::RegionState{2}; title::String = "")
-    mapdata::SparseMatrixCSC = state |> rep |> rep
-
-    function generatestateplot(spstate::FockMap)
-        spmode::Mode = spstate |> getinspace |> first
-        columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
-        positions::Vector{Offset} = [v.first |> pos for v in columnspectrum]
-        mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
-        markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
-        normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * 120
-        markercolors::Vector = [convert(RGB{Float64}, HSV(angle(v.second) / 2π * 360, 1, 1)) for v in columnspectrum]
-        return scatter(
-            x=mesh[1, :], y=mesh[2, :], mode="markers",
-            marker=attr(
-                symbol="circle",
-                size=normalizedmarkersizes,
-                color=markercolors))
-    end
-
-    scatters::Vector = [spstate |> generatestateplot for spstate in state]
-    fig = make_subplots(rows=1, cols=scatters |> length)
-    for (n, scatter) in enumerate(scatters)
-        add_trace!(fig, scatter, row=1, col=n)
-    end
-    relayout!(fig, title_text=title)
-    fig
-end
-
-commutation(c6 * couriercorrelations.outspace, couriercorrelations) |> maximum
+state = regionalrestriction(wanniercourierisometry, courierseedingfock + (c6 * courierseedingfock |> getoutspace))
+state |> visualize
 
 blockedfilledprojector = distillresult[:filled] |> crystalprojector
 blockedfilledcorrelation = idmap(blockedfilledprojector.outspace, blockedfilledprojector.outspace) - blockedfilledprojector
@@ -162,18 +131,16 @@ filledseeds = findlocalspstates(
     spectrumextractpredicate=(v -> v < 1e-2),
     degeneracythreshold=1e-4)
 filledseed = filledseeds[3]
-filledseed |> getinspace |> modeattrs
 
 crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
 wannierfilledisometry = wannierprojection(
     crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
 
-state = regionalrestriction(wannierfilledisometry, frozenseedingfock, frozenseedingfock, frozenseedingfock)
-state |> visualizeregionstate2d
+state = regionalrestriction(wannierfilledisometry, frozenseedingfock)
+state |> visualize
 
 blockedemptyprojector = distillresult[:empty] |> crystalprojector
 blockedemptycorrelation = idmap(blockedemptyprojector.outspace, blockedemptyprojector.outspace) - blockedemptyprojector
-emptyseed = [regionalwannierseeding(blockedemptycorrelation, frozenseedingfock, symmetry=c6, seedsgroupingprecision=1e-3)...][1]
 
 emptyseeds = findlocalspstates(
     statecorrelations=blockedemptycorrelation,
@@ -183,10 +150,13 @@ emptyseeds = findlocalspstates(
     degeneracythreshold=1e-4)
 
 emptyseed = emptyseeds[3]
-emptyseed |> getinspace |> modeattrs
+
 crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
 wannieremptyisometry = wannierprojection(
     crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
+
+state = regionalrestriction(wannieremptyisometry, frozenseedingfock)
+state |> visualize
 
 filledC = wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
 filledC |> crystalspectrum |> visualize

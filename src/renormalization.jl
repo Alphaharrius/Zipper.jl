@@ -244,35 +244,4 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
 end
 export wannierprojection
 
-struct RegionState{Dim} <: Element{FockMap}
-    rep::FockMap
-end
-export RegionState
-
-Base.:convert(::Type{FockMap}, source::RegionState)::FockMap = source.rep
-
-function regionalrestriction(crystalstate::FockMap, regionfocks::FockSpace...)::RegionState
-    positionmodes::Dict{Offset, Mode} = Dict(
-        getattr(mode, :pos) => mode for mode in crystalstate |> getinspace |> unitcellfock |> orderedmodes)
-
-    function regionstate(regionfock::FockSpace)::FockMap
-        statecenter::Offset = Subset(mode |> pos for mode in regionfock |> orderedmodes) |> center
-        haskey(positionmodes, statecenter) || error("Region center $statecenter is not a center in the crystal state!")
-        mode::Mode = positionmodes[statecenter]
-        rightfourier::FockMap = fourier(crystalstate |> getinspace, mode |> FockSpace)
-        leftfourier::FockMap = fourier(crystalstate |> getoutspace, regionfock)
-        return leftfourier' * crystalstate * rightfourier
-    end
-
-    localstate::FockMap = reduce(+, regionfock |> regionstate for regionfock in regionfocks)
-    return localstate |> RegionState{crystalstate |> getoutspace |> getcrystal |> dimension}
-end
-export regionalrestriction
-
-Quantum.:getinspace(state::RegionState) = state |> rep |> getinspace
-Quantum.:getoutspace(state::RegionState) = state |> rep |> getoutspace
-
-Base.:iterate(state::RegionState, i...) = iterate([columns(state |> rep, mode |> FockSpace) for mode in state |> getinspace |> orderedmodes], i...)
-Base.:length(state::RegionState) = state |> getinspace |> dimension
-
 end

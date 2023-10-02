@@ -1,7 +1,7 @@
 module Plotting
 
 using Plotly, ColorTypes, LinearAlgebra, Compat
-using ..Spaces, ..Geometries, ..Quantum, ..Renormalization
+using ..Spaces, ..Geometries, ..Quantum
 
 export visualize
 
@@ -58,27 +58,31 @@ function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T
     fig
 end
 
-function visualize(state::RegionState{2}; title::String = "")
+function visualize(state::RegionState{2}; title::String = "", markersizemultiplier::Real = 120)
     function generatestateplot(spstate::FockMap)
-        columnspectrum::Base.Generator = (
-            outmode => mat[fockorder(spstate |> getoutspace, outmode), 1] for outmode in spstate |> getoutspace |> orderedmodes)
+        spmode::Mode = spstate |> getinspace |> first
+        columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
         positions::Vector{Offset} = [v.first |> pos for v in columnspectrum]
         mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
-        markermesh::Matrix{Float64} = zeros(3, positions |> length)
-        copyto!(view(markermesh, 1:size(mesh, 1), :), mesh)
         markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
-        normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * 120
+        normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * markersizemultiplier
         markercolors::Vector = [convert(RGB{Float64}, HSV(angle(v.second) / 2π * 360, 1, 1)) for v in columnspectrum]
-        return scatter3d(
-            x=markermesh[1, :], y=markermesh[2, :], z=markermesh[3, :], mode="markers",
+        return scatter(
+            x=mesh[1, :], y=mesh[2, :], mode="markers",
             marker=attr(
                 symbol="circle",
                 size=normalizedmarkersizes,
                 color=markercolors))
     end
-    subplots = [spstate |> generatestateplot for spstate in state]
-    relayout!(subplots, title_text=title)
-    subplots
+
+    scatters::Vector = [spstate |> generatestateplot for (_, spstate) in state]
+    subplotnames::Base.Generator = (mode |> string for mode in state |> getinspace |> orderedmodes |> indexmodes)
+    fig = make_subplots(rows=1, cols=scatters |> length, subplot_titles=hcat(subplotnames...))
+    for (n, scatter) in enumerate(scatters)
+        add_trace!(fig, scatter, row=1, col=n)
+    end
+    relayout!(fig, title_text=title)
+    fig
 end
 
 function visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = true)

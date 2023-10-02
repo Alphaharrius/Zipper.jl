@@ -33,6 +33,9 @@ struct Mode <: AbstractSubset{Mode}
 end
 export Mode
 
+""" Stringify the `Mode` object. """
+Base.:string(mode::Mode)::String = join((k => v for (k, v) in mode |> getattrs), " ")
+
 """ Display the number of attributes that identifies this `Mode`. """
 Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
 
@@ -165,6 +168,28 @@ exists in the modes, the current record will be overwritten.
 - To add `:offset` and `:flavor`, we use `newmodes = setattr(modes, :offset => point, :flavor => 1)`
 """
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
+
+"""
+    commonattrs(modes)::Base.Generator
+
+Retrieve all the attributes within the group of modes that has the same values and returned as a generator of `Symbol`.
+"""
+function commonattrs(modes)::Base.Generator
+    attrs::Base.Generator = (Set(k => v for (k, v) in mode |> getattrs) for mode in modes)
+    return (k for (k, _) in intersect(attrs...))
+end
+export commonattrs
+
+"""
+    indexmodes(modes)::Subset{Mode}
+
+Retrieve the representative modes of this group of modes with their corresponding common attributes stripped.
+"""
+function indexmodes(modes)::Subset{Mode}
+    cleanattrs::Base.Generator = modes |> commonattrs
+    return Subset(mode for mode in modes) |> removeattr(cleanattrs...) 
+end
+export indexmodes
 
 getorbital(mode::Mode, default::BasisFunction)::BasisFunction = hasattr(mode, :orbital) ? getattr(mode, :orbital) : default
 export getorbital
@@ -1256,5 +1281,33 @@ function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
     return [outmode => mat[fockorder(fockmap.outspace, outmode), 1] for outmode in orderedmodes(fockmap.outspace)]
 end
+
+struct RegionState{Dim} <: Element{FockMap}
+    spstates::Dict{Mode, FockMap}
+end
+export RegionState
+
+Base.:show(io::IO, state::RegionState) = print(io, string("$(typeof(state))(count=$(state |> getinspace |> dimension))"))
+
+Base.:convert(::Type{FockMap}, source::RegionState)::FockMap = reduce(+, spstate for (_, spstate) in spstates)
+
+function regionalrestriction(crystalstate::FockMap, regionfock::FockSpace)::RegionState
+    eigenmodes::Subset{Mode} = crystalstate |> getinspace |> unitcellfock |> orderedmodes
+
+    function extractregionstate(mode::Mode)
+        rightfourier::FockMap = fourier(crystalstate |> getinspace, mode |> FockSpace)
+        leftfourier::FockMap = fourier(crystalstate |> getoutspace, regionfock)
+        return leftfourier' * crystalstate * rightfourier
+    end
+
+    return Dict(mode => mode |> extractregionstate for mode in eigenmodes) |> RegionState{crystalstate |> getoutspace |> getcrystal |> dimension}
+end
+export regionalrestriction
+
+Quantum.:getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
+Quantum.:getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace
+
+Base.:iterate(state::RegionState, i...) = iterate(state.spstates, i...)
+Base.:length(state::RegionState) = state.spstates |> length
 
 end

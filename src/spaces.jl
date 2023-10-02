@@ -190,6 +190,10 @@ export hashablereal
 hashablecomplex(z::Complex, denominator::Integer = 10000000)::Tuple = (hashablereal(z |> real, denominator), hashablereal(z |> imag, denominator))
 export hashablecomplex
 
+hashablenumber(v::Real, denominator::Integer = 10000000) = hashablereal(v, denominator)
+hashablenumber(z::Complex, denominator::Integer = 10000000) = hashablecomplex(z, denominator)
+export hashablenumber
+
 global spatialhashdenominators::Vector{Integer} = [128, 128, 128] # Default to 128 for each dimension.
 global reciprocalhashdenominators::Vector{Integer} = [128, 128, 128]
 

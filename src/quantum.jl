@@ -762,6 +762,9 @@ Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outsp
 """ Corresponds to the Hermitian adjoint. """
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
+LinearAlgebra.:norm(fockmap::FockMap)::Number = norm(fockmap |> rep)
+LinearAlgebra.:normalize(fockmap::FockMap)::FockMap = FockMap(fockmap |> getoutspace, fockmap |> getinspace, fockmap |> rep |> normalize)
+Base.:abs(fockmap::FockMap)::FockMap = FockMap(fockmap |> getoutspace, fockmap |> getinspace, map(abs, fockmap |> rep))
 
 """ Shorthand for retrieving the eigenvectors from the `eigspech` function. """
 eigvecsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...) |> geteigenvectors

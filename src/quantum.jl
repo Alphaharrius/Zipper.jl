@@ -745,9 +745,7 @@ export permute
 permute(; outspace::FockSpace, inspace::FockSpace)::Function = fockmap::FockMap -> Quantum.permute(fockmap, outspace=outspace, inspace=inspace)
 
 Base.:-(target::FockMap)::FockMap = FockMap(target.outspace, target.inspace, -rep(target))
-
 Base.:+(a::FockMap, b::FockMap)::FockMap = fockadd(a, b)
-
 Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 
 function Base.:*(a::FockMap, b::FockMap)::FockMap

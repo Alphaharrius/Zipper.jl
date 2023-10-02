@@ -903,7 +903,8 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
     returnoutspace::FockSpace = hassamespan(outspace, a.outspace) ? a.outspace : hassamespan(outspace, b.outspace) ? b.outspace : outspace
     returninspace::FockSpace = hassamespan(inspace, a.inspace) ? a.inspace : hassamespan(inspace, b.inspace) ? b.inspace : inspace
 
-    return FockMap(returnoutspace, returninspace, data)
+    result::FockMap = FockMap(outspace, inspace, data)
+    return FockMap(result, outspace=returnoutspace, inspace=returninspace)
 end
 
 """ Addition of two `FockMap` objects with the same `inspace` and `outspace`. """

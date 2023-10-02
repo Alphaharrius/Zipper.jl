@@ -19,10 +19,10 @@ keyed by two grouping symbols with their associated local isometries selected fr
 """
 function frozenselectionbythreshold(threshold::Float64)::Function
     function frozenfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
-        spectrum, 𝑈ᵣ::FockMap = eigh(𝐶ᵣ)
-        filledmodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second < threshold, spectrum)))
-        emptymodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second > 1.0 - threshold, spectrum)))
-        return Dict(:filled => columns(𝑈ᵣ, FockSpace(filledmodes)), :empty => columns(𝑈ᵣ, FockSpace(emptymodes)))
+        spectrum::EigenSpectrum = 𝐶ᵣ |> eigspech
+        filledmodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second < threshold, spectrum |> geteigenvalues)))
+        emptymodes::Subset{Mode} = Subset(map(p -> p.first, filter(p -> p.second > 1.0 - threshold, spectrum |> geteigenvalues)))
+        return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)))
     end
     return frozenfockmaps
 end

@@ -762,102 +762,14 @@ Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outsp
 """ Corresponds to the Hermitian adjoint. """
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
 
-"""
-    eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
 
-According to the provided Hermitian `FockMap`, generate a set of eigenmodes that corresponds one to one to the eigenvectors and eigenvalues when
-performing eigenvalue decomposition.
-
-### Input
-- `fockmap` The source of the generation.
-- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
-"""
-function eigmodes(fockmap::FockMap, attrs::Pair{Symbol}...)::Subset{Mode}
-    @assert(hassamespan(fockmap.inspace, fockmap.outspace))
-    return Subset(
-        Mode([:flavor => index, attrs...]) for index in 1:dimension(fockmap.inspace))
-end
-export eigmodes
-
-"""
-    eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
-
-Perform Hermitian eigenvalue decomposition to find the eigenvectors horizontally concatenated into a `FockMap`, ordered by the eigenvalues in ascending order.
-
-### Input
-- `fockmap` The source of the decomposition.
-- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
-
-### Output
-A `FockMap` with `outspace` of `fockmap` and the inspace of the associated eigenmodes, containing the horizontally concatenated eigenvectors.
-"""
-function eigvecsh(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
-    @assert(fockmap.inspace == fockmap.outspace)
-    evecs::Matrix{ComplexF64} = eigvecs(Hermitian(Matrix(rep(fockmap))))
-    return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), SparseMatrixCSC{ComplexF64, Int64}(evecs))
-end
+""" Shorthand for retrieving the eigenvectors from the `eigspech` function. """
+eigvecsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...) |> geteigenvectors
 export eigvecsh
 
-"""
-    eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
-
-Perform Hermitian eigenvalue decomposition to find the eigenvalues as pairs of eigenmode to eigenvalue ordered by the eigenmode attribute `index`, ordered by the
-eigenvalues in ascending order.
-
-### Input
-- `fockmap` The source of the decomposition.
-- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
-
-### Output
-The returned value will be a generator yielding `Pair` of eigen `Mode` to eigenvalue ordered by the attribute `:flavor`, ordered by the eigenvalues in ascending order.
-"""
-function eigvalsh(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
-    @assert(fockmap.inspace == fockmap.outspace)
-    evs::Vector{Number} = eigvals(Hermitian(Matrix(rep(fockmap))))
-    return (t |> first => t |> last for t in Iterators.zip(eigmodes(fockmap, attrs...), evs))
-end
+""" Shorthand for retrieving the eigenvalues from the `eigspech` function. """
+eigvalsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...) |> geteigenvalues
 export eigvalsh
-
-function LinearAlgebra.:eigvals(fockmap::FockMap, attrs::Pair{Symbol}...)::Base.Generator
-    eigenvalues::Vector{Number} = fockmap |> rep |> Matrix |> eigvals
-    return (pair.first => pair.second for pair in Iterators.zip(eigmodes(fockmap, attrs...), eigenvalues))
-end
-
-function LinearAlgebra.:eigvecs(fockmap::FockMap, attrs::Pair{Symbol}...)::FockMap
-    eigenvectors::Matrix = fockmap |> rep |> Matrix |> eigvecs
-    return FockMap(fockmap.outspace, FockSpace(eigmodes(fockmap, attrs...)), eigenvectors)
-end
-
-function LinearAlgebra.:eigen(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Base.Generator, FockMap}
-    eigenvalues, eigenvectors = fockmap |> rep |> Matrix |> eigen
-    modes::Subset{Mode} = eigmodes(fockmap, attrs...)
-    return (
-        (pair |> first => pair |> last for pair in Iterators.zip(modes, eigenvalues)),
-        FockMap(fockmap.outspace, modes |> FockSpace, eigenvectors))
-end
-
-"""
-    eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
-
-Perform Hermitian eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously.
-
-### Input
-- `fockmap` The source of the decomposition.
-- `attrs`   Attributes to be inserted to the generated eigenmodes, please see `Mode` for more detains.
-
-### Output
-The first returned value will be pairs of eigenmode to eigenvalue ordered by the eigenmode attribute `index`; the second returned value is a `FockMap`
-with `outspace` of `fockmap` and the inspace of the associated eigenmodes, containing the horizontally concatenated eigenvectors. The eigenmodes are
-ordered by the eigenvalues in ascending order.
-"""
-function eigh(fockmap::FockMap, attrs::Pair{Symbol}...)::Tuple{Vector{Pair{Mode, Float64}}, FockMap}
-    decomposed::Eigen = eigen(Hermitian(Matrix(rep(fockmap))))
-    modes::Subset{Mode} = eigmodes(fockmap, attrs...)
-    evals::Vector{Pair{Mode, Float64}} = [m => v for (m, v) in Iterators.zip(modes, decomposed.values)]
-    evecs::FockMap = FockMap(fockmap.outspace, FockSpace(modes), decomposed.vectors)
-    return evals, evecs
-end
-export eigh
 
 """
     fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
@@ -1088,10 +1000,10 @@ function crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
     crystaleigenvalues::Dict{Mode, Number} = Dict()
     crystaleigenvectors::Dict{Momentum, FockMap} = Dict()
     for (k, fockmap) in momentumfockmaps
-        eigenvalues, eigenvectors = eigh(fockmap, :offset => k)
-        crystaleigenmodes[k] = Subset(m for (m, _) in eigenvalues)
-        crystaleigenvectors[k] = eigenvectors
-        for (m, v) in eigenvalues
+        eigenspectrum::EigenSpectrum = eigspech(fockmap, :offset => k)
+        crystaleigenmodes[k] = Subset(m for (m, _) in eigenspectrum |> geteigenvalues)
+        crystaleigenvectors[k] = eigenspectrum |> geteigenvectors
+        for (m, v) in eigenspectrum |> geteigenvalues
             crystaleigenvalues[m] = v
         end
     end
@@ -1155,7 +1067,7 @@ function FockMap(crystalspectrum::CrystalSpectrum)::FockMap
     return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
 end
 
-""" Packaging the result computed from `eigh`. """
+""" Packaging the result computed from eigenvalue decomposition. """
 struct EigenSpectrum
     eigenvalues::Dict{Mode, Number}
     eigenvectors::FockMap
@@ -1172,16 +1084,68 @@ geteigenvectors(spectrum::EigenSpectrum)::FockMap = spectrum.eigenvectors
 
 Base.:show(io::IO, spectrum::EigenSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
-""" This function is the same as calling `eigh` but with a packaged return type. """
-function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...)::EigenSpectrum
-    evals, eigenvectors = eigh(hermitian, attrs...)
-    eigenvalues::Dict{Mode, Number} = Dict(evals)
-    return EigenSpectrum(eigenvalues, eigenvectors)
+"""
+    eigspech(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
+
+Perform Hermitian eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously, the corresponding eigenmodes will have
+the attributes of `:eigenindex` which corresponds to the degenerate group associated to a eigenvalue, and in ascending order of the eigenvalues;
+`:flavor` which indicates the individual degrees of freedom within the degenerate group; along with the attributes supplied by `attrs`.
+
+### Input
+- `hermitian`           The source of the decomposition, must be a Hermitian.
+- `attrs`               Attributes to be inserted to the generated eigenmodes.
+- `groupingthreshold`   The threshold for grouping degenerated eigenvalues.
+
+### Output
+An `EigenSpectrum` object containing all the computed information.
+"""
+function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
+    vals, U = hermitian |> rep |> Matrix |> Hermitian |> eigen
+    eigenvalues::Base.Iterators.Flatten = digesteigenvalues(Rational, Real, vals, groupingthreshold, attrs...)
+    eigenvectors::FockMap = FockMap(hermitian |> getoutspace, FockSpace(m for (m, _) in eigenvalues), U)
+    return EigenSpectrum(eigenvalues |> Dict, eigenvectors)
 end
 export eigspech
 
+""" Internal method that generates the `eigenmode => eigenvalue` pairs. """
+function digesteigenvalues(H::Type, V::Type, vals, groupingthreshold::Real, attrs::Pair{Symbol}...)::Base.Iterators.Flatten
+    denominator = (1 / groupingthreshold) |> round |> Integer
+    valtable::Dict{H, V} = Dict(hashablenumber(v, denominator) => v for v in vals)
+    items::Base.Generator = (hashablenumber(v, denominator) => n for (n, v) in vals |> enumerate)
+    groups::Dict{H, Vector} = foldl(items; init=Dict{H, Vector}()) do d, (k, v)
+        mergewith!(append!, d, LittleDict(k => [v]))
+    end
+    sortedgroups::Vector = sort([groups...], by=(g -> g.first))
+
+    return (
+        Mode(:eigenindex => n, :flavor => f, attrs...) => valtable[group.first]
+        for (n, group) in sortedgroups |> enumerate
+        for f in group.second |> eachindex)
+end
+
 """
-    groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-2)
+    eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
+
+Perform eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously, the corresponding eigenmodes will have
+the attributes of `:eigenindex` which corresponds to the degenerate group associated to a eigenvalue; `:flavor` which indicates the
+individual degrees of freedom within the degenerate group; along with the attributes supplied by `attrs`.
+
+### Input
+- `fockmap`             The source of the decomposition.
+- `attrs`               Attributes to be inserted to the generated eigenmodes.
+- `groupingthreshold`   The threshold for grouping degenerated eigenvalues, since the eigenvalues are complex numbers, this threshold
+                        will be applied to the real and imaginary parts separately.
+"""
+function eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
+    vals, U = fockmap |> rep |> Matrix |> eigen
+    eigenvalues::Base.Iterators.Flatten = digesteigenvalues(Tuple, Complex, vals, groupingthreshold, attrs...)
+    eigenvectors::FockMap = FockMap(fockmap |> getoutspace, FockSpace(m for (m, _) in eigenvalues), U)
+    return EigenSpectrum(eigenvalues |> Dict, eigenvectors)
+end
+export eigspec
+
+"""
+    groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-7)
 
 Given a spectrum, attempt to group the eigenmodes based on their corresponding eigenvalues with a eigenvalue grouping threshold.
 

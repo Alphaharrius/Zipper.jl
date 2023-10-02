@@ -363,6 +363,8 @@ Subset(points::Point...) = Subset(p for p in points)
 
 Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
 
+Base.:in(item, subset::Subset)::Bool = item in (subset |> rep)
+
 """ Allows additions for a subset with another type. """
 # TODO: Requires revision.
 Base.:+(subset::Subset, val)::Subset = Subset(p + val for p in subset)

@@ -81,7 +81,7 @@ function visualize(state::RegionState{2}; title::String = "")
     subplots
 end
 
-function visualize_crystalspectrum_2d(spectrum::CrystalSpectrum; toppadding::Bool = true)
+function visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = true)
     kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
     mesh::Matrix{Momentum} = spectrum.crystal |> brillouinmesh
     plottingdata::Matrix{Vector} = map(k -> haskey(kspectrum, k) ? kspectrum[k] : [], mesh)
@@ -91,19 +91,8 @@ function visualize_crystalspectrum_2d(spectrum::CrystalSpectrum; toppadding::Boo
     end
     paddeddata::Matrix{Vector} = map(v -> v |> padding, plottingdata)
     plottingspectrum::Array = paddeddata |> stack
-    return [surface(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)]
-end
-
-CRYSTALSPECPLOTTINGFUNCTIONS::Dict = Dict(2 => visualize_crystalspectrum_2d)
-
-function visualize(spectrum::CrystalSpectrum; title="")
-    plottingdimension::Integer = spectrum.crystal |> dimension
-    if !haskey(CRYSTALSPECPLOTTINGFUNCTIONS, plottingdimension)
-        @error("Plotting crystal spectrum of dimension $(plottingdimension) is not supported!")
-    end
-    surfaces = spectrum |> CRYSTALSPECPLOTTINGFUNCTIONS[plottingdimension]
     layout::Layout = Layout(title=title)
-    plot(surfaces, layout)
+    plot([surface(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)], layout)
 end
 
 function visualize(source::SnappingResult; title::String = "")

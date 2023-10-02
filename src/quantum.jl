@@ -991,11 +991,17 @@ if being converted back to a `FockMap`, and the corresponding eigenvalues are `1
 
 Packing information into a `CrystalSpectrum` allows visualization of eigen spectrum in a band diagram.
 """
-struct CrystalSpectrum
+struct CrystalSpectrum{Dim}
     crystal::Crystal
     eigenmodes::Dict{Momentum, Subset{Mode}}
     eigenvalues::Dict{Mode, Number}
     eigenvectors::Dict{Momentum, FockMap}
+
+    CrystalSpectrum(
+        crystal::Crystal,
+        eigenmodes::Dict{Momentum, Subset{Mode}},
+        eigenvalues::Dict{Mode, Number},
+        eigenvectors::Dict{Momentum, FockMap}) = new{crystal |> dimension}(crystal, eigenmodes, eigenvalues, eigenvectors)
 end
 export CrystalSpectrum
 

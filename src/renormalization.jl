@@ -1,7 +1,7 @@
 module Renormalization
 
 using LinearAlgebra, OrderedCollections
-using ..Spaces, ..Geometries, ..Quantum, ..Transformations
+using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..QuantumTransformations
 
 """
     frozenselectionbythreshold(threshold::Float64)

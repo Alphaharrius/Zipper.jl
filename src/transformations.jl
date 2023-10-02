@@ -151,6 +151,14 @@ function AffineTransform(
     return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
 end
 
+function addeigenfunction!(transform::AffineTransform; eigenvalue::Number, eigenfunction::BasisFunction)
+    eigenvaluekey::Tuple = hashablecomplex(eigenvalue |> Complex, transform.eigenvaluehashdenominator)
+    trialphase::Complex = relativephase(transform * eigenfunction, eigenfunction)
+    hashablecomplex(trialphase |> Complex, transform.eigenvaluehashdenominator) == eigenvaluekey || error("The eigenvalue is not associated with the eigenfunction!")
+    transform.eigenfunctions[eigenvaluekey] = eigenfunction
+end
+export addeigenfunction!
+
 pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,

@@ -90,7 +90,7 @@ function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Intege
     end
 
 
-    indexmap::Dict{Vector, Integer} = Dict(n => v for (n, v) in tmatfullindexmappings(dimension, maxrank) |> enumerate)
+    indexmap::Dict{Vector, Integer} = Dict(v => n for (n, v) in tmatfullindexmappings(dimension, maxrank) |> enumerate)
     data::Vector{Complex} = zeros(ComplexF64, indexmap |> length)
 
     for (symbol, value) in expressions

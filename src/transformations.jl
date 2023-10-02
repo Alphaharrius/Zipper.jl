@@ -175,6 +175,9 @@ translation(
     Matrix{Float64}(I, dimension, dimension), shiftvector; localspace=localspace, antiunitary=antiunitary)
 export translation
 
+identitytransform(dimension::Integer) = AffineTransform(Matrix{Float64}(I, dimension, dimension))
+export identitytransform
+
 function affinematrix(transformation::AffineTransform)::Matrix{Float64}
     shiftrow::Vector = vcat(transformation.shiftvector, [1])
     leftcolumns::Matrix = vcat(

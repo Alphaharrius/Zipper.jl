@@ -136,7 +136,7 @@ function computeeigenfunctions(pointgroupmatrix::Matrix; functionorderrange::Uni
         return Iterators.filter(p -> !(p.second |> iszero), basisfunctions)
     end
 
-    return (p for functionorder in functionorderrange for p in functionorder |> computeeigenfunctionsatorder)
+    return (p for functionorder in functionorderrange |> reverse for p in functionorder |> computeeigenfunctionsatorder)
 end
 
 functionsignature(basis::BasisFunction, eigenvalue::Complex; denominator::Integer = 128)::Tuple = functionsignature(

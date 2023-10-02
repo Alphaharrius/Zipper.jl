@@ -100,7 +100,7 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))
 end
 
-Base.:(>>)(transform::AffineTransform, fockmap::FockMap)::FockMap = transform * (fockmap |> getoutspace)
-Base.:(<<)(fockmap::FockMap, transform::AffineTransform)::FockMap = transform * (fockmap |> getinspace)
+Base.:*(transform::AffineTransform, fockmap::FockMap)::FockMap = transform * (fockmap |> getoutspace)
+Base.:*(fockmap::FockMap, transform::AffineTransform)::FockMap = transform * (fockmap |> getinspace)
 
 end

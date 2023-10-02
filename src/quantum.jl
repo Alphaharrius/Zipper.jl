@@ -1152,7 +1152,7 @@ Given a spectrum, attempt to group the eigenmodes based on their corresponding e
 ### Output
 A generator yielding `Pair{Number, Subset{Mode}}` objects, with the eigenvalues as keys and the corresponding eigenmodes as values.
 """
-function groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-2)::Base.Generator
+function groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-7)::Base.Generator
     denominator::Integer = (1 / groupingthreshold) |> round |> Integer
     actualvalues::Dict{Rational, Number} = Dict(hashablereal(v, denominator) => v for (_, v) in spectrum |> geteigenvalues)
     items::Base.Generator = (hashablereal(v, denominator) => m for (m, v) in spectrum |> geteigenvalues)

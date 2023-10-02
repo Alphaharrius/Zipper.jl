@@ -993,6 +993,13 @@ export CrystalSpectrum
 
 Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
+""" Shorthand to retrieve the unitcell fockspace from a `CrystalSpectrum`. """
+function Quantum.:unitcellfock(spectrum::CrystalSpectrum)::FockSpace{Region}
+    sourcefock::FockSpace = spectrum |> geteigenvectors |> first |> last |> getoutspace
+    originposition::Offset = sourcefock |> first |> getattr(:pos) |> getspace |> origin
+    return sourcefock |> orderedmodes |> setattr(:offset => originposition) |> FockSpace{Region}
+end
+
 """
     crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
 

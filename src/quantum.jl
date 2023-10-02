@@ -767,7 +767,7 @@ LinearAlgebra.:normalize(fockmap::FockMap)::FockMap = FockMap(fockmap |> getouts
 Base.:abs(fockmap::FockMap)::FockMap = FockMap(fockmap |> getoutspace, fockmap |> getinspace, map(abs, fockmap |> rep))
 
 """ Shorthand for retrieving the eigenvectors from the `eigspech` function. """
-eigvecsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...) |> geteigenvectors
+eigvecsh(hermitian::FockMap, attrs::Pair{Symbol}...)::FockMap = eigspech(hermitian, attrs...) |> geteigenvectors
 export eigvecsh
 
 """ Shorthand for retrieving the eigenvalues from the `eigspech` function. """

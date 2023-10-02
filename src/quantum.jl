@@ -652,6 +652,14 @@ onesmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(outspace, in
 export onesmap
 
 """
+    zerosmap(outspace::FockSpace, inspace::FockSpace)::FockMap
+
+Generate a `FockMap` full of `0`s from `inspace` to `outspace`.
+"""
+zerosmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(outspace, inspace, spzeros(dimension(outspace), dimension(inspace)))
+export zerosmap
+
+"""
     colmap(inmode::Mode, rowdata::Vector{Pair{Mode, ComplexF64}})::FockMap
 
 Create a column `FockMap` with the specified complex value entries associated with the modes which forms the outspace, with a dimension `1` inspace.

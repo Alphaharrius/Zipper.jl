@@ -89,7 +89,6 @@ function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Intege
         error("Function with mixed order elements is not a valid basis function!")
     end
 
-
     indexmap::Dict{Vector, Integer} = Dict(v => n for (n, v) in tmatfullindexmappings(dimension, maxrank) |> enumerate)
     data::Vector{Complex} = zeros(ComplexF64, indexmap |> length)
 

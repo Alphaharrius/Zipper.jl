@@ -615,6 +615,17 @@ function Base.:getindex(fockmap::FockMap, outmode::Mode, inmode::Mode)::Complex
     return (fockmap |> rep)[CartesianIndex(outspaceorder, inspaceorder)]
 end
 
+# ===================================================================================================================================================
+# Added to support getindex of FockMap objects.
+Base.:getindex(fockmap::FockMap, row, col) = restrict(fockmap, (fockmap |> getoutspace)[row] |> FockSpace, (fockmap |> getinspace)[col] |> FockSpace)
+Base.:getindex(fockmap::FockMap, ::Colon, col) = restrict(fockmap, fockmap |> getoutspace, (fockmap |> getinspace)[col] |> FockSpace)
+Base.:getindex(fockmap::FockMap, row, ::Colon) = restrict(fockmap, (fockmap |> getoutspace)[row] |> FockSpace, fockmap |> getinspace)
+Base.:getindex(fockmap::FockMap, ::Colon, ::Colon) = fockmap
+Base.:getindex(fockmap::FockMap, rowspace::FockSpace, colspace::FockSpace) = restrict(fockmap, rowspace, colspace)
+Base.:getindex(fockmap::FockMap, ::Colon, colspace::FockSpace) = columns(fockmap, colspace)
+Base.:getindex(fockmap::FockMap, rowspace::FockSpace, ::Colon) = rows(fockmap, rowspace)
+# ===================================================================================================================================================
+
 getmodepair(fockmap::FockMap, coords::CartesianIndex)::Pair{Mode, Mode} = fockmap.inspace[coords[2]] => fockmap.outspace[coords[1]]
 export getmodepair
 

@@ -110,4 +110,19 @@ function visualize(source::SnappingResult; title::String = "")
         scatter(x=source.forvalues, y=zeros(source.forvalues |> length), mode="markers", name="values")], layout)
 end
 
+function visualize(source::EigenSpectrum; title::String = "")
+    eigenfock::FockSpace = FockSpace(m for (m, _) in source |> geteigenvalues) |> sparsegrouping(:eigenindex)
+    realdatas::Vector = [[(source |> geteigenvalues)[m] |> real for m in subspace] for subspace in eigenfock |> subspaces]
+    # TODO: Think of a better way to visualize complex datas.
+
+    function generateplot(datas::Vector, symbol::Symbol)::Vector
+        sorteddatas::Vector = [data for (_, data) in sort([data[1] => data for data in datas], by=v -> v.first)]
+        paddinglengths::Vector = ([0, (data |> length for data in sorteddatas)...] |> cumsum)[1:end-1]
+        return [scatter(x=paddinglength:(paddinglength + length(data)), y=data, mode="markers", marker=attr(size=10, line_width=2, symbol=symbol)) for (data, paddinglength) in zip(sorteddatas, paddinglengths)]
+    end
+
+    layout = Layout(title=title)
+    plot([generateplot(realdatas, :circle)...], layout)
+end
+
 end

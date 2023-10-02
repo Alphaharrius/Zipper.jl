@@ -29,7 +29,7 @@ bonds::FockMap = bondmap([
     (modeA, modeB |> setattr(:offset => triangularspace & [0, 1])) => tₙ])
 ```
 """
-function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
+function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, T}})::FockMap where {T <: Complex}
     fockspace::FockSpace = FockSpace(Subset(mode for bond in bonds for mode in bond.first))
     half::FockMap = FockMap(fockspace, fockspace, Dict(bonds))
     diag::FockMap = FockMap(fockspace, fockspace, Dict(filter(p -> p.first |> first == p.first |> last, bonds)))

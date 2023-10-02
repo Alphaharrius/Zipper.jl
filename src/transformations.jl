@@ -75,7 +75,8 @@ function Base.:show(io::IO, basisfunction::BasisFunction)
     function generatesymbol(info::Tuple)::String
         if isapprox(info |> last |> abs, 0, atol=1e-10) return "" end
         coords::Vector = invindexmap[info |> first]
-        return "($(info |> last))*" * reduce(*, Iterators.map(c -> indexnametable[c], coords))
+        printnumber::Number = round(info |> last, digits=4)
+        return "($printnumber)*" * reduce(*, Iterators.map(c -> indexnametable[c], coords))
     end
     expression::String = join(filter(v -> v != "", map(generatesymbol, basisfunction |> rep |> enumerate)), " + ")
     print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(expression))"))

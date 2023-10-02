@@ -309,8 +309,8 @@ pointgrouporder(pointgroup::AffineTransform; maxorder=128)::Integer = pointgroup
 export pointgrouporder
 
 function relativephase(target::BasisFunction, ref::BasisFunction)::Complex
-    normalizedref::Vector = ref |> rep
-    normalizedtarget::Vector = target |> rep
+    normalizedref::Vector = ref |> normalize |> rep
+    normalizedtarget::Vector = target |> normalize |> rep
     trialphase::Number = dot(normalizedref, normalizedtarget)
     if !isapprox(dot(normalizedtarget ./ trialphase, normalizedref), 1)
         error("Target function is not a gauged version of the reference function.")

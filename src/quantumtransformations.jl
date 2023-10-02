@@ -102,6 +102,26 @@ end
 
 Base.:*(transform::AffineTransform, fockmap::FockMap)::FockMap = transform * (fockmap |> getoutspace)
 Base.:*(fockmap::FockMap, transform::AffineTransform)::FockMap = transform * (fockmap |> getinspace)
+
+"""
+    getinspacerep(symmetry::AffineTransform, fockmap::FockMap)::FockMap
+
+Determine the symmetry representation within the `inspace` of `fockmap`, this method is used when there are no defined algebra between
+`AffineTransform` and the type of `inspace`.
+
+### Output
+The `FockMap` representation of the symmetry, the `inspace` and `outspace` will be the same as the ones from the input `fockmap`.
+"""
+function getinspacerep(symmetry::AffineTransform, fockmap::FockMap)::FockMap
+    outspacerep::FockMap = symmetry * fockmap
+    hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
+    return fockmap' * outspacerep * fockmap
+end
+export getinspacerep
+
+""" Shorthand to generate a function that calls `getinspacerep` with the given `fockmap`. """
+getinspacerep(fockmap)::Function = symmetry -> getinspacerep(symmetry, fockmap)
+
 """
     spatialmap(fockmap::FockMap)::FockMap
 

@@ -139,10 +139,6 @@ function computeeigenfunctions(pointgroupmatrix::Matrix; functionorderrange::Uni
     return (p for functionorder in functionorderrange |> reverse for p in functionorder |> computeeigenfunctionsatorder)
 end
 
-functionsignature(basis::BasisFunction, eigenvalue::Complex; denominator::Integer = 128)::Tuple = functionsignature(
-    basis.rank, basis |> dimension, eigenvalue; denominator=denominator)
-functionsignature(rank::Integer, dimension::Integer, eigenvalue::Complex; denominator::Integer = 128)::Tuple = (dimension, rank, hashablecomplex(eigenvalue, denominator))
-
 function AffineTransform(
     transformmatrix::Matrix, shiftvector::Vector = zeros(Float64, transformmatrix |> size |> first);
     antiunitary::Bool = false,
@@ -150,8 +146,8 @@ function AffineTransform(
 
     eigenfunctions = transformmatrix |> computeeigenfunctions
     eigenvaluehashdenominator::Integer = findcomplexdenominator(v for (v, _) in eigenfunctions; denominatorrange=64:128).denominator
-    eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(functionsignature(f, v |> Complex, denominator=eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
-    eigenfunctiontable[functionsignature(swave, 1 + 0im, denominator=eigenvaluehashdenominator)] = swave
+    eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(hashablecomplex(v |> Complex, eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
+    eigenfunctiontable[hashablecomplex(1 + 0im, eigenvaluehashdenominator)] = swave
     return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
 end
 
@@ -269,20 +265,12 @@ Spaces.dimension(transformation::AffineTransform)::Integer = transformation.tran
 
 pointgrouprepresentation(transformation::AffineTransform; rank::Integer = 1)::Matrix = pointgrouprepresentation(transformation.transformmatrix; rank=rank)
 
-function findeigenfunction(transformation::AffineTransform;
-    rankrange::UnitRange = 0:3, dimensionrange::UnitRange = 0:3, eigenvalue::Number = 1)::BasisFunction
-
-    lookupsignatures::Base.Generator = (
-        functionsignature(rank, dimension, eigenvalue |> Complex; denominator=transformation.eigenvaluehashdenominator)
-        for (rank, dimension) in Iterators.product(rankrange, dimensionrange))
-
-    for signature in lookupsignatures
-        if haskey(transformation.eigenfunctions, signature)
-            return transformation.eigenfunctions[signature]
-        end
+function findeigenfunction(transformation::AffineTransform; eigenvalue::Number = 1)::BasisFunction
+    eigenvaluekey::Tuple = hashablecomplex(eigenvalue |> Complex, transformation.eigenvaluehashdenominator)
+    if !haskey(transformation.eigenfunctions, eigenvaluekey)
+        error("No eigenfunction is found for eigenvalue $(eigenvalue)!")
     end
-
-    error("No eigenfunction is found for the provided constraints!")
+    return transformation.eigenfunctions[eigenvaluekey]
 end
 export findeigenfunction
 

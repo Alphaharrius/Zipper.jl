@@ -1,8 +1,3 @@
-module Renormalization
-
-using LinearAlgebra, OrderedCollections
-using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..QuantumTransformations
-
 """
     frozenselectionbythreshold(threshold::Float64)
 
@@ -165,7 +160,7 @@ function generategroupingfunction(grouppredicates)
 end
 
 function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol, CrystalSpectrum}
-    groupingfunction::Function = bandpredicates |> Renormalization.generategroupingfunction
+    groupingfunction::Function = bandpredicates |> generategroupingfunction
     labeled::Base.Generator = ((mode |> getattr(:offset), v |> groupingfunction) => mode for (mode, v) in spectrum |> geteigenvalues)
     momentumgroups::Dict{Tuple, Vector{Mode}} = foldl(labeled; init=Dict{Tuple, Vector{Mode}}()) do d,(k, v)
         mergewith!(append!, d, LittleDict(k => [v]))
@@ -243,5 +238,3 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
     return FockMap(wannierisometry, inspace=inspace, outspace=outspace, performpermute=false)
 end
 export wannierprojection
-
-end

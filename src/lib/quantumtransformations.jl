@@ -1,8 +1,3 @@
-module QuantumTransformations
-
-using OrderedCollections
-using ..Spaces, ..Geometries, ..Quantum, ..Transformations
-
 function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
@@ -26,7 +21,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
 
     restrictedfourier::FockMap = fourier(bz, unscaledblockedunitcellfock)
     volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
-    permutedfourier::FockMap = Quantum.permute(restrictedfourier, outspace=scaledfock) / sqrt(volumeratio)
+    permutedfourier::FockMap = Zipper.permute(restrictedfourier, outspace=scaledfock) / sqrt(volumeratio)
 
     function repackfourierblocks(source::FockMap, kscaled::Momentum, partition::Subset{Mode})::FockMap
         partitionrows::FockMap = rows(source, partition |> FockSpace)
@@ -137,7 +132,7 @@ function spatialmap(fockmap::FockMap)::FockMap
         inmode::Mode = colmap |> getinspace |> first
         absmap::FockMap = colmap |> abs
         weights::FockMap = absmap / (absmap |> rep |> collect |> real |> sum)
-        modecenter::Offset = reduce(+, (outmode |> pos) * (weights[outmode, inmode] |> real) for outmode in weights |> getoutspace)
+        modecenter::Offset = reduce(+, (outmode |> getpos) * (weights[outmode, inmode] |> real) for outmode in weights |> getoutspace)
         basis::Offset = modecenter |> basispoint
         offset::Offset = modecenter - basis
         return inmode |> setattr(:offset => offset) |> setattr(:pos => basis)
@@ -158,5 +153,3 @@ function getsymmetrizer(symmetry::AffineTransform, fockmap::FockMap)::FockMap
     return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end
 export getsymmetrizer
-
-end

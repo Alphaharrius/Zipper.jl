@@ -1,8 +1,3 @@
-module Transformations
-
-using LinearAlgebra, SmithNormalForm, OrderedCollections, Combinatorics, Statistics, Base.Iterators
-using ..Spaces, ..Geometries
-
 abstract type Transformation{T} <: Element{T} end
 export Transformation
 
@@ -21,11 +16,11 @@ Base.:isequal(a::BasisFunction, b::BasisFunction)::Bool = a == b
 swave::BasisFunction = BasisFunction([1], 0, 0)
 export swave
 
-LinearAlgebra.normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
+LinearAlgebra.:normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
 
 Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
 
-Spaces.dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
+Zipper.:dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
 
 NAMEINDEXTABLE::Dict{String, Integer} = Dict("x" => 1, "y" => 2, "z" => 3) # The mappings for axis (x y z) in basis functions to tensor indicies.
 
@@ -163,7 +158,7 @@ pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,
     localspace::RealSpace = euclidean(RealSpace, dimension),
-    referencepoint::Offset = localspace |> origin,
+    referencepoint::Offset = localspace |> getorigin,
     antiunitary::Bool = false)::AffineTransform = AffineTransform(pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
     localspace=localspace, antiunitary=antiunitary)
 export pointgrouptransform
@@ -196,10 +191,10 @@ export affinematrix
 
 function transformationshift(transformmatrix::Matrix, localspace::AffineSpace, reference::Point)::Vector
     localreference::Point = lineartransform(localspace, reference)
-    return (localreference |> pos) - (transformmatrix * (localreference |> pos))
+    return (localreference |> vec) - (transformmatrix * (localreference |> vec))
 end
 
-Spaces.:getspace(transformation::AffineTransform)::AffineSpace = transformation.localspace
+Zipper.:getspace(transformation::AffineTransform)::AffineSpace = transformation.localspace
 
 Base.:convert(::Type{Matrix{Float64}}, source::AffineTransform) = source |> affinematrix
 
@@ -212,9 +207,9 @@ function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTrans
     if space |> dimension != transformation |> dimension
         error("Dimension mismatch!")
     end
-    relativebasis::Matrix = (space |> basis |> inv) * (transformation |> getspace |> basis)
+    relativebasis::Matrix = (space |> getbasis |> inv) * (transformation |> getspace |> getbasis)
     transformmatrix::Matrix = relativebasis * (transformation.transformmatrix) * (relativebasis |> inv)
-    shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> pos
+    shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> vec
     return AffineTransform(
         transformmatrix, shiftvector;
         localspace=space, antiunitary=transformation.antiunitary)
@@ -257,7 +252,7 @@ end
 function Base.:*(transformation::AffineTransform, region::Subset{Offset})::Subset{Offset}
     nativetransformation::AffineTransform = (region |> getspace) * transformation
     transformed::Base.Generator = (
-        Point(((nativetransformation |> rep) * vcat(point |> pos, [1]))[1:end - 1], point |> getspace)
+        Point(((nativetransformation |> rep) * vcat(point |> vec, [1]))[1:end - 1], point |> getspace)
         for point in region)
     return Subset(transformed)
 end
@@ -267,12 +262,12 @@ function Base.:*(transformation::AffineTransform, zone::Subset{Momentum})::Subse
     realspace::RealSpace = convert(RealSpace, kspace)
     nativetransformation::AffineTransform = realspace * transformation
     kspacerep::Matrix = Matrix(nativetransformation.transformmatrix |> transpose |> inv)
-    return Subset(Point(kspacerep * (k |> pos), kspace) for k in zone)
+    return Subset(Point(kspacerep * (k |> vec), kspace) for k in zone)
 end
 
 Base.:*(transformation::AffineTransform, point::Point) = (transformation * Subset(point)) |> first
 
-Spaces.dimension(transformation::AffineTransform)::Integer = transformation.transformmatrix |> size |> first
+Zipper.:dimension(transformation::AffineTransform)::Integer = transformation.transformmatrix |> size |> first
 
 pointgrouprepresentation(transformation::AffineTransform; rank::Integer = 1)::Matrix = pointgrouprepresentation(transformation.transformmatrix; rank=rank)
 
@@ -356,6 +351,4 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     relativescale::Scale = Scale(newbasiscoords)
     scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
-end
-
 end

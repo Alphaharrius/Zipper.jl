@@ -1,9 +1,3 @@
-module Physical
-
-using OrderedCollections
-using ..Spaces, ..Quantum, ..Geometries
-
-
 """
     bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
 
@@ -113,5 +107,3 @@ function roundingpurification(correlationspectrum::CrystalSpectrum)::CrystalSpec
     return CrystalSpectrum(correlationspectrum.crystal, correlationspectrum.eigenmodes, eigenvalues, correlationspectrum.eigenvectors)
 end
 export roundingpurification
-
-end

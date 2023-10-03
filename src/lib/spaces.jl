@@ -1,37 +1,8 @@
-module Spaces
-
-using LinearAlgebra, OrderedCollections, Base.Iterators
-
-export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Offset, Momentum, Subset
-export rep, euclidean, basis, dimension, getspace, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
-
-"""
-Simply means an distinct type of object that can be represented by a concrete type `R`.
-"""
-abstract type Element{R <: Any} end
-
-Base.:*(a::A, b::B) where {A <: Element, B <: Element} = error("Composition algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
-
-""" Restrict all print out of elements to just printing the type. """
-Base.:show(io::IO, element::Element) = print(io, string(typeof(element)))
-
-""" Reflexive relation. """
-Base.:convert(::Type{T}, source::T) where {T <: Element} = source
-""" The set representation of an `Element` is a set containing itself. """
-Base.:convert(::Type{OrderedSet{T}}, source::T) where {T <: Element} = OrderedSet{T}([source])
-
-"""
-    rep(source::Element{R}) where {R <: Any}
-
-Retrieve the representation of the `source`, for each subtype of `Element{R}` are ensured to have a representation of type `R`.
-This method will throw error if the subtype `T <: Element{R}` does not overload `Base.convert` to convert `T` to `R`.
-"""
-rep(source::Element{R}) where {R <: Any} = convert(R, source)
-
 """
 Refers to an object with `dimension` spanned by some other objects like `Vector`.
 """
 abstract type AbstractSpace{T} <: Element{T} end
+export AbstractSpace
 
 """
     dimension(space::T)::Integer where {T <: AbstractSpace}
@@ -45,7 +16,7 @@ The dimension of a `AbstractSpace` is the number of objects that spans this spac
 The dimension of the `space`, since this method is arbitary to all types `<: AbstractSpace`, the top root returns `0` as `AbstractSpace` does not refer to any
 concrete space.
 """
-dimension(space::T) where {T <: AbstractSpace} = error("Dimension resolving is not defined for `$(space |> typeof)`!")
+Zipper.:dimension(space::T) where {T <: AbstractSpace} = error("Dimension resolving is not defined for `$(space |> typeof)`!")
 
 """
     hassamespan(a::T, b::F)::Bool where {T <: AbstractSpace, F <: AbstractSpace}
@@ -58,12 +29,13 @@ Check whether the two space is spanned by the same set of elements, regardless o
 ### Output
 `true` if the two spaces `a` & `b` have same span; `false` otherwise. This method can have different implementation varies by the type `T` & `F`.
 """
-hassamespan(a::T, b::F) where {T <: AbstractSpace, F <: AbstractSpace} = false
+Zipper.:hassamespan(a::T, b::F) where {T <: AbstractSpace, F <: AbstractSpace} = false
 
 """
 This is a less general subtype of `AbstractSpace` that is spanned by `Vector` in a continuous manner.
 """
 abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
+export AffineSpace
 
 """ Shorthand for creating a `Point` within the specified space. """
 Base.:&(space::AffineSpace, position::Vector{<:Real})::Point = Point(position, space)
@@ -73,16 +45,16 @@ Base.:&(space::AffineSpace, position::Vector{<:Real})::Point = Point(position, s
 
 Check between two `<: AffineSpace`, returns `false` as `T` and `F` are different subtype of `AffineSpace`.
 """
-hassamespan(a::T, b::F) where {T <: AffineSpace, F <: AffineSpace} = false
+Zipper.:hassamespan(a::T, b::F) where {T <: AffineSpace, F <: AffineSpace} = false
 
 """
     hassamespan(a::T, b::T) where {T <: AffineSpace}
 
 Check between two `<: AffineSpace`, returns `true` if they have same dimension.
 """
-hassamespan(a::T, b::T) where {T <: AffineSpace} = dimension(a::T) == dimension(b::T)
+Zipper.:hassamespan(a::T, b::T) where {T <: AffineSpace} = dimension(a::T) == dimension(b::T)
 
-Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = typeof(a) == typeof(b) && isapprox(basis(a), basis(b))
+Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = typeof(a) == typeof(b) && isapprox(getbasis(a), getbasis(b))
 
 Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 
@@ -92,35 +64,30 @@ Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 Create a Euclidean space (with basis vectors of a identity matrix) of type `S <: AffineSpace` with dimension `n`.
 """
 euclidean(S::Type{<: AffineSpace}, n::Int64) = S(Matrix{Float64}(I(n)))
+export euclidean
 
 """
-    basis(space::AffineSpace)::Matrix{Float64}
+    getbasis(space::AffineSpace)::Matrix{Float64}
 
 Get the basis vectors in form of `Matrix{Float64}` from the `AffineSpace` `space`.
 """
-basis(space::AffineSpace)::Matrix{Float64} = rep(space)
+getbasis(space::AffineSpace)::Matrix{Float64} = rep(space)
+export getbasis
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}
 
 Get the dimension of the `AffineSpace`, the dimension will be the row / column length of the representation `Matrix`.
 """
-dimension(space::T) where {T <: AffineSpace} = size(basis(space), 1)
+Zipper.:dimension(space::T) where {T <: AffineSpace} = size(getbasis(space), 1)
 
-Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, basis(space)))
+Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, getbasis(space)))
 
 """
 Subset of element type `T <: AbstractSubset` defined within a full set.
 """
 abstract type AbstractSubset{T} <: Element{OrderedSet{T}} end
-
-"""
-    getspace(subset::AbstractSubset)
-
-Get the space of the parameter `subset`. If `subset isa Point`, then the output will be its parent space where its position is defined; if `subset isa Subset`, then
-the output will be the common space of all elements within the `subset`.
-"""
-getspace(subset::AbstractSubset) = error("Method not defined for input type `$(subset |> typeof)`!")
+export AbstractSubset
 
 """
     RealSpace(rep::Matrix{Float64})
@@ -133,6 +100,7 @@ A real space concrete type of `AffineSpace`, this is present in tandem with `Mom
 struct RealSpace <: AffineSpace
     rep::Matrix{Float64}
 end
+export RealSpace
 
 """
     MomentumSpace(rep::Matrix{Float64})
@@ -145,14 +113,21 @@ A momentum space concrete type of `AffineSpace`, this is present in tandem with 
 struct MomentumSpace <: AffineSpace
     rep::Matrix{Float64}
 end
+export MomentumSpace
+
+""" Shorthand to get the euclidean space of the same span. """
+euclidean(space::AffineSpace) = euclidean(space |> typeof, space |> dimension)
+
+getbasisvectors(space::AffineSpace) = (euclidean(space) & (space |> rep)[:, d] for d in axes(space |> rep, 2))
+export getbasisvectors
 
 Base.:convert(::Type{RealSpace}, source::Matrix{Float64})::RealSpace = RealSpace(source)
 Base.:convert(::Type{MomentumSpace}, source::Matrix{Float64})::MomentumSpace = MomentumSpace(source)
 
 """ Performing conversion from `RealSpace` to `MomentumSpace` using formula 𝑅ₖ ≝ 2π⋅(𝑅ᵣ⁻¹)ᵀ."""
-Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = MomentumSpace(2.0 * π * Matrix(transpose(inv(basis(source)))))
+Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = MomentumSpace(2.0 * π * Matrix(transpose(inv(getbasis(source)))))
 """ Performing conversion from `MomentumSpace` to `RealSpace`."""
-Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(basis(source) / (2.0 * π)))))
+Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(getbasis(source) / (2.0 * π)))))
 
 """
     Point(pos::Vector{Float64}, space::AbstractSpace)
@@ -169,20 +144,22 @@ struct Point{T <: AffineSpace} <: AbstractSubset{Point}
 
     Point(pos, space::T) where {T <: AffineSpace} = new{space |> typeof}([pos...], space)
 end
+export Point
 
 """ Alias of a real space point. """
 Offset = Point{RealSpace}
 """ Alias of a momentum space point. """
 Momentum = Point{MomentumSpace}
+export Offset, Momentum
 
-Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in pos(point)]) ∈ $(point |> getspace |> typeof)"))
+Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in vec(point)]) ∈ $(point |> getspace |> typeof)"))
 
 """
     getspace(point::Point)
 
 Retrieve the `AffineSpace` of the `Point`.
 """
-getspace(point::Point) = point.space
+Zipper.:getspace(point::Point) = point.space
 
 hashablereal(v::Real, denominator::Integer = 10000000)::Rational = ((v * denominator) |> round |> Integer) // denominator
 export hashablereal
@@ -206,7 +183,7 @@ Analyse the given `positions` to determine the spatial denominators for each dim
 - `positions` The set of positions to be analysed that is iterable.
 """
 function spatialsnappingcalibration(positions)
-    values::Matrix = hcat(map(p -> p |> euclidean |> pos, positions)...)
+    values::Matrix = hcat(map(p -> p |> euclidean |> vec, positions)...)
     foreach(n -> spatialhashdenominators[n] = snappingdenominator(values[n, :]).denominator, axes(values, 1))
     @warn "Updated position hash denominators to $spatialhashdenominators."
 end
@@ -257,15 +234,16 @@ this method is preserved for hashing purposes only.
 ### Output
 A `Vector{Rational{Int64}}` which stores the rounded elements.
 """
-rpos(position::Offset)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(position |> euclidean |> pos, spatialhashdenominators[1:dimension(position)])]
-rpos(momentum::Momentum)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(momentum |> pos, reciprocalhashdenominators[1:dimension(momentum)])]
+rpos(position::Offset)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(position |> euclidean |> vec, spatialhashdenominators[1:dimension(position)])]
+rpos(momentum::Momentum)::Vector{Rational{Integer}} = [hashablereal(r, d) for (r, d) in zip(momentum |> vec, reciprocalhashdenominators[1:dimension(momentum)])]
+export rpos
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}
 
 Get the dimension of the `Point`, which is the dimension of its vector representation.
 """
-dimension(point::Point)::Integer = length(pos(point))
+Zipper.:dimension(point::Point)::Integer = point |> vec |> length
 
 # rpos is used to to equate the points to round off slight differences.
 function Base.:(==)(a::Point, b::Point)::Bool
@@ -273,27 +251,24 @@ function Base.:(==)(a::Point, b::Point)::Bool
     return rpos(a) == rpos(b)
 end
 
-LinearAlgebra.:norm(point::Point) = norm(pos(point))
+LinearAlgebra.:norm(point::Point) = point |> vec |> norm
 
-LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, pos(a)), collect(Float64, pos(b)))
+LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, a |> vec), collect(Float64, b |> vec))
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Vector representation and leave to the Base.isequal for identification.
 Base.:hash(point::Point)::UInt = hash(rpos(point))
 Base.:isequal(a::Point, b::Point)::Bool = a == b
 
-"""
-    pos(point::Point)::Vector{Float64}
-
-Get the vector representation of a `Point`.
-"""
-pos(point::Point)::Vector{Float64} = point.pos
+""" Get the vector representation of a `Point`. """
+Base.:vec(point::Point)::Vector{Float64} = point.pos
 
 """
     lineartransform(new_space::AffineSpace, point::Point)::Point
 
 Perform linear transformation on the point from the original space `getspace(point)` to `newspace`, the vector representation of the `point` will be transformed.
 """
-lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(basis(newspace)) * basis(getspace(point)) * pos(point), newspace)
+lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(getbasis(newspace)) * getbasis(getspace(point)) * vec(point), newspace)
+export lineartransform
 
 """
     orthogonalspace(space::AffineSpace)::AffineSpace
@@ -312,22 +287,22 @@ export orthogonalspace
 
 Perform linear transformation on the point from the original space `getspace(point)` to Euclidean space.
 """
-euclidean(point::Point)::Point = Point(basis(getspace(point)) * pos(point), euclidean(typeof(getspace(point)), dimension(point)))
+Zipper.:euclidean(point::Point)::Point = Point(getbasis(getspace(point)) * vec(point), euclidean(typeof(getspace(point)), dimension(point)))
 
-Base.:-(point::Point)::Point = Point(-pos(point), getspace(point))
+Base.:-(point::Point)::Point = Point(-vec(point), getspace(point))
 
 function Base.:+(a::Point, b::Point)::Point
     @assert(typeof(getspace(a)) == typeof(getspace(b)))
-    return Point(pos(a) + pos(b), getspace(a))
+    return Point(vec(a) + vec(b), getspace(a))
 end
 
 function Base.:-(a::Point, b::Point)::Point
     @assert(typeof(getspace(a)) == typeof(getspace(b)))
-    return Point(pos(a) - pos(b), getspace(a))
+    return Point(vec(a) - vec(b), getspace(a))
 end
 
-Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) * val, getspace(point))
-Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, pos(point)) / val, getspace(point))
+Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) * val, getspace(point))
+Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) / val, getspace(point))
 
 """
     Subset(elements::OrderedSet{T})
@@ -358,6 +333,7 @@ struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
     # Allows the creation of a empty subset.
     Subset{T}() where {T} = new{T}(OrderedSet())
 end
+export Subset
 
 Subset(points::Point...) = Subset(p for p in points)
 
@@ -378,7 +354,7 @@ The space of a `Subset` have to be determined by all of it's underlying elements
 ### Error
 If the underlying elements of `subset` does not belongs to the same space from `getspace(element)`.
 """
-function getspace(subset::Subset)
+function Zipper.:getspace(subset::Subset)
     @assert(length(subset) > 0, "Cannot be determine the space of an empty set.")
     space = getspace(first(subset))
     @assert(all(Iterators.map(el -> getspace(el) == space, subset)))
@@ -420,6 +396,7 @@ Convert the `Subset` into a `Tuple` with all its elements for easier accessing.
 - `e₀, e₁ = members`
 """
 members(subset::Subset)::Tuple = (rep(subset)...,)
+export members
 
 Base.:(==)(a::Subset, b::Subset)::Bool = Set(rep(a)) == Set(rep(b))
 
@@ -435,6 +412,7 @@ Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(re
 Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
 
 subsetunion(subsets)::Subset = union(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
+export subsetunion
 
 function subsetintersect(subsets)::Subset
     intersections::OrderedSet = intersect((subset |> rep for subset in subsets)...)
@@ -443,6 +421,7 @@ function subsetintersect(subsets)::Subset
     end
     return Subset(intersections)
 end
+export subsetintersect
 
 Base.:union(subsets::Subset...)::Subset = subsetunion(subsets)
 Base.:intersect(subsets::Subset...)::Subset = subsetintersect(subsets)
@@ -518,5 +497,3 @@ function findcomplexdenominator(values; denominatorrange::UnitRange = 2:128, tol
     return snappingdenominator(flattenvalues; denominatorrange=denominatorrange, tolerantscalepercent=tolerantscalepercent)
 end
 export findcomplexdenominator
-
-end

@@ -157,7 +157,7 @@ courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
 courierseedingregion::Subset{Offset} = Subset(m |> pos for m in courierseedingmodes)
 visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))
-courierseedingfock::FockSpace = FockSpace(courierseedingmodes)
+courierseedingfock::FockSpace{Region} = FockSpace{Region}(courierseedingmodes)
 
 c3 = c6^2 |> recenter(courierseedingcenter)
 

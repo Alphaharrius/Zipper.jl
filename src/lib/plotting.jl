@@ -1,10 +1,3 @@
-module Plotting
-
-using Plotly, ColorTypes, LinearAlgebra, Compat
-using ..Spaces, ..Geometries, ..Quantum
-
-export visualize
-
 function visualize(fockmap::FockMap; title::String = "", rowrange = :, colrange = :)
     source = rep(fockmap)[rowrange, colrange]
     layout = Layout(yaxis=attr(autorange="reversed"))
@@ -13,9 +6,9 @@ function visualize(fockmap::FockMap; title::String = "", rowrange = :, colrange 
     subplots
 end
 
-function visualize(regions::Subset{<: Point}...; title::String = "", visualspace::AffineSpace)
+function visualize(regions::Subset{<: Point}...; title::String = "", visualspace::AffineSpace = regions |> getspace |> euclidean)
     function generateregionplot(region::Subset{<: Point})
-        positions::Array{Vector} = [lineartransform(visualspace, point) |> pos for point in region]
+        positions::Array{Vector} = [lineartransform(visualspace, point) |> vec for point in region]
         return visualizevectorpositions(positions)
     end
     # How to make all axis having the same scale:
@@ -39,7 +32,7 @@ end
 function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T <: Number}
     𝑁::Int64 = length(spectrum)
     ∑𝑝::Vector{Point} = [getattr(pair.first, :offset) + getattr(pair.first, :pos) for pair in spectrum]
-    𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> pos(lineartransform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
+    𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> vec(lineartransform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
     markerpositions::Matrix{Float64} = zeros(3, 𝑁)
     copyto!(view(markerpositions, 1:size(𝑀ₚ, 1), :), 𝑀ₚ)
     sizes::Vector{Float64} = [abs(pair.second) for pair in spectrum]
@@ -62,8 +55,8 @@ function visualize(state::RegionState{2}; title::String = "", markersizemultipli
     function generatestateplot(spstate::FockMap)
         spmode::Mode = spstate |> getinspace |> first
         columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
-        positions::Vector{Offset} = [v.first |> pos for v in columnspectrum]
-        mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
+        positions::Vector{Offset} = [v.first |> getpos for v in columnspectrum]
+        mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> vec, positions)...)
         markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
         normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * markersizemultiplier
         markercolors::Vector = [convert(RGB{Float64}, HSV(angle(v.second) / 2π * 360, 1, 1)) for v in columnspectrum]
@@ -125,4 +118,4 @@ function visualize(source::EigenSpectrum; title::String = "")
     plot([generateplot(realdatas, :circle)...], layout)
 end
 
-end
+export visualize

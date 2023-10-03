@@ -1,11 +1,4 @@
-module Geometries
-
-using LinearAlgebra, OrderedCollections
-using ..Spaces
-
-export Crystal
-export distance, interpolate, origin, radius, pbc, basispoint, latticeoff, resize, mesh, vol, latticepoints, sitepoints, brillouinzone, brillouinmesh, geometricalfilter, circularfilter
-
+""" Alias for a subset of `Offset` positions which is region like. """
 Region = Subset{Offset}
 export Region
 
@@ -15,6 +8,7 @@ export Region
 Compute the distance between two points `a` & `b` within the same parent `AffineSpace`.
 """
 distance(a::Point, b::Point)::Float64 = norm(a - b)
+export distance
 
 function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <: Integer}
     @assert(getspace(from) == getspace(to))
@@ -23,18 +17,25 @@ function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <:
     points[end] = to
     return points
 end
+export interpolate
 
-origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
+getorigin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
+export getorigin
 
-center(region::Subset{<:Point})::Point = sum(p for p in region) / length(region)
-export center
+getcenter(region::Subset{<:Point})::Point = sum(p for p in region) / length(region)
+export getcenter
 
-radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
+function getradius(region::Subset{<:Point}; metricspace::AffineSpace = region |> getspace |> euclidean)::Real
+    center::Point = region |> getcenter
+    return maximum(lineartransform(metricspace, center - p) |> norm for p in region)
+end
+export getradius
 
 struct Crystal <: AbstractSubset{Crystal}
     unitcell::Subset{Offset}
     sizes::Vector{Int64}
 end
+export Crystal
 
 Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
 
@@ -43,7 +44,8 @@ Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(si
 
 Apply periodic boundary conditions to a point `point` within a `Crystal`.
 """
-pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(pos(point), crystal.sizes)], getspace(point))
+pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(point |> vec, crystal.sizes)], getspace(point))
+export pbc
 
 """
     pbc(crystal::Crystal)::Function
@@ -52,21 +54,25 @@ Return a function that applies periodic boundary conditions to a point within a 
 """
 pbc(crystal::Crystal)::Function = p -> pbc(crystal, p)
 
-latticeoff(point::Point)::Point = Point([trunc(v) for v in pos(point)], getspace(point))
+latticeoff(point::Point)::Point = Point([trunc(v) for v in point |> vec], getspace(point))
+export latticeoff
 
 function basispoint(point::Point)::Point
-    rationalized::Vector = [hashablereal(v) for v in point |> pos]
+    rationalized::Vector = [hashablereal(v) for v in point |> vec]
     return Point([mod(v |> numerator, v |> denominator) / denominator(v) for v in rationalized], point |> getspace)
 end
+export basispoint
 
-Spaces.getspace(crystal::Crystal) = getspace(crystal.unitcell)
-Spaces.dimension(crystal::Crystal) = crystal.sizes |> length
+Zipper.:getspace(crystal::Crystal) = getspace(crystal.unitcell)
+Zipper.:dimension(crystal::Crystal) = crystal.sizes |> length
 
 resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitcell, sizes)
+export resize
 
 mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collect(Iterators.product([0:(d - 1) for d in sizes]...))[:]]...)
 
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
+export vol
 
 function latticepoints(crystal::Crystal)::Subset{Offset}
     real_space::RealSpace = getspace(crystal.unitcell)
@@ -75,9 +81,11 @@ function latticepoints(crystal::Crystal)::Subset{Offset}
     recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2)
     return Subset(Point(pos, real_space) for pos in eachcol(recentered_mesh))
 end
+export latticepoints
 
 sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
     latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
+export sitepoints
 
 function brillouinzone(crystal::Crystal)::Subset{Momentum}
     momentum_space::MomentumSpace = convert(MomentumSpace, getspace(crystal.unitcell))
@@ -86,14 +94,10 @@ function brillouinzone(crystal::Crystal)::Subset{Momentum}
     recentered_mesh::Matrix{Float64} = crystal_mesh ./ tiled_sizes
     return Subset(Point(pos, momentum_space) for pos in eachcol(recentered_mesh))
 end
+export brillouinzone
 
 function brillouinmesh(crystal::Crystal)::Array{Point}
     kspace::MomentumSpace = getspace(crystal)
     return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
 end
-
-geometricalfilter(f, center::Point) = input -> f(lineartransform(getspace(center), convert(Point, input)), center)
-
-circularfilter(center::Point, radius::Float64) = geometricalfilter((point, center) -> norm(point - center) <= radius, center)
-
-end
+export brillouinmesh

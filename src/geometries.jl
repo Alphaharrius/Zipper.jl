@@ -96,8 +96,4 @@ function brillouinmesh(crystal::Crystal)::Array{Point}
     return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
 end
 
-geometricalfilter(f, center::Point) = input -> f(lineartransform(getspace(center), convert(Point, input)), center)
-
-circularfilter(center::Point, radius::Float64) = geometricalfilter((point, center) -> norm(point - center) <= radius, center)
-
 end

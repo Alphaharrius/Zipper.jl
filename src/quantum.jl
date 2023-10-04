@@ -412,7 +412,7 @@ Retrieve the unit cell fockspace of the system from a `FockSpace{Crystal}`, posi
 """
 function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace{Region}
     firstpartition::Subset{Mode} = crystalfock |> rep |> first
-    originpoint::Point = firstpartition |> first |> getattr(:pos) |> getspace |> origin
+    originpoint::Point = firstpartition |> first |> getattr(:pos) |> getspace |> getorigin
     return FockSpace{Region}(firstpartition |> setattr(:offset => originpoint))
 end
 export unitcellfock
@@ -549,7 +549,7 @@ The quantized `Mode` object.
 """
 function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
     @assert(identifier == :offset || identifier == :pos)
-    home::Point = origin(getspace(point))
+    home::Point = getorigin(getspace(point))
     # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
     couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
     # The new mode will take a group of q:$(name).

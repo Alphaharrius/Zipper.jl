@@ -163,7 +163,7 @@ pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,
     localspace::RealSpace = euclidean(RealSpace, dimension),
-    referencepoint::Offset = localspace |> origin,
+    referencepoint::Offset = localspace |> getorigin,
     antiunitary::Bool = false)::AffineTransform = AffineTransform(pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
     localspace=localspace, antiunitary=antiunitary)
 export pointgrouptransform
@@ -212,7 +212,7 @@ function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTrans
     if space |> dimension != transformation |> dimension
         error("Dimension mismatch!")
     end
-    relativebasis::Matrix = (space |> basis |> inv) * (transformation |> getspace |> basis)
+    relativebasis::Matrix = (space |> getbasis |> inv) * (transformation |> getspace |> getbasis)
     transformmatrix::Matrix = relativebasis * (transformation.transformmatrix) * (relativebasis |> inv)
     shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> pos
     return AffineTransform(

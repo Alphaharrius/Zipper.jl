@@ -24,12 +24,16 @@ function interpolate(from::Point, to::Point, count::T)::Array{Point} where {T <:
     return points
 end
 
-origin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
+getorigin(space::AffineSpace)::Point = Point(zeros(Float64, dimension(space)), space)
 
-center(region::Subset{<:Point})::Point = sum(p for p in region) / length(region)
-export center
+getcenter(region::Subset{<:Point})::Point = sum(p for p in region) / length(region)
+export getcenter
 
-radius(region::Subset, center::Point)::Float64 = maximum(distance(center, point) for point in rep(region))
+function getradius(region::Subset{<:Point}; metricspace::AffineSpace = region |> getspace |> euclidean)::Real
+    center::Point = region |> getcenter
+    return maximum(lineartransform(metricspace, center - p) |> norm for p in region)
+end
+export getradius
 
 struct Crystal <: AbstractSubset{Crystal}
     unitcell::Subset{Offset}

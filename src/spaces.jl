@@ -82,7 +82,7 @@ Check between two `<: AffineSpace`, returns `true` if they have same dimension.
 """
 hassamespan(a::T, b::T) where {T <: AffineSpace} = dimension(a::T) == dimension(b::T)
 
-Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = typeof(a) == typeof(b) && isapprox(basis(a), basis(b))
+Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = typeof(a) == typeof(b) && isapprox(getbasis(a), getbasis(b))
 
 Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 
@@ -94,20 +94,20 @@ Create a Euclidean space (with basis vectors of a identity matrix) of type `S <:
 euclidean(S::Type{<: AffineSpace}, n::Int64) = S(Matrix{Float64}(I(n)))
 
 """
-    basis(space::AffineSpace)::Matrix{Float64}
+    getbasis(space::AffineSpace)::Matrix{Float64}
 
 Get the basis vectors in form of `Matrix{Float64}` from the `AffineSpace` `space`.
 """
-basis(space::AffineSpace)::Matrix{Float64} = rep(space)
+getbasis(space::AffineSpace)::Matrix{Float64} = rep(space)
 
 """
     dimension(space::T)::Integer where {T <: AffineSpace}
 
 Get the dimension of the `AffineSpace`, the dimension will be the row / column length of the representation `Matrix`.
 """
-dimension(space::T) where {T <: AffineSpace} = size(basis(space), 1)
+dimension(space::T) where {T <: AffineSpace} = size(getbasis(space), 1)
 
-Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, basis(space)))
+Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, getbasis(space)))
 
 """
 Subset of element type `T <: AbstractSubset` defined within a full set.
@@ -150,9 +150,9 @@ Base.:convert(::Type{RealSpace}, source::Matrix{Float64})::RealSpace = RealSpace
 Base.:convert(::Type{MomentumSpace}, source::Matrix{Float64})::MomentumSpace = MomentumSpace(source)
 
 """ Performing conversion from `RealSpace` to `MomentumSpace` using formula 𝑅ₖ ≝ 2π⋅(𝑅ᵣ⁻¹)ᵀ."""
-Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = MomentumSpace(2.0 * π * Matrix(transpose(inv(basis(source)))))
+Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = MomentumSpace(2.0 * π * Matrix(transpose(inv(getbasis(source)))))
 """ Performing conversion from `MomentumSpace` to `RealSpace`."""
-Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(basis(source) / (2.0 * π)))))
+Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(getbasis(source) / (2.0 * π)))))
 
 """
     Point(pos::Vector{Float64}, space::AbstractSpace)
@@ -293,7 +293,7 @@ pos(point::Point)::Vector{Float64} = point.pos
 
 Perform linear transformation on the point from the original space `getspace(point)` to `newspace`, the vector representation of the `point` will be transformed.
 """
-lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(basis(newspace)) * basis(getspace(point)) * pos(point), newspace)
+lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(getbasis(newspace)) * getbasis(getspace(point)) * pos(point), newspace)
 
 """
     orthogonalspace(space::AffineSpace)::AffineSpace
@@ -312,7 +312,7 @@ export orthogonalspace
 
 Perform linear transformation on the point from the original space `getspace(point)` to Euclidean space.
 """
-euclidean(point::Point)::Point = Point(basis(getspace(point)) * pos(point), euclidean(typeof(getspace(point)), dimension(point)))
+euclidean(point::Point)::Point = Point(getbasis(getspace(point)) * pos(point), euclidean(typeof(getspace(point)), dimension(point)))
 
 Base.:-(point::Point)::Point = Point(-pos(point), getspace(point))
 

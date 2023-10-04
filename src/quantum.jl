@@ -210,29 +210,6 @@ the ordering of `points`, then follows the ordering of `basismodes`.
 spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
 export spanoffset
 
-"""
-    sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
-
-Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset` and form a `FockSpace`. Not to
-be mistakened with `spanoffset`, this method will partition the modes by the generator points.
-Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
-"""
-function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
-    partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
-    modes::Subset{Mode} = spanoffset(basismodes, points)
-    orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
-end
-export sparsefock
-
-"""
-    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
-
-A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
-"""
-crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
-export crystalfock
-
 """ By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space. """
 Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
 
@@ -288,6 +265,29 @@ export FockSpace
 """ To retrieve the reflected property this `FockSpace` is reflected to. """
 getreflected(fockspace::FockSpace) = fockspace.reflected
 export getreflected
+
+"""
+    sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
+
+Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset` and form a `FockSpace`. Not to
+be mistakened with `spanoffset`, this method will partition the modes by the generator points.
+Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
+"""
+function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
+    partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
+    modes::Subset{Mode} = spanoffset(basismodes, points)
+    orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
+    return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
+end
+export sparsefock
+
+"""
+    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
+
+A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
+"""
+crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
+export crystalfock
 
 """ To create a regional `FockSpace`."""
 function FockSpace{Region}(input)
@@ -1035,7 +1035,7 @@ Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> 
 """ Shorthand to retrieve the unitcell fockspace from a `CrystalSpectrum`. """
 function Quantum.:unitcellfock(spectrum::CrystalSpectrum)::FockSpace{Region}
     sourcefock::FockSpace = spectrum |> geteigenvectors |> first |> last |> getoutspace
-    originposition::Offset = sourcefock |> first |> getattr(:pos) |> getspace |> origin
+    originposition::Offset = sourcefock |> first |> getattr(:pos) |> getspace |> getorigin
     return sourcefock |> orderedmodes |> setattr(:offset => originposition) |> FockSpace{Region}
 end
 

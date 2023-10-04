@@ -8,7 +8,7 @@ include("../src/renormalization.jl")
 
 include("../src/plotting.jl")
 
-using PlotlyJS, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Renormalization
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -20,9 +20,7 @@ pc = (pa + pb) / 2
 spatialsnappingcalibration((pa, pb, pc))
 
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
-addeigenfunction!(c6, eigenvalue=-1, eigenfunction=BasisFunction(:yyx => -3, :xxx => 1, dimension=2))
-addeigenfunction!(c6, eigenvalue=-exp(1im * π/3), eigenfunction=BasisFunction(:xx => -1im, :xy => 2, :yy => 1im, dimension=2))
-addeigenfunction!(c6, eigenvalue=-exp(-1im * π/3), eigenfunction=BasisFunction(:xx => 1im, :xy => 2, :yy => -1im, dimension=2))
+c3 = c6^2
 
 unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [24, 24])
@@ -44,10 +42,7 @@ groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellf
 groundstates |> visualize
 groundstateprojector = groundstates |> crystalprojector
 
-visualize(groundstateprojector, rowrange=1:512, colrange=1:512)
-
 C = idmap(groundstateprojector.outspace) - groundstateprojector
-C |> crystalspectrum |> visualize
 
 correlations = C
 
@@ -58,6 +53,79 @@ blockresult = blocking(:action => scale, :correlations => correlations, :crystal
 
 blockedcrystal::Crystal = blockresult[:crystal]
 blockedcorrelations::FockMap = blockresult[:correlations]
+
+
+frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> origin, physicalmodes, 2.0) 
+frozenseedingregion::Subset{Offset} = Subset(m |> pos for m in frozenseedingmodes)
+visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
+frozenseedingfock::FockSpace = FockSpace(frozenseedingmodes)
+localevec = regioncorrelations(blockedcorrelations,frozenseedingfock) |> eigvecsh 
+filledmodes = (localevec |> getinspace |> orderedmodes |> collect)[1:3]
+emptymodes = (localevec |> getinspace |> orderedmodes |> collect)[22:24]
+filledmodes |> Subset |> FockSpace 
+
+fillediso = columns(localevec, filledmodes |> Subset |> FockSpace ) 
+filledproj = fillediso * fillediso'
+
+emptyiso = columns(localevec, emptymodes |> Subset |> FockSpace ) 
+emptyproj = emptyiso * emptyiso'
+locproj = filledproj+emptyproj
+couriermodes = [((locproj |> eigspech) |> groupbyeigenvalues)...][1].second
+courieriso = columns(locproj |> eigvecsh, couriermodes|> FockSpace )
+
+courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
+courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 0.8)
+courierseedingregion::Subset{Offset} = Subset(m |> pos for m in courierseedingmodes)
+visualize(courierseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
+courierseedingfock::FockSpace = FockSpace(courierseedingmodes)
+locseedregionevec = regioncorrelations(blockedcorrelations,courierseedingfock) |> eigvecsh 
+locseedvec = (locseedregionevec |> getinspace |> orderedmodes |> collect)[2:4]
+
+localseed = columns(locseedregionevec, localseedvec |> Subset |> FockSpace )
+
+# columns(locseedregionevec,(localseed |> getinspace |> orderedmodes |> collect)[3] |> Subset |> FockSpace ) |> Quantum.columnspec |> visualize
+
+c3rep = c3 * (localseed |> getoutspace)
+c3localseed = c3rep * localseed
+c3localseed = FockMap(c3localseed,inspace=c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3a")|> FockSpace,performpermute=false)
+c3c3rep = c3^2 * (localseed |> getoutspace)
+c3c3localseed = c3c3rep * localseed
+c3c3localseed = FockMap(c3c3localseed,inspace=c3c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3c3a")|> FockSpace,performpermute=false)
+aseed = (localseed+c3localseed+c3c3localseed)
+
+courierseedingcenter::Offset = (blockedmodes |> getspace) & [1/3, 2/3]
+courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 0.8)
+courierseedingregion::Subset{Offset} = Subset(m |> pos for m in courierseedingmodes)
+visualize(courierseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
+courierseedingfock::FockSpace = FockSpace(courierseedingmodes)
+locseedregionevec = regioncorrelations(blockedcorrelations,courierseedingfock) |> eigvecsh 
+[(regioncorrelations(blockedcorrelations,courierseedingfock) |> eigvalsh)...]
+localseedvec = (locseedregionevec |> getinspace |> orderedmodes |> collect)[1:3]
+localseed = columns(locseedregionevec, localseedvec |> Subset |> FockSpace )
+localseed = FockMap(localseed,inspace=localseed |> getinspace |> orderedmodes |> setattr(:name=> "b")|> FockSpace,performpermute=false)
+
+c3rep = c3 * (localseed |> getoutspace)
+c3localseed = c3rep * localseed
+c3localseed = FockMap(c3localseed,inspace=c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3b")|> FockSpace,performpermute=false)
+c3c3rep = c3^2 * (localseed |> getoutspace)
+c3c3localseed = c3c3rep * localseed
+c3c3localseed = FockMap(c3c3localseed,inspace=c3c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3c3b")|> FockSpace,performpermute=false)
+bseed = (localseed+c3localseed+c3c3localseed)
+aseed
+
+u,sval, vd = (aseed+bseed)'*courieriso |> svd
+u
+vd
+[sval...]
+u*vd
+(u*vd) |> getinspace |> modeattrs
+courieriso' |> getinspace |> modeattrs
+wanniercourieriso = courieriso*(u*vd)'
+
+columns(wanniercourieriso, (wanniercourieriso|> getinspace |> orderedmodes |> collect)[6] |> Subset |> FockSpace ) |> Quantum.columnspec |> visualize
+
+[regionalwannierseeding(blockedcorrelations,courierseedingfock,symmetry=c3)...]
+
 
 function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
     currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
@@ -72,7 +140,7 @@ physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> origin, physicalmodes, 2.0)
 frozenseedingregion::Subset{Offset} = Subset(m |> pos for m in frozenseedingmodes)
 visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
-frozenseedingfock::FockSpace{Region} = FockSpace{Region}(frozenseedingmodes)
+frozenseedingfock::FockSpace = FockSpace(frozenseedingmodes)
 
 globaldistiller = globaldistillerhamiltonian(
     correlations=blockresult[:correlations],
@@ -83,7 +151,7 @@ globaldistiller = globaldistillerhamiltonian(
 globaldistillerspectrum = globaldistiller |> crystalspectrum
 visualize(globaldistillerspectrum, title="Global Distiller")
 
-distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
+distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
 
 courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
@@ -96,14 +164,7 @@ c3 = c6^2 |> recenter(courierseedingcenter)
 blockedcourierprojector = distillresult[:courier] |> crystalprojector
 blockedcouriercorrelation = idmap(blockedcourierprojector.outspace, blockedcourierprojector.outspace) - blockedcourierprojector
 
-localcourierseeds = findlocalspstates(
-    statecorrelations=blockedcouriercorrelation,
-    regionfock=courierseedingfock,
-    symmetry=c3,
-    spectrumextractpredicate=(v -> v < 1e-2))
-
-localcourierseed = localcourierseeds[1]
-localcourierseed |> getinspace |> modeattrs
+localcourierseed = [regionalwannierseeding(blockedcouriercorrelation, courierseedingfock, symmetry=c3)...][1]
 fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
 
 crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
@@ -118,49 +179,58 @@ purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
 purifiedcorrelationspectrum |> visualize
 couriercorrelations = purifiedcorrelationspectrum |> FockMap
 
-state = regionalrestriction(wanniercourierisometry, courierseedingfock + (c6 * courierseedingfock |> getoutspace))
-state |> visualize
+using ColorTypes
+function visualizeregionstate2d(state::RegionState{2}; title::String = "")
+    mapdata::SparseMatrixCSC = state |> rep |> rep
+
+    function generatestateplot(spstate::FockMap)
+        spmode::Mode = spstate |> getinspace |> first
+        columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
+        positions::Vector{Offset} = [v.first |> pos for v in columnspectrum]
+        mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> pos, positions)...)
+        markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
+        normalizedmarkersizes::Vector{Float64} = markersizes / norm(markersizes) * 120
+        markercolors::Vector = [convert(RGB{Float64}, HSV(angle(v.second) / 2π * 360, 1, 1)) for v in columnspectrum]
+        return scatter(
+            x=mesh[1, :], y=mesh[2, :], mode="markers",
+            marker=attr(
+                symbol="circle",
+                size=normalizedmarkersizes,
+                color=markercolors))
+    end
+
+    scatters::Vector = [spstate |> generatestateplot for spstate in state]
+    fig = make_subplots(rows=1, cols=scatters |> length)
+    for (n, scatter) in enumerate(scatters)
+        add_trace!(fig, scatter, row=1, col=n)
+    end
+    relayout!(fig, title_text=title)
+    fig
+end
+
+commutation(c6 * couriercorrelations.outspace, couriercorrelations) |> maximum
 
 blockedfilledprojector = distillresult[:filled] |> crystalprojector
 blockedfilledcorrelation = idmap(blockedfilledprojector.outspace, blockedfilledprojector.outspace) - blockedfilledprojector
-
-filledseeds = findlocalspstates(
-    statecorrelations=blockedfilledcorrelation,
-    regionfock=frozenseedingfock,
-    symmetry=c6,
-    spectrumextractpredicate=(v -> v < 1e-2),
-    degeneracythreshold=1e-4)
-filledseed = filledseeds[3]
+filledseed = [regionalwannierseeding(blockedfilledcorrelation, frozenseedingfock, symmetry=c6, seedsgroupingprecision=1e-3)...][1]
 
 crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
 wannierfilledisometry = wannierprojection(
     crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
 
-state = regionalrestriction(wannierfilledisometry, frozenseedingfock)
-state |> visualize
+state = regionalrestriction(wannierfilledisometry, frozenseedingfock, frozenseedingfock, frozenseedingfock)
+state |> visualizeregionstate2d
 
 blockedemptyprojector = distillresult[:empty] |> crystalprojector
 blockedemptycorrelation = idmap(blockedemptyprojector.outspace, blockedemptyprojector.outspace) - blockedemptyprojector
-
-emptyseeds = findlocalspstates(
-    statecorrelations=blockedemptycorrelation,
-    regionfock=frozenseedingfock,
-    symmetry=c6,
-    spectrumextractpredicate=(v -> v < 1e-2),
-    degeneracythreshold=1e-4)
-
-emptyseed = emptyseeds[3]
+emptyseed = [regionalwannierseeding(blockedemptycorrelation, frozenseedingfock, symmetry=c6, seedsgroupingprecision=1e-3)...][1]
 
 crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
 wannieremptyisometry = wannierprojection(
     crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
 
-state = regionalrestriction(wannieremptyisometry, frozenseedingfock)
-state |> visualize
-
 filledC = wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
 filledC |> crystalspectrum |> visualize
-commutation(c6 * filledC, filledC) |> maximum
 emptyC = wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
 emptyC |> crystalspectrum |> visualize
 

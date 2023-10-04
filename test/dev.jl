@@ -7,7 +7,7 @@ include("../src/plotting.jl")
 include("../src/quantumtransformations.jl")
 include("../src/renormalization.jl")
 
-using PlotlyJS, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Renormalization
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')

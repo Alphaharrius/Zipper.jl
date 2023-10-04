@@ -1,13 +1,3 @@
-abstract type Transformation{T} <: Element{T} end
-export Transformation
-
-struct BasisFunction <: Element{Vector{Complex}}
-    rep::Vector{Complex}
-    dimension::Integer
-    rank::Integer
-end
-export BasisFunction
-
 Base.:(==)(a::BasisFunction, b::BasisFunction) = a.rank == b.rank && (a |> dimension) == (b |> dimension) && isapprox(a |> rep, b |> rep)
 
 Base.:hash(basisfunction::BasisFunction)::UInt = (map(hashablecomplex, basisfunction |> rep), basisfunction |> dimension, basisfunction.rank) |> hash
@@ -103,16 +93,6 @@ function Base.:+(a::BasisFunction, b::BasisFunction)::BasisFunction
 end
 
 Base.:iszero(basis::BasisFunction)::Bool = basis |> normalize |> rep |> iszero
-
-struct AffineTransform <: Transformation{Matrix{Float64}}
-    localspace::AffineSpace
-    shiftvector::Vector{Float64}
-    transformmatrix::Matrix{Float64}
-    eigenfunctions::Dict{Tuple, BasisFunction}
-    eigenvaluehashdenominator::Integer
-    antiunitary::Bool
-end
-export AffineTransform
 
 fullpointgrouprepresentation(irrep::Matrix; rank::Integer = 1)::Matrix = reduce(kron, repeat([irrep], rank))
 export fullpointgrouprepresentation
@@ -327,11 +307,6 @@ export relativephase
 
 relativephase(ref::BasisFunction) = target::BasisFunction -> relativephase(target, ref)
 
-struct Scale <: Transformation{Matrix{Float64}}
-    rep::Matrix{Float64}
-end
-export Scale
-
 Base.:convert(::Type{Matrix{Float64}}, source::Scale) = source.rep
 
 Base.:inv(scale::Scale)::Scale = scale |> rep |> inv |> Scale
@@ -352,3 +327,23 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
 end
+
+function getsphericalregion(;from::Offset, generators::Subset{Offset}, symmetry::AffineTransform, radius::Real, metricspace::RealSpace)
+    from |> latticeoff == from || error("`from` must be a lattice offset!")
+    
+    getspancount(generator::Offset)::Integer = radius / (generator |> euclidean |> norm) |> ceil |> Integer
+
+    generated::Region = Subset(from |> getspace |> getorigin)
+    println(generated |> collect)
+    for vec in generators
+        expanded::Region = Subset(p + vec * n for p in generated for n in 0:getspancount(vec))
+        generated = filter(p -> lineartransform(metricspace, p) |> norm <= radius, expanded)
+    end
+
+    for transform in symmetry |> pointgroupelements
+        generated += transform * generated
+    end
+
+    return generated + from
+end
+export getsphericalregion

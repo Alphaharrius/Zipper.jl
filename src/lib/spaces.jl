@@ -1,10 +1,4 @@
 """
-Refers to an object with `dimension` spanned by some other objects like `Vector`.
-"""
-abstract type AbstractSpace{T} <: Element{T} end
-export AbstractSpace
-
-"""
     dimension(space::T)::Integer where {T <: AbstractSpace}
 
 The dimension of a `AbstractSpace` is the number of objects that spans this space.
@@ -30,12 +24,6 @@ Check whether the two space is spanned by the same set of elements, regardless o
 `true` if the two spaces `a` & `b` have same span; `false` otherwise. This method can have different implementation varies by the type `T` & `F`.
 """
 Zipper.:hassamespan(a::T, b::F) where {T <: AbstractSpace, F <: AbstractSpace} = false
-
-"""
-This is a less general subtype of `AbstractSpace` that is spanned by `Vector` in a continuous manner.
-"""
-abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
-export AffineSpace
 
 """ Shorthand for creating a `Point` within the specified space. """
 Base.:&(space::AffineSpace, position::Vector{<:Real})::Point = Point(position, space)
@@ -83,38 +71,6 @@ Zipper.:dimension(space::T) where {T <: AffineSpace} = size(getbasis(space), 1)
 
 Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, getbasis(space)))
 
-"""
-Subset of element type `T <: AbstractSubset` defined within a full set.
-"""
-abstract type AbstractSubset{T} <: Element{OrderedSet{T}} end
-export AbstractSubset
-
-"""
-    RealSpace(rep::Matrix{Float64})
-
-A real space concrete type of `AffineSpace`, this is present in tandem with `MomentumSpace` to distinguish between real space and momentum space.
-
-### Input
-- `rep` The representation of the space which is the basis vectors.
-"""
-struct RealSpace <: AffineSpace
-    rep::Matrix{Float64}
-end
-export RealSpace
-
-"""
-    MomentumSpace(rep::Matrix{Float64})
-
-A momentum space concrete type of `AffineSpace`, this is present in tandem with `RealSpace` to distinguish between real space and momentum space.
-
-### Input
-- `rep` The representation of the space which is the basis vectors.
-"""
-struct MomentumSpace <: AffineSpace
-    rep::Matrix{Float64}
-end
-export MomentumSpace
-
 """ Shorthand to get the euclidean space of the same span. """
 euclidean(space::AffineSpace) = euclidean(space |> typeof, space |> dimension)
 
@@ -128,29 +84,6 @@ Base.:convert(::Type{MomentumSpace}, source::Matrix{Float64})::MomentumSpace = M
 Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = MomentumSpace(2.0 * π * Matrix(transpose(inv(getbasis(source)))))
 """ Performing conversion from `MomentumSpace` to `RealSpace`."""
 Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(getbasis(source) / (2.0 * π)))))
-
-"""
-    Point(pos::Vector{Float64}, space::AbstractSpace)
-
-A point in an `AffineSpace`.
-
-### Input
-- `pos` The vector representation of the point in the spacial unit of the parent `AffineSpace`.
-- `space` The parent `AffineSpace`.
-"""
-struct Point{T <: AffineSpace} <: AbstractSubset{Point}
-    pos::Vector{Float64}
-    space::T
-
-    Point(pos, space::T) where {T <: AffineSpace} = new{space |> typeof}([pos...], space)
-end
-export Point
-
-""" Alias of a real space point. """
-Offset = Point{RealSpace}
-""" Alias of a momentum space point. """
-Momentum = Point{MomentumSpace}
-export Offset, Momentum
 
 Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in vec(point)]) ∈ $(point |> getspace |> typeof)"))
 
@@ -304,38 +237,7 @@ end
 Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) * val, getspace(point))
 Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) / val, getspace(point))
 
-"""
-    Subset(elements::OrderedSet{T})
-    Subset(elements::Vector{T})
-
-A concrete type of `AbstractSubset` act as a container of elements of type `<: AbstractSubset` in ordered manner, as a subset of a larger set, this set is assumed
-to reside within a given `AbstractSpace`, which all of the elements also belongs to the `AbstractSpace`. To 
-
-### Input
-- `elements` The set of elements to be stored, can be type of `OrderedSet{T}` or `Vector{T}` depends on use case, normally `OrderedSet{T}` is suggested if possible
-             if it is created before the constructor of this type.
-"""
-struct Subset{T <: AbstractSubset} <: AbstractSubset{T}
-    rep::OrderedSet{T}
-
-    Subset(elements::OrderedSet{T}) where {T} = new{T}(elements)
-    # Handles OrderedSet with arbitary types, assume that all elements has the same type.
-    Subset(elements::OrderedSet) = new{elements |> first |> typeof}(elements)
-    Subset(elements::Vector{T}) where {T <: AbstractSubset} = Subset(OrderedSet(elements))
-    # For arbitary typed Vector, delegate to Subset(elements::OrderedSet).
-    Subset(elements::Vector) = Subset(OrderedSet(elements))
-
-    Subset(generator::Base.Generator) = Subset(OrderedSet{generator |> first |> typeof}(generator))
-    Subset(input::Base.Iterators.Flatten) = Subset(OrderedSet{input |> first |> typeof}(input))
-    Subset(subset::Subset) = Subset(OrderedSet([subset]))
-    Subset(input::Base.Iterators.Filter) = Subset(OrderedSet{input |> first |> typeof}(input))
-
-    # Allows the creation of a empty subset.
-    Subset{T}() where {T} = new{T}(OrderedSet())
-end
-export Subset
-
-Subset(points::Point...) = Subset(p for p in points)
+Zipper.:Subset(points::Point...) = Subset(p for p in points)
 
 Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
 
@@ -380,7 +282,7 @@ Iterators.:filter(f, subset::T) where {T <: Subset} = Base.filter(f, subset)
 
 Flatten a higher order subset to order `1`, and preserves the element orderings of each order.
 """
-function Iterators.flatten(subset::Subset{T})::Subset where {T <: AbstractSubset}
+function Iterators.flatten(subset::Subset{T})::Subset where {T}
     if T <: Subset
         return union((flatten(element) for element in rep(subset))...)
     end
@@ -400,16 +302,18 @@ export members
 
 Base.:(==)(a::Subset, b::Subset)::Bool = Set(rep(a)) == Set(rep(b))
 
-Base.:convert(::Type{OrderedSet{T}}, source::Subset{T}) where {T <: AbstractSubset} = source.rep
+Base.:convert(::Type{OrderedSet{T}}, source::Subset{T}) where {T} = source.rep
 """ Reflexive relation. """
-Base.:convert(::Type{Subset}, source::Subset{T}) where {T <: AbstractSubset} = source
-Base.:convert(::Type{Subset{T}}, source::Subset{T}) where {T <: AbstractSubset} = source
+Base.:convert(::Type{Subset}, source::Subset{T}) where {T} = source
+Base.:convert(::Type{Subset{T}}, source::Subset{T}) where {T} = source
 """ Element-wise conversions. """
-Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A <: AbstractSubset, B <: AbstractSubset} = (
+Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A, B} = (
     Subset(OrderedSet{A}([convert(A, el) for el in rep(source)])))
 """ Convert to the generalized type of `AbstractSubset`. """
-Base.:convert(::Type{Subset}, source::T) where {T <: AbstractSubset} = Subset(rep(source))
-Base.:convert(::Type{Subset{T}}, source::T) where {T <: AbstractSubset} = convert(Subset, source)
+Base.:convert(::Type{Subset}, source::T) where {T} = Subset(rep(source))
+Base.:convert(::Type{Subset{T}}, source::T) where {T} = convert(Subset, source)
+
+Base.:eltype(subset::Subset) = subset |> rep |> eltype
 
 subsetunion(subsets)::Subset = union(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
 export subsetunion

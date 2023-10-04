@@ -1,7 +1,3 @@
-""" Alias for a subset of `Offset` positions which is region like. """
-Region = Subset{Offset}
-export Region
-
 """
     distance(a::Point, b::Point)::Float64
 
@@ -30,12 +26,6 @@ function getradius(region::Subset{<:Point}; metricspace::AffineSpace = region |>
     return maximum(lineartransform(metricspace, center - p) |> norm for p in region)
 end
 export getradius
-
-struct Crystal <: AbstractSubset{Crystal}
-    unitcell::Subset{Offset}
-    sizes::Vector{Int64}
-end
-export Crystal
 
 Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
 

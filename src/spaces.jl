@@ -146,6 +146,11 @@ struct MomentumSpace <: AffineSpace
     rep::Matrix{Float64}
 end
 
+euclidean(space::AffineSpace) = euclidean(space |> typeof, space |> dimension)
+
+getbasisvectors(space::AffineSpace) = (euclidean(space) & (space |> rep)[:, d] for d in axes(space |> rep, 2))
+export getbasisvectors
+
 Base.:convert(::Type{RealSpace}, source::Matrix{Float64})::RealSpace = RealSpace(source)
 Base.:convert(::Type{MomentumSpace}, source::Matrix{Float64})::MomentumSpace = MomentumSpace(source)
 

@@ -1,14 +1,5 @@
-include("../src/spaces.jl")
-include("../src/geometries.jl")
-include("../src/transformations.jl")
-include("../src/quantum.jl")
-include("../src/physical.jl")
-include("../src/quantumtransformations.jl")
-include("../src/renormalization.jl")
-include("../src/plotting.jl")
-
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Renormalization
+using Zipper
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
@@ -61,19 +52,26 @@ blockedcorrelations::FockMap = blockresult[:correlations]
 
 function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
     currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
-    physicalnorm = m -> lineartransform(currentspace, m |> pos) |> norm
+    physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
     return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
 end
 
 crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
 blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
+scaledtriangular = scale*triangular 
+
+localsitemodes::Subset{Mode} = circularregionmodes(scaledtriangular&[-1,-1], physicalmodes, 2.0) 
+localregion::Subset{Offset} = Subset(m |> getpos for m in frozenseedingmodes)
+visualize(localregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
+localfock::FockSpace = FockSpace{Region}(localsitemodes)
+regioncorrelations(blockedcorrelations,localfock) |> eigspech |> visualize
+localmodes = findlocalspstates(statecorrelations = blockedcorrelations, regionfock = localfock, symmetry = identitytransform(2))
 
 
-frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> origin, physicalmodes, 2.0) 
-frozenseedingregion::Subset{Offset} = Subset(m |> pos for m in frozenseedingmodes)
-visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
-frozenseedingfock::FockSpace = FockSpace(frozenseedingmodes)
+
+
+
 localevec = regioncorrelations(blockedcorrelations,frozenseedingfock) |> eigvecsh 
 filledmodes = (localevec |> getinspace |> orderedmodes |> collect)[1:6]
 emptymodes = (localevec |> getinspace |> orderedmodes |> collect)[19:24]

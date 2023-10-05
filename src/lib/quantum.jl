@@ -1152,8 +1152,8 @@ export eigspech
 """ Internal method that generates the `eigenmode => eigenvalue` pairs. """
 function digesteigenvalues(H::Type, V::Type, vals, groupingthreshold::Real, attrs::Pair{Symbol}...)::Base.Iterators.Flatten
     denominator = (1 / groupingthreshold) |> round |> Integer
-    valtable::Dict{H, V} = Dict(hashablenumber(v, denominator) => v for v in vals)
-    items::Base.Generator = (hashablenumber(v, denominator) => n for (n, v) in vals |> enumerate)
+    valtable::Dict{H, V} = Dict(hashablenumber(v |> V, denominator) => v for v in vals)
+    items::Base.Generator = (hashablenumber(v |> V, denominator) => n for (n, v) in vals |> enumerate)
     groups::Dict{H, Vector} = foldl(items; init=Dict{H, Vector}()) do d, (k, v)
         mergewith!(append!, d, LittleDict(k => [v]))
     end

@@ -1,15 +1,5 @@
-include("../src/spaces.jl")
-include("../src/geometries.jl")
-include("../src/transformations.jl")
-include("../src/quantum.jl")
-include("../src/physical.jl")
-include("../src/quantumtransformations.jl")
-include("../src/renormalization.jl")
-
-include("../src/plotting.jl")
-
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Renormalization
+using Zipper
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
@@ -129,7 +119,7 @@ columns(wanniercourieriso, (wanniercourieriso|> getinspace |> orderedmodes |> co
 
 function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
     currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
-    physicalnorm = m -> lineartransform(currentspace, m |> pos) |> norm
+    physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
     return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
 end
 
@@ -137,10 +127,10 @@ crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
 blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 
-frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> origin, physicalmodes, 2.0)
-frozenseedingregion::Subset{Offset} = Subset(m |> pos for m in frozenseedingmodes)
+frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2.0)
+frozenseedingregion::Subset{Offset} = Subset(m |> getpos for m in frozenseedingmodes)
 visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
-frozenseedingfock::FockSpace = FockSpace(frozenseedingmodes)
+frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
 
 globaldistiller = globaldistillerhamiltonian(
     correlations=blockresult[:correlations],
@@ -155,7 +145,7 @@ distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 
 
 courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
-courierseedingregion::Subset{Offset} = Subset(m |> pos for m in courierseedingmodes)
+courierseedingregion::Subset{Offset} = Subset(m |> getpos for m in courierseedingmodes)
 visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))
 courierseedingfock::FockSpace{Region} = FockSpace{Region}(courierseedingmodes)
 
@@ -164,7 +154,7 @@ c3 = c6^2 |> recenter(courierseedingcenter)
 blockedcourierprojector = distillresult[:courier] |> crystalprojector
 blockedcouriercorrelation = idmap(blockedcourierprojector.outspace, blockedcourierprojector.outspace) - blockedcourierprojector
 
-localcourierseed = [regionalwannierseeding(blockedcouriercorrelation, courierseedingfock, symmetry=c3)...][1]
+localcourierseed = findlocalspstates(statecorrelations=blockedcouriercorrelation, regionfock=courierseedingfock, symmetry=identitytransform(2))
 fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
 
 crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)

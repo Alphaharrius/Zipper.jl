@@ -6,7 +6,7 @@ function visualize(fockmap::FockMap; title::String = "", rowrange = :, colrange 
     subplots
 end
 
-function visualize(regions::Subset{<: Point}...; title::String = "", visualspace::AffineSpace = regions |> getspace |> euclidean)
+function visualize(regions::Subset{<: Point}...; title::String = "", visualspace::AffineSpace = regions |> first |> getspace |> euclidean)
     function generateregionplot(region::Subset{<: Point})
         positions::Array{Vector} = [lineartransform(visualspace, point) |> vec for point in region]
         return visualizevectorpositions(positions)

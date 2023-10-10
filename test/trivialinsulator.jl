@@ -67,6 +67,7 @@ localregion::Subset{Offset} = Subset(m |> getpos for m in localsitemodes)
 visualize(localregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
 localfock::FockSpace = FockSpace{Region}(localsitemodes)
 localeigspec = regioncorrelations(blockedcorrelations,localfock) |> eigspech 
+visualize(localeigspec)
 localfrozenmodes = Subset(m for (m,v) in localeigspec |> geteigenvalues if v <0.01 || v>1-0.01)
 localcouriermodes = Subset(m for (m,v) in localeigspec |> geteigenvalues if  0.01<v<1-0.01 )
 localfrozenbasis = (localeigspec |> geteigenvectors)[:,localfrozenmodes|> FockSpace]
@@ -91,8 +92,8 @@ spectrumextractpredicate = v -> 0.2 < v < 0.4, symmetry = identitytransform(2))[
 courierseedB = findlocalspstates(statecorrelations = blockedcorrelations, regionfock = courierseedingfockB, 
 spectrumextractpredicate = v -> 0.6 < v < 0.8, symmetry = identitytransform(2))[2]
 
-courierseedAs = courierseedA + (c3recenter*courierseedA)*courierseedA*(courierseedA*c3recenter)' + (c3recenter^2*courierseedA)*courierseedA*(courierseedA*c3recenter^2)'
-courierseedBs = courierseedB + (c3recenter*courierseedB)*courierseedB*(courierseedB*c3recenter)' + (c3recenter^2*courierseedB)*courierseedB*(courierseedB*c3recenter^2)'
+courierseedAs = courierseedA + (c3recenter*courierseedA.outspace)*courierseedA*(c3recenter*courierseedA.inspace)' + (c3recenter^2*courierseedA.outspace)*courierseedA*(c3recenter^2*courierseedA.inspace)'
+courierseedBs = courierseedB + (c3recenter*courierseedB.outspace)*courierseedB*(c3recenter*courierseedB.inspace)' + (c3recenter^2*courierseedB.outspace)*courierseedB*(c3recenter^2*courierseedB.inspace)'
 
 courierseeds = courierseedAs+courierseedBs
 
@@ -127,8 +128,8 @@ spectrumextractpredicate = v -> 0.8 < v, symmetry = identitytransform(2))[1]
 frozenseedB = findlocalspstates(statecorrelations = blockedcorrelations, regionfock = frozenseedingfockB, 
 spectrumextractpredicate = v -> v < 0.2, symmetry = identitytransform(2))[1]
 
-frozenseedAs = frozenseedA + (c3recenter*frozenseedA)*frozenseedA*(frozenseedA*c3recenter)' + (c3recenter^2*frozenseedA)*frozenseedA*(frozenseedA*c3recenter^2)'
-frozenseedBs = frozenseedB + (c3recenter*frozenseedB)*frozenseedB*(frozenseedB*c3recenter)' + (c3recenter^2*frozenseedB)*frozenseedB*(frozenseedB*c3recenter^2)'
+frozenseedAs = frozenseedA + (c3recenter*frozenseedA.outspace)*frozenseedA*(c3recenter*frozenseedA.inspace)' + (c3recenter^2*frozenseedA.outspace)*frozenseedA*(c3recenter^2*frozenseedA.inspace)'
+frozenseedBs = frozenseedB + (c3recenter*frozenseedB.outspace)*frozenseedB*(c3recenter*frozenseedB.inspace)' + (c3recenter^2*frozenseedB.outspace)*frozenseedB*(c3recenter^2*frozenseedB.inspace)'
 
 frozenseedingcenter::Offset = (blockedmodes |> getspace) & [-1, -1]
 frozenseedingmodes::Subset{Mode} = circularregionmodes(frozenseedingcenter, physicalmodes, 1)
@@ -161,7 +162,7 @@ function _findlocalspstates(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * getsymmetrizer(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return (state |> getinspace |> dimension => state for state in spstates)
@@ -186,7 +187,7 @@ wannierizedlocalfrozen = wannierizedlocalfrozen*spatialmap(wannierizedlocalfroze
 
 # local unitary
 
-ft = fourier(blockedcorrelations |> getoutspace, spanoffset(blockedcorrelations |> getinspace |> unitcellfock |> orderedmodes, blockedcrystal |> latticepoints)|> FockSpace)
+ft = fourier(blockedcorrelations |> getoutspace, spanoffset(blockedcorrelations |> getinspace |> unitcellfock |> orderedmodes, blockedcrystal |> latticepoints)|> FockSpace)/sqrt(blockedcrystal |> vol)
 blockedcorrelationsRS = ft'*blockedcorrelations*ft
 localunit1 = (wannierizedlocalcourier+localfrozenbasis)
 
@@ -198,17 +199,19 @@ localunitaryphysical = ((((blockedcorrelationsRS|> getoutspace) - (localunitary 
 
 transformedblockedcorrelationsRS = localunitaryphysical'*blockedcorrelationsRS*localunitaryphysical
 
-function circularfilter(mode::Mode, radius::Real = 2)::Bool
+function circularfilter(mode::Mode, radius::Real = 1.8)::Bool
     return norm((mode |> getpos |> euclidean))<=radius
 end
 
 localreuniregion::Subset{Offset} = Subset(m |> getpos for m in localunitary |> getinspace)
 
-localrefmodes::Subset{Mode} = Iterators.filter(circularfilter,m for m in transformedblockedcorrelationsRS |> getoutspace) |> Subset
-localrefregion::Subset{Offset} = Subset(m |> getpos for m in localrefmodes)
-visualize(localrefmodes, title="l", visualspace=euclidean(RealSpace, 2))
+localrefmodes::Subset{Mode} = Subset(m for m in transformedblockedcorrelationsRS |> getoutspace |> orderedmodes if circularfilter(m))
 
-findfirst([!hasattr(m,:offset) for m in transformedblockedcorrelationsRS |> getinspace |> orderedmodes])
+#localrefmodes::Subset{Mode} = Iterators.filter(circularfilter,m for m in transformedblockedcorrelationsRS |> getoutspace) |> Subset
+localrefregion::Subset{Offset} = Subset(m |> getpos for m in localrefmodes)
+visualize(localrefregion, title="l", visualspace=euclidean(RealSpace, 2))
+
+visualize(eigspech(transformedblockedcorrelationsRS[localrefmodes |> FockSpace, localrefmodes |> FockSpace]))
 
 
 localregion::Subset{Offset} = Subset(m |> getpos for m in localrefmodes)

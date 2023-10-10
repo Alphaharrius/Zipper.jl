@@ -216,6 +216,18 @@ end
 export orthogonalspace
 
 """
+    affinespace(points::Point...)::AffineSpace
+
+Create a `AffineSpace` with the `basisvectors` provided.
+"""
+function affinespace(basisvectors::Point...)::AffineSpace
+    basis::Matrix = hcat((p |> vec for p in basisvectors)...)
+    isapprox(basis |> det, 0, atol=1e-10) && error("Cannot create affine space with linearly dependent basis vectors!")
+    return (basisvectors[1] |> getspace |> typeof)(basis)
+end
+export affinespace
+
+"""
     euclidean(point::Point)::Point
 
 Perform linear transformation on the point from the original space `getspace(point)` to Euclidean space.

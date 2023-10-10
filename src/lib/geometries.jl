@@ -118,3 +118,6 @@ function getsphericalregion(;from::Offset, generators::Subset{Offset}, symmetrie
     return generated + from
 end
 export getsphericalregion
+
+geometricfilter(f, metricspace::AffineSpace) = p -> (metricspace * p) |> f
+export geometricfilter

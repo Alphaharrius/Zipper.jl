@@ -135,8 +135,8 @@ function spatialmap(fockmap::FockMap)::FockMap
 end
 export spatialmap
 
-function getsymmetrizer(symmetry::AffineTransform, fockmap::FockMap)::FockMap
-    inspacerep::FockMap = getinspacerep(symmetry, fockmap)
+function symmetricmap(symmetry::AffineTransform, fockmap::FockMap)::FockMap
+    inspacerep::FockMap = fockmap * symmetry
     phasespectrum::EigenSpectrum = inspacerep |> eigspec
     inspace::FockSpace = FockSpace(
         m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
@@ -144,4 +144,4 @@ function getsymmetrizer(symmetry::AffineTransform, fockmap::FockMap)::FockMap
         for m in phasespectrum |> geteigenvectors |> getinspace)
     return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end
-export getsymmetrizer
+export symmetricmap

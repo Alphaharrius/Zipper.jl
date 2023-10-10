@@ -29,6 +29,13 @@ export getradius
 
 Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
 
+Zipper.:getregion(crystal::Crystal) = sitepoints(crystal)
+
+getunitcell(crystal::Crystal) = crystal.unitcell
+export getunitcell
+
+Base.:size(crystal::Crystal) = crystal.sizes
+
 """
     pbc(crystal::Crystal, point::Point)::Point
 

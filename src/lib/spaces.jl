@@ -260,8 +260,8 @@ Base.:in(item, subset::Subset)::Bool = item in (subset |> rep)
 
 """ Allows additions for a subset with another type. """
 # TODO: Requires revision.
-Base.:+(subset::Subset, val)::Subset = Subset(p + val for p in subset)
-Base.:-(subset::Subset, val)::Subset = subset + (-val)
+Base.:+(subset::Subset, val::Element)::Subset = Subset(p + val for p in subset)
+Base.:-(subset::Subset, val::Element)::Subset = subset + (-val)
 
 """
     getspace(subset::Subset)::AbstractSpace

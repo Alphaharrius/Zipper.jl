@@ -246,6 +246,9 @@ function Base.:-(a::Point, b::Point)::Point
     return Point(vec(a) - vec(b), getspace(a))
 end
 
+""" Performing linear transform of a `point` to `space`. """
+Base.:*(space::T, point::Point{T}) where {T <: AffineSpace} = lineartransform(space, point)
+
 Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) * val, getspace(point))
 Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) / val, getspace(point))
 

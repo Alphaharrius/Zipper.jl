@@ -80,7 +80,7 @@ function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})
 
     outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in regionfock)
     
-    return FockMap(outmodes |> FockSpace, regionfock, connections)
+    return FockMap(outmodes |> FockSpace{Region}, regionfock, connections)
 end
 
 function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap

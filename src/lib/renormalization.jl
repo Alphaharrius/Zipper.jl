@@ -221,7 +221,7 @@ function findlocalspstates(;
     symmetry::AffineTransform = identitytransform(statecorrelations |> getcrystal |> dimension),
     spectrumextractpredicate::Function = v -> v < 1e-2,
     linearindependencethreshold::Real = 5e-2,
-    degeneracythreshold::Real = 1e-7)
+    degeneracythreshold::Real = 1e-7)::Dict{Integer, FockMap}
 
     function lineardependencefilter(spstate::FockMap)::Bool
         crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecorrelations.outspace)

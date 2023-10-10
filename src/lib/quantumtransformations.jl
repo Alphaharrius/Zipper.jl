@@ -80,7 +80,7 @@ function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})
 
     outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in regionfock)
     
-    return FockMap(outmodes |> FockSpace, regionfock, connections)
+    return FockMap(outmodes |> FockSpace{Region}, regionfock, connections)
 end
 
 function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap
@@ -96,27 +96,19 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))
 end
 
-Base.:*(transform::AffineTransform, fockmap::FockMap)::FockMap = transform * (fockmap |> getoutspace)
-Base.:*(fockmap::FockMap, transform::AffineTransform)::FockMap = transform * (fockmap |> getinspace)
-
-"""
-    getinspacerep(symmetry::AffineTransform, fockmap::FockMap)::FockMap
-
-Determine the symmetry representation within the `inspace` of `fockmap`, this method is used when there are no defined algebra between
-`AffineTransform` and the type of `inspace`.
-
-### Output
-The `FockMap` representation of the symmetry, the `inspace` and `outspace` will be the same as the ones from the input `fockmap`.
-"""
-function getinspacerep(symmetry::AffineTransform, fockmap::FockMap)::FockMap
-    outspacerep::FockMap = symmetry * fockmap
+""" Defines the computation of the `transform` representation in the `inspace` with the full data provided by the data and `outspace` of the fockmap. """
+function Base.:*(fockmap::FockMap, transform::AffineTransform)::FockMap
+    outspacerep::FockMap = *(transform, fockmap |> getoutspace)
     hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
     return fockmap' * outspacerep * fockmap
 end
-export getinspacerep
 
-""" Shorthand to generate a function that calls `getinspacerep` with the given `fockmap`. """
-getinspacerep(fockmap)::Function = symmetry -> getinspacerep(symmetry, fockmap)
+""" Defines the computation of the `transform` representation in the `outspace` with the full data provided by the data and `inspace` of the fockmap. """
+function Base.:*(transform::AffineSpace, fockmap::FockMap)::FockMap
+    inspacerep::FockMap = *(transform, fockmap |> getinspace)
+    hassamespan(inspacerep |> getoutspace, fockmap |> getinspace) || error("The symmetry action on the inspace in not closed!")
+    return fockmap' * inspacerep * fockmap
+end
 
 """
     spatialmap(fockmap::FockMap)::FockMap
@@ -143,8 +135,8 @@ function spatialmap(fockmap::FockMap)::FockMap
 end
 export spatialmap
 
-function getsymmetrizer(symmetry::AffineTransform, fockmap::FockMap)::FockMap
-    inspacerep::FockMap = getinspacerep(symmetry, fockmap)
+function symmetricmap(symmetry::AffineTransform, fockmap::FockMap)::FockMap
+    inspacerep::FockMap = fockmap * symmetry
     phasespectrum::EigenSpectrum = inspacerep |> eigspec
     inspace::FockSpace = FockSpace(
         m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
@@ -152,4 +144,4 @@ function getsymmetrizer(symmetry::AffineTransform, fockmap::FockMap)::FockMap
         for m in phasespectrum |> geteigenvectors |> getinspace)
     return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end
-export getsymmetrizer
+export symmetricmap

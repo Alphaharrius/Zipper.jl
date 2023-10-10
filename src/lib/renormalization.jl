@@ -79,6 +79,17 @@ function blocking(parameters::Dict{Symbol})::Dict{Symbol}
     return result
 end
 
+"""
+    crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal}, addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
+
+Given a `localisometry` that is defined within a `FockSpace{Region}`, perform fourier transform to obtain the k-space representation of the isometry
+and store as a dictionary of bloch isometries keyed by the momentum of the `crystalfock`.
+
+### Input
+- `localisometry::FockMap`: The local isometry defined within a `FockSpace{Region}`.
+- `crystalfock::FockSpace{Crystal}`: The crystal `FockSpace`.
+- `addinspacemomentuminfo::Bool`: Whether to add the momentum information into the `inspace` as attribute `:offset` of the returned `FockMap`.
+"""
 function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal},
     addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
 
@@ -99,6 +110,13 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
 end
 export crystalisometries
 
+"""
+    crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
+
+Given a `localisometry` that is defined within a `FockSpace{Region}`, perform fourier transform to obtain the k-space representation of the isometry.
+The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `inspace` of the input `localisometry` as the unitcell fockspace and
+the brillouin zone of the `crystalfock`.
+"""
 function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
     isometries::Dict{Momentum, FockMap} = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
@@ -182,12 +200,28 @@ function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol
 end
 export distillation
 
+"""
+    findlocalspstates(; kwargs...)::Dict{Integer, FockMap}
+
+Search for local degenerate groups of single particle states within the restricted local correlations.
+
+### Input
+- `statecorrelations::FockMap`: The source crystal correlations.
+- `regionfock::FockSpace`: The restriction fockspace.
+- `symmetry::AffineTransform`: The symmetry of the region defined in `regionfock`.
+- `spectrumextractpredicate::Function`: The predicate to extract the spectrum values.
+- `linearindependencethreshold::Real`: The threshold for the linear independence of the local single particle states.
+- `degeneracythreshold::Real`: The threshold for the correlation value degeneracy of the local single particle states.
+
+### Output
+A dictionary of the local single particle states keyed by their group sizes.
+"""
 function findlocalspstates(;
     statecorrelations::FockMap, regionfock::FockSpace,
     symmetry::AffineTransform = identitytransform(statecorrelations |> getcrystal |> dimension),
     spectrumextractpredicate::Function = v -> v < 1e-2,
     linearindependencethreshold::Real = 5e-2,
-    degeneracythreshold::Real = 1e-7)
+    degeneracythreshold::Real = 1e-7)::Dict{Integer, FockMap}
 
     function lineardependencefilter(spstate::FockMap)::Bool
         crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecorrelations.outspace)
@@ -206,7 +240,7 @@ function findlocalspstates(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * getsymmetrizer(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return Dict(state |> getinspace |> dimension => state for state in spstates)

@@ -29,6 +29,13 @@ export getradius
 
 Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
 
+Zipper.:getregion(crystal::Crystal) = sitepoints(crystal)
+
+getunitcell(crystal::Crystal) = crystal.unitcell
+export getunitcell
+
+Base.:size(crystal::Crystal) = crystal.sizes
+
 """
     pbc(crystal::Crystal, point::Point)::Point
 
@@ -91,3 +98,26 @@ function brillouinmesh(crystal::Crystal)::Array{Point}
     return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
 end
 export brillouinmesh
+
+function getsphericalregion(;from::Offset, generators::Subset{Offset}, symmetries, radius::Real, metricspace::RealSpace)
+    from |> latticeoff == from || error("`from` must be a lattice offset!")
+
+    getspancount(generator::Offset)::Integer = radius / (generator |> euclidean |> norm) |> ceil |> Integer
+
+    generated::Region = Subset(from |> getspace |> getorigin)
+    println(generated |> collect)
+    for vec in generators
+        expanded::Region = Subset(p + vec * n for p in generated for n in 0:getspancount(vec))
+        generated = filter(p -> lineartransform(metricspace, p) |> norm <= radius, expanded)
+    end
+
+    for symmetry in symmetries, transform in symmetry |> pointgroupelements
+        generated += transform * generated
+    end
+
+    return generated + from
+end
+export getsphericalregion
+
+geometricfilter(f, metricspace::AffineSpace) = p -> (metricspace * p) |> f
+export geometricfilter

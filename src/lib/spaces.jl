@@ -185,7 +185,7 @@ function Base.:(==)(a::Point, b::Point)::Bool
 end
 
 LinearAlgebra.:norm(point::Point) = point |> vec |> norm
-
+LinearAlgebra.:normalize(point::Point) = Point(point |> vec |> normalize, point |> getspace)
 LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, a |> vec), collect(Float64, b |> vec))
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Vector representation and leave to the Base.isequal for identification.
@@ -216,6 +216,18 @@ end
 export orthogonalspace
 
 """
+    affinespace(points::Point...)::AffineSpace
+
+Create a `AffineSpace` with the `basisvectors` provided.
+"""
+function affinespace(basisvectors::Point...)::AffineSpace
+    basis::Matrix = hcat((p |> vec for p in basisvectors)...)
+    isapprox(basis |> det, 0, atol=1e-10) && error("Cannot create affine space with linearly dependent basis vectors!")
+    return (basisvectors[1] |> getspace |> typeof)(basis)
+end
+export affinespace
+
+"""
     euclidean(point::Point)::Point
 
 Perform linear transformation on the point from the original space `getspace(point)` to Euclidean space.
@@ -234,6 +246,9 @@ function Base.:-(a::Point, b::Point)::Point
     return Point(vec(a) - vec(b), getspace(a))
 end
 
+""" Performing linear transform of a `point` to `space`. """
+Base.:*(space::T, point::Point{T}) where {T <: AffineSpace} = lineartransform(space, point)
+
 Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) * val, getspace(point))
 Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) / val, getspace(point))
 
@@ -245,8 +260,8 @@ Base.:in(item, subset::Subset)::Bool = item in (subset |> rep)
 
 """ Allows additions for a subset with another type. """
 # TODO: Requires revision.
-Base.:+(subset::Subset, val)::Subset = Subset(p + val for p in subset)
-Base.:-(subset::Subset, val)::Subset = subset + (-val)
+Base.:+(subset::Subset, val::Element)::Subset = Subset(p + val for p in subset)
+Base.:-(subset::Subset, val::Element)::Subset = subset + (-val)
 
 """
     getspace(subset::Subset)::AbstractSpace

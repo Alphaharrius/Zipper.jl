@@ -185,7 +185,7 @@ function Base.:(==)(a::Point, b::Point)::Bool
 end
 
 LinearAlgebra.:norm(point::Point) = point |> vec |> norm
-
+LinearAlgebra.:normalize(point::Point) = Point(point |> vec |> normalize, point |> getspace)
 LinearAlgebra.:dot(a::Point, b::Point)::Float64 = dot(collect(Float64, a |> vec), collect(Float64, b |> vec))
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the Vector representation and leave to the Base.isequal for identification.

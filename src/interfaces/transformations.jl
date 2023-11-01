@@ -20,5 +20,6 @@ export AffineTransform
 
 struct Scale <: Transformation{Matrix{Float64}}
     rep::Matrix{Float64}
+    localspace::AffineSpace
 end
 export Scale

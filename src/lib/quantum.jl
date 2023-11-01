@@ -597,7 +597,7 @@ struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
     FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new(outspace, inspace, rep)
     FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
 
-    function FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})::FockMap
+    function FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, T})::FockMap where {T <: Complex}
         rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
             rep[outspace.ordering[out_mode], inspace.ordering[in_mode]] = value

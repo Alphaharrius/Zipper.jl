@@ -2,11 +2,13 @@ using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, 
 using Revise
 using Zipper
 
+∈(vec, space::AffineSpace)::Point = Point(vec |> collect, space)
+
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
-pa = triangular & [1/3, 2/3]
-pb = triangular & [2/3, 1/3]
+pa = [1/3, 2/3] ∈ triangular
+pb = [2/3, 1/3] ∈ triangular
 pc = (pa + pb) / 2
 spatialsnappingcalibration((pa, pb, pc))
 
@@ -24,16 +26,16 @@ tₕ = 0.1im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
-    (m0, m1 |> setattr(:offset => triangular & [-1, 0])) => tₙ,
-    (m0, m1 |> setattr(:offset => triangular & [0, 1])) => tₙ]
+    (m0, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₙ,
+    (m0, m1 |> setattr(:offset => [0, 1]) ∈ triangular) => tₙ]
 
 haldane = [
-    (m0, m0 |> setattr(:offset => triangular & [1, 1])) => tₕ,
-    (m0, m0 |> setattr(:offset => triangular & [-1, 0])) => tₕ,
-    (m0, m0 |> setattr(:offset => triangular & [0, -1])) => tₕ,
-    (m1, m1 |> setattr(:offset => triangular & [1, 1])) => -tₕ,
-    (m1, m1 |> setattr(:offset => triangular & [-1, 0])) => -tₕ,
-    (m1, m1 |> setattr(:offset => triangular & [0, -1])) => -tₕ]
+    (m0, m0 |> setattr(:offset => [1, 1] ∈ triangular)) => tₕ,
+    (m0, m0 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₕ,
+    (m0, m0 |> setattr(:offset => [0, -1] ∈ triangular)) => tₕ,
+    (m1, m1 |> setattr(:offset => [1, 1] ∈ triangular)) => -tₕ,
+    (m1, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => -tₕ,
+    (m1, m1 |> setattr(:offset => [0, -1] ∈ triangular)) => -tₕ]
 
 bonds::FockMap = bondmap([nearestneighbor..., haldane...])
 
@@ -97,7 +99,7 @@ function zer(correlations::FockMap)
 
     distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
 
-    courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
+    courierseedingcenter::Offset = [2/3, 1/3] ∈ (blockedmodes |> getspace)
     courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
     courierseedingregion::Subset{Offset} = Subset(m |> getpos for m in courierseedingmodes)
     # visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))

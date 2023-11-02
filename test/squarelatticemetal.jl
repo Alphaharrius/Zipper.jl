@@ -2,7 +2,7 @@ using Revise, LinearAlgebra
 using Zipper
 
 square = euclidean(RealSpace, 2)
-point = square & [1/2, 1/2]
+point = [1/2, 1/2] ∈ square
 spatialsnappingcalibration([point])
 
 kspace = convert(MomentumSpace, square)
@@ -19,8 +19,8 @@ subsetunion((Subset(m), Subset(m)))
 
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
-    (m, m |> setattr(:offset => square & [1, 0])) => tₙ,
-    (m, m |> setattr(:offset => square & [0, 1])) => tₙ])
+    (m, m |> setattr(:offset => [1, 0] ∈ square)) => tₙ,
+    (m, m |> setattr(:offset => [0, 1] ∈ square)) => tₙ])
 
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize

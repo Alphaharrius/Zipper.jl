@@ -189,7 +189,7 @@ function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTrans
     end
     relativebasis::Matrix = (space |> getbasis |> inv) * (transformation |> getspace |> getbasis)
     transformmatrix::Matrix = relativebasis * (transformation.transformmatrix) * (relativebasis |> inv)
-    shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> vec
+    shiftvector::Vector = lineartransform(space, transformation.shiftvector ∈ (transformation |> getspace)) |> vec
     return AffineTransform(
         transformmatrix, shiftvector;
         localspace=space, antiunitary=transformation.antiunitary)

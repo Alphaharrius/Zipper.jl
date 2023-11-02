@@ -19,8 +19,8 @@ The `FockMap` object that contains the bonding information.
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
     (modeA, modeB) => tₙ,
-    (modeA, modeB |> setattr(:offset => triangularspace & [-1, 0])) => tₙ,
-    (modeA, modeB |> setattr(:offset => triangularspace & [0, 1])) => tₙ])
+    (modeA, modeB |> setattr(:offset => [-1, 0] ∈ triangularspace)) => tₙ,
+    (modeA, modeB |> setattr(:offset => [0, 1] ∈ triangularspace)) => tₙ])
 ```
 """
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, T}})::FockMap where {T <: Complex}

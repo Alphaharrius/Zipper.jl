@@ -189,7 +189,7 @@ function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTrans
     end
     relativebasis::Matrix = (space |> getbasis |> inv) * (transformation |> getspace |> getbasis)
     transformmatrix::Matrix = relativebasis * (transformation.transformmatrix) * (relativebasis |> inv)
-    shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> vec
+    shiftvector::Vector = lineartransform(space, transformation.shiftvector ∈ (transformation |> getspace)) |> vec
     return AffineTransform(
         transformmatrix, shiftvector;
         localspace=space, antiunitary=transformation.antiunitary)
@@ -307,13 +307,26 @@ export relativephase
 
 relativephase(ref::BasisFunction) = target::BasisFunction -> relativephase(target, ref)
 
+Zipper.:dimension(scale::Scale)::Integer = scale |> rep |> size |> first
+Zipper.:getspace(scale::Scale)::RealSpace = scale.localspace
+
 Base.:convert(::Type{Matrix{Float64}}, source::Scale) = source.rep
 
-Base.:inv(scale::Scale)::Scale = scale |> rep |> inv |> Scale
-Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * (b |> rep))
-Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace((scale |> rep) * (space |> rep))
-Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace((scale |> inv |> rep) * (space |> rep))
-Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * (point |> getspace), point)
+Base.:inv(scale::Scale)::Scale = Scale(scale |> rep |> inv, scale |> getspace)
+
+Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * ((a |> getspace) * b |> rep), a |> getspace)
+
+function Base.:*(space::RealSpace, scale::Scale)::Scale
+    space |> dimension == scale |> dimension || error("Dimension mismatch!")
+    relativebasis::Matrix = (space |> getbasis |> inv) * (scale |> getspace |> getbasis)
+    scalematrix::Matrix = relativebasis * (scale |> rep) * (relativebasis |> inv)
+    return Scale(scalematrix, space)
+end
+
+Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space * scale |> rep, space |> rep))
+
+Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(*(convert(RealSpace, space) * scale |> inv |> rep, space |> rep))
+Base.:*(scale::Scale, point::Point)::Point = scale * (point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
 function Base.:*(scale::Scale, crystal::Crystal)::Crystal
@@ -323,7 +336,7 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     Δ::Matrix{Float64} = snf |> diagm
     newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
     blockingpoints::Base.Generator = (Point(collect(coord), oldspace) for coord in Iterators.product((0:size - 1 for size in diag(Δ))...))
-    relativescale::Scale = Scale(newbasiscoords)
+    relativescale::Scale = Scale(newbasiscoords, crystal |> getspace)
     scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
     return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
 end

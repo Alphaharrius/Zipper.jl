@@ -35,7 +35,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
         repackfourierblocks(permutedfourier, kscaled, partition)
         for (kscaled, partition) in Iterators.zip(scaledbz, scaledfock |> rep))
     blocking::FockMap = directsum(repackedblocks)
-    return FockMap(blocking.outspace, FockSpace(blocking.inspace, reflected=scaledcrystal), blocking |> rep)'
+    return FockMap(blocking, inspace=FockSpace(blocking |> getinspace, reflected=scaledcrystal), outspace=crystalfock)'
 end
 
 function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})::FockMap

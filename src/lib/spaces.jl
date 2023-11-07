@@ -26,7 +26,7 @@ Check whether the two space is spanned by the same set of elements, regardless o
 Zipper.:hassamespan(a::T, b::F) where {T <: AbstractSpace, F <: AbstractSpace} = false
 
 """ Shorthand for creating a `Point` within the specified space. """
-Base.:&(space::AffineSpace, position::Vector{<:Real})::Point = Point(position, space)
+Base.:∈(data, space::AffineSpace)::Point = Point(data |> collect, space)
 
 """
     hassamespan(a::T, b::F) where {T <: AffineSpace, F <: AffineSpace}
@@ -74,7 +74,7 @@ Base.:hash(space::AffineSpace) = hash(map(v -> Rational{Int64}(round(v * 1000000
 """ Shorthand to get the euclidean space of the same span. """
 euclidean(space::AffineSpace) = euclidean(space |> typeof, space |> dimension)
 
-getbasisvectors(space::AffineSpace) = (euclidean(space) & (space |> rep)[:, d] for d in axes(space |> rep, 2))
+getbasisvectors(space::AffineSpace) = ((space |> rep)[:, d] ∈ euclidean(space) for d in axes(space |> rep, 2))
 export getbasisvectors
 
 Base.:convert(::Type{RealSpace}, source::Matrix{Float64})::RealSpace = RealSpace(source)

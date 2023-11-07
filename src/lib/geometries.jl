@@ -40,6 +40,7 @@ Base.:size(crystal::Crystal) = crystal.sizes
     pbc(crystal::Crystal, point::Point)::Point
 
 Apply periodic boundary conditions to a point `point` within a `Crystal`.
+To do: fix mod in pbc
 """
 pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(point |> vec, crystal.sizes)], getspace(point))
 export pbc

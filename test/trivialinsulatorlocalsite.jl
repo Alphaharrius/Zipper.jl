@@ -350,11 +350,12 @@ extendediso = ((((blockedcorrelationsRS|> getoutspace) - (localunitary1 |> getou
 transformedblockedcorrelationsRS = extendediso'*blockedcorrelationsRS*extendediso
 
 # local RG step after the first RG
-function locaclRGsecond(center)::Tuple{FockMap,FockMap}
+function locaclRGsecond(center_pt)::Tuple{FockMap,FockMap}
+    center = Point(center_pt, scaledtriangular)
     # inspecting local region spectrum
     transformedphysicalmodes = transformedblockedcorrelationsRS |> getoutspace |> orderedmodes
 
-    trsasnformedlocalregion, trsasnformedlocalfock = localregioninspection(scaledtriangular&center,transformedphysicalmodes, 2, blockedcrystal)
+    trsasnformedlocalregion, trsasnformedlocalfock = localregioninspection(center,transformedphysicalmodes, 2, blockedcrystal)
     visualize(trsasnformedlocalregion, title="l", visualspace=euclidean(RealSpace, 2))
 
     transformedlocaleigspec = transformedblockedcorrelationsRS[trsasnformedlocalfock, trsasnformedlocalfock] |> eigspech 
@@ -367,7 +368,7 @@ function locaclRGsecond(center)::Tuple{FockMap,FockMap}
     # c3recenter = c3 |> recenter(scaledtriangular&center)
 
     # finding seeds for local frozen (6 modes at the centers)
-    frozenseedingcenter::Offset = scaledtriangular&center
+    frozenseedingcenter::Offset = center
     frozenregionRG, frozenseedingfockRG = localregioninspection(frozenseedingcenter, transformedphysicalmodes, 1, blockedcrystal)
     visualize(frozenregionRG, visualspace=euclidean(RealSpace, 2))
 
@@ -386,11 +387,11 @@ function locaclRGsecond(center)::Tuple{FockMap,FockMap}
 
 
     # finding seeds for local courier (6 modes at the corners)
-    courierseedingcenterA1::Offset = scaledtriangular&(center + [0 + 1/6, -3/4 + 1/12])
+    courierseedingcenterA1::Offset = Point(center_pt+[0 + 1/6, -3/4 + 1/12] ,  scaledtriangular)
     courierregionA1RG, courierseedingfockA1RG = localregioninspection(courierseedingcenterA1, transformedphysicalmodes, 0.1, blockedcrystal)
     visualize(courierregionA1RG, visualspace=euclidean(RealSpace, 2))
 
-    courierseedingcenterB1::Offset = scaledtriangular&(center + [0 - 1/6, -3/4 - 1/12])
+    courierseedingcenterB1::Offset = Point(center_pt+[0 - 1/6, -3/4 - 1/12] ,  scaledtriangular)
     courierregionB1RG, courierseedingfockB1RG = localregioninspection(courierseedingcenterB1, transformedphysicalmodes, 0.1, blockedcrystal)
     visualize(courierregionB1RG, visualspace=euclidean(RealSpace, 2))
 
@@ -406,12 +407,12 @@ function locaclRGsecond(center)::Tuple{FockMap,FockMap}
     courierseedB1RG = reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRS, regionfock = courierseedingfockB1RG, 
     spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
 
-    courierseedingcenterB2::Offset = scaledtriangular&(center + [-3/4 + 1/12, 0 + 1/6])
+    courierseedingcenterB2::Offset = Point(center_pt+[-3/4 + 1/12, 0 + 1/6] ,  scaledtriangular)
     courierregionB2RG, courierseedingfockB2RG = localregioninspection(courierseedingcenterB2, transformedphysicalmodes, 0.1, blockedcrystal)
     courierB2RGspec = transformedblockedcorrelationsRS[courierseedingfockB2RG, courierseedingfockB2RG] |> eigspech 
     visualize(courierB2RGspec)
 
-    courierseedingcenterA2::Offset = scaledtriangular&(center + [-3/4 - 1/12, 0 - 1/6])
+    courierseedingcenterA2::Offset = Point(center_pt+[-3/4 - 1/12, 0 - 1/6] ,  scaledtriangular)
     courierregionA2RG, courierseedingfockA2RG = localregioninspection(courierseedingcenterA2, transformedphysicalmodes, 0.1, blockedcrystal)
     courierA2RGspec = transformedblockedcorrelationsRS[courierseedingfockA2RG, courierseedingfockA2RG] |> eigspech 
     visualize(courierA2RGspec)
@@ -422,12 +423,12 @@ function locaclRGsecond(center)::Tuple{FockMap,FockMap}
     courierseedB2RG = reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRS, regionfock = courierseedingfockB2RG, 
     spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
 
-    courierseedingcenterB3::Offset = scaledtriangular&(center + [3/4 + 1/12, 3/4 - 1/12])
+    courierseedingcenterB3::Offset = Point(center_pt+[3/4 + 1/12, 3/4 - 1/12] ,  scaledtriangular)
     courierregionB3RG, courierseedingfockB3RG = localregioninspection(courierseedingcenterB3, transformedphysicalmodes, 0.1, blockedcrystal)
     courierB3RGspec = transformedblockedcorrelationsRS[courierseedingfockB3RG, courierseedingfockB3RG] |> eigspech 
     visualize(courierB3RGspec)
 
-    courierseedingcenterA3::Offset = scaledtriangular&(center + [3/4 - 1/12, 3/4 + 1/12])
+    courierseedingcenterA3::Offset = Point(center_pt+[3/4 - 1/12, 3/4 + 1/12] ,  scaledtriangular)
     courierregionA3RG, courierseedingfockA3RG = localregioninspection(courierseedingcenterA3, transformedphysicalmodes, 0.1, blockedcrystal)
     courierA3RGspec = transformedblockedcorrelationsRS[courierseedingfockA3RG, courierseedingfockA3RG] |> eigspech 
     visualize(courierA3RGspec)
@@ -451,7 +452,7 @@ end
 
 transformedphysicalmodes = transformedblockedcorrelationsRS |> getoutspace |> orderedmodes
 
-trsasnformedlocalregion, trsasnformedlocalfock = localregioninspection(scaledtriangular&[0,0],transformedphysicalmodes, 2, blockedcrystal)
+trsasnformedlocalregion, trsasnformedlocalfock = localregioninspection(Point(center_pt ,  scaledtriangular),transformedphysicalmodes, 2, blockedcrystal)
 visualize(trsasnformedlocalregion, title="l", visualspace=euclidean(RealSpace, 2))
 
 transformedlocaleigspec = transformedblockedcorrelationsRS[trsasnformedlocalfock, trsasnformedlocalfock] |> eigspech 
@@ -483,7 +484,7 @@ transformedblockedcorrelationsRSsecond = extendedisosecond'*transformedblockedco
 # inspecting local region spectrum
 transformedphysicalmodessecond = transformedblockedcorrelationsRSsecond |> getoutspace |> orderedmodes
 
-trsasnformedlocalregionsecond, trsasnformedlocalfocksecond = localregioninspection(scaledtriangular&[0,0],transformedphysicalmodessecond, 2, blockedcrystal)
+trsasnformedlocalregionsecond, trsasnformedlocalfocksecond = localregioninspection(Point([0,0], scaledtriangular),transformedphysicalmodessecond, 2, blockedcrystal)
 visualize(trsasnformedlocalregionsecond, title="l", visualspace=euclidean(RealSpace, 2))
 
 transformedlocaleigspec = transformedblockedcorrelationsRSsecond[trsasnformedlocalfocksecond, trsasnformedlocalfocksecond] |> eigspech 

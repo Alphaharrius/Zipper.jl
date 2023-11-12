@@ -93,21 +93,7 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
         rows(transformedfourier, ksubspaces[transformation * k |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
         for (k, fockspace) in ksubspaces)
     crystal::Crystal = crystalfock |> getcrystal
-    return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))
-end
-
-""" Defines the computation of the `transform` representation in the `inspace` with the full data provided by the data and `outspace` of the fockmap. """
-function Base.:*(fockmap::FockMap, transform::AffineTransform)::FockMap
-    outspacerep::FockMap = *(transform, fockmap |> getoutspace)
-    hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
-    return fockmap' * outspacerep * fockmap
-end
-
-""" Defines the computation of the `transform` representation in the `outspace` with the full data provided by the data and `inspace` of the fockmap. """
-function Base.:*(transform::AffineSpace, fockmap::FockMap)::FockMap
-    inspacerep::FockMap = *(transform, fockmap |> getinspace)
-    hassamespan(inspacerep |> getoutspace, fockmap |> getinspace) || error("The symmetry action on the inspace in not closed!")
-    return fockmap' * inspacerep * fockmap
+    return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal), performpermute=false)
 end
 
 """

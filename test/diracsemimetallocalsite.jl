@@ -396,13 +396,11 @@ function locaclRGsecond(center_pt)::Tuple{FockMap,FockMap}
     # finding seeds for local courier (6 modes closer to the center)
     courierseedingcenternA1::Offset = Point(center_pt+[2/3, 1/3] ,  scaledtriangular)
     courierseedingregionnA1RG,courierseedingfocknA1RG = localregioninspection(courierseedingcenternA1, transformedphysicalmodes, 0.1, blockedcrystal)
-    visualize(courierseedingregionnA1, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
-    regioncorrelations(blockedcorrelations,courierseedingfocknA1) |> eigspech |>visualize
+    visualize(courierseedingregionnA1RG, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
     
     courierseedingcenternB1::Offset = Point(center_pt+[1/3, 2/3] ,  scaledtriangular)
     courierseedingregionnB1RG,courierseedingfocknB1RG = localregioninspection(courierseedingcenternB1, transformedphysicalmodes, 0.1, blockedcrystal)
-    visualize(courierseedingregionnB1, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
-    regioncorrelations(blockedcorrelations,courierseedingfocknB1) |> eigspech |>visualize
+    visualize(courierseedingregionnB1RG, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
     
     # for A 
     courierseednA1 = reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRS, regionfock = courierseedingfocknA1RG, 
@@ -416,12 +414,10 @@ function locaclRGsecond(center_pt)::Tuple{FockMap,FockMap}
     courierseedingcenternA2::Offset = Point(center_pt+[-1/3, -2/3] ,  scaledtriangular)
     courierseedingregionnA2RG,courierseedingfocknA2RG = localregioninspection(courierseedingcenternA2, transformedphysicalmodes, 0.1, blockedcrystal)
     visualize(courierseedingregionnA2RG, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
-    regioncorrelations(blockedcorrelations,courierseedingfocknA2RG) |> eigspech |>visualize
     
     courierseedingcenternB2::Offset = Point(center_pt+[1/3, -1/3] ,  scaledtriangular)
     courierseedingregionnB2RG,courierseedingfocknB2RG = localregioninspection(courierseedingcenternB2, transformedphysicalmodes, 0.1, blockedcrystal)
     visualize(courierseedingregionnB2RG, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
-    regioncorrelations(blockedcorrelations,courierseedingfocknB2RG) |> eigspech |>visualize
     
     # for A 
     courierseednA2 =  reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRS, regionfock = courierseedingfocknA2RG, 
@@ -433,13 +429,11 @@ function locaclRGsecond(center_pt)::Tuple{FockMap,FockMap}
     
     courierseedingcenternA3::Offset = Point(center_pt+[-1/3, 1/3] ,  scaledtriangular)
     courierseedingregionnA3RG,courierseedingfocknA3RG = localregioninspection(courierseedingcenternA3, transformedphysicalmodes, 0.1, blockedcrystal)
-    visualize(courierseedingregionnA2RG, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
-    regioncorrelations(blockedcorrelations,courierseedingfocknA2RG) |> eigspech |>visualize
+    visualize(courierseedingregionnA3RG, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
     
     courierseedingcenternB3::Offset = Point(center_pt+[-2/3, -1/3] ,  scaledtriangular)
     courierseedingregionnB3RG,courierseedingfocknB3RG = localregioninspection(courierseedingcenternB3, transformedphysicalmodes, 0.1, blockedcrystal)
-    visualize(courierseedingregionnB2RG, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
-    regioncorrelations(blockedcorrelations,courierseedingfocknB2RG) |> eigspech |>visualize
+    visualize(courierseedingregionnB3RG, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
     
     # for A 
     courierseednA3 =  reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRS, regionfock = courierseedingfocknA3RG, 
@@ -534,6 +528,7 @@ extendedisosecond = ((((transformedblockedcorrelationsRS|> getoutspace) - (local
 transformedblockedcorrelationsRSsecond = extendedisosecond'*transformedblockedcorrelationsRS*extendedisosecond
 
 # inspecting local region spectrum
+center_pt = [0,0]
 transformedphysicalmodessecond = transformedblockedcorrelationsRSsecond |> getoutspace |> orderedmodes
 
 trsasnformedlocalregionsecond, trsasnformedlocalfocksecond = localregioninspection(Point([0,0], scaledtriangular),transformedphysicalmodessecond, 2, blockedcrystal)
@@ -542,4 +537,84 @@ visualize(trsasnformedlocalregionsecond, title="l", visualspace=euclidean(RealSp
 transformedlocaleigspec = transformedblockedcorrelationsRSsecond[trsasnformedlocalfocksecond, trsasnformedlocalfocksecond] |> eigspech 
 visualize(transformedlocaleigspec)
 
-visualize((wannierizedfrozensRGA'*transformedblockedcorrelationsRS[trsasnformedlocalfock, trsasnformedlocalfock]*wannierizedfrozensRGA) |> eigspech )
+transformedlocalmodesdictsecond = localmodesgrouping(transformedblockedcorrelationsRSsecond[trsasnformedlocalfocksecond, trsasnformedlocalfocksecond], 0.002)
+
+
+# visualize((wannierizedfrozensRGA'*transformedblockedcorrelationsRS[trsasnformedlocalfock, trsasnformedlocalfock]*wannierizedfrozensRGA) |> eigspech )
+
+# finding seeds for local frozen (6 modes at the centers)
+frozenseedingcenter::Offset = Point(center_pt, scaledtriangular)
+frozenregionRG, frozenseedingfockRG = localregioninspection(frozenseedingcenter, transformedphysicalmodessecond , 1, blockedcrystal)
+visualize(frozenregionRG, visualspace=euclidean(RealSpace, 2))
+
+frozenRGspec = transformedblockedcorrelationsRSsecond[frozenseedingfockRG, frozenseedingfockRG] |> eigspech 
+visualize(frozenRGspec)
+
+frozenseedsRG = reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRSsecond, regionfock = frozenseedingfockRG, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
+
+extendedfrozenseedsRG = idmap(trsasnformedlocalfocksecond, trsasnformedlocalfocksecond)[:,frozenseedsRG |> getoutspace] * frozenseedsRG
+
+# Wannierization for frozen
+wannierizedfrozensRG = localwannierization(transformedlocalmodesdictsecond[:frozen], extendedfrozenseedsRG)
+
+wannierizedfrozensRG[:,1] |> Zipper.columnspec |> visualize
+
+
+# finding seeds for local courier (6 modes closer to the center)
+courierseedingcenternA1::Offset = Point(center_pt+[2/3, 1/3] ,  scaledtriangular)
+courierseedingregionnA1RG,courierseedingfocknA1RG = localregioninspection(courierseedingcenternA1, transformedphysicalmodessecond, 0.1, blockedcrystal)
+visualize(courierseedingregionnA1, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
+
+courierseedingcenternB1::Offset = Point(center_pt+[1/3, 2/3] ,  scaledtriangular)
+courierseedingregionnB1RG,courierseedingfocknB1RG = localregioninspection(courierseedingcenternB1, transformedphysicalmodessecond, 0.1, blockedcrystal)
+visualize(courierseedingregionnB1, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
+
+# for A 
+courierseednA1 = reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRSsecond, regionfock = courierseedingfocknA1RG, 
+spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
+
+# for B 
+courierseednB1 =  reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRSsecond, regionfock = courierseedingfocknB1RG, 
+spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
+
+
+courierseedingcenternA2::Offset = Point(center_pt+[-1/3, -2/3] ,  scaledtriangular)
+courierseedingregionnA2RG,courierseedingfocknA2RG = localregioninspection(courierseedingcenternA2, transformedphysicalmodessecond, 0.1, blockedcrystal)
+visualize(courierseedingregionnA2RG, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
+
+courierseedingcenternB2::Offset = Point(center_pt+[1/3, -1/3] ,  scaledtriangular)
+courierseedingregionnB2RG,courierseedingfocknB2RG = localregioninspection(courierseedingcenternB2, transformedphysicalmodessecond, 0.1, blockedcrystal)
+visualize(courierseedingregionnB2RG, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
+
+# for A 
+courierseednA2 =  reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRSsecond, regionfock = courierseedingfocknA2RG, 
+spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
+# for B 
+courierseednB2 =  reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRSsecond, regionfock = courierseedingfocknB2RG, 
+spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
+
+
+courierseedingcenternA3::Offset = Point(center_pt+[-1/3, 1/3] ,  scaledtriangular)
+courierseedingregionnA3RG,courierseedingfocknA3RG = localregioninspection(courierseedingcenternA3, transformedphysicalmodessecond, 0.1, blockedcrystal)
+visualize(courierseedingregionnA2RG, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
+
+courierseedingcenternB3::Offset = Point(center_pt+[-2/3, -1/3] ,  scaledtriangular)
+courierseedingregionnB3RG,courierseedingfocknB3RG = localregioninspection(courierseedingcenternB3, transformedphysicalmodessecond, 0.1, blockedcrystal)
+visualize(courierseedingregionnB2RG, title="Courier Seeding Region B", visualspace=euclidean(RealSpace, 2))
+
+# for A 
+courierseednA3 =  reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRSsecond, regionfock = courierseedingfocknA3RG, 
+spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
+# for B 
+courierseednB3 =  reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = transformedblockedcorrelationsRSsecond, regionfock = courierseedingfocknB3RG, 
+spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
+
+courierseedRG = courierseednA1 + courierseednB1 + courierseednA2 + courierseednB2 + courierseednA3+ courierseednB3
+    
+extendedcourierseedsRG = idmap(trsasnformedlocalfocksecond, trsasnformedlocalfocksecond)[:,courierseedRG |> getoutspace] * courierseedRG
+    
+# Wannierization for couriers
+wannierizedcouriersRG = _localwannierization(transformedlocalmodesdictsecond[:courier], extendedcourierseedsRG)
+
+wannierizedcouriersRG[:,6] |> Zipper.columnspec |> visualize

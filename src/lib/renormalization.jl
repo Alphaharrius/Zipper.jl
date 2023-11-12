@@ -152,19 +152,14 @@ function crystalprojector(spectrum::CrystalSpectrum)::FockMap
 end
 
 function globaldistillerhamiltonian(;
-    correlations::FockMap, restrictspace::FockSpace, localisometryselectionstrategy::Function, manualeigenenergies::Dict{Symbol, <:Number} = Dict(:filled => -1, :empty => 1),
-    symmetry::AffineTransform)
+    correlations::FockMap, restrictspace::FockSpace,
+    localisometryselectionstrategy::Function, manualeigenenergies::Dict{Symbol, <:Number} = Dict(:filled => -1, :empty => 1))::FockMap
 
     localisometries::Dict{Symbol} = localfrozenisometries(correlations, restrictspace, selectionstrategy=localisometryselectionstrategy)
     crystalprojectors::Dict{Symbol, FockMap} = Dict(
         name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations.inspace)
         for (name, isometry) in localisometries)
-    globaldistillhamiltonian::FockMap = reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
-
-    order::Integer = symmetry |> pointgrouporder
-    transformers::Vector{FockMap} = repeat([symmetry * globaldistillhamiltonian.outspace], order) |> cumprod
-
-    return reduce(+, (transformer * globaldistillhamiltonian * transformer' for transformer in transformers))
+    return reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
 end
 export globaldistillerhamiltonian
 
@@ -240,7 +235,7 @@ function findlocalspstates(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return Dict(state |> getinspace |> dimension => state for state in spstates)

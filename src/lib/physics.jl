@@ -72,7 +72,7 @@ function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfilling
     groupcollectcount::Integer = findfirst(v -> v >= totalfillings, cumfillings)
     contributions = Iterators.take(groupedeigenvalues, groupcollectcount)
     groundstatemodesets::Base.Generator = (modeset for (_, modeset) in contributions)
-    groundstatemodes::Subset{Mode} = reduce(+, groundstatemodesets)
+    groundstatemodes::Subset{Mode} = groundstatemodesets |> subsetunion
 
     decoratedmodes::Base.Generator = ((m |> getattr(:offset)) => m for m in groundstatemodes)
     momentummodes::Dict = foldl(decoratedmodes; init=Dict()) do d, (k, v)

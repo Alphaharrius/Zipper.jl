@@ -93,21 +93,7 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
         rows(transformedfourier, ksubspaces[transformation * k |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
         for (k, fockspace) in ksubspaces)
     crystal::Crystal = crystalfock |> getcrystal
-    return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal))
-end
-
-""" Defines the computation of the `transform` representation in the `inspace` with the full data provided by the data and `outspace` of the fockmap. """
-function Base.:*(fockmap::FockMap, transform::AffineTransform)::FockMap
-    outspacerep::FockMap = *(transform, fockmap |> getoutspace)
-    hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
-    return fockmap' * outspacerep * fockmap
-end
-
-""" Defines the computation of the `transform` representation in the `outspace` with the full data provided by the data and `inspace` of the fockmap. """
-function Base.:*(transform::AffineSpace, fockmap::FockMap)::FockMap
-    inspacerep::FockMap = *(transform, fockmap |> getinspace)
-    hassamespan(inspacerep |> getoutspace, fockmap |> getinspace) || error("The symmetry action on the inspace in not closed!")
-    return fockmap' * inspacerep * fockmap
+    return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal), performpermute=false)
 end
 
 """
@@ -135,8 +121,24 @@ function spatialmap(fockmap::FockMap)::FockMap
 end
 export spatialmap
 
-function symmetricmap(symmetry::AffineTransform, fockmap::FockMap)::FockMap
-    inspacerep::FockMap = fockmap * symmetry
+function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
+    inspacerep::FockMap = *(symmetry, fockmap |> getinspace)
+    hassamespan(inspacerep |> getoutspace, fockmap |> getinspace) || error("The symmetry action on the inspace in not closed!")
+    outspacerep::FockMap = fockmap' * inspacerep * fockmap
+
+    phasespectrum::EigenSpectrum = outspacerep |> eigspec
+    outspace::FockSpace = FockSpace(
+        m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
+          |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
+        for m in phasespectrum |> geteigenvectors |> getinspace)s
+    return FockMap(phasespectrum |> geteigenvectors, inspace=outspace, performpermute=false)'
+end
+
+function Base.:*(fockmap::FockMap, symmetry::AffineTransform)::FockMap
+    outspacerep::FockMap = *(symmetry, fockmap |> getoutspace)
+    hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
+    inspacerep::FockMap = fockmap' * outspacerep * fockmap
+
     phasespectrum::EigenSpectrum = inspacerep |> eigspec
     inspace::FockSpace = FockSpace(
         m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
@@ -144,4 +146,3 @@ function symmetricmap(symmetry::AffineTransform, fockmap::FockMap)::FockMap
         for m in phasespectrum |> geteigenvectors |> getinspace)
     return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end
-export symmetricmap

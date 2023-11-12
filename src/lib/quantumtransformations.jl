@@ -121,17 +121,6 @@ function spatialmap(fockmap::FockMap)::FockMap
 end
 export spatialmap
 
-function symmetricmap(symmetry::AffineTransform, fockmap::FockMap)::FockMap
-    inspacerep::FockMap = fockmap * symmetry
-    phasespectrum::EigenSpectrum = inspacerep |> eigspec
-    inspace::FockSpace = FockSpace(
-        m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
-          |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
-        for m in phasespectrum |> geteigenvectors |> getinspace)
-    return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
-end
-export symmetricmap
-
 function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
     inspacerep::FockMap = *(symmetry, fockmap |> getinspace)
     hassamespan(inspacerep |> getoutspace, fockmap |> getinspace) || error("The symmetry action on the inspace in not closed!")

@@ -1,6 +1,7 @@
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
 using Revise
 using Zipper
+using DataFrames
 
 function _findlocalspstates(;
     statecorrelations::FockMap, regionfock::FockSpace,
@@ -10,7 +11,9 @@ function _findlocalspstates(;
     degeneracythreshold::Real = 1e-7)
 
     function lineardependencefilter(spstate::FockMap)::Bool
-        pseudoidentity::FockMap = (spstate' * spstate)
+        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecorrelations.outspace)
+        crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
+        pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
         mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
         return mineigenvalue > linearindependencethreshold
     end
@@ -24,7 +27,7 @@ function _findlocalspstates(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return (state |> getinspace |> dimension => state for state in spstates)
@@ -52,7 +55,7 @@ function findlocalseeds(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return (state |> getinspace |> dimension => state for state in spstates)
@@ -71,7 +74,7 @@ function _findlocalseeds(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return (state |> getinspace |> dimension => state for state in spstates)
@@ -152,6 +155,29 @@ function _localwannierization(localbasis::FockMap, localseeds::FockMap, svdortho
     return wannierizedbasis
 end
 
+function groupmodesbydist(;
+    region::Subset{Point{RealSpace}},
+    regionfock::FockSpace,
+    center::Point,
+    samedistancethreshold::Int = 8)
+
+    visualspace = region |> getspace |> euclidean
+    distancewithmode = sort(((norm(lineartransform(visualspace, (mode |> getpos)-center) |> vec),mode) for mode in regionfock), by = first, rev = true)
+    df = DataFrame()
+    df.distance = [round(dist; digits=samedistancethreshold) for (dist,_) in distancewithmode]
+    df.mode = [mode for (_,mode) in distancewithmode]
+    grouped_df = groupby(df, :distance)
+    store = Dict()
+    for (ind,group) in enumerate(grouped_df)
+        store[ind] = []
+        for (distance,mode) in zip(group.distance,group.mode)
+            push!(store[ind],(distance,mode))
+        end
+    end
+
+    return store
+end
+
 
 ∈(vec, space::AffineSpace)::Point = Point(vec |> collect, space)
 
@@ -219,12 +245,14 @@ scaledtriangular = scale*triangular
 center_pt = [-2,0]
 center = Point(center_pt, scaledtriangular)
 
-localregion,localfock = localregioninspection(center , physicalmodes, 4,blockedcrystal)
+localregion,localfock = localregioninspection(center , physicalmodes, 2,blockedcrystal)
 visualize(localregion)
 
 localcorrelation = regioncorrelations(blockedcorrelations,localfock)
 localeigspec = localcorrelation |> eigspech 
 visualize(localeigspec)
+
+modebydist = groupmodesbydist(region = localregion,regionfock = localfock,center = center)
 
 function locaclRG(center_pt)::Tuple{FockMap,FockMap}
     center = Point(center_pt, scaledtriangular)
@@ -519,6 +547,8 @@ function locaclRGsecond(center_pt)::Tuple{FockMap,FockMap}
     
     return wannierizedfrozensRG, wannierizedcouriersRG
 end
+
+transformedblockedcorrelationsRS |> getinspace 
 
 center_pt = [1,0]
 center = Point(center_pt, scaledtriangular)

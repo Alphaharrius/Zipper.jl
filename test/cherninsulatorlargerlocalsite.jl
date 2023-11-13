@@ -1,6 +1,7 @@
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
 using Revise
 using Zipper
+findlocalspstates
 
 function _findlocalspstates(;
     statecorrelations::FockMap, regionfock::FockSpace,
@@ -10,7 +11,9 @@ function _findlocalspstates(;
     degeneracythreshold::Real = 1e-7)
 
     function lineardependencefilter(spstate::FockMap)::Bool
-        pseudoidentity::FockMap = (spstate' * spstate)
+        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecorrelations.outspace)
+        crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
+        pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
         mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
         return mineigenvalue > linearindependencethreshold
     end
@@ -24,7 +27,7 @@ function _findlocalspstates(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return (state |> getinspace |> dimension => state for state in spstates)
@@ -52,7 +55,7 @@ function findlocalseeds(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return (state |> getinspace |> dimension => state for state in spstates)
@@ -71,7 +74,7 @@ function _findlocalseeds(;
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
-    symmetricspstates = (state * symmetricmap(symmetry, state) for state in orthogonalspstates)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
     spstates = (state * spatialmap(state)' for state in symmetricspstates)
 
     return (state |> getinspace |> dimension => state for state in spstates)
@@ -216,7 +219,7 @@ blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 scaledtriangular = scale*triangular 
 
-center_pt = [1.5,0]
+center_pt = [-3,-3]
 center = Point(center_pt, scaledtriangular)
 
 localregion,localfock = localregioninspection(center , physicalmodes, 2.6,blockedcrystal)
@@ -250,7 +253,6 @@ function locaclRG(center_pt)::Tuple{FockMap,FockMap}
     visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
 
     regioncorrelations(blockedcorrelations,frozenseedingfock) |> eigspech |>visualize
-
     frozenseedsorig = reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(_findlocalspstates(statecorrelations = blockedcorrelations, regionfock = frozenseedingfock, 
     spectrumextractpredicate = v -> true, symmetry = identitytransform(2))))
 
@@ -335,6 +337,12 @@ localunitary4 = wannierizedfrozens4 + wannierizedcouriers4
 localunitary5 = wannierizedfrozens5 + wannierizedcouriers5
 localunitary6 = wannierizedfrozens6 + wannierizedcouriers6
 
+localunitary = localunitary1 + localunitary2 + localunitary3 + localunitary4 + localunitary5 + localunitary6
+wannierizedcouriers = wannierizedcouriers1 + wannierizedcouriers2 + wannierizedcouriers3 + wannierizedcouriers4 + wannierizedcouriers5 + wannierizedcouriers6
+
+localunitary |> getoutspace
+wannierizedcouriers'*regioncorrelations(blockedcorrelations,localunitary |> getoutspace)*wannierizedcouriers
+
 # Getting real space form of the correlation matrix
 ft = fourier(blockedcorrelations |> getoutspace, spanoffset(blockedcorrelations |> getinspace |> unitcellfock |> orderedmodes, blockedcrystal |> latticepoints)|> FockSpace)/sqrt(blockedcrystal |> vol)
 blockedcorrelationsRS = ft'*blockedcorrelations*ft
@@ -343,8 +351,8 @@ blockedcorrelationsRS = ft'*blockedcorrelations*ft
 extendediso = ((((blockedcorrelationsRS|> getoutspace) - (localunitary1 |> getoutspace) - (localunitary2 |> getoutspace) - (localunitary3 |> getoutspace) - (localunitary4 |> getoutspace) - (localunitary5 |> getoutspace) - (localunitary6 |> getoutspace)) |> idmap)
                  + wannierizedcouriers1 +  wannierizedcouriers2 +  wannierizedcouriers3 +  wannierizedcouriers4 +  wannierizedcouriers5 +  wannierizedcouriers6)
 
-transformedblockedcorrelationsRS = extendediso'*blockedcorrelationsRS*extendediso
-
+# transformedblockedcorrelationsRS = extendediso'*blockedcorrelationsRS*extendediso
+transformedblockedcorrelationsRS = wannierizedcouriers'*regioncorrelations(blockedcorrelations,localunitary |> getoutspace)*wannierizedcouriers
 
 center_pt = [1.5,0]
 center = Point(center_pt, scaledtriangular)
@@ -496,10 +504,17 @@ localunitaryRGsecondA = wannierizedfrozensRGA + wannierizedcouriersRGA
 localunitaryRGsecondB = wannierizedfrozensRGB + wannierizedcouriersRGB
 localunitaryRGsecondC = wannierizedfrozensRGC + wannierizedcouriersRGC
 
+localunitaryRGsecond = localunitaryRGsecondA + localunitaryRGsecondB  + localunitaryRGsecondC
+wannierizedcouriersRGsecond = wannierizedcouriersRGA + wannierizedcouriersRGB + wannierizedcouriersRGC
+
+localunitaryRGsecond |> getoutspace
+wannierizedcouriersRGsecond'*regioncorrelations(transformedblockedcorrelationsRS,localunitaryRGsecond |> getoutspace)*wannierizedcouriersRGsecond
+
 extendedisosecond = ((((transformedblockedcorrelationsRS|> getoutspace) - (localunitaryRGsecondA  |> getoutspace) - (localunitaryRGsecondB  |> getoutspace) - (localunitaryRGsecondC  |> getoutspace)) |> idmap)
                  + wannierizedcouriersRGA + wannierizedcouriersRGB + wannierizedcouriersRGC)
 
-transformedblockedcorrelationsRSsecond = extendedisosecond'*transformedblockedcorrelationsRS*extendedisosecond
+# transformedblockedcorrelationsRSsecond = extendedisosecond'*transformedblockedcorrelationsRS*extendedisosecond
+transformedblockedcorrelationsRSsecond = wannierizedcouriersRGsecond'*regioncorrelations(transformedblockedcorrelationsRS,localunitaryRGsecond |> getoutspace)*wannierizedcouriersRGsecond
 
 # inspecting local region spectrum
 center_pt = [0,0]

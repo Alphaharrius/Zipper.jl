@@ -411,7 +411,7 @@ wanniercouriersRGRG = sum(wanniercourierlistRGRG)
 couriercorrelationRGRG = wanniercouriersRGRG'*couriercorrelationRG[localunitaryRGRG |> getoutspace, localunitaryRGRG |> getoutspace]*wanniercouriersRGRG
 
 # inspecting local region spectrum
-center_pt = [2,1]
+center_pt = [0,0]
 center = Point(center_pt, scaledtriangular)
 transformedphysicalmodesnext = couriercorrelationRGRG |> getoutspace |> orderedmodes
 
@@ -420,3 +420,179 @@ visualize(trsasnformedlocalregionnext, title="l", visualspace=euclidean(RealSpac
 
 transformedlocaleigspec = couriercorrelationRGRG[trsasnformedlocalfocknext, trsasnformedlocalfocknext] |> eigspech 
 visualize(transformedlocaleigspec)
+
+
+firstlayernext = Set([[-4,-4], [-2,0], [0,4], [0,-2], [2,2], [4,0]])
+secondlayernext = Set([[-2,-2], [0,2], [2,0]])
+thirdlayernext = Set([[0,0]])
+
+firstlayersnext = Set([[-4,-4], [-2,0], [0,4], [0,-2], [2,2], [4,0]])
+secondlayersnext = Set([[-2,-2], [0,2], [2,0]])
+thirdlayersnext = Set([[0,0]])
+
+# for i in range(-1,1)
+#     for j in range(-1,1)
+#         firstlayersnext = union(firstlayersnext,Set([r+i*[1,2]+j*[2,1] for r in firstlayer]))
+#         secondlayersnext = union(secondlayersnext,Set([r+i*[1,2]+j*[2,1] for r in secondlayer]))
+#         thirdlayersnext = union(thirdlayersnext,Set([r+i*[1,2]+j*[2,1] for r in thirdlayer]))
+#     end
+# end
+
+function locaclRGnext(center_pt)::Tuple{FockMap,FockMap}
+    center = Point(center_pt, scaledtriangular)
+
+    physicalmodesnext = couriercorrelationRGRG |> getoutspace |> orderedmodes
+
+    localregionnext, localfocknext = localregioninspection(center,physicalmodesnext, 4, blockedcrystal)
+    visualize(localregionnext, title="l", visualspace=euclidean(RealSpace, 2))
+
+    localeigspec = couriercorrelationRGRG[localfocknext, localfocknext] |> eigspech 
+    visualize(localeigspec)
+
+    localmodesdict = localmodesgrouping(couriercorrelationRGRG[localfocknext, localfocknext], 0.002)
+    modebydistnext = groupmodesbydist(region = localregionnext,regionfock = localfocknext,center = center)  
+
+    # finding seeds for local frozen (6 modes at the center)
+    frozenseedingfocks = (frozenseedingfock for (_,frozenseedingfock) in (localregioninspection(modewithdist[2] |> getpos, physicalmodesnext, 0.1, blockedcrystal) for modewithdist in modebydistnext[3]))
+    frozenseeds = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationRGRG, regionfock = frozenseedingfock, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for frozenseedingfock in frozenseedingfocks])
+
+    extendedfrozenseeds = idmap(localfocknext, localfocknext)[:,frozenseeds |> getoutspace] * frozenseeds
+
+    wannierizedfrozens = _localwannierization(localmodesdict[:frozen], extendedfrozenseeds)
+
+    # finding seeds for local courier (18 (12+6) modes at "boundary")
+    courierseedingfocks1 = (courierseedingfock for (_,courierseedingfock) in (localregioninspection(modewithdist[2] |> getpos, physicalmodesnext, 0.1, blockedcrystal) for modewithdist in modebydistnext[1]))
+    courierseedingfocks2 = (courierseedingfock for (_,courierseedingfock) in (localregioninspection(modewithdist[2] |> getpos, physicalmodesnext, 0.1, blockedcrystal) for modewithdist in modebydistnext[2]))
+
+    courierseeds1 = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationRGRG, regionfock = courierseedingfock, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for courierseedingfock in courierseedingfocks1])
+    courierseeds2 = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationRGRG, regionfock = courierseedingfock, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for courierseedingfock in courierseedingfocks2])
+
+    courierseeds = courierseeds1 + courierseeds2
+    extendedcourierseeds = idmap(localfocknext, localfocknext)[:, courierseeds |> getoutspace] * courierseeds
+
+    wannierizedcouriers = _localwannierization(localmodesdict[:courier], extendedcourierseeds)
+
+    return wannierizedfrozens, wannierizedcouriers
+end
+
+function locaclRGsecondnext(center_pt)::Tuple{FockMap,FockMap}
+    center = Point(center_pt, scaledtriangular)
+    # inspecting local region spectrum
+    transformedphysicalmodesnext = couriercorrelationnext |> getoutspace |> orderedmodes
+    
+    transformedlocalregionnext, transformedlocalfocknext = localregioninspection(center ,transformedphysicalmodesnext, 4, blockedcrystal)
+    visualize(transformedlocalregionnext, title="l", visualspace=euclidean(RealSpace, 2))
+    
+    transformedlocaleigspecnext = couriercorrelationnext[transformedlocalfocknext, transformedlocalfocknext] |> eigspech 
+    visualize(transformedlocaleigspecnext)
+
+    transformedlocalmodesdict = localmodesgrouping(couriercorrelationnext[transformedlocalfocknext, transformedlocalfocknext], 0.003)
+    transformedmodebydist = groupmodesbydist(region =  transformedlocalregionnext,regionfock = transformedlocalfocknext,center = center)
+    
+    # finding seeds for local frozen (6 modes at the center)
+    frozenseedingfocksRG = (frozenseedingfock for (_,frozenseedingfock) in (localregioninspection(modewithdist[2] |> getpos, transformedphysicalmodesnext, 0.1, blockedcrystal) for modewithdist in transformedmodebydist[3]))
+    frozenseedsRG = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationnext, regionfock = frozenseedingfockRG, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for frozenseedingfockRG in frozenseedingfocksRG])
+
+    extendedfrozenseedsRG = idmap(transformedlocalfocknext, transformedlocalfocknext)[:,frozenseedsRG |> getoutspace] * frozenseedsRG
+
+    wannierizedfrozensRG = _localwannierization(transformedlocalmodesdict[:frozen], extendedfrozenseedsRG)
+
+    # finding seeds for local courier (18 (12+6) modes at "boundary")
+    courierseedingfocks1RG = (courierseedingfock for (_,courierseedingfock) in (localregioninspection(modewithdist[2] |> getpos, transformedphysicalmodesnext, 0.1, blockedcrystal) for modewithdist in transformedmodebydist[1]))
+    courierseedingfocks2RG = (courierseedingfock for (_,courierseedingfock) in (localregioninspection(modewithdist[2] |> getpos, transformedphysicalmodesnext, 0.1, blockedcrystal) for modewithdist in transformedmodebydist[2]))
+
+    courierseeds1RG = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationnext, regionfock = courierseedingfockRG, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for courierseedingfockRG in courierseedingfocks1RG])
+    courierseeds2RG = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationnext, regionfock = courierseedingfockRG, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for courierseedingfockRG in courierseedingfocks2RG])
+
+    courierseedsRG = courierseeds1RG + courierseeds2RG
+    extendedcourierseedsRG = idmap(transformedlocalfocknext, transformedlocalfocknext)[:, courierseedsRG |> getoutspace] * courierseedsRG
+    
+
+    # Wannierization for couriers
+    wannierizedcouriersRG = _localwannierization(transformedlocalmodesdict[:courier], extendedcourierseedsRG)
+    
+    return wannierizedfrozensRG, wannierizedcouriersRG
+end
+
+function locaclRGthirdnext(center_pt)::Tuple{FockMap,FockMap}
+    center = Point(center_pt, scaledtriangular)
+    # inspecting local region spectrum
+    transformedphysicalmodessecond = couriercorrelationRGnext |> getoutspace |> orderedmodes
+    
+    trsasnformedlocalregionsecond, trsasnformedlocalfocksecond = localregioninspection(center,transformedphysicalmodessecond, 4, blockedcrystal)
+    visualize(trsasnformedlocalregionsecond, title="l", visualspace=euclidean(RealSpace, 2))
+    
+    transformedlocaleigspec = couriercorrelationRGnext[trsasnformedlocalfocksecond, trsasnformedlocalfocksecond] |> eigspech 
+    visualize(transformedlocaleigspec)
+    
+    transformedlocalmodesdictsecond = localmodesgrouping(couriercorrelationRGnext[trsasnformedlocalfocksecond, trsasnformedlocalfocksecond], 0.006)
+    transformedmodebydistsecond = groupmodesbydist(region = trsasnformedlocalregionsecond,regionfock = trsasnformedlocalfocksecond,center = center)
+    
+    # finding seeds for local frozen (6 modes at the center)
+    frozenseedingfocksRGsecond = (frozenseedingfock for (_,frozenseedingfock) in (localregioninspection(modewithdist[2] |> getpos, transformedphysicalmodessecond, 0.1, blockedcrystal) for modewithdist in transformedmodebydistsecond[2]))
+    frozenseedsRGsecond = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationRGnext, regionfock = frozenseedingfockRG, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for frozenseedingfockRG in frozenseedingfocksRGsecond])
+
+    extendedfrozenseedsRGsecond = idmap(trsasnformedlocalfocksecond, trsasnformedlocalfocksecond)[:,frozenseedsRGsecond |> getoutspace] * frozenseedsRGsecond
+
+    wannierizedfrozensRG = _localwannierization(transformedlocalmodesdictsecond[:frozen], extendedfrozenseedsRGsecond)
+
+    # finding seeds for local courier (18 (12+6) modes at "boundary")
+    courierseedingfocksRGsecond = (courierseedingfock for (_,courierseedingfock) in (localregioninspection(modewithdist[2] |> getpos, transformedphysicalmodessecond, 0.1, blockedcrystal) for modewithdist in transformedmodebydistsecond[1]))
+    
+    courierseedsRGsecond = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(findlocalseeds(statecorrelations = couriercorrelationRGnext, regionfock = courierseedingfockRG, 
+    spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for courierseedingfockRG in courierseedingfocksRGsecond])
+
+    extendedcourierseedsRGsecond = idmap(trsasnformedlocalfocksecond, trsasnformedlocalfocksecond)[:, courierseedsRGsecond |> getoutspace] * courierseedsRGsecond
+    
+
+    # Wannierization for couriers
+    wannierizedcouriersRG = _localwannierization(transformedlocalmodesdictsecond[:courier], extendedcourierseedsRGsecond)
+    
+    return wannierizedfrozensRG, wannierizedcouriersRG
+end
+
+wannier_fns_next = [locaclRGnext(center_pt) for center_pt in firstlayersnext]
+localunitarylistnext = [wannierizedfrozen+wannierizedcourier for (wannierizedfrozen, wannierizedcourier) in wannier_fns_next]
+localunitarynext = sum(localunitarylistnext)
+wanniercourierlistnext = [wannierizedcourier for (_, wannierizedcourier) in wannier_fns_next]
+wanniercouriersnext = sum(wanniercourierlistnext)
+
+couriercorrelationnext = wanniercouriersnext'*couriercorrelationRGRG[localunitarynext |> getoutspace, localunitarynext |> getoutspace]*wanniercouriersnext
+
+
+wannier_fnsRGnext = [locaclRGsecondnext(center_pt) for center_pt in secondlayersnext]
+localunitarylistRGnext = [wannierizedfrozen+wannierizedcourier for (wannierizedfrozen, wannierizedcourier) in wannier_fnsRGnext]
+localunitaryRGnext = sum(localunitarylistRGnext)
+wanniercourierlistRGnext = [wannierizedcourier for (_, wannierizedcourier) in wannier_fnsRGnext]
+wanniercouriersRGnext = sum(wanniercourierlistRGnext)
+
+couriercorrelationRGnext = wanniercouriersRGnext'*couriercorrelationnext[localunitaryRGnext |> getoutspace, localunitaryRGnext |> getoutspace]*wanniercouriersRGnext
+
+transformedlocalmodesdict = localmodesgrouping(couriercorrelationRGnext[trsasnformedlocalfocknext, trsasnformedlocalfocknext], 0.006)
+transformedmodebydist = groupmodesbydist(region = trsasnformedlocalregionnext,regionfock = trsasnformedlocalfocknext,center = center)
+
+wannier_fnsRGRGnext = [locaclRGthirdnext(center_pt) for center_pt in thirdlayersnext]
+localunitarylistRGRGnext = [wannierizedfrozen+wannierizedcourier for (wannierizedfrozen, wannierizedcourier) in wannier_fnsRGRGnext]
+localunitaryRGRGnext = sum(localunitarylistRGRGnext)
+wanniercourierlistRGRGnext = [wannierizedcourier for (_, wannierizedcourier) in wannier_fnsRGRGnext]
+wanniercouriersRGRGnext = sum(wanniercourierlistRGRGnext)
+
+couriercorrelationRGRGnext = wanniercouriersRGRGnext'*couriercorrelationRGnext[localunitaryRGRGnext |> getoutspace, localunitaryRGRGnext |> getoutspace]*wanniercouriersRGRGnext
+
+# inspecting local region spectrum
+center_pt = [0,0]
+center = Point(center_pt, scaledtriangular)
+transformedphysicalmodesnext = couriercorrelationRGRGnext |> getoutspace |> orderedmodes
+
+trsasnformedlocalregionnext, trsasnformedlocalfocknext = localregioninspection(center,transformedphysicalmodesnext, 4, blockedcrystal)
+visualize(trsasnformedlocalregionnext, title="l", visualspace=euclidean(RealSpace, 2))
+
+localeigspecnext = couriercorrelationRGRGnext[trsasnformedlocalfocknext, trsasnformedlocalfocknext] |> eigspech 
+visualize(localeigspecnext)

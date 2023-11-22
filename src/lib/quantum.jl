@@ -568,6 +568,8 @@ The quantized set of `Mode` objects.
 quantize(identifier::Symbol, subset::Subset{Offset}, count::Int64)::Subset{Mode} = (
     Subset(quantize(identifier, point, flavor) for point in subset for flavor in 1:count))
 
+abstract type AbstractFockMap{A <: FockSpace, B <: FockSpace} <: Element{SparseMatrixCSC{ComplexF64, Int64}} end
+
 """
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
     FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})

@@ -104,7 +104,7 @@ function getsphericalregion(;from::Offset, generators::Subset{Offset}, symmetrie
     getspancount(generator::Offset)::Integer = radius / (generator |> euclidean |> norm) |> ceil |> Integer
 
     generated::Region = Subset(from |> getspace |> getorigin)
-    println(generated |> collect)
+
     for vec in generators
         expanded::Region = Subset(p + vec * n for p in generated for n in 0:getspancount(vec))
         generated = filter(p -> lineartransform(metricspace, p) |> norm <= radius, expanded)

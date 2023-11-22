@@ -591,20 +591,20 @@ Represents an mapping between two fockspaces with the same span of the underlyin
   for a distinct 2-point pair.
 - `FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)` is for using new `outspace` and `inspace`.
 """
-struct FockMap <: Element{SparseMatrixCSC{ComplexF64, Int64}}
-    outspace::FockSpace
-    inspace::FockSpace
+struct FockMap{A <: FockSpace, B <: FockSpace} <: AbstractFockMap{A, B}
+    outspace::A
+    inspace::B
     rep::SparseMatrixCSC{ComplexF64, Int64}
 
-    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new(outspace, inspace, rep)
-    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
+    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, rep)
+    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
 
     function FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, T})::FockMap where {T <: Complex}
         rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
             rep[outspace.ordering[out_mode], inspace.ordering[in_mode]] = value
         end
-        return new(outspace, inspace, rep)
+        return FockMap(outspace, inspace, rep)
     end
 
     FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace, performpermute::Bool = true) = (

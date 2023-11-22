@@ -78,7 +78,7 @@ function visualize(state::RegionState{2}; title::String = "", markersizemultipli
     fig
 end
 
-function visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = true)
+function visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = true, usecontour::Bool = false)
     kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
     mesh::Matrix{Momentum} = spectrum.crystal |> brillouinmesh
     plottingdata::Matrix{Vector} = map(k -> haskey(kspectrum, k) ? kspectrum[k] : [], mesh)
@@ -89,7 +89,7 @@ function visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = tr
     paddeddata::Matrix{Vector} = map(v -> v |> padding, plottingdata)
     plottingspectrum::Array = paddeddata |> stack
     layout::Layout = Layout(title=title)
-    plot([surface(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)], layout)
+    plot([(usecontour ? contour : surface)(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)], layout)
 end
 
 function visualize(source::SnappingResult; title::String = "")

@@ -299,6 +299,8 @@ export CrystalFock
 
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
+Base.:show(io::IO, ::Type{FockSpace{Region}}) = print(io, string("RegionFock"))
+Base.:show(io::IO, ::Type{CrystalFock}) = print(io, string("CrystalFock"))
 
 """ Check whether a `Mode` is in the `FockSpace`. """
 Base.:in(mode::Mode, fockspace::FockSpace)::Bool = haskey(fockspace.ordering, mode)

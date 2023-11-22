@@ -2,8 +2,6 @@ using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, 
 using Revise
 using Zipper
 
-∈(vec, space::AffineSpace)::Point = Point(vec |> collect, space)
-
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
@@ -15,7 +13,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [96, 96])
+crystal = Crystal(unitcell, [48, 48])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
@@ -27,7 +25,7 @@ tₕ = 0.1im
 nearestneighbor = [
     (m0, m1) => tₙ,
     (m0, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₙ,
-    (m0, m1 |> setattr(:offset => [0, 1]) ∈ triangular) => tₙ]
+    (m0, m1 |> setattr(:offset => [0, 1] ∈ triangular)) => tₙ]
 
 haldane = [
     (m0, m0 |> setattr(:offset => [1, 1] ∈ triangular)) => tₕ,
@@ -44,26 +42,79 @@ energyspectrum |> visualize
 
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstates |> visualize
-groundstateprojector = groundstates |> crystalprojector
 
+groundstateprojector = groundstates |> crystalprojector
 C = idmap(groundstateprojector.outspace) - groundstateprojector
+
+inplaceadd(a::FockMap, b::FockMap)::FockMap = a + FockMap(b, outspace=a|>getoutspace, inspace=a|>getinspace, performpermute=false)
+
+function computequantumgeometrictensor2d(state::CrystalSpectrum)
+    statevectors::Dict{Momentum, FockMap} = state|>geteigenvectors
+    Δkx = (1 / size(crystal)[1], 0) ∈ kspace
+    Δky = (0, 1 / size(crystal)[2]) ∈ kspace
+
+    kprojectors::Dict{Momentum, FockMap} = Dict(k => kstate * kstate' for (k, kstate) in statevectors)
+    kcorrelations::Dict{Momentum, FockMap} = Dict(k => idmap(projector|>getoutspace) - projector for (k, projector) in kprojectors)
+    ΔCkxs::Dict{Momentum, FockMap} = Dict(k => inplaceadd(-kcorr, kcorrelations[k + Δkx |> basispoint]) for (k, kcorr) in kcorrelations)
+    ΔCkys::Dict{Momentum, FockMap} = Dict(k => inplaceadd(-kcorr, kcorrelations[k + Δky |> basispoint]) for (k, kcorr) in kcorrelations)
+    
+    function kqgtensor(k::Momentum)::FockMap
+        gxx = statevectors[k]' * (ΔCkxs[k]' * kcorrelations[k] * ΔCkxs[k]) * statevectors[k]
+        gxy = statevectors[k]' * (ΔCkxs[k]' * kcorrelations[k] * ΔCkys[k]) * statevectors[k]
+        gyx = statevectors[k]' * (ΔCkys[k]' * kcorrelations[k] * ΔCkxs[k]) * statevectors[k]
+        gyy = statevectors[k]' * (ΔCkys[k]' * kcorrelations[k] * ΔCkys[k]) * statevectors[k]
+
+        xmode::Mode = Mode(:offset=>k, :axis=>(:x))
+        ymode::Mode = Mode(:offset=>k, :axis=>(:y))
+
+        fockspace::FockSpace = FockSpace([xmode, ymode])
+        return FockMap(fockspace, fockspace, [rep(gxx)[1,1] rep(gxy)[1,1]; rep(gyx)[1,1] rep(gyy)[1,1]])
+    end
+
+    return Dict(k=>k|>kqgtensor for (k, _) in statevectors)
+end
+
+Base.:real(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>real)
+Base.:imag(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>imag)
+
+kqgtensors = computequantumgeometrictensor2d(groundstates)
+gxx = directsum(tensor[1,2] for (k, tensor) in kqgtensors)
+barecrystal = Crystal(triangular|>getorigin, crystal|>size)
+barecrystalfock = FockSpace(gxx|>getoutspace, reflected=barecrystal)
+gxx = FockMap(gxx, inspace=barecrystalfock, outspace=barecrystalfock, performpermute=false)|>real
+gxx|>crystalspectrum|>visualize
+
+bc = directsum(tensor[1,2]|>imag for (k, tensor) in kqgtensors)
+barecrystalfock = FockSpace(bc|>getoutspace, reflected=barecrystal)
+berrycurvature = 2 * FockMap(bc, inspace=barecrystalfock, outspace=barecrystalfock, performpermute=false)
+
+(berrycurvature|>rep|>sum) / (2π)
+
+berrycurvature|>crystalspectrum|>visualize
+
+groundstateeigenvectors = groundstates |> geteigenvectors
+δkx = (1 / size(crystal)[1], 0) ∈ kspace
+δky = (0, 1 / size(crystal)[2]) ∈ kspace
+
+δIxs = Dict(k => FockMap(groundstateeigenvectors[k + δkx |> basispoint], inspace=I|>getinspace, outspace=I|>getoutspace, performpermute=false) - I for (k, I) in groundstateeigenvectors)
+δIys = Dict(k => FockMap(groundstateeigenvectors[k + δky |> basispoint], inspace=I|>getinspace, outspace=I|>getoutspace, performpermute=false) - I for (k, I) in groundstateeigenvectors)
+δIx = directsum(I for (_, I) in δIxs)
+δIy = directsum(I for (_, I) in δIys)
+
+Base.:real(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>real)
+
+qgtcrystal = Crystal(triangular |> getorigin, crystal|>size)
+qgt = δIx' * groundstateprojector * δIy
+qgtoutspace = FockSpace(qmt|>getoutspace, reflected=qmtcrystal)
+quantumgeometrictensor = idmap(qgtoutspace) - FockMap(qmt, inspace=qmtoutspace, outspace=qmtoutspace)
+quantummetrictensor = quantumgeometrictensor |> real
+quantummetrictensor |> crystalspectrum |> visualize
 
 C |> crystalspectrum |> visualize
 
-function entanglemententropy(correlationspectrum::CrystalSpectrum)
-    sumresult = 0
-    for (_, v) in correlationspectrum |> geteigenvalues
-        if isapprox(v, 0, atol=1e-7) || isapprox(v, 1, atol=1e-7)
-            continue
-        end
-        sumresult += v * log(v) + (1 - v) * log(1 - v)
-    end
-    return sumresult
-end
-
 entanglemententropy(C |> crystalspectrum)
 
-function zer(correlations::FockMap)
+function zer(correlations::FockMap)        
     crystalfock = correlations.outspace
 
     scale = Scale([2 0; 0 2], crystalfock |> getcrystal |> getspace)
@@ -80,24 +131,24 @@ function zer(correlations::FockMap)
     end
 
     crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
+    samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
     blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
-    physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
+    physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
 
-    frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2.0)
-    frozenseedingregion::Subset{Offset} = Subset(m |> getpos for m in frozenseedingmodes)
+
+    frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2)
     # visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
     frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
 
     globaldistiller = globaldistillerhamiltonian(
         correlations=blockresult[:correlations],
         restrictspace=frozenseedingfock,
-        localisometryselectionstrategy=frozenselectionbycount(3),
-        symmetry=c6)
+        localisometryselectionstrategy=frozenselectionbycount(3))
 
     globaldistillerspectrum = globaldistiller |> crystalspectrum
     # visualize(globaldistillerspectrum, title="Global Distiller")
 
-    distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
+    distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
 
     courierseedingcenter::Offset = [2/3, 1/3] ∈ (blockedmodes |> getspace)
     courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
@@ -125,6 +176,7 @@ function zer(correlations::FockMap)
     couriercorrelationspectrum = couriercorrelations |> crystalspectrum
     purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
     # purifiedcorrelationspectrum |> visualize
+    unpurecorrelations = couriercorrelations
     couriercorrelations = purifiedcorrelationspectrum |> FockMap
 
     blockedfilledprojector = distillresult[:filled] |> crystalprojector
@@ -148,20 +200,53 @@ function zer(correlations::FockMap)
 
     return Dict(
         :blocker => blocker,
-        :correlations => couriercorrelations, 
+        :correlations => couriercorrelations,
+        :unpurecorrelations => unpurecorrelations,
         :courierzipper => wanniercourierisometry' * blocker, 
         :filledzipper => wannierfilledisometry' * blocker,
         :emptyzipper => wannieremptyisometry' * blocker,
-        :globaldistiller => globaldistiller, 
+        :emptyisometry => wannieremptyisometry,
+        :filledisometry => wannierfilledisometry,
+        :courierisometry => wanniercourierisometry,
+        :globaldistiller => globaldistiller,
         :filledcorrelations => filledcorrelations, 
         :emptycorrelations => emptycorrelations,
+        :frozenseedingfock => frozenseedingfock,
         :entanglemententropy => entanglemententropy(couriercorrelationspectrum))
 end
 
 rg1 = zer(C)
+(rg1[:unpurecorrelations] |> crystalspectrum |> entanglemententropy) / (crystal|>vol)
 rg2 = zer(rg1[:correlations])
+(rg2[:unpurecorrelations] |> crystalspectrum |> entanglemententropy) / (rg1[:correlations]|>getoutspace|>getcrystal|>vol)
 rg3 = zer(rg2[:correlations])
+(rg3[:unpurecorrelations] |> crystalspectrum |> entanglemententropy) / (rg2[:correlations]|>getoutspace|>getcrystal|>vol)
 rg4 = zer(rg3[:correlations])
+
+frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular|>getorigin, physicalmodes, 8)
+frozenseedingregion::Subset{Offset} = Subset(m |> getpos for m in frozenseedingmodes)
+visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
+frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
+
+visualize(frozenseedingregion, Subset(m |> getpos for m in rg2[:frozenseedingfock]))
+
+
+regionalrestriction(rg1[:filledisometry], frozenseedingfock) |> visualize
+
+rg1[:courierzipper]' * rg2[:blocker]' * rg2[:filledisometry]
+
+regionalrestriction(rg2[:blocker]' * rg2[:filledisometry], rg1[:frozenseedingfock]) |> visualize
+
+rg3[:correlations] |> crystalspectrum |> visualize
+
+regionalrestriction(rg3[:blocker]' * rg3[:filledisometry], rg2[:frozenseedingfock]) |> visualize
+
+rg1[:entanglemententropy]
+
+rg1[:globaldistiller] |> crystalspectrum |> visualize
+rg1[:filledisometry] |> getinspace |> unitcellfock |> modeattrs
+
+rg1[:filledcorrelations] |> crystalspectrum |> visualize
 
 H = energyspectrum |> FockMap
 energyspectrum |> visualize
@@ -192,52 +277,6 @@ rg4[:blocker] * courierH * rg4[:blocker]' |> crystalspectrum |> visualize
 rg4[:courierzipper] * rg3[:courierzipper] * rg2[:courierzipper] * rg1[:courierzipper] * H * rg1[:courierzipper]' * rg2[:courierzipper]' * rg3[:courierzipper]' * rg4[:courierzipper]' |> crystalspectrum |> visualize
 rg4[:filledzipper] * rg3[:courierzipper] * rg2[:courierzipper] * rg1[:courierzipper] * H * rg1[:courierzipper]' * rg2[:courierzipper]' * rg3[:courierzipper]' * rg4[:filledzipper]' |> crystalspectrum |> visualize
 rg4[:emptyzipper] * rg3[:courierzipper] * rg2[:courierzipper] * rg1[:courierzipper] * H * rg1[:courierzipper]' * rg2[:courierzipper]' * rg3[:courierzipper]' * rg4[:emptyzipper]' |> crystalspectrum |> visualize
-
-function momentumoccupations(correlations::FockMap)::FockMap
-    kcorrelations::Base.Generator = correlations |> crystalsubmaps
-    crystal::Crystal = correlations |> getoutspace |> getcrystal
-    center::Offset = crystal |> getspace |> getorigin
-    tracecrystal::Crystal = Crystal(center |> Subset, crystal |> size)
-    mode::Mode = Mode(:pos => center)
-
-    function tracing(k::Momentum, corr::FockMap)::FockMap
-        space::FockSpace = mode |> setattr(:offset => k) |> FockSpace
-        return FockMap(space, space, [corr |> tr][:, :] |> SparseMatrixCSC) / dimension(corr |> getoutspace)
-    end
-
-    occupations::FockMap = directsum(tracing(k, corr) for (k, corr) in kcorrelations)
-    fockspace::FockSpace = FockSpace(occupations |> getoutspace, reflected=tracecrystal)
-    return FockMap(occupations, inspace=fockspace, outspace=fockspace)
-end
-
-using Compat
-function Zipper.visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = true)
-    kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
-    mesh::Matrix{Momentum} = spectrum.crystal |> brillouinmesh
-    plottingdata::Matrix{Vector} = map(k -> haskey(kspectrum, k) ? kspectrum[k] : [], mesh)
-    bandcount::Integer = map(v -> v |> length, plottingdata) |> maximum
-    function padding(v::Vector)::Vector
-        return toppadding ? vcat(v, repeat([NaN], bandcount - length(v))) : vcat(repeat([NaN], bandcount - length(v)), v)
-    end
-    paddeddata::Matrix{Vector} = map(v -> v |> padding, plottingdata)
-    plottingspectrum::Array = paddeddata |> stack
-    layout::Layout = Layout(title=title)
-    plot([contour(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)], layout)
-end
-
-function Zipper.visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = true)
-    kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
-    mesh::Matrix{Momentum} = spectrum.crystal |> brillouinmesh
-    plottingdata::Matrix{Vector} = map(k -> haskey(kspectrum, k) ? kspectrum[k] : [], mesh)
-    bandcount::Integer = map(v -> v |> length, plottingdata) |> maximum
-    function padding(v::Vector)::Vector
-        return toppadding ? vcat(v, repeat([NaN], bandcount - length(v))) : vcat(repeat([NaN], bandcount - length(v)), v)
-    end
-    paddeddata::Matrix{Vector} = map(v -> v |> padding, plottingdata)
-    plottingspectrum::Array = paddeddata |> stack
-    layout::Layout = Layout(title=title)
-    plot([surface(z=plottingspectrum[n, :, :]) for n in axes(plottingspectrum, 1)], layout)
-end
 
 filled = rg1[:filledzipper]' * rg1[:filledzipper]
 empty = rg1[:emptyzipper]' * rg1[:emptyzipper]

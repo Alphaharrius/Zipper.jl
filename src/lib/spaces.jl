@@ -416,3 +416,9 @@ function findcomplexdenominator(values; denominatorrange::UnitRange = 2:128, tol
     return snappingdenominator(flattenvalues; denominatorrange=denominatorrange, tolerantscalepercent=tolerantscalepercent)
 end
 export findcomplexdenominator
+
+function dosnf(matrix::Matrix)::Tuple{Matrix, Matrix, Matrix}
+    snf = smith(matrix)
+    return snf.S, diagm(snf), snf.T
+end
+export dosnf

@@ -624,7 +624,7 @@ Base.:size(fockmap::FockMap)::Tuple{Int64, Int64} = (dimension(fockmap.outspace)
 Base.:*(fockspace::FockSpace, fockmap::FockMap)::FockMap = FockMap(fockmap, outspace=fockspace)
 Base.:*(fockmap::FockMap, fockspace::FockSpace)::FockMap = FockMap(fockmap, inspace=fockspace)
 
-Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(typeof(fockmap))(in=$(fockmap.inspace), out=$(fockmap.outspace))"))
+Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(fockmap.inspace) => $(fockmap.outspace)"))
 
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
 

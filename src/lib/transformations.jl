@@ -330,13 +330,16 @@ Base.:*(scale::Scale, point::Point)::Point = scale * (point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
 function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    oldspace::RealSpace = crystal |> getspace
-    snf = vcat(scale |> rep, crystal.sizes |> diagm) |> smith
-    boundarysnf = snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)] |> smith
-    Δ::Matrix{Float64} = snf |> diagm
-    newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
-    blockingpoints::Base.Generator = (Point(collect(coord), oldspace) for coord in Iterators.product((0:size - 1 for size in diag(Δ))...))
-    relativescale::Scale = Scale(newbasiscoords, crystal |> getspace)
-    scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
-    return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
+    realspace::RealSpace = crystal |> getspace
+    snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
+    U, S, Vd = snfinput |> dosnf
+    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
+    _, bS, bVd = snfinput |> dosnf
+    newsizes = bS |> diag
+    newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
+
+    subunitcell = Subset((Vd * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
+    newscale = Scale(newrelativebasis, realspace)
+    newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
+    return Crystal(newunitcell, newsizes)
 end

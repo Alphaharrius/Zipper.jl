@@ -6,6 +6,15 @@ Base.:isequal(a::BasisFunction, b::BasisFunction)::Bool = a == b
 swave::BasisFunction = BasisFunction([1], 0, 0)
 export swave
 
+swaveminus::BasisFunction = BasisFunction([-1], 0, 0)
+export swaveminus
+
+ppluswave::BasisFunction = BasisFunction([0.5+0.5*sqrt(3)im], 0, 0)
+export ppluswave
+
+pminuswave::BasisFunction = BasisFunction([0.5-0.5*sqrt(3)im], 0, 0)
+export ppluswave
+
 LinearAlgebra.:normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
 
 Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
@@ -123,6 +132,9 @@ function AffineTransform(
     eigenvaluehashdenominator::Integer = findcomplexdenominator(v for (v, _) in eigenfunctions; denominatorrange=64:128).denominator
     eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(hashablecomplex(v |> Complex, eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
     eigenfunctiontable[hashablecomplex(1 + 0im, eigenvaluehashdenominator)] = swave
+    eigenfunctiontable[hashablecomplex(-1 + 0im, eigenvaluehashdenominator)] = swaveminus
+    eigenfunctiontable[hashablecomplex(0.5+0.5sqrt(3)im, eigenvaluehashdenominator)] = ppluswave
+    eigenfunctiontable[hashablecomplex(0.5-0.5sqrt(3)im, eigenvaluehashdenominator)] = pminuswave
     return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
 end
 

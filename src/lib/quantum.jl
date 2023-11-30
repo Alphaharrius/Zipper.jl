@@ -615,7 +615,15 @@ struct SparseFockMap{A <: FockSpace, B <: FockSpace} <: FockMap{A, B}
 end
 export SparseFockMap
 
-getoutspace(fockmap::FockMap)::FockSpace = fockmap.outspace
+"""
+Using `FockMap` as the entry point of instantiating a default `SparseFockMap` object.
+"""
+# Using SparseFockMap as the default implementation of FockMap
+FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = SparseFockMap(outspace, inspace, rep)
+FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = SparseFockMap(outspace, inspace, rep)
+FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}})::SparseFockMap= SparseFockMap(outspace, inspace, mapping)
+FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap|>getoutspace, inspace::FockSpace{<: Any} = fockmap|>getinspace, performpermute::Bool = true) = SparseFockMap(fockmap, outspace=outspace, inspace=inspace, performpermute=performpermute)
+
 export getoutspace
 
 getinspace(fockmap::FockMap)::FockSpace = fockmap.inspace

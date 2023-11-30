@@ -382,14 +382,14 @@ getmomentum(subspace::FockSpace{Momentum})::Momentum = subspace.reflected
 export getmomentum
 
 """
-    commonattr(subset::Subset{Mode}, key::Symbol)
+    commonattr(modes, key::Symbol)
 
 Retrieve the common attribute associated to `key` of all the child modes of the `fockspace`, and throws assertion error if the attribute
 is not unique within the `fockspace`.
 """
-function commonattr(subset::Subset{Mode}, key::Symbol)
+function commonattr(modes, key::Symbol)
     set::Set = Set()
-    foreach(m -> push!(set, getattr(m, key)), subset)
+    foreach(m -> push!(set, getattr(m, key)), modes)
     @assert(length(set) == 1, "The modes in this fockspace does not share the same attr `$(key)`!")
     return first(set)
 end

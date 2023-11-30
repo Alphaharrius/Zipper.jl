@@ -1318,3 +1318,74 @@ getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace
 
 Base.:iterate(state::RegionState, i...) = iterate(state.spstates, i...)
 Base.:length(state::RegionState) = state.spstates |> length
+
+struct CrystalFockMap <: FockMap{CrystalFock, CrystalFock}
+    outcrystal::Crystal
+    incrystal::Crystal
+    outsubspaces::Dict{Momentum, FockSpace}
+    insubspaces::Dict{Momentum, FockSpace}
+    outbz::Subset{Momentum} # The outspace brillouin zone also served as the ordering.
+    momentummappings::Dict{Momentum, Momentum} # The momentum mapping from the outspace to the inspace.
+    subfockmaps::Dict{Momentum, FockMap} # The sub-fockmaps indexed by the momentums in the outspace.
+end
+export CrystalFockMap
+
+function Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock
+    fockspace::FockSpace = fockspaceunion(fockmap.outsubspaces[k] for k in fockmap.outbz)
+    return FockSpace(fockspace, reflected=fockmap.outcrystal)
+end
+
+function Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock
+    fockspace::FockSpace = fockspaceunion(fockmap.insubspaces[fockmap.momentummappings[k]] for k in fockmap.outbz)
+    return FockSpace(fockspace, reflected=fockmap.incrystal)
+end
+
+function CrystalFockMap(fockmap::FockMap)
+    @assert(fockmap|>getoutspace isa CrystalFock)
+    @assert(fockmap|>getinspace isa CrystalFock)
+
+    outsubspaces::Base.Generator = fockmap|>getoutspace|>crystalsubspaces
+    insubspaces::Base.Generator = fockmap|>getinspace|>crystalsubspaces
+
+    outbz::Subset{Momentum} = Subset(k for (k, _) in outsubspaces)
+    inbz::Subset{Momentum} = Subset(k for (k, _) in insubspaces)
+
+    momentummappings::Dict{Momentum, Momentum} = Dict(outk => ink for (outk, ink) in Iterators.zip(outbz, inbz))
+    subfockmaps::Dict = Dict(k => fockmap[outspace, inspace] for ((k, outspace), inspace) in Iterators.zip(((k, subspace) for (k, subspace) in outsubspaces), (subspace for (_, subspace) in insubspaces)))
+
+    return CrystalFockMap(fockmap|>getoutspace|>getcrystal, fockmap|>getinspace|>getcrystal, outsubspaces|>Dict, insubspaces|>Dict, outbz, momentummappings, subfockmaps)
+end
+
+function FockMap(fockmap::CrystalFockMap)
+    ret::FockMap = directsum(fockmap.subfockmaps[k] for k in fockmap.outbz)
+    return FockMap(ret, inspace=fockmap|>getinspace, outspace=fockmap|>getoutspace)
+end
+
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::CrystalFockMap) = source|>FockMap|>rep
+
+function crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator
+    @assert(fockmap.incrystal == fockmap.outcrystal)
+    return (k => fockmap.subfockmaps[k] for k in fockmap.outbz)
+end
+
+function Base.:+(a::CrystalFockMap, b::CrystalFockMap)
+    bsubmaps::Dict{Tuple{Momentum, Momentum}, FockMap} = Dict((k, b.momentummappings[k]) => b.subfockmaps[k] for k in b.outbz)
+    addedsubmaps::Dict{Momentum, FockMap} = Dict(k => a.subfockmaps[k] + bsubmaps[(k, a.momentummappings[k])] for k in a.outbz)
+    return CrystalFockMap(a.outcrystal, a.incrystal, a.outsubspaces, a.insubspaces, a.outbz, a.momentummappings, addedsubmaps)
+end
+
+Base.:+(a::CrystalFockMap, b::FockMap)::CrystalFockMap = a + (b|>CrystalFockMap)
+Base.:+(a::FockMap, b::CrystalFockMap)::FockMap = (a|>FockMap) + b
+
+function Base.:*(a::CrystalFockMap, b::CrystalFockMap)
+    momentummappings::Dict{Momentum, Momentum} = Dict(k => b.momentummappings[a.momentummappings[k]] for k in a.outbz)
+    multipliedsubmaps::Dict{Momentum, FockMap} = Dict(k => a.subfockmaps[k] * b.subfockmaps[a.momentummappings[k]] for k in a.outbz)
+
+    return CrystalFockMap(a.outcrystal, b.incrystal, a.outsubspaces, b.insubspaces, a.outbz, momentummappings, multipliedsubmaps)
+end
+
+Base.:*(a::CrystalFockMap, b::FockMap)::CrystalFockMap = a * (b|>CrystalFockMap)
+Base.:*(a::FockMap, b::CrystalFockMap)::FockMap = (a|>FockMap) * b
+
+Base.:*(num::Number, f::CrystalFockMap)::CrystalFockMap = CrystalFockMap(f.outcrystal, f.incrystal, f.outsubspaces, f.insubspaces, f.outbz, f.momentummappings, Dict(k => num * submap for (k, submap) in f.subfockmaps))
+Base.:*(f::CrystalFockMap, num::Number)::CrystalFockMap = num * f

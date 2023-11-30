@@ -360,16 +360,16 @@ crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = 
 export crystalsubsets
 
 """
-    crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace}
+    crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
 
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
-function crystalsubspaces(crystalfock::FockSpace{Crystal})::Dict{Momentum, FockSpace}
+function crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
     function subsettofockspace(subset::Subset{Mode})::Pair{Momentum, FockSpace}
         k::Momentum = commonattr(subset, :offset)
         return k => FockSpace(subset, reflected=k)
     end
-    return Dict(subspace |> subsettofockspace for subspace in crystalfock |> rep)
+    return (subspace |> subsettofockspace for subspace in crystalfock |> rep)
 end
 export crystalsubspaces
 

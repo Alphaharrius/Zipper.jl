@@ -624,9 +624,10 @@ FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractAr
 FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}})::SparseFockMap= SparseFockMap(outspace, inspace, mapping)
 FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap|>getoutspace, inspace::FockSpace{<: Any} = fockmap|>getinspace, performpermute::Bool = true) = SparseFockMap(fockmap, outspace=outspace, inspace=inspace, performpermute=performpermute)
 
+getoutspace(fockmap::SparseFockMap)::FockSpace = fockmap.outspace
 export getoutspace
 
-getinspace(fockmap::FockMap)::FockSpace = fockmap.inspace
+getinspace(fockmap::SparseFockMap)::FockSpace = fockmap.inspace
 export getinspace
 
 Base.:size(fockmap::FockMap)::Tuple{Int64, Int64} = (dimension(fockmap.outspace), dimension(fockmap.inspace))

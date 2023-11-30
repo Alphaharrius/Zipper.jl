@@ -86,7 +86,7 @@ end
 function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap
     homefock::FockSpace = crystalfock |> unitcellfock
     homefocktransform::FockMap = transformation * homefock
-    ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces
+    ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces |> Dict
     fouriertransform::FockMap = fourier(crystalfock, homefock)
     transformedfourier::FockMap = fourier(crystalfock, homefocktransform.outspace)
     transform::FockMap = directsum(

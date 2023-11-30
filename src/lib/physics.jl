@@ -114,7 +114,7 @@ function entanglemententropy(correlationspectrum::CrystalSpectrum)
         if isapprox(v, 0, atol=1e-7) || isapprox(v, 1, atol=1e-7)
             continue
         end
-        println(v)
+        
         sumresult += v * log(v) + (1 - v) * log(1 - v)
     end
     return -sumresult

@@ -1,3 +1,6 @@
+# Overload the hashing function for vector of points to yield the same value with the same data content.
+Base.:hash(elements::Vector{T}) where {T <: Element} = hash([element |> hash for element in elements])
+
 """
     dimension(space::T)::Integer where {T <: AbstractSpace}
 

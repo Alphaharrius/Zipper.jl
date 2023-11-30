@@ -1369,8 +1369,8 @@ function crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator
 end
 
 function Base.:+(a::CrystalFockMap, b::CrystalFockMap)
-    bsubmaps::Dict{Tuple{Momentum, Momentum}, FockMap} = Dict((k, b.momentummappings[k]) => b.subfockmaps[k] for k in b.outbz)
-    addedsubmaps::Dict{Momentum, FockMap} = Dict(k => a.subfockmaps[k] + bsubmaps[(k, a.momentummappings[k])] for k in a.outbz)
+    bsubmaps::Dict{Vector{Momentum}, FockMap} = Dict([k, b.momentummappings[k]] => b.subfockmaps[k] for k in b.outbz)
+    addedsubmaps::Dict{Momentum, FockMap} = Dict(k => a.subfockmaps[k] + bsubmaps[[k, a.momentummappings[k]]] for k in a.outbz)
     return CrystalFockMap(a.outcrystal, a.incrystal, a.outsubspaces, a.insubspaces, a.outbz, a.momentummappings, addedsubmaps)
 end
 

@@ -572,10 +572,10 @@ abstract type FockMap{A <: FockSpace, B <: FockSpace} <: Element{SparseMatrixCSC
 export FockMap
 
 """
-    FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
-    FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})
-    FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})
-    FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)
+    SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})
+    SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})
+    SparseFockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})
+    SparseFockMap(fockmap::FockMap; outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace)
 
 Represents an mapping between two fockspaces with the same span of the underlying Hilbert space.
 
@@ -588,32 +588,32 @@ Represents an mapping between two fockspaces with the same span of the underlyin
 - `mapping`  The values of the map have to be specified for a distinct 2-point pair, keyed by the pair in `Tuple`.
 
 ### Examples
-- `FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})` is used when every ingredients are precomputed.
-- `FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})` is used when the `rep` is an arbitary array like object.
-- `FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})` is used when the values of the map have to be specified
+- `SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64})` is used when every ingredients are precomputed.
+- `SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number})` is used when the `rep` is an arbitary array like object.
+- `SparseFockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, ComplexF64})` is used when the values of the map have to be specified
   for a distinct 2-point pair.
-- `FockMap(fockmap::FockMap; outspace::FockSpace = fockmap.outspace, inspace::FockSpace = fockmap.inspace)` is for using new `outspace` and `inspace`.
+- `SparseFockMap(fockmap::FockMap; outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace)` is for using new `outspace` and `inspace`.
 """
-struct FockMap{A <: FockSpace, B <: FockSpace} <: AbstractFockMap{A, B}
+struct SparseFockMap{A <: FockSpace, B <: FockSpace} <: FockMap{A, B}
     outspace::A
     inspace::B
     rep::SparseMatrixCSC{ComplexF64, Int64}
 
-    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, rep)
-    FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
+    SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, rep)
+    SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
 
-    function FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, T})::FockMap where {T <: Complex}
+    function SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, T})::SparseFockMap where {T <: Complex}
         rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
             rep[outspace.ordering[out_mode], inspace.ordering[in_mode]] = value
         end
-        return FockMap(outspace, inspace, rep)
+        return SparseFockMap(outspace, inspace, rep)
     end
 
-    FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap.outspace, inspace::FockSpace{<: Any} = fockmap.inspace, performpermute::Bool = true) = (
-        FockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
+    SparseFockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap|>getoutspace, inspace::FockSpace{<: Any} = fockmap|>getinspace, performpermute::Bool = true) = (
+        SparseFockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
 end
-export FockMap
+export SparseFockMap
 
 getoutspace(fockmap::FockMap)::FockSpace = fockmap.outspace
 export getoutspace

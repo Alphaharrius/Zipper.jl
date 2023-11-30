@@ -630,20 +630,20 @@ export getoutspace
 getinspace(fockmap::SparseFockMap)::FockSpace = fockmap.inspace
 export getinspace
 
-Base.:size(fockmap::FockMap)::Tuple{Int64, Int64} = (dimension(fockmap.outspace), dimension(fockmap.inspace))
+Base.:size(fockmap::FockMap)::Tuple{Int64, Int64} = (dimension(fockmap|>getoutspace), dimension(fockmap|>getinspace))
 
 """ Shorthand to update the `inspace` & `outspace` of the `FockMap`. """
 Base.:*(fockspace::FockSpace, fockmap::FockMap)::FockMap = FockMap(fockmap, outspace=fockspace)
 Base.:*(fockmap::FockMap, fockspace::FockSpace)::FockMap = FockMap(fockmap, inspace=fockspace)
 
-Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(fockmap.inspace) => $(fockmap.outspace)"))
+Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(fockmap|>getinspace) => $(fockmap|>getoutspace)"))
 
-Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::FockMap) = source.rep
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::SparseFockMap) = source.rep
 
 """ Allows the retrieval of mapping data via `fockmap[outmode, inmode]`. """
 function Base.:getindex(fockmap::FockMap, outmode::Mode, inmode::Mode)::Complex
-    inspaceorder::Integer = fockorder(fockmap.inspace, inmode)
-    outspaceorder::Integer = fockorder(fockmap.outspace, outmode)
+    inspaceorder::Integer = fockorder(fockmap|>getinspace, inmode)
+    outspaceorder::Integer = fockorder(fockmap|>getoutspace, outmode)
     return (fockmap |> rep)[CartesianIndex(outspaceorder, inspaceorder)]
 end
 
@@ -660,7 +660,7 @@ Base.:getindex(fockmap::FockMap, ::Colon, colspace::FockSpace) = columns(fockmap
 Base.:getindex(fockmap::FockMap, rowspace::FockSpace, ::Colon) = rows(fockmap, rowspace)
 # ===================================================================================================================================================
 
-getmodepair(fockmap::FockMap, coords::CartesianIndex)::Pair{Mode, Mode} = fockmap.inspace[coords[2]] => fockmap.outspace[coords[1]]
+getmodepair(fockmap::FockMap, coords::CartesianIndex)::Pair{Mode, Mode} = (fockmap|>getinspace)[coords[2]] => (fockmap|>getoutspace)[coords[1]]
 export getmodepair
 
 """
@@ -719,9 +719,9 @@ export colmap
 Restrict the `inspace` of the `fockmap` by a sub-fockspace `restrictspace`.
 """
 function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    restrictindices::Vector{Integer} = [fockorder(fockmap.inspace, mode) for mode in orderedmodes(restrictspace)]
+    restrictindices::Vector{Integer} = [fockorder(fockmap|>getinspace, mode) for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), :, restrictindices))
-    return FockMap(fockmap.outspace, restrictspace, spmat)
+    return FockMap(fockmap|>getoutspace, restrictspace, spmat)
 end
 export columns
 
@@ -731,9 +731,9 @@ export columns
 Restrict the `outspace` of the `fockmap` by a sub-fockspace `restrictspace`.
 """
 function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    restrictindices::Vector{Integer} = [fockorder(fockmap.outspace, mode) for mode in orderedmodes(restrictspace)]
+    restrictindices::Vector{Integer} = [fockorder(fockmap|>getoutspace, mode) for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
-    return FockMap(restrictspace, fockmap.inspace, spmat)
+    return FockMap(restrictspace, fockmap|>getinspace, spmat)
 end
 export rows
 
@@ -742,7 +742,7 @@ export rows
 
 Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `outspace`.
 """
-rowsubmaps(fockmap::FockMap)::Base.Generator = (rows(fockmap, subspace) for subspace in fockmap.outspace |> subspaces)
+rowsubmaps(fockmap::FockMap)::Base.Generator = (rows(fockmap, subspace) for subspace in fockmap|>getoutspace |> subspaces)
 export rowsubmaps
 
 """
@@ -750,7 +750,7 @@ export rowsubmaps
 
 Partition the `fockmap` into smaller `fockmaps` by the subspaces of its `inspace`.
 """
-colsubmaps(fockmap::FockMap)::Base.Generator = (columns(fockmap, subspace) for subspace in fockmap.inspace |> subspaces)
+colsubmaps(fockmap::FockMap)::Base.Generator = (columns(fockmap, subspace) for subspace in fockmap|>getinspace |> subspaces)
 export colsubmaps
 
 """
@@ -759,15 +759,15 @@ export colsubmaps
 Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `outspace` & `inspace` respectively.
 """
 function restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
-    outindices::Vector{Integer} = [fockorder(fockmap.outspace, mode) for mode in orderedmodes(outspace)]
-    inindices::Vector{Integer} = [fockorder(fockmap.inspace, mode) for mode in orderedmodes(inspace)]
+    outindices::Vector{Integer} = [fockorder(fockmap|>getoutspace, mode) for mode in orderedmodes(outspace)]
+    inindices::Vector{Integer} = [fockorder(fockmap|>getinspace, mode) for mode in orderedmodes(inspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), outindices, inindices))
     return FockMap(outspace, inspace, spmat)
 end
 export restrict
 
 """
-    permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
+    permute(source::FockMap; outspace::FockSpace=source|>getoutspace, inspace::FockSpace=source|>getinspace)::FockMap
 
 Permute the columns and rows of the representation of the `source` `FockMap` by `outspace` & `inspace` respectively.
 
@@ -776,9 +776,9 @@ Permute the columns and rows of the representation of the `source` `FockMap` by 
 - `outspace` A `FockSpace` with the same span as the `outspace` of the `source` `FockMap`.
 - `inspace`  A `FockSpace` with the same span as the `inspace` of the `source` `FockMap`.
 """
-function permute(source::FockMap; outspace::FockSpace=source.outspace, inspace::FockSpace=source.inspace)::FockMap
-    row_rule::Vector{Int64} = orderingrule(source.outspace, outspace)
-    col_rule::Vector{Int64} = orderingrule(source.inspace, inspace)
+function permute(source::FockMap; outspace::FockSpace=source|>getoutspace, inspace::FockSpace=source|>getinspace)::FockMap
+    row_rule::Vector{Int64} = orderingrule(source|>getoutspace, outspace)
+    col_rule::Vector{Int64} = orderingrule(source|>getinspace, inspace)
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), row_rule, col_rule))
 end
 export permute
@@ -786,23 +786,23 @@ export permute
 """ Shorthand for creating a function with single parameter `FockMap` to perform `permute`. """
 permute(; outspace::FockSpace, inspace::FockSpace)::Function = fockmap::FockMap -> Zipper.permute(fockmap, outspace=outspace, inspace=inspace)
 
-Base.:-(target::FockMap)::FockMap = FockMap(target.outspace, target.inspace, -rep(target))
+Base.:-(target::FockMap)::FockMap = FockMap(target|>getoutspace, target|>getinspace, -rep(target))
 Base.:+(a::FockMap, b::FockMap)::FockMap = fockadd(a, b)
 Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 
 function Base.:*(a::FockMap, b::FockMap)::FockMap
-    @assert(hassamespan(a.inspace, b.outspace)) # Even if the fockspaces are different, composition works as long as they have same span.
-    return FockMap(a.outspace, b.inspace, rep(a) * rep(permute(b, outspace=a.inspace, inspace=b.inspace)))
+    @assert(hassamespan(a|>getinspace, b|>getoutspace)) # Even if the fockspaces are different, composition works as long as they have same span.
+    return FockMap(a|>getoutspace, b|>getinspace, rep(a) * rep(permute(b, outspace=a|>getinspace, inspace=b|>getinspace)))
 end
 
-Base.:*(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) * number)
+Base.:*(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, rep(fockmap) * number)
 Base.:*(number::Number, fockmap::FockMap)::FockMap = fockmap * number
 
-Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, rep(fockmap) / number)
+Base.:/(fockmap::FockMap, number::Number)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, rep(fockmap) / number)
 
-Base.:transpose(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, transpose(rep(source)))
+Base.:transpose(source::FockMap)::FockMap = FockMap(source|>getinspace, source|>getoutspace, transpose(rep(source)))
 """ Corresponds to the Hermitian adjoint. """
-Base.:adjoint(source::FockMap)::FockMap = FockMap(source.inspace, source.outspace, rep(source)')
+Base.:adjoint(source::FockMap)::FockMap = FockMap(source|>getinspace, source|>getoutspace, rep(source)')
 
 LinearAlgebra.:norm(fockmap::FockMap)::Number = norm(fockmap |> rep)
 LinearAlgebra.:normalize(fockmap::FockMap)::FockMap = FockMap(fockmap |> getoutspace, fockmap |> getinspace, fockmap |> rep |> normalize)
@@ -880,8 +880,8 @@ be a `FockMap` with `outspace` and `inspace` with 3 subspaces of (!intersect x 2
 function is accessed via `a::FockMap + b::FockMap`.
 """
 function fockadd(a::FockMap, b::FockMap)::FockMap
-    outspacesamespan::Bool = hassamespan(a.outspace, b.outspace)
-    inspacesamespan::Bool = hassamespan(a.inspace, b.inspace)
+    outspacesamespan::Bool = hassamespan(a|>getoutspace, b|>getoutspace)
+    inspacesamespan::Bool = hassamespan(a|>getinspace, b|>getinspace)
 
     if outspacesamespan && inspacesamespan
         return fockaddsamespan(a, b)
@@ -903,18 +903,18 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
     # | -- | 32 | 33 |
     # ----------------
 
-    outspace2::FockSpace = intersect(a.outspace, b.outspace)
-    inspace2::FockSpace = intersect(a.inspace, b.inspace)
+    outspace2::FockSpace = intersect(a|>getoutspace, b|>getoutspace)
+    inspace2::FockSpace = intersect(a|>getinspace, b|>getinspace)
 
     if outspace2 |> dimension == 0 && inspace2 |> dimension == 0
         return directsum(a, b)
     end
 
-    outspace1::FockSpace = a.outspace - b.outspace
-    outspace3::FockSpace = b.outspace - a.outspace
+    outspace1::FockSpace = (a|>getoutspace) - (b|>getoutspace)
+    outspace3::FockSpace = (b|>getoutspace) - (a|>getoutspace)
 
-    inspace1::FockSpace = a.inspace - b.inspace
-    inspace3::FockSpace = b.inspace - a.inspace
+    inspace1::FockSpace = (a|>getinspace) - (b|>getinspace)
+    inspace3::FockSpace = (b|>getinspace) - (a|>getinspace)
 
     outspace::FockSpace = union(outspace1, outspace2, outspace3) # Orthogonal
     inspace::FockSpace = union(inspace1, inspace2, inspace3) # Orthogonal
@@ -942,8 +942,8 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
     internaladdition(b, outspace3, inspace3)
 
     # Prioritize the fockspaces of `a`.
-    returnoutspace::FockSpace = hassamespan(outspace, a.outspace) ? a.outspace : hassamespan(outspace, b.outspace) ? b.outspace : outspace
-    returninspace::FockSpace = hassamespan(inspace, a.inspace) ? a.inspace : hassamespan(inspace, b.inspace) ? b.inspace : inspace
+    returnoutspace::FockSpace = hassamespan(outspace, a|>getoutspace) ? a|>getoutspace : hassamespan(outspace, b|>getoutspace) ? b|>getoutspace : outspace
+    returninspace::FockSpace = hassamespan(inspace, a|>getinspace) ? a|>getinspace : hassamespan(inspace, b|>getinspace) ? b|>getinspace : inspace
 
     result::FockMap = FockMap(outspace, inspace, data)
     return FockMap(result, outspace=returnoutspace, inspace=returninspace)
@@ -952,8 +952,8 @@ end
 """ Addition of two `FockMap` objects with the same `inspace` and `outspace`. """
 function fockaddsamespan(a::FockMap, b::FockMap)::FockMap
     data::SparseMatrixCSC{ComplexF64, Int64} = (
-        (a |> rep) + (Zipper.permute(b, outspace=a.outspace, inspace=a.inspace) |> rep))
-    return FockMap(a.outspace, a.inspace, data)
+        (a |> rep) + (Zipper.permute(b, outspace=a|>getoutspace, inspace=a|>getinspace) |> rep))
+    return FockMap(a|>getoutspace, a|>getinspace, data)
 end
 
 """
@@ -966,11 +966,11 @@ The direct summed `FockMap`, with both `inspace` and `outspace` as the union of 
 each forming a subspace within the new `inspace` and `outspace`.
 """
 function directsum(a::FockMap, b::FockMap)::FockMap
-    outspace::FockSpace = a.outspace + b.outspace
-    inspace::FockSpace = a.inspace + b.inspace
+    outspace::FockSpace = (a|>getoutspace) + (b|>getoutspace)
+    inspace::FockSpace = (a|>getinspace) + (b|>getinspace)
     data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
-    data[1:(a.outspace |> dimension), 1:(a.inspace |> dimension)] += a |> rep
-    data[(a.outspace |> dimension) + 1:end, (a.inspace |> dimension) + 1:end] += b |> rep
+    data[1:(a|>getoutspace |> dimension), 1:(a|>getinspace |> dimension)] += a |> rep
+    data[(a|>getoutspace |> dimension) + 1:end, (a|>getinspace |> dimension) + 1:end] += b |> rep
     return FockMap(outspace, inspace, data)
 end
 export directsum
@@ -984,14 +984,14 @@ Given a collection of `FockMap` objects, and perform direct sum of the `FockMap`
 - `fockmaps` An iterable of `FockMap` objects.
 """
 function directsum(fockmaps)::FockMap
-    outspace::FockSpace = Iterators.map(fockmap -> fockmap.outspace, fockmaps) |> fockspaceunion
-    inspace::FockSpace = Iterators.map(fockmap -> fockmap.inspace, fockmaps) |> fockspaceunion
+    outspace::FockSpace = Iterators.map(fockmap -> fockmap|>getoutspace, fockmaps) |> fockspaceunion
+    inspace::FockSpace = Iterators.map(fockmap -> fockmap|>getinspace, fockmaps) |> fockspaceunion
     data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace |> dimension, inspace |> dimension)
     function filldata(fockmap::FockMap)
         # The procedure beneath assumes that the fockspace elements are concatenated in order during union operations.
-        outmodes::Subset{Mode} = fockmap.outspace |> orderedmodes
+        outmodes::Subset{Mode} = fockmap|>getoutspace |> orderedmodes
         outrange::UnitRange = fockorder(outspace, outmodes |> first):fockorder(outspace, outmodes |> last)
-        inmodes::Subset{Mode} = fockmap.inspace |> orderedmodes
+        inmodes::Subset{Mode} = fockmap|>getinspace |> orderedmodes
         inrange::UnitRange = fockorder(inspace, inmodes |> first):fockorder(inspace, inmodes |> last)
         data[outrange, inrange] += fockmap |> rep
     end
@@ -1009,10 +1009,10 @@ into smaller `FockMap` objects by the subspaces indexed by the `Momentum` attrib
 A generator yielding `Pair{Momentum, FockMap}` objects, with the momentums corresponds to thw brillouin zone.
 """
 function crystalsubmaps(fockmap::FockMap)::Base.Generator
-    (fockmap.inspace isa CrystalFock && fockmap.outspace isa CrystalFock && hassamespan(fockmap.inspace, fockmap.outspace) ||
+    (fockmap|>getinspace isa CrystalFock && fockmap|>getoutspace isa CrystalFock && hassamespan(fockmap|>getinspace, fockmap|>getoutspace) ||
         error("The in/out spaces of the fock map must be the same crystal fock-spaces!"))
-    hassamespan(fockmap.inspace, fockmap.outspace) || error("Required a FockMap with the same in/out CrystalFock!")
-    return (k => restrict(fockmap, fockspace, fockspace) for (k, fockspace) in fockmap.inspace |> crystalsubspaces)
+    hassamespan(fockmap|>getinspace, fockmap|>getoutspace) || error("Required a FockMap with the same in/out CrystalFock!")
+    return (k => restrict(fockmap, fockspace, fockspace) for (k, fockspace) in fockmap|>getinspace|>crystalsubspaces|>Dict)
 end
 export crystalsubmaps
 
@@ -1075,7 +1075,7 @@ export crystalspectrum
 
 Given a Hermitian `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span, pack into a `CrystalSpectrum` object.
 """
-crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(fockmap |> crystalsubmaps, crystal=fockmap.inspace |> getcrystal)
+crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(fockmap |> crystalsubmaps, crystal=fockmap|>getinspace |> getcrystal)
 
 """ Get the associated crystal of a `CrystalSpectrum` object. """
 Zipper.:getcrystal(spectrum::CrystalSpectrum)::Crystal = spectrum.crystal
@@ -1122,7 +1122,7 @@ function FockMap(crystalspectrum::CrystalSpectrum)::FockMap
         return crystalspectrum.eigenvectors[k] * diagonal * crystalspectrum.eigenvectors[k]'
     end
     fockmap::FockMap = directsum(k |> momentumfockmap for (k, _) in crystalspectrum.eigenmodes)
-    crystalfock::FockSpace = FockSpace(fockmap.inspace, reflected=crystalspectrum.crystal)
+    crystalfock::FockSpace = FockSpace(fockmap|>getinspace, reflected=crystalspectrum.crystal)
     return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
 end
 
@@ -1134,7 +1134,7 @@ end
 export EigenSpectrum
 
 function geteigenmodes(spectrum::EigenSpectrum)::Subset{Mode}
-    return spectrum.eigenvectors.inspace |> orderedmodes
+    return spectrum.eigenvectors|>getinspace |> orderedmodes
 end
 
 geteigenvalues(spectrum::EigenSpectrum)::Dict{Mode, Number} = spectrum.eigenvalues
@@ -1225,18 +1225,18 @@ export groupbyeigenvalues
 
 function LinearAlgebra.log(fockmap::FockMap)::FockMap
     mat::SparseMatrixCSC = fockmap |> rep |> Matrix |> log |> SparseMatrixCSC
-    return FockMap(fockmap.outspace, fockmap.inspace, mat)
+    return FockMap(fockmap|>getoutspace, fockmap|>getinspace, mat)
 end
 
 Base.iszero(fockmap::FockMap)::Bool = iszero(fockmap |> rep)
 
 function LinearAlgebra.:svd(fockmap::FockMap)::Tuple{FockMap, Base.Generator, FockMap}
-    leftmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap.inspace))
-    rightmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap.outspace))
+    leftmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap|>getinspace))
+    rightmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap|>getoutspace))
     U, Σ, Vt = fockmap |> rep |> Matrix |> svd
     svdvalues::Base.Generator = (
         (Mode([:svdindex => n]), Mode([:svdindex => n])) => Σ[n] for n in 1:min(leftmodes |> length, rightmodes |> length))
-    return FockMap(fockmap.outspace, leftmodes |> FockSpace, U), svdvalues, FockMap(rightmodes |> FockSpace, fockmap.inspace, Vt')
+    return FockMap(fockmap|>getoutspace, leftmodes |> FockSpace, U), svdvalues, FockMap(rightmodes |> FockSpace, fockmap|>getinspace, Vt')
 end
 
 """
@@ -1244,7 +1244,7 @@ end
 
 Round all numerical zeros within the `FockMap` to actual zero with a given tolerance `eps`.
 """
-makezero(fockmap::FockMap, eps::Number = 1e-7)::FockMap = FockMap(fockmap.outspace, fockmap.inspace, map(v -> abs(v |> real) < eps && abs(v |> imag) < eps ? 0im : v, fockmap |> rep))
+makezero(fockmap::FockMap, eps::Number = 1e-7)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, map(v -> abs(v |> real) < eps && abs(v |> imag) < eps ? 0im : v, fockmap |> rep))
 """ Shorthand returning a function that performs `makezero` with a given tolerance `eps` on parameter `fockmap`. """
 makezero(eps::Number = 1e-7)::Function = fockmap -> makezero(fockmap, eps)
 export makezero
@@ -1286,9 +1286,9 @@ export commute
 Extract the column values as a `Mode` to `ComplexF64` pair from a `N×1` `FockMap`, this is used when you need to visualize the column spectrum.
 """
 function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
-    @assert(dimension(fockmap.inspace) == 1)
+    @assert(dimension(fockmap|>getinspace) == 1)
     mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
-    return [outmode => mat[fockorder(fockmap.outspace, outmode), 1] for outmode in orderedmodes(fockmap.outspace)]
+    return [outmode => mat[fockorder(fockmap|>getoutspace, outmode), 1] for outmode in orderedmodes(fockmap|>getoutspace)]
 end
 
 struct RegionState{Dim} <: Element{FockMap}

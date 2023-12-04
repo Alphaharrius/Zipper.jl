@@ -254,6 +254,7 @@ Base.:*(space::T, point::Point{T}) where {T <: AffineSpace} = lineartransform(sp
 
 Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) * val, getspace(point))
 Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) / val, getspace(point))
+Base.:*(val::T, point::Point) where {T <: Real} = point * val
 
 Zipper.:Subset(points::Point...) = Subset(p for p in points)
 

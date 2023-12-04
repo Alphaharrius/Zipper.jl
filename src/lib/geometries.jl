@@ -115,12 +115,12 @@ export geometricfilter
 linearscale(space::AffineSpace) = log.([v|>norm for v in space|>getbasisvectors])|>mean|>exp
 export linearscale
 
-function orthos(vector::Point)
+function orthodirections(vector::Point)
     Q, _ = vector|>vec|>qr
     space::RealSpace = vector|>getspace
     return Iterators.drop((Q[:, n] ∈ space for n in axes(Q, 2)), 1)
 end
-export orthos
+export orthodirections
 
 function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real)
     height::Real = (normalvector|>norm) / (crystal|>getspace|>linearscale)

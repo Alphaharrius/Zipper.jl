@@ -207,16 +207,16 @@ lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(getbasis
 export lineartransform
 
 """
-    orthogonalspace(space::AffineSpace)::AffineSpace
+    orthospace(space::AffineSpace)::AffineSpace
 
 Given a affine space, get it't corresponding orthogonal space of the same scale.
 """
-function orthogonalspace(space::AffineSpace)::AffineSpace
+function orthospace(space::AffineSpace)::AffineSpace
     basisvectors::Base.Generator = ((space |> rep)[:, d] for d in axes(space |> rep, 2))
     scalings::Vector = [norm(v) for v in basisvectors]
     return (space |> typeof)(scalings |> diagm)
 end
-export orthogonalspace
+export orthospace
 
 """
     affinespace(points::Point...)::AffineSpace

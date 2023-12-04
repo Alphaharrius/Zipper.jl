@@ -98,23 +98,14 @@ function brillouinmesh(crystal::Crystal)::Array{Point}
 end
 export brillouinmesh
 
-function getsphericalregion(;from::Offset, generators::Subset{Offset}, symmetries, radius::Real, metricspace::RealSpace)
-    from |> latticeoff == from || error("`from` must be a lattice offset!")
-
-    getspancount(generator::Offset)::Integer = radius / (generator |> euclidean |> norm) |> ceil |> Integer
-
-    generated::Region = Subset(from |> getspace |> getorigin)
-
-    for vec in generators
-        expanded::Region = Subset(p + vec * n for p in generated for n in 0:getspancount(vec))
-        generated = filter(p -> lineartransform(metricspace, p) |> norm <= radius, expanded)
-    end
-
-    for symmetry in symmetries, transform in symmetry |> pointgroupelements
-        generated += transform * generated
-    end
-
-    return generated + from
+function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
+    generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
+    generatinglength::Integer = generatingradius * 2 - 1
+    generatingcrystal::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, [generatinglength, generatinglength])
+    crystalregion::Region = generatingcrystal|>sitepoints
+    baseregion::Region = crystalregion - (crystalregion|>getcenter)
+    generatingregion::Base.Iterators.Flatten = (base + (base|>getspace) * basis for base in baseregion for basis in crystal|>getunitcell)
+    return Subset(point for point in generatingregion if norm(metricspace * point) <= radius)
 end
 export getsphericalregion
 

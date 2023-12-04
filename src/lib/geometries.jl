@@ -111,3 +111,25 @@ export getsphericalregion
 
 geometricfilter(f, metricspace::AffineSpace) = p -> (metricspace * p) |> f
 export geometricfilter
+
+linearscale(space::AffineSpace) = log.([v|>norm for v in space|>getbasisvectors])|>mean|>exp
+export linearscale
+
+function orthos(vector::Point)
+    Q, _ = vector|>vec|>qr
+    space::RealSpace = vector|>getspace
+    return Iterators.drop((Q[:, n] ∈ space for n in axes(Q, 2)), 1)
+end
+export orthos
+
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real)
+    height::Real = (normalvector|>norm) / (crystal|>getspace|>linearscale)
+    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2), metricspace=square)
+
+    normaldirection::Offset = normalvector|>normalize
+    orthodirection::Offset = normaldirection|>orthos|>first
+    crosssectionfilter(point::Point) = 0 < dot(point, normaldirection) < height && (dot(point, orthodirection)|>abs) < radius
+
+    return sphericalregion|>filter(crosssectionfilter)
+end
+export getcrosssection

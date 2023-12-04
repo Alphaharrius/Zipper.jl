@@ -122,13 +122,13 @@ function orthodirections(vector::Point)
 end
 export orthodirections
 
-function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real)
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace)
     height::Real = (normalvector|>norm) / (crystal|>getspace|>linearscale)
-    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2), metricspace=square)
+    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2), metricspace=metricspace)
 
     normaldirection::Offset = normalvector|>normalize
-    orthodirection::Offset = normaldirection|>orthos|>first
-    crosssectionfilter(point::Point) = 0 < dot(point, normaldirection) < height && (dot(point, orthodirection)|>abs) < radius
+    getorthodirection(point::Point) = normalize(point - dot(point, normaldirection) * normaldirection)
+    crosssectionfilter(point::Point) = 0 < dot(point, getspace(point) * normaldirection) < height && (dot(point, point|>getorthodirection)|>abs) < radius
 
     return sphericalregion|>filter(crosssectionfilter)
 end

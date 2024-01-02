@@ -26,16 +26,16 @@ tₕ = 0.1im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
-    (m0, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₙ,
-    (m0, m1 |> setattr(:offset => [0, 1]) ∈ triangular) => tₙ]
+    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
+    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ]
 
 haldane = [
-    (m0, m0 |> setattr(:offset => [1, 1] ∈ triangular)) => tₕ,
-    (m0, m0 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₕ,
-    (m0, m0 |> setattr(:offset => [0, -1] ∈ triangular)) => tₕ,
-    (m1, m1 |> setattr(:offset => [1, 1] ∈ triangular)) => -tₕ,
-    (m1, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => -tₕ,
-    (m1, m1 |> setattr(:offset => [0, -1] ∈ triangular)) => -tₕ]
+    (m0, setattr(m0, :offset => Point([1, 1], triangular))) => tₕ,
+    (m0, setattr(m0, :offset => Point([-1, 0], triangular))) => tₕ,
+    (m0, setattr(m0, :offset => Point([0, -1], triangular))) => tₕ,
+    (m1, setattr(m1, :offset => Point([1, 1], triangular))) => -tₕ,
+    (m1, setattr(m1, :offset => Point([-1, 0], triangular))) => -tₕ,
+    (m1, setattr(m1, :offset => Point([0, -1], triangular))) => -tₕ]
 
 bonds::FockMap = bondmap([nearestneighbor..., haldane...])
 
@@ -91,8 +91,7 @@ function zer(correlations::FockMap)
     globaldistiller = globaldistillerhamiltonian(
         correlations=blockresult[:correlations],
         restrictspace=frozenseedingfock,
-        localisometryselectionstrategy=frozenselectionbycount(3),
-        symmetry=c6)
+        localisometryselectionstrategy=frozenselectionbycount(3))
 
     globaldistillerspectrum = globaldistiller |> crystalspectrum
     # visualize(globaldistillerspectrum, title="Global Distiller")
@@ -157,6 +156,54 @@ function zer(correlations::FockMap)
         :emptycorrelations => emptycorrelations,
         :entanglemententropy => entanglemententropy(couriercorrelationspectrum))
 end
+
+
+function circularfilter(mode::Mode, center::Offset, radius::Real = 1.5)::Bool
+    return norm(((mode-center) |> getpos |> euclidean))<=radius
+end
+
+function localregioninspection(center::Offset, physicalmodes::Subset{Mode}, radius::Number, crystal:: Crystal, correlation::FockMap)::Tuple{Subset{Offset},FockSpace}
+    seedingmodes::Subset{Mode} = circularregionmodes(center, physicalmodes, radius, crystal,correlation)
+    seedingregion::Subset{Offset} = Subset(m |> getpos for m in seedingmodes)
+    seedingfock::FockSpace = FockSpace{Region}(seedingmodes)
+    return seedingregion,seedingfock
+end
+
+function circularregionmodes(center::Offset, physicalmodes::Subset{Mode}, radius::Number, crystal:: Crystal, correlations::FockMap)::Subset{Mode}
+    currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
+    crystalsize = crystal |> size
+    # periodicnorm =  m -> lineartransform(currentspace, takeperiodic(m |> getpos,crystalsize)) |> norm
+     
+    # function takeperiodic(p, crystalsize)
+    #     return (p |> getspace)&[min(vectno,24-vectno) for (size,vectno) in zip(crystalsize, vec(p))]
+    # end
+    return filter(p -> circularfilter(p, center,radius), physicalmodes)
+end
+
+correlation = C
+crystalfock = correlation.outspace
+
+scale = Scale([2 0; 0 2], crystalfock |> getcrystal |> getspace)
+blockresult = blocking(:action => scale, :correlations => correlation, :crystal => crystalfock |> getcrystal)
+
+blockedcrystal::Crystal = blockresult[:crystal]
+blockedcorrelations::FockMap = blockresult[:correlations]
+blocker = blockresult[:transformer]
+
+crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
+blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
+physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
+
+# inspecting local region spectrum
+center_pt = [0,0]
+center = Point(center_pt, scale*triangular)
+
+localregion,localfock = localregioninspection(center , physicalmodes, 2,blockedcrystal,correlation)
+visualize(localregion)
+
+localcorrelation = regioncorrelations(blockedcorrelations,localfock)
+localeigspec = localcorrelation |> eigspech 
+visualize(localeigspec, title="Spectrum of Chern to start with")
 
 rg1 = zer(C)
 rg2 = zer(rg1[:correlations])

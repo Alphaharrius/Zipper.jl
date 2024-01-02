@@ -193,7 +193,9 @@ function translatedlocalfockmaplist(;
     transceterlist::Set{Offset})::Vector{FockMap}
     localfockmaplist::Vector{FockMap} = []
     for transcenter in transceterlist
-        shift = transcenter - center
+        shift::Offset = transcenter - center
+        # println(transcenter)
+        # println(shift)
         push!(localfockmaplist,translatelocalfockmap(localfockmap = localfockmap,offset = shift))
     end
     return localfockmaplist
@@ -211,6 +213,7 @@ pc = (pa + pb) / 2
 spatialsnappingcalibration((pa, pb, pc))
 
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+c3 = c6^2
 
 unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [96, 96])
@@ -219,23 +222,11 @@ reciprocalhashcalibration(crystal.sizes)
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 m0, m1 = members(modes)
 
-tₙ = ComplexF64(-1)
-tₕ = 0.1im
-
-nearestneighbor = [
+tₙ = ComplexF64(-1.)
+bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
     (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ]
-
-haldane = [
-    (m0, setattr(m0, :offset => Point([1, 1], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([-1, 0], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([0, -1], triangular))) => tₕ,
-    (m1, setattr(m1, :offset => Point([1, 1], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([-1, 0], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([0, -1], triangular))) => -tₕ]
-
-bonds::FockMap = bondmap([nearestneighbor..., haldane...])
+    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
 
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize
@@ -245,8 +236,6 @@ groundstates |> visualize
 groundstateprojector = groundstates |> crystalprojector
 
 C = idmap(groundstateprojector.outspace) - groundstateprojector
-
-C |> crystalspectrum |> visualize
 
 correlations = C
 
@@ -413,7 +402,7 @@ visualize(localregion)
 
 localcorrelation = regioncorrelations(blockedcorrelations,localfock)
 localeigspec = localcorrelation |> eigspech 
-visualize(localeigspec, title="Spectrum of Chern to start with")
+visualize(localeigspec, title="Spectrum of Dirac semi-metal to start with")
 
 #
 center = Point([-2,-2],scaledtriangular)
@@ -428,7 +417,7 @@ wanniercouriers = sum(wanniercourierlist)
 couriercorrelationsecond = wanniercouriers'*regioncorrelations(blockedcorrelations,localunitary |> getoutspace)*wanniercouriers
 
 # inspecting local region spectrum
-center = Point([1,0], scaledtriangular)
+center = Point([-1,-1], scaledtriangular)
 transformedphysicalmodesnext = couriercorrelationsecond |> getoutspace |> orderedmodes
 
 trsasnformedlocalregionnext, trsasnformedlocalfocknext = localregioninspection(center,transformedphysicalmodesnext, 2, blockedcrystal)
@@ -440,7 +429,7 @@ visualize(localeigspecnext)
 #
 physicalmodessecond = couriercorrelationsecond |> getoutspace |> orderedmodes
 
-refwannierfnsecond = locaclRGsecond(center,couriercorrelationsecond, physicalmodessecond, 0.002, 2)
+refwannierfnsecond = locaclRGsecond(center,couriercorrelationsecond, physicalmodessecond, 0.003, 2)
 localunitaryrefsecond = refwannierfnsecond[1]+refwannierfnsecond[2]
 
 localunitarylistsecond = translatedlocalfockmaplist(center = center,localfockmap = localunitaryrefsecond,transceterlist=secondlayers)
@@ -463,7 +452,7 @@ visualize(localeigspecnext)
 #
 physicalmodesthird = couriercorrelationthird |> getoutspace |> orderedmodes
 
-refwannierfnthird = locaclRGthird(center,couriercorrelationthird, physicalmodesthird, 0.004, 2)
+refwannierfnthird = locaclRGthird(center,couriercorrelationthird, physicalmodesthird, 0.002, 2)
 localunitaryrefthird = refwannierfnthird[1]+refwannierfnthird[2]
 
 localunitarylistthird = translatedlocalfockmaplist(center = center,localfockmap = localunitaryrefthird,transceterlist=thirdlayers)
@@ -481,7 +470,7 @@ trsasnformedlocalregionnext, trsasnformedlocalfocknext = localregioninspection(c
 visualize(trsasnformedlocalregionnext, title="l", visualspace=euclidean(RealSpace, 2))
 
 localeigspecnext = couriercorrelationRG[trsasnformedlocalfocknext, trsasnformedlocalfocknext] |> eigspech 
-visualize(localeigspecnext, title="Spectrum after 1 RG step for Chern")
+visualize(localeigspecnext,title="Spectrum after 1 RG step for Dirac semi-metal")
 
 firstlayerRG = Set([Point([-4,-4],scaledtriangular), Point([-2,0],scaledtriangular), Point([0,4],scaledtriangular), Point([0,-2],scaledtriangular), Point([2,2],scaledtriangular), Point([4,0],scaledtriangular)])
 secondlayerRG = Set([Point([-2,-2],scaledtriangular), Point([0,2],scaledtriangular), Point([2,0],scaledtriangular)])
@@ -504,7 +493,7 @@ end
 physicalmodesRG = couriercorrelationRG |> getoutspace |> orderedmodes
 
 center = Point([-4,-4],scaledtriangular)
-refwannierfnRG = locaclRGsecond(center,couriercorrelationRG, physicalmodesRG , 0.002, 4)
+refwannierfnRG = locaclRGsecond(center,couriercorrelationRG, physicalmodesRG , 0.003, 4)
 localunitaryrefRG = refwannierfnRG[1]+refwannierfnRG[2]
 
 localunitarylistRG = translatedlocalfockmaplist(center = center,localfockmap = localunitaryrefRG,transceterlist=firstlayerRGs)
@@ -528,7 +517,7 @@ visualize(localeigspecnext)
 #
 physicalmodesRGsecond = couriercorrelationRGsecond |> getoutspace |> orderedmodes
 
-refwannierfnsecondRG = locaclRGsecond(center,couriercorrelationRGsecond, physicalmodesRGsecond, 0.003, 4)
+refwannierfnsecondRG = locaclRGsecond(center,couriercorrelationRGsecond, physicalmodesRGsecond, 0.005, 4)
 localunitaryrefsecondRG = refwannierfnsecondRG[1]+refwannierfnsecondRG[2]
 
 localunitarylistsecondRG = translatedlocalfockmaplist(center = center,localfockmap = localunitaryrefsecondRG,transceterlist=secondlayerRGs)
@@ -569,11 +558,4 @@ trsasnformedlocalregionnext, trsasnformedlocalfocknext = localregioninspection(c
 visualize(trsasnformedlocalregionnext, title="l", visualspace=euclidean(RealSpace, 2))
 
 localeigspecnext = couriercorrelationRGRG[trsasnformedlocalfocknext, trsasnformedlocalfocknext] |> eigspech 
-visualize(localeigspecnext, title="Spectrum after 2 RG steps for Chern")
-
-function ee(a)
-    return a*log(a)+(1-a)*log(1-a)
-end
-plot([scatter(x=[1,2,3], y=[ee(185.5298*10^-6), ee(0.001171), ee(0.0034644)]),scatter(x=[1,2,3], y=[ee(2418*10^-6), ee(0.0028432), ee(0.0051762)])])
-
-plot(scatter(x=[1,2,3], y=[2418*10^-6, 0.0028432, 0.0051762]))
+visualize(localeigspecnext, title="Spectrum after 2 RG steps for Dirac semi-metal")

@@ -107,3 +107,34 @@ function roundingpurification(correlationspectrum::CrystalSpectrum)::CrystalSpec
     return CrystalSpectrum(correlationspectrum.crystal, correlationspectrum.eigenmodes, eigenvalues, correlationspectrum.eigenvectors)
 end
 export roundingpurification
+
+function entanglemententropy(correlationspectrum::CrystalSpectrum)
+    sumresult = 0
+    for (_, v) in correlationspectrum |> geteigenvalues
+        if isapprox(v, 0, atol=1e-7) || isapprox(v, 1, atol=1e-7)
+            continue
+        end
+        
+        sumresult += v * log(v) + (1 - v) * log(1 - v)
+    end
+    return -sumresult
+end
+export entanglemententropy
+
+function momentumoccupations(correlations::FockMap)::FockMap
+    kcorrelations::Base.Generator = correlations |> crystalsubmaps
+    crystal::Crystal = correlations |> getoutspace |> getcrystal
+    center::Offset = crystal |> getspace |> getorigin
+    tracecrystal::Crystal = Crystal(center |> Subset, crystal |> size)
+    mode::Mode = Mode(:pos => center)
+
+    function tracing(k::Momentum, corr::FockMap)::FockMap
+        space::FockSpace = mode |> setattr(:offset => k) |> FockSpace
+        return FockMap(space, space, [corr |> tr][:, :] |> SparseMatrixCSC) / dimension(corr |> getoutspace)
+    end
+
+    occupations::FockMap = directsum(tracing(k, corr) for (k, corr) in kcorrelations)
+    fockspace::FockSpace = FockSpace(occupations |> getoutspace, reflected=tracecrystal)
+    return FockMap(occupations, inspace=fockspace, outspace=fockspace)
+end
+export momentumoccupations

@@ -55,6 +55,11 @@ pbc(crystal::Crystal)::Function = p -> pbc(crystal, p)
 latticeoff(point::Point)::Point = Point([trunc(v) for v in point |> vec], getspace(point))
 export latticeoff
 
+"""
+    basispoint(point::Point)::Point
+
+Convert a point back to the corresponding basis point within the unitcell.
+"""
 function basispoint(point::Point)::Point
     rationalized::Vector = [hashablereal(v) for v in point |> vec]
     return Point([mod(v |> numerator, v |> denominator) / denominator(v) for v in rationalized], point |> getspace)
@@ -73,11 +78,9 @@ vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 export vol
 
 function latticepoints(crystal::Crystal)::Subset{Offset}
-    real_space::RealSpace = getspace(crystal.unitcell)
-    crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
-    tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
-    recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2)
-    return Subset(Point(pos, real_space) for pos in eachcol(recentered_mesh))
+    realspace::RealSpace = getspace(crystal.unitcell)
+    crystalmesh::Matrix{Int64} = mesh(crystal.sizes)
+    return Subset(Point(pos, realspace) for pos in eachcol(crystalmesh))
 end
 export latticepoints
 
@@ -100,25 +103,38 @@ function brillouinmesh(crystal::Crystal)::Array{Point}
 end
 export brillouinmesh
 
-function getsphericalregion(;from::Offset, generators::Subset{Offset}, symmetries, radius::Real, metricspace::RealSpace)
-    from |> latticeoff == from || error("`from` must be a lattice offset!")
-
-    getspancount(generator::Offset)::Integer = radius / (generator |> euclidean |> norm) |> ceil |> Integer
-
-    generated::Region = Subset(from |> getspace |> getorigin)
-    println(generated |> collect)
-    for vec in generators
-        expanded::Region = Subset(p + vec * n for p in generated for n in 0:getspancount(vec))
-        generated = filter(p -> lineartransform(metricspace, p) |> norm <= radius, expanded)
-    end
-
-    for symmetry in symmetries, transform in symmetry |> pointgroupelements
-        generated += transform * generated
-    end
-
-    return generated + from
+function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
+    generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
+    generatinglength::Integer = generatingradius * 2 - 1
+    generatingcrystal::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, [generatinglength, generatinglength])
+    crystalregion::Region = generatingcrystal|>sitepoints
+    baseregion::Region = crystalregion - (crystalregion|>getcenter)
+    generatingregion::Base.Iterators.Flatten = (base + (base|>getspace) * basis for base in baseregion for basis in crystal|>getunitcell)
+    return Subset(point for point in generatingregion if norm(metricspace * point) <= radius)
 end
 export getsphericalregion
 
 geometricfilter(f, metricspace::AffineSpace) = p -> (metricspace * p) |> f
 export geometricfilter
+
+linearscale(space::AffineSpace) = log.([v|>norm for v in space|>getbasisvectors])|>mean|>exp
+export linearscale
+
+function orthodirections(vector::Point)
+    Q, _ = vector|>vec|>qr
+    space::RealSpace = vector|>getspace
+    return Iterators.drop((Q[:, n] ∈ space for n in axes(Q, 2)), 1)
+end
+export orthodirections
+
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace)
+    height::Real = (normalvector|>norm) / (crystal|>getspace|>linearscale)
+    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2), metricspace=metricspace)
+
+    normaldirection::Offset = normalvector|>normalize
+    getorthodirection(point::Point) = normalize(point - dot(point, normaldirection) * normaldirection)
+    crosssectionfilter(point::Point) = 0 < dot(point, getspace(point) * normaldirection) < height && (dot(point, point|>getorthodirection)|>abs) < radius
+
+    return sphericalregion|>filter(crosssectionfilter)
+end
+export getcrosssection

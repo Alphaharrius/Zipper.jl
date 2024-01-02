@@ -1,3 +1,6 @@
+# Overload the hashing function for vector of points to yield the same value with the same data content.
+Base.:hash(elements::Vector{T}) where {T <: Element} = hash([element |> hash for element in elements])
+
 """
     dimension(space::T)::Integer where {T <: AbstractSpace}
 
@@ -204,16 +207,16 @@ lineartransform(newspace::AffineSpace, point::Point)::Point = Point(inv(getbasis
 export lineartransform
 
 """
-    orthogonalspace(space::AffineSpace)::AffineSpace
+    orthospace(space::AffineSpace)::AffineSpace
 
 Given a affine space, get it't corresponding orthogonal space of the same scale.
 """
-function orthogonalspace(space::AffineSpace)::AffineSpace
+function orthospace(space::AffineSpace)::AffineSpace
     basisvectors::Base.Generator = ((space |> rep)[:, d] for d in axes(space |> rep, 2))
     scalings::Vector = [norm(v) for v in basisvectors]
     return (space |> typeof)(scalings |> diagm)
 end
-export orthogonalspace
+export orthospace
 
 """
     affinespace(points::Point...)::AffineSpace
@@ -251,6 +254,7 @@ Base.:*(space::T, point::Point{T}) where {T <: AffineSpace} = lineartransform(sp
 
 Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) * val, getspace(point))
 Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) / val, getspace(point))
+Base.:*(val::T, point::Point) where {T <: Real} = point * val
 
 Zipper.:Subset(points::Point...) = Subset(p for p in points)
 
@@ -416,3 +420,9 @@ function findcomplexdenominator(values; denominatorrange::UnitRange = 2:128, tol
     return snappingdenominator(flattenvalues; denominatorrange=denominatorrange, tolerantscalepercent=tolerantscalepercent)
 end
 export findcomplexdenominator
+
+function dosnf(matrix::Matrix)::Tuple{Matrix, Matrix, Matrix}
+    snf = smith(matrix)
+    return snf.S, diagm(snf), snf.T
+end
+export dosnf

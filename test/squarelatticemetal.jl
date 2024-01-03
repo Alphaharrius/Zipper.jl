@@ -23,7 +23,7 @@ kspace = convert(MomentumSpace, square)
 c4 = pointgrouptransform([0 -1; 1 0])
 
 unitcell = Subset(point)
-crystal = Crystal(unitcell, [48, 48])
+crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
 m = quantize(:pos, unitcell, 1) |> first
@@ -35,6 +35,13 @@ bonds::FockMap = bondmap([
 
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize
+
+H = energyspectrum|>FockMap
+crystalH = crystaldirectsum((block for (_, block) in H|>crystalsubmaps), outcrystal=crystal, incrystal=crystal)
+# crystalH|>crystalspectrum|>visualize
+
+Hprime = crystalH|>FockMap
+Hprime|>crystalspectrum|>visualize
 
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=0.5)
 groundstates |> visualize

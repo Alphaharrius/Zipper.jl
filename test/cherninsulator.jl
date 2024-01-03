@@ -100,20 +100,42 @@ function computequantummetric(state::CrystalSpectrum)
     return Dict(:gxx => gxx, :gyy => gyy, :gxy => gxy, :gyx => gyx)
 end
 
-scale = Scale([2 0; 0 2], crystal|>getspace)
+correlations = C
 
-bz = crystal|>brillouinzone
-ka = bz[278]
+crystalfock = correlations.outspace
 
-bbz = Subset(scale * k |>basispoint for k in bz)
-kspace|>rep
+    scale = Scale([2 0; 0 2], crystalfock |> getcrystal |> getspace)
+    @time blockresult = blocking(:action => scale, :correlations => correlations, :crystal => crystalfock |> getcrystal)
 
-(ka|>euclidean)
-(scale*ka|>euclidean)
+    blockedcrystal::Crystal = blockresult[:crystal]
+    blockedcorrelations::FockMap = blockresult[:correlations]
+    blocker = blockresult[:transformer]
 
-scale * kspace |>rep
-visualize(bz, bbz, ka|>Subset, scale * ka |>basispoint|>Subset, scale * ka |>Subset)
+    function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
+        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthospace
+        physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
+        return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
+    end
 
+    crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
+    samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
+    blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
+    physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
+
+
+    frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2)
+    # visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
+    frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
+
+    Base.:show(io::IO, fockmap::CrystalFockMap) = print(io, string("CrystalFockMap"))
+
+    @time globaldistiller = globaldistillerhamiltonian(
+        correlations=blockresult[:correlations],
+        restrictspace=frozenseedingfock,
+        localisometryselectionstrategy=frozenselectionbycount(3))
+
+    globaldistillerspectrum = globaldistiller|>crystalspectrum
+    globaldistillerspectrum|>visualize
 
 
 # gsqm = computequantummetric(groundstates)

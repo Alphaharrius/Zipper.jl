@@ -167,7 +167,11 @@ function generategroupingfunction(grouppredicates)
     labels::Vector{Symbol} = [label for (label, _) in grouppredicates]
     predicates::Vector{Function} = [predicate for (_, predicate) in grouppredicates]
     function f(value::Number)::Symbol
-        return labels[findfirst(p -> value |> p, predicates)]
+        # This modification is added to support grouping the eigenvalues by rules that
+        # are not fully include the entire spectrum, all remaining elements will be grouped
+        # into the `:others` group.
+        index = findfirst(p -> value |> p, predicates)
+        return index|>isnothing ? :others : labels[index]
     end
     return f
 end

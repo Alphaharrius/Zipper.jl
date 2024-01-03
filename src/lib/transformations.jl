@@ -343,7 +343,7 @@ Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for eleme
 
 function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     realspace::RealSpace = crystal |> getspace
-    snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
+    snfinput::Matrix{Integer} = map(Integer, vcat(scale|>rep|>transpose, crystal|>size|>diagm))
     U, S, Vd = snfinput |> dosnf
     snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
     _, bS, bVd = snfinput |> dosnf

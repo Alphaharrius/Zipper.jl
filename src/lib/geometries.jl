@@ -55,6 +55,11 @@ pbc(crystal::Crystal)::Function = p -> pbc(crystal, p)
 latticeoff(point::Point)::Point = Point([trunc(v) for v in point |> vec], getspace(point))
 export latticeoff
 
+"""
+    basispoint(point::Point)::Point
+
+Convert a point back to the corresponding basis point within the unitcell.
+"""
 function basispoint(point::Point)::Point
     rationalized::Vector = [hashablereal(v) for v in point |> vec]
     return Point([mod(v |> numerator, v |> denominator) / denominator(v) for v in rationalized], point |> getspace)

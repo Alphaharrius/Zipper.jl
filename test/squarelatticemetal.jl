@@ -1,6 +1,19 @@
 using Revise, LinearAlgebra, AbstractAlgebra, SmithNormalForm
 using Zipper
 
+# a = [1, 1]
+# b = [-1, -1]
+
+# T = a * b'
+
+# U, S, V = svd(T)
+# M = U * V'
+# det(M)
+# M = map(v -> round(v, digits=10), U * V')
+# U, _, V = svd(M)
+# V * b
+# V * [-24, 0]
+
 square = euclidean(RealSpace, 2)
 point = [1/2, 1/2] ∈ square
 spatialsnappingcalibration([point])
@@ -10,7 +23,7 @@ kspace = convert(MomentumSpace, square)
 c4 = pointgrouptransform([0 -1; 1 0])
 
 unitcell = Subset(point)
-crystal = Crystal(unitcell, [24, 24])
+crystal = Crystal(unitcell, [48, 48])
 reciprocalhashcalibration(crystal.sizes)
 
 m = quantize(:pos, unitcell, 1) |> first
@@ -35,262 +48,199 @@ correlations |> crystalspectrum |> visualize
 
 crystalfock = correlations |> getoutspace
 
-function dosnf(matrix::Matrix)
-    snf = smith(matrix)
-    return snf.S, diagm(snf), snf.T
-end
-
-    realspace::RealSpace = crystal |> getspace
-    snfinput = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
-    U, S, Vd = snfinput |> computesnf
-    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
-    bU, bS, bVd = snfinput |> computesnf
-    newsizes = bS |> diag
-    newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
-
-    subunitcell = Subset((Vd * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
-    newscale = Scale(newrelativebasis, realspace)
-    newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
-    newcrystal = Crystal(newunitcell, newsizes)
-
-function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    realspace::RealSpace = crystal |> getspace
-    snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
-    U, S, Vd = snfinput |> dosnf
-    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
-    _, bS, bVd = snfinput |> dosnf
-    newsizes = bS |> diag
-    newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
-
-    subunitcell = Subset((Vd * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
-    newscale = Scale(newrelativebasis, realspace)
-    newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
-    return Crystal(newunitcell, newsizes)
-end
-
-function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    realspace::RealSpace = crystal |> getspace
-    snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
-    U, S, Vd = snfinput |> computesnf
-    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
-    _, bS, bVd = snfinput |> computesnf
-    newsizes = bS |> diag
-    newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
-
-    subunitcell = Subset((Vd * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
-    newscale = Scale(newrelativebasis, realspace)
-    newunitcell = Subset(newscale * (a + b) for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
-    return Crystal(newunitcell, newsizes)
-end
-
-scale = Scale([2 0; 0 2], square)
-scale * crystal |> getspace |> rep
+scale = Scale([4 0; 0 4], square)
 blockresult = blocking(:action => scale, :correlations => correlations, :crystal => crystalfock |> getcrystal)
 
 H = energyspectrum |> FockMap
-blockresult[:transformer] * H * blockresult[:transformer]' |> crystalspectrum |> visualize
-
-circleregion = getsphericalregion(from=square |> getorigin, generators=Subset(square |> getbasisvectors), symmetries=[c4], radius=10, metricspace=square)
-circleregion |> visualize
-
-normaldirection = [1, 1] ∈ square
-orthodirection = c4 * normaldirection
-
-crosssectionfilter(point::Point) = 0 < dot(point, normaldirection |> normalize) < norm(normaldirection) && (dot(point, orthodirection) |> abs) < 4
+blockedH = blockresult[:transformer] * H * blockresult[:transformer]'
+blockedH |> crystalspectrum |> visualize
 
 blockedcrystal = blockresult[:crystal]
-blockedcrystal |> getspace |> rep
 
-blockedcrystal |> sitepoints |> visualize
-
-function extendedcrystalrestriction(crystal::Crystal, generatingvector::Offset)
+function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)::Scale
     snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector |> vec |> transpose, crystal |> size |> diagm)) 
     _, S, Vd = snfinput |> dosnf
-    scale::Scale = Scale((S |> diag |> diagm) * Vd, crystal |> getspace)
-    show(scale |> rep)
-    barecrystal::Crystal = Crystal(crystal |> getspace |> getorigin |> Subset, crystal |> size)
-    return scale * barecrystal
+    return Scale((S |> diag |> diagm) * Vd |> transpose, crystal |> getspace)
 end
 
-embeddedcrystal = extendedcrystalrestriction(blockedcrystal, [1, 1] ∈ square)
-embeddedcrystal |> getspace |> getbasisvectors |> collect
-
-embeddedcrystal |> sitepoints |> visualize
-
-
-function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    oldspace::RealSpace = crystal |> getspace
-    snf = vcat(scale |> rep, crystal.sizes |> diagm) |> smith
-    boundarysnf = snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)] |> smith
-    Δ::Matrix{Float64} = snf |> diagm
-    newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
-    blockingpoints::Base.Generator = (Point(collect(coord)' * snf.T, oldspace) for coord in Iterators.product((0:size - 1 for size in diag(Δ))...))
-    relativescale::Scale = Scale(newbasiscoords, crystal |> getspace)
-    scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
-    return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
-end
-
-    oldspace::RealSpace = crystal |> getspace
-    snf = vcat(scale |> rep, crystal.sizes |> diagm) |> smith
-    U, S, Vd = map(Integer, vcat(scale |> rep, crystal.sizes |> diagm)) |> computesnf
-    boundarysnf = snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)] |> smith
-    Δ::Matrix{Float64} = snf |> diagm
-    newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
-    blockingpoints::Base.Generator = (Point(collect(coord)' * snf.T, oldspace) for coord in Iterators.product((0:size - 1 for size in diag(Δ))...))
-    relativescale::Scale = Scale(newbasiscoords, crystal |> getspace)
-    scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
-    return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
-
-function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    realspace::RealSpace = crystal |> getspace
-    snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
-    U, S, Vd = snfinput |> computesnf
-    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
-    _, bS, bVd = snfinput |> computesnf
-    newsizes = bS |> diag
-    newrelativebasis = bVd * (S |> diag |> diagm) * Vd
-    show(newrelativebasis)
-
-    subunitcell = Subset((Vd * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
-    newscale = Scale(newrelativebasis, realspace)
-    newunitcell = Subset(newscale * (a + b) for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
-    return Crystal(newunitcell, newsizes)
-end
+blockedcorrelations = blockresult[:correlations]
 
 blockedcrystal = blockresult[:crystal]
 
-blockedcrystal |> getspace |> rep
-normaldirection
-normaldirection = [1, 1] ∈ square
+normalvector = (1, 1) ∈ (blockedcrystal|>getspace)
 
-function extendedcrystalrestriction(crystal::Crystal, generatingvector::Offset)
-    snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector |> vec |> transpose, crystal |> size |> diagm)) 
-    _, S, Vd = snfinput |> computesnf
-    scale::Scale = Scale((S |> diag |> diagm) * Vd, crystal |> getspace)
-    barecrystal::Crystal = Crystal(crystal |> getspace |> getorigin |> Subset, crystal |> size)
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace)
+    height::Real = (*(metricspace, normalvector)|>norm)
+    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2)*2, metricspace=metricspace)
 
-    return scale * barecrystal
+    normaldirection::Offset = *(metricspace, normalvector)|>normalize
+    function crosssectionfilter(point::Point)::Bool
+        metricpoint::Point = metricspace * point
+        iswithinheight::Bool = 0 <= dot(metricpoint, normaldirection) <= height
+        orthoreminder::Point = metricpoint - dot(metricpoint, normaldirection) * normaldirection
+        iswithinradius::Bool = norm(orthoreminder) < radius
+        return iswithinheight && iswithinradius
+    end
+
+    rawregion::Region = sphericalregion|>filter(crosssectionfilter)
+    proximityregion::Region = rawregion - normalvector
+
+    return rawregion - intersect(rawregion, proximityregion)
 end
 
-snfinput = map(Integer, vcat(normaldirection |> vec |> transpose, blockedcrystal |> size |> diagm))
-U, S, Vd = snfinput |> dosnf
-U * S * Vd
-scalematrix = (S |> diag |> diagm) * Vd
-scale = Scale(scalematrix, blockedcrystal |> getspace)
-barecrystal = Crystal(blockedcrystal |> getspace |> getorigin |> Subset, blockedcrystal |> size)
-barecrystal |> getspace |> rep
+crosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector, radius=1.5)
 
-scale |> rep
+visualize(getsphericalregion(crystal=blockedcrystal, radius=5, metricspace=blockedcrystal|>getspace), crosssection, crosssection + normalvector)
 
-function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    realspace::RealSpace = crystal |> getspace
-    snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
-    U, S, Vd = snfinput |> computesnf
-    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
-    _, bS, bVd = snfinput |> computesnf
-    newsizes = bS |> diag
-    newrelativebasis = bVd * (S |> diag |> diagm) * Vd
-    show(newrelativebasis)
+crosssectionfock = regionfock(crosssection)
+crosssectionfourier = fourier(blockedcorrelations|>getoutspace, crosssectionfock)
 
-    subunitcell = Subset((Vd * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
-    newscale = Scale(newrelativebasis, realspace)
-    newunitcell = Subset(newscale * (a + b) for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
-    return Crystal(newunitcell, newsizes)
+function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)
+    snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector|>vec|>transpose, crystal|>size|>diagm)) 
+    _, S, Vd = snfinput|>dosnf
+    return Scale((S|>diag|>diagm) * Vd |>transpose, crystal|>getspace)
 end
 
-newcrystal = scale * barecrystal
+extendedscale = extendedcrystalscale(crystal=blockedcrystal, generatingvector=normalvector)
+extendedscale|>rep
 
-space = barecrystal |> getspace
-snfinput = map(Integer, vcat(scale |> rep, barecrystal |> size |> diagm))
-U, S, Vd = snfinput |> computesnf
-snfinput = U[end - dimension(space) + 1:end, 1:dimension(space)]
-bU, bS, bVd = snfinput |> computesnf
-newsizes = bS |> diag
-newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
+scaledcrystal = extendedscale * blockedcrystal
+scaledcrystal|>getspace|>rep
+scaledcrystal|>sitepoints|>visualize
 
-subunitcell = Subset((Vd * (r |> collect)) ∈ space for r in Iterators.product((0:(s-1) for s in S |> diag)...))
-newscale = Scale(newrelativebasis, space)
-newunitcell = Subset(newscale * (a + b) for (a, b) in Iterators.product(subunitcell, barecrystal |> getunitcell))
-newunitcell |> collect
-newcrystal = Crystal(newunitcell, newsizes)
+scaledspace = scaledcrystal|>getspace
 
+embeddedfock = FockSpace(mode|>setattr(:pos=>(scaledspace * getpos(mode)))|>removeattr(:offset) for mode in crosssectionfock)
+embeddedfock|>modeattrs
 
+scaledkspace = convert(MomentumSpace, scaledspace)
 
+blockedcrystalfock = blockedcorrelations|>getoutspace
 
-
-visualize(newcrystal |> sitepoints, barecrystal |> sitepoints)
-
-visualize(circleregion, filter(crosssectionfilter, circleregion))
-map(Integer, vcat(normaldirection |> vec |> transpose, blockedcrystal |> size |> diagm))
-S, T, U = matrix(ZZ, map(Integer, vcat(normaldirection |> vec |> transpose, blockedcrystal |> size |> diagm))) |> snf_with_transform
-sU = inv(T)
-sVd = inv(U)
-S
-
-sU * S * sVd
-
-(S |> Matrix |> diag |> diagm) * Matrix(U |> inv)
-
-snf = vcat(normaldirection |> vec |> transpose, blockedcrystal |> size |> diagm) |> smith
-extendscale = Scale((snf |> diagm |> diag |> diagm) * snf.T, blockedcrystal |> getspace)
-barecrystal = Crystal(blockedcrystal |> getspace |> getorigin |> Subset, blockedcrystal |> size)
-
-extendscale |> rep
-space::RealSpace = barecrystal |> getspace
-
-S, invU, invVd = matrix(ZZ, map(Integer, vcat(extendscale |> rep, barecrystal |> size |> diagm))) |> snf_with_transform
-newsize, invboundaryU, invboundaryVd = inv(invU)[end - dimension(space) + 1:end, 1:dimension(space)] |> snf_with_transform
-newbasis = map(Int64, inv(invboundaryVd) * matrix(ZZ, S |> Matrix |> diag |> diagm) * inv(invVd) |> Matrix)
-Vd = map(Int64, invVd |> inv |> Matrix)
-newpoints = (Point((shift |> collect |> transpose) * Vd, space) for shift in product((0:size - 1 for size in map(Int64, S |> Matrix |> diag))...))
-newscale = Scale(reverse(newbasis, dims=2), space)
-newunitcell = Subset(newscale * (a + b) for (a, b) in Iterators.product(newpoints, barecrystal |> getunitcell))
-newcrystal = Crystal(newunitcell, newsize |> Matrix |> diag)
-
-newcrystal |> getunitcell |> collect
-newcrystal |> sitepoints |> visualize
-
-
-barecrystal = Crystal(blockedcrystal |> getspace |> getorigin |> Subset, blockedcrystal |> size)
-extendscale |> rep
-scaledcrystal = extendscale * barecrystal
-scaledcrystal |> getspace |> getbasisvectors |> collect
-for (basis, d) in zip(scaledcrystal |> getspace |> rep, scaledcrystal |> size)
+using OrderedCollections
+momentummappings = (scaledkspace * k |> basispoint => k for k in blockedcrystal|>brillouinzone)
+mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point, Vector{Point}}()) do d, (k, v)
+    mergewith!(append!, d, LittleDict(k => [v]))
 end
-scaledcrystal |> getspace |> rep
-scaledcrystal |> getspace |> getbasisvectors |> collect
-fr = Iterators.filter(zip(scaledcrystal |> getspace |> getbasisvectors, scaledcrystal |> size)) do v
-    return v |> last > 1
+ksubsets = blockedcrystalfock|>crystalsubsets
+scaledfock::FockSpace = ((ksubsets[k] for k in mappingpartitions[kscaled])|>subsetunion|>FockSpace
+        for kscaled in mappingpartitions|>keys)|>fockspaceunion
+scaledbz = Subset(sk for sk in mappingpartitions|>keys)
+
+embeddedunitcell = Subset(mode|>getattr(:pos) for mode in embeddedfock)
+embeddedunitcell|>collect
+
+embeddedcrystal = Crystal(embeddedunitcell, scaledcrystal|>size)
+
+volumeratio = vol(blockedcrystal) / vol(embeddedcrystal)
+
+function repackfourierblocks(source::FockMap, kscaled::Momentum, partition::Subset{Mode})::FockMap
+    partitionrows::FockMap = rows(source, partition |> FockSpace)
+    inspace::FockSpace = FockSpace(setattr(mode, :offset => kscaled, :pos => scaledspace * (mode|>getpos)) for mode in partitionrows|>getinspace)
+    return FockMap(partitionrows.outspace, inspace, partitionrows |> rep) / sqrt(volumeratio)
 end
-fr |> collect |> first |> first |> getspace |> rep
-affinespace(fr |> collect |> first, )
 
-visualize(barecrystal |> sitepoints, scaledcrystal |> sitepoints)
+repackedblocks::Base.Generator = (
+    repackfourierblocks(crosssectionfourier, kscaled, partition)
+    for (kscaled, partition) in Iterators.zip(scaledbz, scaledfock|>rep))
+blockmap::FockMap = directsum(repackedblocks)
+embeddedcrystalfock = FockSpace(blockmap|>getinspace, reflected=embeddedcrystal)
+blockmap = FockMap(blockmap, inspace=embeddedcrystalfock, outspace=blockedcrystalfock)
 
-scaledcrystal |> getspace |> rep
-extendscale |> rep
-visualize(barecrystal |> sitepoints, scaledcrystal |> sitepoints)
+extendedrestrictedC = blockmap' * blockedcorrelations * blockmap
+# extendedrestrictedC|>visualize
 
-extendunitcell = extendscale * blockedcrystal |> getunitcell
-extendcrystal = Crystal(Subset(extendunitcell[2], extendunitcell[1]), [3, 1])
-extendcrystal |> getspace |> getbasisvectors |> collect
+extendedCspec = extendedrestrictedC|>crystalspectrum
+eigenmodes = sort([(k, modes) for (k, modes) in extendedCspec.eigenmodes], by=(v -> (v[1]|>vec)[2]))
+cspec = hcat(([extendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
+using Plotly
+plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
 
-extendcrystal |> sitepoints |> visualize
+extendedfrozenspec = distillation(extendedCspec, :frozen => v -> v < 1e-7 || v > 1 - 1e-7)[:frozen]
+extendedfrozenprojector = extendedfrozenspec|>crystalprojector
+extendedfrozencorrelations = idmap(extendedfrozenprojector|>getoutspace) - extendedfrozenprojector
+extendedCspec = extendedfrozencorrelations|>crystalspectrum
 
-snf = vcat(extendscale |> rep, blockedcrystal |> size |> diagm) |> smith
-snf.S
-snf |> diagm |> diag
-snf.T
+cspec = hcat(([extendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
+using Plotly
+plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
 
-barecrystal = Crystal(blockedcrystal |> getspace |> getorigin |> Subset, blockedcrystal |> size)
-barecrystal |> sitepoints |> visualize
-extendscale * barecrystal |> getunitcell |> visualize
+scaledspace = extendedrestrictedC|>getoutspace|>getcrystal|>getspace
+truncregion = reduce(+, crosssection + normalvector * n for n in 0:2)
+transformedcrosssection = Subset(scaledspace * point for point in truncregion)
+
+visualize(blockedcrystal|>sitepoints, transformedcrosssection)
+
+Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
+# Compute unit-cell mapping FockMap
+modefrombasis = Dict((mode|>getattr(:pos)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
+truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfock
+values = Dict((modefrombasis[rmode|>getattr(:pos)], rmode) => 1 + 0im for rmode in truncunitfock)
+modemap = FockMap(extendedrestrictedC|>getoutspace|>unitcellfock, truncunitfock, values)
+# After this perform tensor product
+
+Base.:merge(a::Mode, b::Mode)::Mode = Mode(Dict(getattrs(a)..., getattrs(b)...))
+
+function tensorproduct(primary::FockSpace, secondary::FockSpace; keepprimaryattrs)
+    secondarymodes = (removeattr(mode, keepprimaryattrs...) for mode in secondary)
+    return fockspaceunion(FockSpace(merge(pmode, smode) for smode in secondarymodes) for pmode in primary)
+end
+
+Ftinspace = tensorproduct(Ft|>getinspace, modemap|>getinspace, keepprimaryattrs=[:offset])|>FockSpace{Region}
+Ftoutspace = tensorproduct(Ft|>getoutspace, modemap|>getoutspace, keepprimaryattrs=[:offset])
+Ftoutspace = FockSpace(Ftoutspace, reflected=extendedrestrictedC|>getoutspace|>getcrystal)
+Ftrep = kron(Ft|>rep, modemap|>rep)
+newFt = FockMap(Ftoutspace, Ftinspace, Ftrep)
+rFt = columns(newFt, transformedcrosssection|>regionfock)
+
+tiisometries = (rows(rFt, fockspace) for (_, fockspace) in rFt|>getoutspace|>crystalsubspaces)
+tiprojector = directsum(isometry * isometry' for isometry in tiisometries)
+tiprojector = FockMap(tiprojector, inspace=rFt|>getoutspace, outspace=rFt|>getoutspace)
+
+tiprojector = rFt * rFt'
+
+truncatedextendedfrozencorrelations = tiprojector * extendedfrozencorrelations * tiprojector'
+truncextendedCspec = truncatedextendedfrozencorrelations|>crystalspectrum
+eigenmodes = sort([(k, modes) for (k, modes) in truncextendedCspec.eigenmodes], by=(v -> (v[1]|>vec)[2]))
+cspec = hcat(([truncextendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
+using Plotly
+plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
+
+comparefock = FockSpace(mode|>fixposition for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
 
 
-bS, bT, bU = inv(snf.T)[end - dimension(blockedcrystal |> getspace) + 1:end, 1:dimension(blockedcrystal |> getspace)] |> snf_with_transform
-Matrix(U |> inv) * (S |> Matrix |> diag |> diagm) * Matrix(bU)
 
-bsnf.S
-A = bsnf.T * (snf |> diagm |> diag |> diagm) * snf.T
-Scale(A, blockedcrystal |> getspace) * point == point
+truncfock = FockSpace{Region}(mode|>setattr(:pos => mode|>getpos)|>setattr(:offset => mode|>getpos|>getspace|>getorigin) for mode in regionfock(transformedcrosssection))
+truncfourier = fourier(extendedfrozencorrelations|>getoutspace, truncfock)
+truncfourier|>visualize
+truncator = truncfourier * truncfourier'
 
+truncatedextendedfrozencorrelations = truncator * extendedfrozencorrelations * truncator'
+truncextendedCspec = truncatedextendedfrozencorrelations|>crystalspectrum
+cspec = hcat(([truncextendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in truncextendedCspec.eigenmodes)...)
+using Plotly
+plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
+
+extendedfrozencorrelationprime = blockmap * extendedfrozencorrelations * blockmap'
+extendedfrozencorrelationprime|>crystalspectrum|>visualize
+truncrosssectionfourier = fourier(blockedcorrelations|>getoutspace, regionfock(crosssection)) / sqrt(vol(blockedcorrelations|>getoutspace|>getcrystal))
+
+truncator = truncrosssectionfourier * truncrosssectionfourier'
+
+trunextendedfrozencorrelationprime = truncator * extendedfrozencorrelationprime * truncator'
+trunextendedfrozencorrelationprime|>crystalspectrum|>visualize
+
+trunextendedfrozencorrelations = blockmap' * trunextendedfrozencorrelationprime * blockmap
+trunextendedCspec = trunextendedfrozencorrelations|>crystalspectrum
+
+cspec = hcat(([trunextendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in trunextendedCspec.eigenmodes)...)
+using Plotly
+plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
+
+extendedscale * crystal |>getunitcell|>collect
+extendedscale * crystal |>getspace|>rep
+
+scale * crystal|>getunitcell|>collect
+scale * crystal |>getspace|>rep
+
+extendedscale * ([1, 1] ∈ square)

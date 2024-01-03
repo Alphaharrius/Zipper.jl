@@ -230,6 +230,8 @@ function affinespace(basisvectors::Point...)::AffineSpace
 end
 export affinespace
 
+LinearAlgebra.:det(space::AffineSpace)::Real = getbasis(space)|>det
+
 """
     euclidean(point::Point)::Point
 

@@ -647,7 +647,9 @@ function Base.:getindex(fockmap::FockMap, outmode::Mode, inmode::Mode)::Complex
     return (fockmap |> rep)[CartesianIndex(outspaceorder, inspaceorder)]
 end
 
-LinearAlgebra.tr(fockmap::FockMap) = fockmap |> rep |> tr
+LinearAlgebra.:tr(fockmap::FockMap) = fockmap|>rep|>tr
+
+LinearAlgebra.:det(fockmap::FockMap) = fockmap|>rep|>det
 
 # ===================================================================================================================================================
 # Added to support getindex of FockMap objects.

@@ -100,12 +100,11 @@ export brillouinmesh
 
 function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
     generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
-    generatinglength::Integer = generatingradius * 2 - 1
-    generatingcrystal::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, [generatinglength, generatinglength])
+    generatinglength::Integer = generatingradius * 2
+    generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
     crystalregion::Region = generatingcrystal|>sitepoints
-    baseregion::Region = crystalregion - (crystalregion|>getcenter)
-    generatingregion::Base.Iterators.Flatten = (base + (base|>getspace) * basis for base in baseregion for basis in crystal|>getunitcell)
-    return Subset(point for point in generatingregion if norm(metricspace * point) <= radius)
+    centeredregion::Region = crystalregion - (crystalregion|>getcenter)
+    return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
 end
 export getsphericalregion
 

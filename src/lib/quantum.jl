@@ -1077,7 +1077,7 @@ export crystalspectrum
 
 Given a Hermitian `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span, pack into a `CrystalSpectrum` object.
 """
-crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(fockmap |> crystalsubmaps, crystal=fockmap|>getinspace |> getcrystal)
+crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(fockmap|>crystalsubmaps, crystal=fockmap|>getinspace|>getcrystal)
 
 """ Get the associated crystal of a `CrystalSpectrum` object. """
 Zipper.:getcrystal(spectrum::CrystalSpectrum)::Crystal = spectrum.crystal

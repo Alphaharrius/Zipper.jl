@@ -20,7 +20,7 @@ modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 m0, m1 = members(modes)
 
 tₙ = -1 + 0im
-tₕ = 0.1im
+tₕ = 0.4im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
@@ -537,6 +537,12 @@ occ2 |> crystalspectrum |> visualize
 occ3 |> crystalspectrum |> visualize
 occ4 |> crystalspectrum |> visualize
 occcore |> crystalspectrum |> visualize
+
+visualize(occ1|>crystalspectrum, usecontour=true, title="occ1")
+visualize(occ2|>crystalspectrum, usecontour=true, title="occ2")
+visualize(occ3|>crystalspectrum, usecontour=true, title="occ3")
+visualize(occ4|>crystalspectrum, usecontour=true, title="occ4")
+visualize(occcore|>crystalspectrum, usecontour=true, title="occcore")
 
 occ1 + occ2 + occ3 + occ4 + occcore |> crystalspectrum |> visualize
 

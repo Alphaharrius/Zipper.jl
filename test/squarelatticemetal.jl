@@ -23,7 +23,7 @@ kspace = convert(MomentumSpace, square)
 c4 = pointgrouptransform([0 -1; 1 0])
 
 unitcell = Subset(point)
-crystal = Crystal(unitcell, [48, 48])
+crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
 m = quantize(:pos, unitcell, 1) |> first
@@ -88,9 +88,18 @@ function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real,
     return rawregion - intersect(rawregion, proximityregion)
 end
 
-crosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector, radius=1.5)
+crosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector, radius=0.5)
 
 visualize(getsphericalregion(crystal=blockedcrystal, radius=5, metricspace=blockedcrystal|>getspace), crosssection, crosssection + normalvector)
+
+function sitefock(site::Offset; flavorcount::Integer = 1)::FockSpace{Offset}
+    basis::Offset = site|>basispoint
+    offset::Offset = site - basis
+    return FockSpace((Mode(:offset => offset, :pos => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
+end
+
+regionfock(region::Region; flavorcount::Integer = 1)::FockSpace{Region} = (
+    fockspaceunion(sitefock(r, flavorcount=flavorcount) for r in region)|>FockSpace{Region})
 
 crosssectionfock = regionfock(crosssection)
 crosssectionfourier = fourier(blockedcorrelations|>getoutspace, crosssectionfock)
@@ -106,7 +115,7 @@ extendedscale|>rep
 
 scaledcrystal = extendedscale * blockedcrystal
 scaledcrystal|>getspace|>rep
-scaledcrystal|>sitepoints|>visualize
+visualize(scaledcrystal|>sitepoints, scaledcrystal|>getunitcell)
 
 scaledspace = scaledcrystal|>getspace
 
@@ -151,16 +160,19 @@ extendedrestrictedC = blockmap' * blockedcorrelations * blockmap
 # extendedrestrictedC|>visualize
 
 extendedCspec = extendedrestrictedC|>crystalspectrum
+
+extendedCspec|>linespectrum|>visualize
+
 eigenmodes = sort([(k, modes) for (k, modes) in extendedCspec.eigenmodes], by=(v -> (v[1]|>vec)[2]))
 cspec = hcat(([extendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
 using Plotly
 plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
 
-extendedfrozenspec = distillation(extendedCspec, :frozen => v -> v < 1e-7 || v > 1 - 1e-7)[:frozen]
+extendedfrozenspec = distillation(extendedCspec, :frozen => v -> v < 1e-2 || v > 1 - 1e-2)[:frozen]
 extendedfrozenprojector = extendedfrozenspec|>crystalprojector
 extendedfrozencorrelations = idmap(extendedfrozenprojector|>getoutspace) - extendedfrozenprojector
 extendedCspec = extendedfrozencorrelations|>crystalspectrum
-
+eigenmodes = sort([(k, modes) for (k, modes) in extendedCspec.eigenmodes], by=(v -> (v[1]|>vec)[2]))
 cspec = hcat(([extendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
 using Plotly
 plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
@@ -170,6 +182,23 @@ truncregion = reduce(+, crosssection + normalvector * n for n in 0:2)
 transformedcrosssection = Subset(scaledspace * point for point in truncregion)
 
 visualize(blockedcrystal|>sitepoints, transformedcrosssection)
+
+using SparseArrays
+function Zipper.fourier(crystal::Crystal, region::Region)
+    bz::Subset{Momentum} = crystal|>brillouinzone
+    barepoint::Offset = crystal|>getspace|>getorigin
+    barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
+    outspace::CrystalFock = FockSpace((Mode(:offset => k, :pos => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
+    
+    latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
+    inspace::FockSpace{Region} = latticesites|>regionfock
+
+    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in bz)...)
+    offsetmatrix::Matrix = hcat((p|>euclidean|>vec for p in latticesites)...)
+
+    fouriermatrix::SparseMatrixCSC = exp.(-1im * momentummatrix' * offsetmatrix)
+    return FockMap(outspace, inspace, fouriermatrix)
+end
 
 Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
 # Compute unit-cell mapping FockMap
@@ -201,10 +230,36 @@ tiprojector = rFt * rFt'
 
 truncatedextendedfrozencorrelations = tiprojector * extendedfrozencorrelations * tiprojector'
 truncextendedCspec = truncatedextendedfrozencorrelations|>crystalspectrum
-eigenmodes = sort([(k, modes) for (k, modes) in truncextendedCspec.eigenmodes], by=(v -> (v[1]|>vec)[2]))
-cspec = hcat(([truncextendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
-using Plotly
-plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
+
+truncextendedCspec|>linespectrum|>visualize
+
+truncfilledCspec = groundstatespectrum(truncextendedCspec, perunitcellfillings=8)
+truncfilledCspec|>linespectrum|>visualize
+
+truncfilledprojector = truncfilledCspec|>crystalprojector
+truncfilledcorrelations = idmap(truncfilledprojector|>getoutspace) - truncfilledprojector
+truncfilledcorrelations|>crystalspectrum|>linespectrum|>visualize
+
+truncregion = crosssection
+transformedcrosssection = Subset(scaledspace * point for point in truncregion)
+Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
+# Compute unit-cell mapping FockMap
+modefrombasis = Dict((mode|>getattr(:pos)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
+truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfock
+values = Dict((modefrombasis[rmode|>getattr(:pos)], rmode) => 1 + 0im for rmode in truncunitfock)
+modemap = FockMap(extendedrestrictedC|>getoutspace|>unitcellfock, truncunitfock, values)
+# After this perform tensor product
+
+Ftinspace = tensorproduct(Ft|>getinspace, modemap|>getinspace, keepprimaryattrs=[:offset])|>FockSpace{Region}
+Ftoutspace = tensorproduct(Ft|>getoutspace, modemap|>getoutspace, keepprimaryattrs=[:offset])
+Ftoutspace = FockSpace(Ftoutspace, reflected=extendedrestrictedC|>getoutspace|>getcrystal)
+Ftrep = kron(Ft|>rep, modemap|>rep)
+newFt = FockMap(Ftoutspace, Ftinspace, Ftrep)
+rFt = columns(newFt, transformedcrosssection|>regionfock)
+
+rFt' * truncfilledcorrelations * rFt / 24 |>eigspech|>visualize
+truncfilledprojector * extendedrestrictedC * truncfilledprojector |>crystalspectrum|>linespectrum|>visualize
+
 
 comparefock = FockSpace(mode|>fixposition for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
 

@@ -350,6 +350,10 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     newsizes = bS|>diag
     newrelativebasis = bVd * (S|>diag|>diagm) * Vd |>transpose
 
+    if reduce(+, newrelativebasis) < 0
+        newrelativebasis = -newrelativebasis
+    end
+
     subunitcell = Subset((transpose(Vd) * (r|>collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S|>diag)...))
     newscale = Scale(newrelativebasis, realspace)
     newunitcell = Subset(newscale * (a + b)|>basispoint for (a, b) in Iterators.product(subunitcell, crystal|>getunitcell))

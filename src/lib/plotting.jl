@@ -78,6 +78,13 @@ function visualize(state::RegionState{2}; title::String = "", markersizemultipli
     fig
 end
 
+function visualize(spectrum::CrystalSpectrum{1}; title="")
+    eigenmodes = sort([(k, modes) for (k, modes) in spectrum|>geteigenmodes], by=(in -> in[1]|>norm))
+    cspec = hcat(([spectrum.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
+    layout::Layout = Layout(title=title)
+    plot([scatter(y=cspec[n, :], markers=true) for n in axes(cspec, 1)], layout)
+end
+
 function visualize(spectrum::CrystalSpectrum{2}; title="", toppadding::Bool = true, usecontour::Bool = false)
     kspectrum::Dict{Momentum} = Dict(k => ([spectrum.eigenvalues[m] for m in modes] |> sort) for (k, modes) in spectrum.eigenmodes)
     mesh::Matrix{Momentum} = spectrum.crystal |> brillouinmesh

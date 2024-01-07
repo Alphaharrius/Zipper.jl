@@ -1349,77 +1349,19 @@ Zipper.:getoutspace(state::RegionState) = state.spstates |> first |> last |> get
 Base.:iterate(state::RegionState, i...) = iterate(state.spstates, i...)
 Base.:length(state::RegionState) = state.spstates |> length
 
-# struct CrystalFockMap <: FockMap{CrystalFock, CrystalFock}
-#     outcrystal::Crystal
-#     incrystal::Crystal
-#     outsubspaces::Dict{Momentum, FockSpace}
-#     insubspaces::Dict{Momentum, FockSpace}
-#     outbz::Subset{Momentum} # The outspace brillouin zone also served as the ordering.
-#     momentummappings::Dict{Momentum, Momentum} # The momentum mapping from the outspace to the inspace.
-#     subfockmaps::Dict{Momentum, FockMap} # The sub-fockmaps indexed by the momentums in the outspace.
-# end
-# export CrystalFockMap
+"""
+    CrystalFockMap(outcrystal::Crystal, incrystal::Crystal, blocks::Dict{Tuple{Momentum, Momentum}, FockMap})
 
-# function Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock
-#     fockspace::FockSpace = fockspaceunion(fockmap.outsubspaces[k] for k in fockmap.outbz)
-#     return FockSpace(fockspace, reflected=fockmap.outcrystal)
-# end
+An implementation of `FockMap` designed to pack `FockMap{CrystalFock, CrystalFock}` more efficiently by storing blocks of sub-fockmaps into a `Dict`
+indexed by the outspace and inspace `Momentum` of the `FockMap` blocks. Noted that when using this type, the performance for generating `CrystalSpectrum`
+will be significantly faster than the `SparseFockMap`, yet for algebric operations it will be slower. This type is used when the generated data for
+are blocks of `k -> k'` `FockMap` that requires a `directsum` to finalize the packaging, which is very inefficient when using `SparseFockMap`.
 
-# function Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock
-#     fockspace::FockSpace = fockspaceunion(fockmap.insubspaces[fockmap.momentummappings[k]] for k in fockmap.outbz)
-#     return FockSpace(fockspace, reflected=fockmap.incrystal)
-# end
-
-# function CrystalFockMap(fockmap::FockMap)
-#     @assert(fockmap|>getoutspace isa CrystalFock)
-#     @assert(fockmap|>getinspace isa CrystalFock)
-
-#     outsubspaces::Base.Generator = fockmap|>getoutspace|>crystalsubspaces
-#     insubspaces::Base.Generator = fockmap|>getinspace|>crystalsubspaces
-
-#     outbz::Subset{Momentum} = Subset(k for (k, _) in outsubspaces)
-#     inbz::Subset{Momentum} = Subset(k for (k, _) in insubspaces)
-
-#     momentummappings::Dict{Momentum, Momentum} = Dict(outk => ink for (outk, ink) in Iterators.zip(outbz, inbz))
-#     subfockmaps::Dict = Dict(k => fockmap[outspace, inspace] for ((k, outspace), inspace) in Iterators.zip(((k, subspace) for (k, subspace) in outsubspaces), (subspace for (_, subspace) in insubspaces)))
-
-#     return CrystalFockMap(fockmap|>getoutspace|>getcrystal, fockmap|>getinspace|>getcrystal, outsubspaces|>Dict, insubspaces|>Dict, outbz, momentummappings, subfockmaps)
-# end
-
-# function FockMap(fockmap::CrystalFockMap)
-#     ret::FockMap = directsum(fockmap.subfockmaps[k] for k in fockmap.outbz)
-#     return FockMap(ret, inspace=fockmap|>getinspace, outspace=fockmap|>getoutspace)
-# end
-
-# Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::CrystalFockMap) = source|>FockMap|>rep
-
-# function crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator
-#     @assert(fockmap.incrystal == fockmap.outcrystal)
-#     return (k => fockmap.subfockmaps[k] for k in fockmap.outbz)
-# end
-
-# function Base.:+(a::CrystalFockMap, b::CrystalFockMap)
-#     bsubmaps::Dict{Vector{Momentum}, FockMap} = Dict([k, b.momentummappings[k]] => b.subfockmaps[k] for k in b.outbz)
-#     addedsubmaps::Dict{Momentum, FockMap} = Dict(k => a.subfockmaps[k] + bsubmaps[[k, a.momentummappings[k]]] for k in a.outbz)
-#     return CrystalFockMap(a.outcrystal, a.incrystal, a.outsubspaces, a.insubspaces, a.outbz, a.momentummappings, addedsubmaps)
-# end
-
-# Base.:+(a::CrystalFockMap, b::FockMap)::CrystalFockMap = a + (b|>CrystalFockMap)
-# Base.:+(a::FockMap, b::CrystalFockMap)::FockMap = (a|>FockMap) + b
-
-# function Base.:*(a::CrystalFockMap, b::CrystalFockMap)
-#     momentummappings::Dict{Momentum, Momentum} = Dict(k => b.momentummappings[a.momentummappings[k]] for k in a.outbz)
-#     multipliedsubmaps::Dict{Momentum, FockMap} = Dict(k => a.subfockmaps[k] * b.subfockmaps[a.momentummappings[k]] for k in a.outbz)
-
-#     return CrystalFockMap(a.outcrystal, b.incrystal, a.outsubspaces, b.insubspaces, a.outbz, momentummappings, multipliedsubmaps)
-# end
-
-# Base.:*(a::CrystalFockMap, b::FockMap)::CrystalFockMap = a * (b|>CrystalFockMap)
-# Base.:*(a::FockMap, b::CrystalFockMap)::FockMap = (a|>FockMap) * b
-
-# Base.:*(num::Number, f::CrystalFockMap)::CrystalFockMap = CrystalFockMap(f.outcrystal, f.incrystal, f.outsubspaces, f.insubspaces, f.outbz, f.momentummappings, Dict(k => num * submap for (k, submap) in f.subfockmaps))
-# Base.:*(f::CrystalFockMap, num::Number)::CrystalFockMap = num * f
-
+### Input
+- `outcrystal`  The crystal of the `outspace` of the `FockMap`.
+- `incrystal`   The crystal of the `inspace` of the `FockMap`.
+- `blocks`      A dictionary indexed by the `Momentum` of the `outspace` and `inspace` of the `FockMap` blocks, with values of the `FockMap` blocks.
+"""
 struct CrystalFockMap <: FockMap{CrystalFock, CrystalFock}
     outcrystal::Crystal
     incrystal::Crystal
@@ -1427,10 +1369,13 @@ struct CrystalFockMap <: FockMap{CrystalFock, CrystalFock}
 end
 export CrystalFockMap
 
+""" Generates the input `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
 Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock = crystalfock(fockmap.blocks|>first|>last|>getinspace|>orderedmodes, fockmap.incrystal)
 
+""" Generates the output `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
 Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock = crystalfock(fockmap.blocks|>first|>last|>getoutspace|>orderedmodes, fockmap.outcrystal)
 
+""" Convert a `CrystalFockMap` into a `SparseFockMap`. """
 function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, CrystalFock}
     outspace::CrystalFock = fockmap|>getoutspace
     inspace::CrystalFock = fockmap|>getinspace
@@ -1488,10 +1433,20 @@ function Base.:adjoint(fockmap::CrystalFockMap)::CrystalFockMap
     return CrystalFockMap(fockmap.incrystal, fockmap.outcrystal, blocks)
 end
 
+function Base.:transpose(fockmap::CrystalFockMap)::CrystalFockMap
+    blocks::Dict{Tuple{Momentum, Momentum}, FockMap} = Dict((ink, outk)=>transpose(block) for ((outk, ink), block) in fockmap.blocks)
+    return CrystalFockMap(fockmap.incrystal, fockmap.outcrystal, blocks)
+end
+
 Zipper.:crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator = (outk=>block for ((outk, ink), block) in fockmap.blocks if outk == ink)
 
 Zipper.:crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
 
+"""
+    crystaldirectsum(kfockmaps; outcrystal::Crystal, incrystal::Crystal)::CrystalFockMap
+
+If the `FockMap` blocks are direct summed to form a `FockMap{CrystalFock, CrystalFock}`, this will be a more efficient way than using `directsum`.
+"""
 function crystaldirectsum(kfockmaps; outcrystal::Crystal, incrystal::Crystal)::CrystalFockMap
     blocks::Dict = Dict((commonattr(block|>getoutspace, :offset), commonattr(block|>getinspace, :offset))=>block for block in kfockmaps)
     return CrystalFockMap(outcrystal, incrystal, blocks)

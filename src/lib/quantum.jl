@@ -1037,7 +1037,7 @@ struct CrystalSpectrum{Dim}
         crystal::Crystal,
         eigenmodes::Dict{Momentum, Subset{Mode}},
         eigenvalues::Dict{Mode, Number},
-        eigenvectors::Dict{Momentum, FockMap}) = new{crystal |> dimension}(crystal, eigenmodes, eigenvalues, eigenvectors)
+        eigenvectors::Dict{Momentum, FockMap}) = new{crystal|>dimension}(crystal, eigenmodes, eigenvalues, eigenvectors)
 end
 export CrystalSpectrum
 

@@ -1079,6 +1079,25 @@ Given a Hermitian `FockMap` with `inspace` and `outspace` of type `CrystalFock` 
 """
 crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(fockmap|>crystalsubmaps, crystal=fockmap|>getinspace|>getcrystal)
 
+"""
+    linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
+
+Since some spectrum might be defined in a crystal that is implicitly on 1-D space, such as a line in the 2D plane, inorder to visualize
+the spectrum properly instead of using the plot in the original dimension, we can embed the spectrum into a 1-D space for plotting.
+"""
+function linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
+    crystal::Crystal = spectrum|>getcrystal
+    nontrivialbasis = Iterators.filter(v -> (v[1]) == 1, zip(crystal|>size, crystal|>getspace|>getbasisvectors))|>collect
+    @assert(nontrivialbasis|>collect|>length == 1, "More than 1 non-trivial basis in this crystal.")
+    embeddedbasis::Real = nontrivialbasis[1][2]|>norm
+    embeddedspace::RealSpace = RealSpace([embeddedbasis][:, :])
+    unitcelllength = crystal|>getunitcell|>length
+    dummyunitcell::Region = Subset([r / unitcelllength] ∈ embeddedspace for r in (0:unitcelllength - 1))
+    embeddedcrystal::Crystal = Crystal(dummyunitcell, [nontrivialbasis[1][1]])
+    return CrystalSpectrum(embeddedcrystal, spectrum|>geteigenmodes, spectrum|>geteigenvalues, spectrum|>geteigenvectors)
+end
+export linespectrum
+
 """ Get the associated crystal of a `CrystalSpectrum` object. """
 Zipper.:getcrystal(spectrum::CrystalSpectrum)::Crystal = spectrum.crystal
 

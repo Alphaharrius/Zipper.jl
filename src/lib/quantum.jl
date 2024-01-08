@@ -1393,9 +1393,10 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
 end
 
 function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
-    blocks::Dict = Dict(pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block) for (pair, block) in a.blocks)
+    addblocks::Dict = Dict(pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block) for (pair, block) in a.blocks)
+    remainblocks::Dict = Dict(pair=>block for (pair, block) in b.blocks if !haskey(addblocks, pair))
 
-    return CrystalFockMap(a.outcrystal, a.incrystal, blocks)
+    return CrystalFockMap(a.outcrystal, a.incrystal, Dict(addblocks..., remainblocks...))
 end
 
 function Base.:-(target::CrystalFockMap)::CrystalFockMap

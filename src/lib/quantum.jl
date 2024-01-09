@@ -413,14 +413,14 @@ modeattrs(subset::Subset{Mode})::OrderedSet{Dict} = OrderedSet(mode |> getattrs 
 export modeattrs
 
 """
-    unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace
+    unitcellfock(crystalfock::CrystalFock)::FockSpace
 
-Retrieve the unit cell fockspace of the system from a `FockSpace{Crystal}`, positioned at the origin of the parent `AffineSpace`.
+Retrieve the unit cell fockspace of the system from a `CrystalFock`, positioned at the origin of the parent `AffineSpace`.
 """
-function unitcellfock(crystalfock::FockSpace{Crystal})::FockSpace{Region}
-    firstpartition::Subset{Mode} = crystalfock |> rep |> first
-    originpoint::Point = firstpartition |> first |> getattr(:pos) |> getspace |> getorigin
-    return FockSpace{Region}(firstpartition |> setattr(:offset => originpoint))
+function unitcellfock(crystalfock::CrystalFock)::RegionFock
+    firstpartition::Subset{Mode} = crystalfock|>rep|>first
+    originpoint::Point = firstpartition|>first|>getspace|>getorigin
+    return RegionFock(firstpartition|>setattr(:offset => originpoint))
 end
 export unitcellfock
 

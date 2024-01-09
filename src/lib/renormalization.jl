@@ -217,7 +217,7 @@ A dictionary of the local single particle states keyed by their group sizes.
 """
 function findlocalspstates(;
     statecorrelations::FockMap, regionfock::FockSpace,
-    symmetry::AffineTransform = identitytransform(statecorrelations |> getcrystal |> dimension),
+    symmetry::AffineTransform = identitytransform(statecorrelations|>getoutspace|>getcrystal|>dimension),
     spectrumextractpredicate::Function = v -> v < 1e-2,
     linearindependencethreshold::Real = 5e-2,
     degeneracythreshold::Real = 1e-7)::Dict{Integer, FockMap}

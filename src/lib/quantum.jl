@@ -887,6 +887,15 @@ function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix
     return FockMap(outspace, inspace, spmat)
 end
 
+function sitefock(site::Offset; flavorcount::Integer = 1)::SiteFock
+    basis::Offset = site|>basispoint
+    offset::Offset = site - basis
+    return FockSpace((Mode(:offset => offset, :pos => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
+end
+
+regionfock(region::Region; flavorcount::Integer = 1)::RegionFock = (
+    fockspaceunion(sitefock(r, flavorcount=flavorcount) for r in region)|>RegionFock)
+
 """
 Perform addition of two `FockMap`s, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
 non-overlapping `inspace` and `outspace`, this corresponds to a direct sum; if they have overlapping but different span of `inspace` or `outspace`, the result will

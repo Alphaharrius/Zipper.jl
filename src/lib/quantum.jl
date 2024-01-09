@@ -150,6 +150,9 @@ The line `mode |> setattr(:flavor => 1)` is equal to `setattr(mode, :flavor => 1
 """
 setattr(attrs::Pair{Symbol}...) = v -> setattr(v, attrs...)
 
+""" Allow merging attributes of two distinct `Mode`. """
+Base.:merge(a::Mode, b::Mode)::Mode = Mode(Dict(getattrs(a)..., getattrs(b)...))
+
 """ A shorthand for setting an attribute to a mode. """
 Base.:&(mode::Mode, attr::Pair{Symbol}) = setattr(mode, attr)
 

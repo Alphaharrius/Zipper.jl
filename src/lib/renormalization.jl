@@ -120,7 +120,7 @@ the brillouin zone of the `crystalfock`.
 function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
     isometries::Dict{Momentum, FockMap} = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
-    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in localisometry.inspace |> orderedmodes)
+    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
     isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
     isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
     isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
@@ -247,7 +247,7 @@ end
 export findlocalspstates
 
 function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, FockMap}, svdorthothreshold::Number = 1e-1)
-    wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
+    wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
     overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
     precarioussvdvalues::Vector = []

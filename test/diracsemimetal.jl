@@ -16,7 +16,7 @@ unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
-modes::Subset{Mode} = quantize(:pos, unitcell, 1)
+modes::Subset{Mode} = quantize(:b, unitcell, 1)
 m0, m1 = members(modes)
 
 tₙ = ComplexF64(-1.)
@@ -124,7 +124,7 @@ function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius
 end
 
 crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
-blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
+blockedmodes::Subset{Mode} = quantize(:b, blockedcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 
 frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2.0)

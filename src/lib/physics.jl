@@ -126,7 +126,7 @@ function momentumoccupations(correlations::FockMap)::FockMap
     crystal::Crystal = correlations |> getoutspace |> getcrystal
     center::Offset = crystal |> getspace |> getorigin
     tracecrystal::Crystal = Crystal(center |> Subset, crystal |> size)
-    mode::Mode = Mode(:pos => center)
+    mode::Mode = Mode(:b => center)
 
     function tracing(k::Momentum, corr::FockMap)::FockMap
         space::FockSpace = mode |> setattr(:offset => k) |> FockSpace

@@ -55,7 +55,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         modecenter::Offset = reduce(+, (outmode |> getpos) |> real for outmode in colmap |> getoutspace)
         basis::Offset = modecenter |> basispoint
         offset::Offset = modecenter - basis
-        return inmode |> setattr(:offset => offset) |> setattr(:pos => basis)
+        return inmode |> setattr(:offset => offset) |> setattr(:b => basis)
     end
 
     spatialinspace::FockSpace{Region} = FockSpace{Region}(fockmap[:, m] |> _spatialinmode for m in fockmap |> getinspace)
@@ -91,7 +91,7 @@ unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [48, 48])
 reciprocalhashcalibration(crystal.sizes)
 
-modes::Subset{Mode} = quantize(:pos, unitcell, 1)
+modes::Subset{Mode} = quantize(:b, unitcell, 1)
 m0, m1 = members(modes)
 
 t_a = ComplexF64(-0.3)
@@ -126,7 +126,7 @@ blockedcrystal::Crystal = blockresult[:crystal]
 blockedcorrelations::FockMap = blockresult[:correlations]
 
 crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
-blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
+blockedmodes::Subset{Mode} = quantize(:b, blockedcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 scaledtriangular = scale*triangular 
 

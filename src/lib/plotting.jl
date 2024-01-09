@@ -31,7 +31,7 @@ end
 
 function visualize(spectrum::Vector{Pair{Mode, T}}; title::String = "") where {T <: Number}
     𝑁::Int64 = length(spectrum)
-    ∑𝑝::Vector{Point} = [getattr(pair.first, :offset) + getattr(pair.first, :pos) for pair in spectrum]
+    ∑𝑝::Vector{Point} = [getattr(pair.first, :offset) + getattr(pair.first, :b) for pair in spectrum]
     𝑀ₚ::Matrix{Float64} = hcat(map(𝑝 -> vec(lineartransform(euclidean(RealSpace, dimension(𝑝)), 𝑝)), ∑𝑝)...)
     markerpositions::Matrix{Float64} = zeros(3, 𝑁)
     copyto!(view(markerpositions, 1:size(𝑀ₚ, 1), :), 𝑀ₚ)

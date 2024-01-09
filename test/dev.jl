@@ -24,7 +24,7 @@ unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [32, 32])
 reciprocalhashcalibration(crystal.sizes)
 
-modes::Subset{Mode} = quantize(:pos, unitcell, 1)
+modes::Subset{Mode} = quantize(:b, unitcell, 1)
 m0, m1 = members(modes)
 
 tₙ = ComplexF64(-1.)
@@ -64,7 +64,7 @@ function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius
 end
 
 crystalpoints::Subset{Offset} = latticepoints(newcrystal)
-newmodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
+newmodes::Subset{Mode} = quantize(:b, newcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 
 frozenseedingregion::Subset{Mode} = circularregionmodes(triangular |> origin, physicalmodes, 2.0)
@@ -123,7 +123,7 @@ symmetrizedseed = reduce(+, (t * fullcourierseed.outspace) * fullcourierseed for
 function Renormalization.crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
     isometries::Dict{Momentum, FockMap} = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
-    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in localisometry.inspace |> orderedmodes)
+    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
     isometrycrystal::Crystal = Crystal(isometryunitcell, (crystalfock |> getcrystal).sizes)
     isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
     isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
@@ -263,7 +263,7 @@ commutation(c6 * courierseedproj.outspace, courierseedproj) |> maximum
 
 
 function Renormalization.wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, FockMap}, svdorthothreshold::Number = 1e-1)
-    wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:pos) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
+    wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
     overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
     precarioussvdvalues::Vector = []
@@ -408,7 +408,7 @@ c62C |> crystalspectrum |> visualize
 crystal2 = block2[:crystal]
 
 crystalpoints2::Subset{Offset} = latticepoints(crystal2)
-newmodes2::Subset{Mode} = quantize(:pos, crystal2.unitcell, 1)
+newmodes2::Subset{Mode} = quantize(:b, crystal2.unitcell, 1)
 physicalmodes2::Subset{Mode} = spanoffset(newmodes2, crystalpoints2)
 Subset(m |> pos |> euclidean for m in newmodes2) |> visualize
 

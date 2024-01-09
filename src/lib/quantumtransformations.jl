@@ -25,7 +25,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
 
     function repackfourierblocks(source::FockMap, kscaled::Momentum, partition::Subset{Mode})::FockMap
         partitionrows::FockMap = rows(source, partition |> FockSpace)
-        inspace::FockSpace = (Subset(setattr(mode, :offset => kscaled, :pos => scale * convert(Point, mode))
+        inspace::FockSpace = (Subset(setattr(mode, :offset => kscaled, :b => scale * convert(Point, mode))
             for mode in partitionrows.inspace |> orderedmodes)
             |> FockSpace)
         return FockMap(partitionrows.outspace, inspace, partitionrows |> rep)
@@ -39,14 +39,14 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
 end
 
 function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})::FockMap
-    # This is used to correct the :pos attribute, since the :pos as a Point will be symmetrized,
-    # which the basis point set might not include the symmetrized :pos. Thus we would like to set
-    # the :pos to its corresponding basis point, and offload the difference to :offset.
+    # This is used to correct the :b attribute, since the :b as a Point will be symmetrized,
+    # which the basis point set might not include the symmetrized :b. Thus we would like to set
+    # the :b to its corresponding basis point, and offload the difference to :offset.
     function correctsymmetrizedmode(mode::Mode)::Mode
-        actualposition::Offset = mode |> getattr(:pos)
+        actualposition::Offset = mode |> getattr(:b)
         basisposition::Offset = actualposition |> basispoint
         offset::Offset = actualposition - basisposition
-        return mode |> setattr(:pos => basisposition) |> setattr(:offset => offset)
+        return mode |> setattr(:b => basisposition) |> setattr(:offset => offset)
     end
 
     modemapping::Dict{Mode, Mode} = Dict()
@@ -54,8 +54,8 @@ function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})
     function mergepositions(mode::Mode)::Mode
         latticeoffset::Point = mode |> getattr(:offset)
         latticeoffset isa Offset || error("Transforming a mode based on momentum must be done with crystal fockspace!")
-        actualposition::Offset = getattr(mode, :pos) + latticeoffset
-        return mode |> setattr(:pos => actualposition) |> removeattr(:offset)
+        actualposition::Offset = getattr(mode, :b) + latticeoffset
+        return mode |> setattr(:b => actualposition) |> removeattr(:offset)
     end
 
     function modesymmetrize(mode::Mode)::Mode
@@ -100,7 +100,7 @@ end
     spatialmap(fockmap::FockMap)::FockMap
 
 Given `fockmap` with a `outspace` of `FockMap{Region}`, determine the center position of the column function and generate a identity map that transforms
-the `inspace` of `fockmap` to include the actual physical attribute of `:offset` and `:pos`.
+the `inspace` of `fockmap` to include the actual physical attribute of `:offset` and `:b`.
 
 ### Output
 The transformer `FockMap` with `inspace` of `fockmap` and the spatially decorated version as the `outspace`.
@@ -113,7 +113,7 @@ function spatialmap(fockmap::FockMap)::FockMap
         modecenter::Offset = reduce(+, (outmode |> getpos) * (weights[outmode, inmode] |> real) for outmode in weights |> getoutspace)
         basis::Offset = modecenter |> basispoint
         offset::Offset = modecenter - basis
-        return inmode |> setattr(:offset => offset) |> setattr(:pos => basis)
+        return inmode |> setattr(:offset => offset) |> setattr(:b => basis)
     end
 
     spatialinspace::FockSpace{Region} = FockSpace{Region}(fockmap[:, m] |> spatialinmode for m in fockmap |> getinspace)

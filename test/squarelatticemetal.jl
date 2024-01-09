@@ -26,7 +26,7 @@ unitcell = Subset(point)
 crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
-m = quantize(:pos, unitcell, 1) |> first
+m = quantize(:b, unitcell, 1) |> first
 
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
@@ -95,7 +95,7 @@ visualize(getsphericalregion(crystal=blockedcrystal, radius=5, metricspace=block
 function sitefock(site::Offset; flavorcount::Integer = 1)::FockSpace{Offset}
     basis::Offset = site|>basispoint
     offset::Offset = site - basis
-    return FockSpace((Mode(:offset => offset, :pos => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
+    return FockSpace((Mode(:offset => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
 end
 
 regionfock(region::Region; flavorcount::Integer = 1)::FockSpace{Region} = (
@@ -119,7 +119,7 @@ visualize(scaledcrystal|>sitepoints, scaledcrystal|>getunitcell)
 
 scaledspace = scaledcrystal|>getspace
 
-embeddedfock = FockSpace(mode|>setattr(:pos=>(scaledspace * getpos(mode)))|>removeattr(:offset) for mode in crosssectionfock)
+embeddedfock = FockSpace(mode|>setattr(:b=>(scaledspace * getpos(mode)))|>removeattr(:offset) for mode in crosssectionfock)
 embeddedfock|>modeattrs
 
 scaledkspace = convert(MomentumSpace, scaledspace)
@@ -136,7 +136,7 @@ scaledfock::FockSpace = ((ksubsets[k] for k in mappingpartitions[kscaled])|>subs
         for kscaled in mappingpartitions|>keys)|>fockspaceunion
 scaledbz = Subset(sk for sk in mappingpartitions|>keys)
 
-embeddedunitcell = Subset(mode|>getattr(:pos) for mode in embeddedfock)
+embeddedunitcell = Subset(mode|>getattr(:b) for mode in embeddedfock)
 embeddedunitcell|>collect
 
 embeddedcrystal = Crystal(embeddedunitcell, scaledcrystal|>size)
@@ -145,7 +145,7 @@ volumeratio = vol(blockedcrystal) / vol(embeddedcrystal)
 
 function repackfourierblocks(source::FockMap, kscaled::Momentum, partition::Subset{Mode})::FockMap
     partitionrows::FockMap = rows(source, partition |> FockSpace)
-    inspace::FockSpace = FockSpace(setattr(mode, :offset => kscaled, :pos => scaledspace * (mode|>getpos)) for mode in partitionrows|>getinspace)
+    inspace::FockSpace = FockSpace(setattr(mode, :offset => kscaled, :b => scaledspace * (mode|>getpos)) for mode in partitionrows|>getinspace)
     return FockMap(partitionrows.outspace, inspace, partitionrows |> rep) / sqrt(volumeratio)
 end
 
@@ -182,13 +182,14 @@ truncregion = reduce(+, crosssection + normalvector * n for n in 0:2)
 transformedcrosssection = Subset(scaledspace * point for point in truncregion)
 
 visualize(blockedcrystal|>sitepoints, transformedcrosssection)
+visualize(blockedcrystal|>sitepoints, blockedcrystal|>getunitcell)
 
 using SparseArrays
 function Zipper.fourier(crystal::Crystal, region::Region)
     bz::Subset{Momentum} = crystal|>brillouinzone
     barepoint::Offset = crystal|>getspace|>getorigin
     barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
-    outspace::CrystalFock = FockSpace((Mode(:offset => k, :pos => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
+    outspace::CrystalFock = FockSpace((Mode(:offset => k, :b => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
     
     latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
     inspace::FockSpace{Region} = latticesites|>regionfock
@@ -200,11 +201,22 @@ function Zipper.fourier(crystal::Crystal, region::Region)
     return FockMap(outspace, inspace, fouriermatrix)
 end
 
+function crystaltoregionsublatticemapping(crystalfock::CrystalFock, regionfock::RegionFock)
+    crystaunitfock = crystalfock|>unitcellfock
+    regionfock = regionfock
+end
+
+function Zipper.fourier(crystalfock::CrystalFock, regionfock::RegionFock; sublatticemapping::FockMap = 1)
+end
+
+transformedcrosssection
 Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
+Ft|>getinspace|>modeattrs
+Ft|>visualize
 # Compute unit-cell mapping FockMap
-modefrombasis = Dict((mode|>getattr(:pos)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
+modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
 truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfock
-values = Dict((modefrombasis[rmode|>getattr(:pos)], rmode) => 1 + 0im for rmode in truncunitfock)
+values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in truncunitfock)
 modemap = FockMap(extendedrestrictedC|>getoutspace|>unitcellfock, truncunitfock, values)
 # After this perform tensor product
 
@@ -240,13 +252,79 @@ truncfilledprojector = truncfilledCspec|>crystalprojector
 truncfilledcorrelations = idmap(truncfilledprojector|>getoutspace) - truncfilledprojector
 truncfilledcorrelations|>crystalspectrum|>linespectrum|>visualize
 
+crosssectionfock|>modeattrs
+truncfilledcorrelations|>getoutspace|>modeattrs
+
+wannierregion = Subset(scaledspace * point for point in crosssection)
+wannierregion|>regionfock
+
+regioncorrelations(truncfilledcorrelations, wannierregion|>regionfock)|>eigspech|>visualize
+
+function _findlocalspstates(;
+    statecorrelations::FockMap, regionfock::FockSpace,
+    symmetry::AffineTransform = identitytransform(statecorrelations|>getoutspace|>getcrystal|>dimension),
+    spectrumextractpredicate::Function = v -> v < 1e-2,
+    linearindependencethreshold::Real = 5e-2,
+    degeneracythreshold::Real = 1e-7)::Dict{Integer, FockMap}
+
+    function lineardependencefilter(spstate::FockMap)::Bool
+        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecorrelations.outspace)
+        crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
+        pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
+        mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
+        return mineigenvalue > linearindependencethreshold
+    end
+
+    localcorrelations::FockMap = regioncorrelations(statecorrelations, regionfock)
+    localspectrum::EigenSpectrum = eigspech(localcorrelations, groupingthreshold=degeneracythreshold)
+    groupeigenvalues::Base.Generator = (
+        subset => (localspectrum |> geteigenvalues)[subset |> first]
+        for subset in localspectrum |> geteigenvectors |> getinspace |> sparsegrouping(:eigenindex) |> rep)
+    selectedgroups = Iterators.filter(p -> p.second |> spectrumextractpredicate, groupeigenvalues)
+
+    selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
+    orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
+    symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
+    spstates = (state * spatialmap(state)' for state in symmetricspstates)
+
+    return Dict(state |> getinspace |> dimension => state for state in spstates)
+end
+
+wregioncorr = regioncorrelations(truncfilledcorrelations, wannierregion|>regionfock)
+localspectrum::EigenSpectrum = eigspech(wregioncorr, groupingthreshold=1e-4)
+localspectrum|>visualize
+groupeigenvalues::Base.Generator = (
+    subset => (localspectrum |> geteigenvalues)[subset |> first]
+    for subset in localspectrum |> geteigenvectors |> getinspace |> sparsegrouping(:eigenindex) |> rep)
+[groupeigenvalues...]
+selectedgroups = Iterators.filter(p -> p.second |> (v -> v < 1e-2), groupeigenvalues)
+[selectedgroups...]
+selectedisometries = ((localspectrum |> geteigenvectors)[:, (group.first|>FockSpace)[1:8]] for group in selectedgroups)
+selectedisometries|>collect
+function lineardependencefilter(spstate::FockMap)::Bool
+    crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=truncfilledcorrelations|>getoutspace)
+    crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
+    pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
+    mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
+    println(mineigenvalue)
+    return mineigenvalue > 5e-2
+end
+orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
+symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
+spstates = (state * spatialmap(state)' for state in symmetricspstates)
+Dict(state |> getinspace |> dimension => state for state in spstates)
+
+localseed = findlocalspstates(statecorrelations=truncfilledcorrelations, regionfock=wannierregion|>regionfock, spectrumextractpredicate=v -> v < 5e-1, degeneracythreshold=0.2)
+
+
+
 truncregion = crosssection
 transformedcrosssection = Subset(scaledspace * point for point in truncregion)
 Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
 # Compute unit-cell mapping FockMap
-modefrombasis = Dict((mode|>getattr(:pos)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
+modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
 truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfock
-values = Dict((modefrombasis[rmode|>getattr(:pos)], rmode) => 1 + 0im for rmode in truncunitfock)
+values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in truncunitfock)
 modemap = FockMap(extendedrestrictedC|>getoutspace|>unitcellfock, truncunitfock, values)
 # After this perform tensor product
 
@@ -265,7 +343,7 @@ comparefock = FockSpace(mode|>fixposition for mode in extendedrestrictedC|>getou
 
 
 
-truncfock = FockSpace{Region}(mode|>setattr(:pos => mode|>getpos)|>setattr(:offset => mode|>getpos|>getspace|>getorigin) for mode in regionfock(transformedcrosssection))
+truncfock = FockSpace{Region}(mode|>setattr(:b => mode|>getpos)|>setattr(:offset => mode|>getpos|>getspace|>getorigin) for mode in regionfock(transformedcrosssection))
 truncfourier = fourier(extendedfrozencorrelations|>getoutspace, truncfock)
 truncfourier|>visualize
 truncator = truncfourier * truncfourier'

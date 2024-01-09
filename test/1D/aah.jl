@@ -11,7 +11,7 @@ using ..Spaces, ..Quantum, ..Physical, ...Plotting, ...Geometries, ...Transforma
 
 𝑅₁ = euclidean(RealSpace, 1)
 unitcell::Subset{Point} = Subset(Point([1/2], 𝑅₁))
-quantized::Subset{Mode} = quantize(:pos, unitcell, 1)
+quantized::Subset{Mode} = quantize(:b, unitcell, 1)
 mode::Mode = first(quantized)
 
 # Generate all modes spanning the space.
@@ -50,7 +50,7 @@ for 𝑉 in 0:0.01:3
 
     scale::Scale = Scale([2.0][:,:])
     newcrystal::Crystal = scale * crystal
-    newbasismodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
+    newbasismodes::Subset{Mode} = quantize(:b, newcrystal.unitcell, 1)
     newmodes::Subset{Mode} = spanoffset(newbasismodes, latticepoints(newcrystal))
 
     modemapping::Dict{Point, Mode} = Dict(convert(Point, m) => m for m in newmodes)
@@ -110,7 +110,7 @@ visualize(𝐶)
 
 scale::Scale = Scale([2.0][:,:])
 newcrystal::Crystal = scale * scale * crystal
-newbasismodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
+newbasismodes::Subset{Mode} = quantize(:b, newcrystal.unitcell, 1)
 newmodes::Subset{Mode} = spanoffset(newbasismodes, latticepoints(newcrystal))
 
 modemapping::Dict{Point, Mode} = Dict(convert(Point, m) => m for m in newmodes)

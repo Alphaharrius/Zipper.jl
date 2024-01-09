@@ -8,7 +8,7 @@ Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
 
 ### Attributes to put in `attrs`
 - `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
-- `:pos` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
+- `:b` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
 - `:orbital` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
 
@@ -41,16 +41,16 @@ Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)
 """
     getspace(mode::Mode)
 
-The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:pos`, if none of those are defined,
+The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:b`, if none of those are defined,
 it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
 
 ### Output
-The space of the attribute `:offset` if available, fall back to `:pos` if otherwise; returns a Euclidean space of dimension `1` if both `:offset` & `:pos` is missing.
+The space of the attribute `:offset` if available, fall back to `:b` if otherwise; returns a Euclidean space of dimension `1` if both `:offset` & `:b` is missing.
 """
 function Zipper.:getspace(mode::Mode)
     # :offset have a higher priority in determining the space of the mode.
     if hasattr(mode, :offset) return getspace(getattr(mode, :offset)) end
-    if hasattr(mode, :pos) return getspace(getattr(mode, :pos)) end
+    if hasattr(mode, :b) return getspace(getattr(mode, :b)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
     return euclidean(RealSpace, 1)
@@ -62,7 +62,7 @@ Zipper.:Subset(modes::Mode...) = Subset(m for m in modes)
 """
     getpos(mode::Mode)::Point
 
-Get the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space.
+Get the actual position of the mode, this method only works when `:offset` and `:b` are defined in the same space.
 """
 Zipper.:getpos(mode::Mode)::Point = convert(Point, mode)
 
@@ -102,7 +102,7 @@ export getattrs
 Create a **copy** of `mode` **without** the attributes identified by `keys`.
 
 ### Examples
-- To remove the attribute of `:offset` and `:pos`, we use `removeattr(mode, :offset, :pos)`.
+- To remove the attribute of `:offset` and `:b`, we use `removeattr(mode, :offset, :b)`.
 """
 removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
 export removeattr
@@ -124,7 +124,7 @@ Create a **copy** of every `Mode` of `modes` **without** the attributes identifi
 same length as the input `modes` as some `Mode` might be **condensed** into a single one after some unique identifier attributes is removed.
 
 ### Examples
-To remove the attribute of `:offset` and `:pos`, we use `removeattr(modes, :offset, :pos)`.
+To remove the attribute of `:offset` and `:b`, we use `removeattr(modes, :offset, :b)`.
 """
 removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
 
@@ -205,8 +205,8 @@ the ordering of `points`, then follows the ordering of `basismodes`.
 spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
 export spanoffset
 
-""" By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:pos` are defined in the same space. """
-Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :pos)
+""" By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:b` are defined in the same space. """
+Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :b)
 
 """ Two `Mode` objects are equivalent if they held the same informations. """
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
@@ -554,10 +554,10 @@ Quantizing a mode from a given `Point`.
 The quantized `Mode` object.
 """
 function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
-    @assert(identifier == :offset || identifier == :pos)
+    @assert(identifier == :offset || identifier == :b)
     home::Point = getorigin(getspace(point))
-    # Since there are only one of the attribute :offset or :pos will take the point, the left over shall take the origin.
-    couple::Pair{Symbol, Point} = identifier == :offset ? :pos => home : :offset => home
+    # Since there are only one of the attribute :offset or :b will take the point, the left over shall take the origin.
+    couple::Pair{Symbol, Point} = identifier == :offset ? :b => home : :offset => home
     # The new mode will take a group of q:$(name).
     return Mode([identifier => point, :flavor => flavor, couple])
 end
@@ -890,7 +890,7 @@ end
 function sitefock(site::Offset; flavorcount::Integer = 1)::SiteFock
     basis::Offset = site|>basispoint
     offset::Offset = site - basis
-    return FockSpace((Mode(:offset => offset, :pos => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
+    return FockSpace((Mode(:offset => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
 end
 
 regionfock(region::Region; flavorcount::Integer = 1)::RegionFock = (
@@ -1067,7 +1067,7 @@ Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> 
 """ Shorthand to retrieve the unitcell fockspace from a `CrystalSpectrum`. """
 function unitcellfock(spectrum::CrystalSpectrum)::FockSpace{Region}
     sourcefock::FockSpace = spectrum |> geteigenvectors |> first |> last |> getoutspace
-    originposition::Offset = sourcefock |> first |> getattr(:pos) |> getspace |> getorigin
+    originposition::Offset = sourcefock |> first |> getattr(:b) |> getspace |> getorigin
     return sourcefock |> orderedmodes |> setattr(:offset => originposition) |> FockSpace{Region}
 end
 

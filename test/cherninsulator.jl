@@ -16,7 +16,7 @@ unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
-modes::Subset{Mode} = quantize(:pos, unitcell, 1)
+modes::Subset{Mode} = quantize(:b, unitcell, 1)
 m0, m1 = members(modes)
 
 tₙ = -1 + 0im
@@ -173,7 +173,7 @@ function zer(correlations::FockMap)
 
     crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
     samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
-    blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
+    blockedmodes::Subset{Mode} = quantize(:b, blockedcrystal.unitcell, 1)
     physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
 
 
@@ -301,7 +301,7 @@ end
 # blockedcrystal = rg1[:correlations]|>getoutspace|>getcrystal
 # crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
 # samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
-# blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
+# blockedmodes::Subset{Mode} = quantize(:b, blockedcrystal.unitcell, 1)
 # physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
 
 
@@ -395,7 +395,7 @@ function berrycurvaturemultiband(state::CrystalSpectrum)
     crystalfock = FockSpace(fockmap|>getoutspace, reflected=barecrystal)
     return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock)
 end
-
+:b
 scale
 
 Chern_number_multiband(groundstates)
@@ -427,7 +427,7 @@ function quantummetricdeterminants(state::CrystalSpectrum)
     fockspace = FockSpace(product|>getoutspace, reflected=barecrystal)
     return FockMap(product, inspace=fockspace, outspace=fockspace)
 end
-
+:b
 rg1det = quantummetricdeterminants(rg1gs)
 visualize(rg1det, colrange=512:1024, rowrange=512:1024)
 visualize(rg1det|>crystalspectrum, usecontour=true, title="qgtdet-RG1-RG1space")

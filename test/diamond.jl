@@ -15,7 +15,7 @@ crystal = Crystal(unitcell, [4, 4, 4])
 zone::Subset{Point} = points(crystal)
 k_zone::Subset{Point} = brillouinzone(crystal)
 
-modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
+modes::Subset{Mode} = quantize("physical", :b, unitcell, 1)
 fock::FockSpace = FockSpace(modes)
 
 m0, m1 = members(modes)

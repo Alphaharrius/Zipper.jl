@@ -202,11 +202,26 @@ function Zipper.fourier(crystal::Crystal, region::Region)
 end
 
 function crystaltoregionsublatticemapping(crystalfock::CrystalFock, regionfock::RegionFock)
-    crystaunitfock = crystalfock|>unitcellfock
-    regionfock = regionfock
+    crystalunitfock = crystalfock|>unitcellfock|>orderedmodes|>removeattr(:offset)|>FockSpace
+    regionunitfock = regionfock|>orderedmodes|>removeattr(:offset)|>FockSpace
+    if !hasamespan(crystalunitfock, regionunitfock)
+        @assert(==(crystalunitfock|>dimension, regionunitfock|>dimension))
+        @warn("Abstract mapping between sub-lattice degrees of freedom...")
+    end
+    return idmap(crystalunitfock, regionunitfock)
 end
 
-function Zipper.fourier(crystalfock::CrystalFock, regionfock::RegionFock; sublatticemapping::FockMap = 1)
+function tensorproduct(primary::FockSpace, secondary::FockSpace)
+    return fockspaceunion(FockSpace(merge(pmode, smode) for smode in secondary) for pmode in primary)
+end
+
+function Zipper.fourier(crystal::Crystal, regionfock::RegionFock)
+end
+
+function Zipper.fourier(crystalfock::CrystalFock, regionfock::RegionFock, sublatticemapping::FockMap)
+    baretransform::FockMap = fourier(crystalfock|>getcrystal, regionfock|>getregion)
+    ftrep::SparseMatrixCSC = kron(baretransform|>rep, sublatticemapping|>rep)
+    return FockSpace(crystalfock, regionfock, ftrep)
 end
 
 transformedcrosssection
@@ -219,8 +234,6 @@ truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfo
 values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in truncunitfock)
 modemap = FockMap(extendedrestrictedC|>getoutspace|>unitcellfock, truncunitfock, values)
 # After this perform tensor product
-
-Base.:merge(a::Mode, b::Mode)::Mode = Mode(Dict(getattrs(a)..., getattrs(b)...))
 
 function tensorproduct(primary::FockSpace, secondary::FockSpace; keepprimaryattrs)
     secondarymodes = (removeattr(mode, keepprimaryattrs...) for mode in secondary)

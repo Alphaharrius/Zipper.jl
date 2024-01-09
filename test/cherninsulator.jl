@@ -339,14 +339,9 @@ function Chern_number_multiband(state::CrystalSpectrum)
     
     function LinkVariable(k::Momentum, direction)
         delta_k = Δk[direction]
-        # println("statevector value k: ", statevectors[k] |> rep)
-        # println("statevector value k': ",statevectors[k+delta_k|> basispoint] |> rep)
         overlap = (statevectors[k] |> rep)' * (statevectors[k+delta_k|> basispoint]|> rep)
-        U, Σ, Vt = Matrix(overlap) |> svd
-        # println("sigma mat: ",Σ)
-        U_mu = det(U*Vt)
+        U_mu = det(overlap)
         U_mu /= abs(U_mu)
-        # println("U val: ",U_mu)
         return U_mu
     end
     
@@ -358,12 +353,12 @@ function Chern_number_multiband(state::CrystalSpectrum)
         return -1im*log(Berry_phase(k))
     end
 
-    C = 0 
+    Chern = 0 
     for kpoints in statevectors
         k = kpoints[1]
-        C += Berry_curvature(k)
+        Chern += Berry_curvature(k)
     end
-    return C/(2*pi)
+    return Chern/(2*pi)
 end
 
 function berrycurvaturemultiband(state::CrystalSpectrum)
@@ -375,14 +370,9 @@ function berrycurvaturemultiband(state::CrystalSpectrum)
     
     function LinkVariable(k::Momentum, direction)
         delta_k = Δk[direction]
-        # println("statevector value k: ", statevectors[k] |> rep)
-        # println("statevector value k': ",statevectors[k+delta_k|> basispoint] |> rep)
         overlap = (statevectors[k] |> rep)' * (statevectors[k+delta_k|> basispoint]|> rep)
-        U, Σ, Vt = Matrix(overlap) |> svd
-        # println("sigma mat: ",Σ)
-        U_mu = det(U*Vt)
+        U_mu = det(overlap)
         U_mu /= abs(U_mu)
-        # println("U val: ",U_mu)
         return U_mu
     end
     

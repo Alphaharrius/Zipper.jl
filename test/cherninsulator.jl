@@ -101,41 +101,7 @@ function computequantummetric(state::CrystalSpectrum)
 end
 
 correlations = C
-
-crystalfock = correlations.outspace
-
-    scale = Scale([2 0; 0 2], crystalfock |> getcrystal |> getspace)
-    @time blockresult = blocking(:action => scale, :correlations => correlations, :crystal => crystalfock |> getcrystal)
-
-    blockedcrystal::Crystal = blockresult[:crystal]
-    blockedcorrelations::FockMap = blockresult[:correlations]
-    blocker = blockresult[:transformer]
-
-    function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
-        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthospace
-        physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
-        return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
-    end
-
-    crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
-    samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
-    blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
-    physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
-
-
-    frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2)
-    # visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
-    frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
-
-    Base.:show(io::IO, fockmap::CrystalFockMap) = print(io, string("CrystalFockMap"))
-
-    @time globaldistiller = globaldistillerhamiltonian(
-        correlations=blockresult[:correlations],
-        restrictspace=frozenseedingfock,
-        localisometryselectionstrategy=frozenselectionbycount(3))
-
-    globaldistillerspectrum = globaldistiller|>crystalspectrum
-    globaldistillerspectrum|>visualize
+correlations = CrystalFockMap(crystal, crystal, Dict((k, k)=>block for (k, block) in correlations|>crystalsubmaps))
 
 
 # gsqm = computequantummetric(groundstates)
@@ -178,17 +144,15 @@ crystalfock = correlations.outspace
 entanglemententropy(C |> crystalspectrum)
 
 function zer(correlations::FockMap)
-    crystalfock = correlations.outspace
+    crystalfock = correlations|>getoutspace
 
-    scale = Scale([2 0; 0 2], crystalfock |> getcrystal |> getspace)
-    @time blockresult = blocking(:action => scale, :correlations => correlations, :crystal => crystalfock |> getcrystal)
-
-    blockedcrystal::Crystal = blockresult[:crystal]
-    blockedcorrelations::FockMap = blockresult[:correlations]
-    blocker = blockresult[:transformer]
+    scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
+    blocker = scale * (crystalfock)
+    blockedcorrelations = blocker * correlations * blocker'
+    blockedcrystal::Crystal = blockedcorrelations.outcrystal
 
     function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
-        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthospace
+        currentspace::RealSpace = crystalfock|>getcrystal|>getspace|>orthospace
         physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
         return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
     end
@@ -204,7 +168,7 @@ function zer(correlations::FockMap)
     frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
 
     @time globaldistiller = globaldistillerhamiltonian(
-        correlations=blockresult[:correlations],
+        correlations=blockedcorrelations,
         restrictspace=frozenseedingfock,
         localisometryselectionstrategy=frozenselectionbycount(3))
 
@@ -278,7 +242,7 @@ function zer(correlations::FockMap)
         :entanglemententropy => entanglemententropy(couriercorrelationspectrum))
 end
 
-rg1 = zer(C)
+rg1 = zer(correlations)
 
 rg1C = rg1[:correlations]
 rg1courierzipper = rg1[:courierzipper]

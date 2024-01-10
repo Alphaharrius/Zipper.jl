@@ -47,8 +47,8 @@ The real space local correlation with `inspace` and `outspace` as the `regionfoc
 """
 function regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockMap
     fock::FockSpace = correlations|>getinspace
-    fouriermap::FockMap = fourier(fock, regionfock) / (fock|>subspacecount|>sqrt)
-    return fouriermap' * correlations * fouriermap
+    transform = fourier(fock, regionfock) / (fock|>subspacecount|>sqrt)
+    return transform' * correlations * transform
 end
 export regioncorrelations
 

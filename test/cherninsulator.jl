@@ -103,6 +103,17 @@ end
 correlations = C
 correlations = CrystalFockMap(crystal, crystal, Dict((k, k)=>block for (k, block) in correlations|>crystalsubmaps))
 
+function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::CrystalFockMap)::SparseFockMap
+    space::RealSpace = fouriertransform|>getinspace|>getcrystal|>getspace
+    kspace::MomentumSpace = convert(MomentumSpace, space)
+    Γ::Momentum = kspace|>getorigin
+    singularcrystal::Crystal = Crystal(space|>getorigin|>Subset, space|>dimension|>ones)
+    blocks::Dict = Dict((Γ, k)=>fouriertransform[:, fock] for (k, fock) in fouriertransform|>getinspace|>crystalsubspaces)
+    crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, fockmap.incrystal, blocks)
+
+    return crystaltransform * fockmap |>FockMap
+end
+
 
 # gsqm = computequantummetric(groundstates)
 # visualize(gsqm[:gxx]|>crystalspectrum, usecontour=true, title="gxx-GS")

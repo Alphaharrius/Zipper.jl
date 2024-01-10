@@ -1455,6 +1455,17 @@ Zipper.:crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator = (outk=>block f
 
 Zipper.:crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
 
+function CrystalFockMap(crystalspectrum::CrystalSpectrum)::CrystalFockMap
+    function momentumfockmap(k::Momentum)
+        modes::Subset{Mode} = crystalspectrum.eigenmodes[k]
+        eigenfock::FockSpace = modes |> FockSpace
+        diagonal::FockMap = FockMap(eigenfock, eigenfock, Dict((m, m) => crystalspectrum.eigenvalues[m] |> ComplexF64 for m in modes))
+        return crystalspectrum.eigenvectors[k] * diagonal * crystalspectrum.eigenvectors[k]'
+    end
+    blocks::Dict = Dict((k, k)=>(k|>momentumfockmap) for (k, _) in crystalspectrum.eigenmodes)
+    return CrystalFockMap(crystalspectrum|>getcrystal, crystalspectrum|>getcrystal, blocks)
+end
+
 """
     crystaldirectsum(kfockmaps; outcrystal::Crystal, incrystal::Crystal)::CrystalFockMap
 

@@ -297,6 +297,18 @@ Zipper.:getregion(regionfock::FockSpace{Region})::Region = regionfock |> getrefl
 CrystalFock = FockSpace{Crystal}
 export CrystalFock
 
+""" Shorthand alias for `FockSpace{Region}`. """
+RegionFock = FockSpace{Region}
+export RegionFock
+
+""" Shorthand alias for `FockSpace{Momentum}`. """
+MomentumFock = FockSpace{Momentum}
+export MomentumFock
+
+""" Shorthand alias for `FockSpace{Offset}`. """
+SiteFock = FockSpace{Offset}
+export SiteFock
+
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
 Base.:show(io::IO, ::Type{FockSpace{Region}}) = print(io, string("RegionFock"))

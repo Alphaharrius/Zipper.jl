@@ -156,7 +156,7 @@ function globaldistillerhamiltonian(;
 
     localisometries::Dict{Symbol} = localfrozenisometries(correlations, restrictspace, selectionstrategy=localisometryselectionstrategy)
     crystalprojectors::Dict{Symbol, FockMap} = Dict(
-        name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations.inspace)
+        name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations|>getinspace)
         for (name, isometry) in localisometries)
     return reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
 end

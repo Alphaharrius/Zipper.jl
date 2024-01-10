@@ -264,9 +264,7 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
     end
-    wannierisometry::FockMap = directsum(approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
-    inspace::FockSpace = FockSpace(wannierisometry.inspace, reflected=wanniercrystal)
-    outspace::FockSpace = FockSpace(wannierisometry.outspace, reflected=crystal)
-    return FockMap(wannierisometry, inspace=inspace, outspace=outspace, performpermute=false)
+    blocks::Dict = Dict((k, k)=>approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
+    return CrystalFockMap(crystal, wanniercrystal, blocks)
 end
 export wannierprojection

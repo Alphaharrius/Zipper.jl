@@ -140,14 +140,8 @@ end
 export crystalprojector
 
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
-    fockmap::FockMap = directsum(spectrum.eigenvectors[k] * spectrum.eigenvectors[k]' for (k, _) in spectrum.eigenmodes)
-    basismodes::Subset{Mode} = spectrum |> unitcellfock |> orderedmodes
-    fockspace::CrystalFock = crystalfock(basismodes, spectrum |> getcrystal)
-    if hassamespan(fockmap |> getoutspace, fockspace)
-        return FockMap(fockmap, inspace=fockspace, outspace=fockspace, performpermute=true)
-    end
-    # If some of the modes of the crystalfock is not included within the spectrum, we have to include them back into the nullspace of the projector.
-    return zerosmap(fockspace, fockspace) + fockmap
+    blocks::Dict = Dict((k, k)=>(u * u') for (k, u) in spectrum|>geteigenvectors)
+    return CrystalFockMap(spectrum|>getcrystal, spectrum|>getcrystal, blocks)
 end
 
 function globaldistillerhamiltonian(;

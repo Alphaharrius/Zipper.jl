@@ -1477,13 +1477,25 @@ function crystaldirectsum(kfockmaps; outcrystal::Crystal, incrystal::Crystal)::C
 end
 export crystaldirectsum
 
-function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::CrystalFockMap)::SparseFockMap
-    space::RealSpace = fouriertransform|>getinspace|>getcrystal|>getspace
-    kspace::MomentumSpace = convert(MomentumSpace, space)
+""" Implemented to support Fourier transform of `CrystalFockMap` objects. """
+function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::CrystalFockMap)
+    crystal::Crystal = fouriertransform|>getinspace|>getcrystal
+    realspace::RealSpace = crystal|>getspace
+    kspace::MomentumSpace = convert(MomentumSpace, realspace)
     Γ::Momentum = kspace|>getorigin
-    singularcrystal::Crystal = Crystal(space|>getorigin|>Subset, space|>dimension|>ones)
+    singularcrystal::Crystal = Crystal(realspace|>getorigin|>Subset, realspace|>dimension|>ones)
     blocks::Dict = Dict((Γ, k)=>fouriertransform[:, fock] for (k, fock) in fouriertransform|>getinspace|>crystalsubspaces)
-    crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, fockmap.incrystal, blocks)
+    crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, crystal, blocks)
 
-    return crystaltransform * fockmap |>FockMap
+    transformed::CrystalFockMap = crystaltransform * fockmap
+    outspace::RegionFock = fouriertransform|>getoutspace
+    inspace::CrystalFock = fouriertransform|>getinspace
+    data::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
+    for (_, block) in transformed.blocks
+        blockinspace::FockSpace = block|>getinspace
+        inorder::UnitRange = fockorder(inspace, blockinspace|>first):fockorder(inspace, blockinspace|>last)
+        data[:, inorder] += block|>rep
+    end
+
+    return FockMap(outspace, inspace, data)
 end

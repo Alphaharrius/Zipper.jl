@@ -1412,7 +1412,7 @@ function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
 end
 
 function Base.:-(target::CrystalFockMap)::CrystalFockMap
-    blocks::Dict = (mapping=>(-block) for (mapping, block) in blocks)
+    blocks::Dict = Dict(mapping=>(-block) for (mapping, block) in target.blocks)
     return CrystalFockMap(target.outcrystal, target.incrystal, blocks)
 end
 

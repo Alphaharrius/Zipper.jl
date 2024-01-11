@@ -71,7 +71,7 @@ end
     blocker = blockresult[:transformer]
 
     function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
-        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
+        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthospace
         physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
         return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
     end
@@ -166,8 +166,8 @@ Base.:real(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>g
 
 qgtcrystal = Crystal(triangular |> getorigin, crystal|>size)
 qgt = δIx' * groundstateprojector * δIy
-qgtoutspace = FockSpace(qmt|>getoutspace, reflected=qmtcrystal)
-quantumgeometrictensor = idmap(qgtoutspace) - FockMap(qmt, inspace=qmtoutspace, outspace=qmtoutspace)
+qgtoutspace = FockSpace(qgt|>getoutspace, reflected=qgtcrystal)
+quantumgeometrictensor = idmap(qgtoutspace) - FockMap(qgt, inspace=qgtoutspace, outspace=qgtoutspace)
 quantummetrictensor = quantumgeometrictensor |> real
 quantummetrictensor |> crystalspectrum |> visualize
 
@@ -186,7 +186,7 @@ function zer(correlations::FockMap)
     blocker = blockresult[:transformer]
 
     function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
-        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
+        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthospace
         physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
         return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
     end
@@ -287,7 +287,7 @@ visualize(frozenseedingregion, Subset(m |> getpos for m in rg2[:frozenseedingfoc
 
 
 function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
-    currentspace::RealSpace = blockedcrystal |> getspace |> orthogonalspace
+    currentspace::RealSpace = blockedcrystal |> getspace |> orthospace
     physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
     return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
 end

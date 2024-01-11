@@ -82,15 +82,10 @@ function circularfilter(mode::Mode, center::Offset, radius::Real = 1.5)::Bool
     return norm(((mode-center) |> getpos |> euclidean))<=radius
 end
 
-function circularregionmodes(center::Offset, physicalmodes::Subset{Mode}, radius::Number, crystal:: Crystal)::Subset{Mode}
-    currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthogonalspace
-    crystalsize = crystal |> size
-    # periodicnorm =  m -> lineartransform(currentspace, takeperiodic(m |> getpos,crystalsize)) |> norm
-     
-    # function takeperiodic(p, crystalsize)
-    #     return (p |> getspace)&[min(vectno,24-vectno) for (size,vectno) in zip(crystalsize, vec(p))]
-    # end
-    return filter(p -> circularfilter(p, center,radius), physicalmodes)
+function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
+    currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthospace
+    physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
+    return filter(p -> physicalnorm(p - origin) <= radius, physicalmodes)
 end
 
 
@@ -105,7 +100,7 @@ function localmodesgrouping(localcorrelation::FockMap, threshold::Float64)::Dict
 end
 
 function localregioninspection(center::Offset, physicalmodes::Subset{Mode}, radius::Number, crystal:: Crystal)::Tuple{Subset{Offset},FockSpace}
-    seedingmodes::Subset{Mode} = circularregionmodes(center, physicalmodes, radius, crystal)
+    seedingmodes::Subset{Mode} = circularregionmodes(center, physicalmodes, radius)
     seedingregion::Subset{Offset} = Subset(m |> getpos for m in seedingmodes)
     seedingfock::FockSpace = FockSpace{Region}(seedingmodes)
     return seedingregion,seedingfock
@@ -157,7 +152,7 @@ function groupmodesbydist(;
     region::Subset{Point{RealSpace}},
     regionfock::FockSpace,
     center::Point,
-    samedistancethreshold::Int = 8)
+    samedistancethreshold::Int = 5)
 
     visualspace = region |> getspace |> euclidean
     distancewithmode = sort(((norm(lineartransform(visualspace, (mode |> getpos)-center) |> vec),mode) for mode in regionfock), by = first, rev = true)
@@ -200,8 +195,6 @@ function translatedlocalfockmaplist(;
 end
 
 
-∈(vec, space::AffineSpace)::Point = Point(vec |> collect, space)
-
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
 
@@ -219,13 +212,13 @@ reciprocalhashcalibration(crystal.sizes)
 modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 m0, m1 = members(modes)
 
-tₙ = ComplexF64(-1)
+tₙ = -1 + 0im
 tₕ = 0.1im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
-    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ]
+    (m0, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₙ,
+    (m0, m1 |> setattr(:offset => [0, 1] ∈ triangular)) => tₙ]
 
 haldane = [
     (m0, setattr(m0, :offset => Point([1, 1], triangular))) => tₕ,
@@ -242,14 +235,13 @@ energyspectrum |> visualize
 
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstates |> visualize
-groundstateprojector = groundstates |> crystalprojector
 
+groundstateprojector = groundstates |> crystalprojector
 C = idmap(groundstateprojector.outspace) - groundstateprojector
 
-C |> crystalspectrum |> visualize
+CC = CrystalFockMap(C)
 
 correlations = C
-
 crystalfock = correlations.outspace
 
 scale = Scale([2 0; 0 2], crystalfock |> getcrystal |> getspace)
@@ -259,21 +251,21 @@ blockedcrystal::Crystal = blockresult[:crystal]
 blockedcorrelations::FockMap = blockresult[:correlations]
 
 crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
+samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
 blockedmodes::Subset{Mode} = quantize(:pos, blockedcrystal.unitcell, 1)
-physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
-scaledtriangular = scale*triangular 
+physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
 
-firstlayer = Set([Point([-2,-2],scaledtriangular), Point([-1,0],scaledtriangular), Point([0,2],scaledtriangular), Point([0,-1],scaledtriangular), Point([1,1],scaledtriangular), Point([2,0],scaledtriangular)])
-secondlayer = Set([Point([-1,-1],scaledtriangular), Point([0,1],scaledtriangular), Point([1,0],scaledtriangular)])
-thirdlayer = Set([Point([0,0],scaledtriangular)])
+firstlayer = Set([Point([-2,-2],triangular), Point([-1,0],triangular), Point([0,2],triangular), Point([0,-1],triangular), Point([1,1],triangular), Point([2,0],triangular)])
+secondlayer = Set([Point([-1,-1],triangular), Point([0,1],triangular), Point([1,0],triangular)])
+thirdlayer = Set([Point([0,0],triangular)])
 
 # firstlayer = Set([[-2,-2], [-1,0], [0,2], [0,-1], [1,1], [2,0]])
 # secondlayer = Set([[-1,-1], [0,1], [1,0]])
 # thirdlayer = Set([[0,0]])
 
-firstlayers = Set([Point([-2,-2],scaledtriangular), Point([-1,0],scaledtriangular), Point([0,2],scaledtriangular), Point([0,-1],scaledtriangular), Point([1,1],scaledtriangular), Point([2,0],scaledtriangular)])
-secondlayers = Set([Point([-1,-1],scaledtriangular), Point([0,1],scaledtriangular), Point([1,0],scaledtriangular)])
-thirdlayers = Set([Point([0,0],scaledtriangular)])
+firstlayers = Set([Point([-2,-2],triangular), Point([-1,0],triangular), Point([0,2],triangular), Point([0,-1],triangular), Point([1,1],triangular), Point([2,0],triangular)])
+secondlayers = Set([Point([-1,-1],triangular), Point([0,1],triangular), Point([1,0],triangular)])
+thirdlayers = Set([Point([0,0],triangular)])
 
 # firstlayers = Set([[-2,-2], [-1,0], [0,2], [0,-1], [1,1], [2,0]])
 # secondlayers = Set([[-1,-1], [0,1], [1,0]])
@@ -281,27 +273,19 @@ thirdlayers = Set([Point([0,0],scaledtriangular)])
 
 for i in range(-6,6)
     for j in range(-6,6)
-        firstlayers = union(firstlayers,Set([r + Point(i*[1,2]+j*[2,1], scaledtriangular) for r in firstlayer]))
-        secondlayers = union(secondlayers,Set([r + Point(i*[1,2]+j*[2,1], scaledtriangular) for r in secondlayer]))
-        thirdlayers = union(thirdlayers,Set([r + Point(i*[1,2]+j*[2,1], scaledtriangular) for r in thirdlayer]))
+        firstlayers = union(firstlayers,Set([r + Point(i*[1,2]+j*[2,1], triangular) for r in firstlayer]))
+        secondlayers = union(secondlayers,Set([r + Point(i*[1,2]+j*[2,1], triangular) for r in secondlayer]))
+        thirdlayers = union(thirdlayers,Set([r + Point(i*[1,2]+j*[2,1], triangular) for r in thirdlayer]))
     end
 end
 
-# for i in range(-7,7)
-#     for j in range(-7,7)
-#         firstlayers = union(firstlayers,Set([r+i*[1,2]+j*[2,1] for r in firstlayer]))
-#         secondlayers = union(secondlayers,Set([r+i*[1,2]+j*[2,1] for r in secondlayer]))
-#         thirdlayers = union(thirdlayers,Set([r+i*[1,2]+j*[2,1] for r in thirdlayer]))
-#     end
-# end
 
 function locaclRGfirst(center::Offset,statecorrelation::FockMap, physicalmodes::Subset{Mode}, modegroupingthreshold::Float64, radius::Number)::Tuple{FockMap,FockMap}
     localregion,localfock = localregioninspection(center , physicalmodes, radius,blockedcrystal)
     visualize(localregion)
 
     localcorrelation = regioncorrelations(statecorrelation,localfock)
-    localeigspec = localcorrelation |> eigspech 
-    visualize(localeigspec)
+    # localeigspec = localcorrelation |> eigspech 
 
     localmodesdict = localmodesgrouping(localcorrelation, modegroupingthreshold)
     modebydist = groupmodesbydist(region = localregion,regionfock = localfock,center = center)  
@@ -405,18 +389,21 @@ function locaclRGthird(center::Offset,statecorrelation::FockMap, physicalmodes::
 end
 
 # inspecting local region spectrum
-center_pt = [-2,2]
-center = Point(center_pt, scaledtriangular)
+center = triangular |> getorigin
 
 localregion,localfock = localregioninspection(center , physicalmodes, 2,blockedcrystal)
 visualize(localregion)
+
+circularregionmodes(center, physicalmodes, 2)
+
+groupmodesbydist(region=localregion,regionfock=localfock,center=center, samedistancethreshold = 5)
 
 localcorrelation = regioncorrelations(blockedcorrelations,localfock)
 localeigspec = localcorrelation |> eigspech 
 visualize(localeigspec, title="Spectrum of Chern to start with")
 
 #
-center = Point([-2,-2],scaledtriangular)
+center = Point([-2,-2],triangular)
 refwannierfn = locaclRGfirst(center,blockedcorrelations, physicalmodes, 0.001, 2)
 localunitaryref = refwannierfn[1]+refwannierfn[2]
 
@@ -428,7 +415,7 @@ wanniercouriers = sum(wanniercourierlist)
 couriercorrelationsecond = wanniercouriers'*regioncorrelations(blockedcorrelations,localunitary |> getoutspace)*wanniercouriers
 
 # inspecting local region spectrum
-center = Point([1,0], scaledtriangular)
+center = Point([1,0], triangular)
 transformedphysicalmodesnext = couriercorrelationsecond |> getoutspace |> orderedmodes
 
 trsasnformedlocalregionnext, trsasnformedlocalfocknext = localregioninspection(center,transformedphysicalmodesnext, 2, blockedcrystal)

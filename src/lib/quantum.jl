@@ -4,7 +4,7 @@
     Mode(input::Base.Iterators.Flatten)
     Mode(datas::Vector{Pair{Symbol, T}}) where {T}
 
-Represents an element in a `FockSpace`, and uniquely identifies a physical mode.
+Represents an element in a `FockSpace`, and uniquely identifies a physical mode. The attribute `:orbital` is defaulted to `swave` if not specified.
 
 ### Attributes to put in `attrs`
 - `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.

@@ -163,19 +163,12 @@ extendedCspec = extendedrestrictedC|>crystalspectrum
 
 extendedCspec|>linespectrum|>visualize
 
-eigenmodes = sort([(k, modes) for (k, modes) in extendedCspec.eigenmodes], by=(v -> (v[1]|>vec)[2]))
-cspec = hcat(([extendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
-using Plotly
-plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
-
 extendedfrozenspec = distillation(extendedCspec, :frozen => v -> v < 1e-2 || v > 1 - 1e-2)[:frozen]
 extendedfrozenprojector = extendedfrozenspec|>crystalprojector
 extendedfrozencorrelations = idmap(extendedfrozenprojector|>getoutspace) - extendedfrozenprojector
 extendedCspec = extendedfrozencorrelations|>crystalspectrum
-eigenmodes = sort([(k, modes) for (k, modes) in extendedCspec.eigenmodes], by=(v -> (v[1]|>vec)[2]))
-cspec = hcat(([extendedCspec.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
-using Plotly
-plot([scatter(y=cspec[n, :]) for n in axes(cspec, 1)])
+
+extendedCspec|>linespectrum|>visualize
 
 scaledspace = extendedrestrictedC|>getoutspace|>getcrystal|>getspace
 truncregion = reduce(+, crosssection + normalvector * n for n in 0:2)
@@ -229,10 +222,10 @@ Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssecti
 Ft|>getinspace|>modeattrs
 Ft|>visualize
 # Compute unit-cell mapping FockMap
-modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>unitcellfock)
+modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:offset))
 truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfock
 values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in truncunitfock)
-modemap = FockMap(extendedrestrictedC|>getoutspace|>unitcellfock, truncunitfock, values)
+modemap = FockMap(extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:offset)|>FockSpace, truncunitfock, values)
 # After this perform tensor product
 
 function tensorproduct(primary::FockSpace, secondary::FockSpace; keepprimaryattrs)
@@ -268,10 +261,15 @@ truncfilledcorrelations|>crystalspectrum|>linespectrum|>visualize
 crosssectionfock|>modeattrs
 truncfilledcorrelations|>getoutspace|>modeattrs
 
-wannierregion = Subset(scaledspace * point for point in crosssection)
-wannierregion|>regionfock
-
+wanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.5, radius=0.5)
+wannierregion = Subset(scaledspace * point for point in wanniercrosssection)
 regioncorrelations(truncfilledcorrelations, wannierregion|>regionfock)|>eigspech|>visualize
+
+wanniercrosssection2 = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.35, radius=0.5) + normalvector * 0.5
+wannierregion2 = Subset(scaledspace * point for point in wanniercrosssection2)
+regioncorrelations(truncfilledcorrelations, wannierregion2|>regionfock)|>eigspech|>visualize
+
+visualize(crosssection, wanniercrosssection, wanniercrosssection2)
 
 function _findlocalspstates(;
     statecorrelations::FockMap, regionfock::FockSpace,
@@ -312,14 +310,16 @@ groupeigenvalues::Base.Generator = (
 [groupeigenvalues...]
 selectedgroups = Iterators.filter(p -> p.second |> (v -> v < 1e-2), groupeigenvalues)
 [selectedgroups...]
-selectedisometries = ((localspectrum |> geteigenvectors)[:, (group.first|>FockSpace)[1:8]] for group in selectedgroups)
+selectedisometries = ((localspectrum |> geteigenvectors)[:, (group.first|>FockSpace)] for group in selectedgroups)
 selectedisometries|>collect
 function lineardependencefilter(spstate::FockMap)::Bool
+    
+    
     crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=truncfilledcorrelations|>getoutspace)
     crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
     pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
     mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
-    println(mineigenvalue)
+    println([v for (_, v) in pseudoidentity |> eigvalsh])
     return mineigenvalue > 5e-2
 end
 orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)

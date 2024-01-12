@@ -168,6 +168,23 @@ exists in the modes, the current record will be overwritten.
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
 """
+    renameattr(mode::Mode, oldkey::Symbol, newkey::Symbol)::Mode
+
+Renames an attribute of a `Mode` object.
+
+# Arguments
+- `mode` The `Mode` object whose attribute is to be renamed.
+- `oldkey` The current name of the attribute.
+- `newkey` The new name for the attribute.
+
+# Returns
+- `Mode`: A new `Mode` object with the renamed attribute.
+"""
+renameattr(mode::Mode, oldkey::Symbol, newkey::Symbol)::Mode = mode|>setattr(newkey=>getattr(mode, oldkey))|>removeattr(oldkey)
+renameattr(input, oldkey::Symbol, newkey::Symbol) = Subset(renameattr(mode, oldkey, newkey) for mode in input)
+renameattr(oldkey, newkey)::Function = m -> renameattr(m, oldkey, newkey)
+
+"""
     commonattrs(modes)::Base.Generator
 
 Retrieve all the attributes within the group of modes that has the same values and returned as a generator of `Symbol`.

@@ -335,9 +335,9 @@ function Base.:*(space::RealSpace, scale::Scale)::Scale
     return Scale(scalematrix, space)
 end
 
-Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space * scale |> rep, space |> rep))
+Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space |> rep, space * scale |> rep))
 
-Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(*(convert(RealSpace, space) * scale |> inv |> rep, space |> rep))
+Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(*(space |> rep, convert(RealSpace, space) * scale |> inv |> rep))
 Base.:*(scale::Scale, point::Point)::Point = *(scale, point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 

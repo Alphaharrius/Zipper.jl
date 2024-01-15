@@ -7,7 +7,8 @@
 Represents an element in a `FockSpace`, and uniquely identifies a physical mode. The attribute `:orbital` is defaulted to `swave` if not specified.
 
 ### Attributes to put in `attrs`
-- `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
+- `:r` stores a `Offset` which is the offset in lattice unit.
+- `:k` stores a `Momentum` which is the offset in reciprocal lattice unit.
 - `:b` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
 - `:orbital` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
@@ -34,22 +35,24 @@ Base.:string(mode::Mode)::String = join((k => v for (k, v) in mode |> getattrs),
 """ Display the number of attributes that identifies this `Mode`. """
 Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
 
-""" Allow for offset the `:offset` attribute of a mode. """
-Base.:+(mode::Mode, offset::Point)::Mode = setattr(mode, :offset => getattr(mode, :offset) + offset)
-Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)
+""" Allow for offset the primary position attribute of a mode. """
+Base.:+(mode::Mode, r::Offset)::Mode = setattr(mode, :r => getattr(mode, :r) + r)
+Base.:+(mode::Mode, k::Momentum)::Mode = setattr(mode, :k => getattr(mode, :k) + k)
+Base.:-(mode::Mode, point::Point)::Mode = mode + (-point)
 
 """
     getspace(mode::Mode)
 
-The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:b`, if none of those are defined,
+The space of a `Mode` comes from the physical quantities its defined on, such as `:r`, `:k` and `:b`, if none of those are defined,
 it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
 
 ### Output
-The space of the attribute `:offset` if available, fall back to `:b` if otherwise; returns a Euclidean space of dimension `1` if both `:offset` & `:b` is missing.
+The space of the attribute `:k` or `:r` if available, fall back to `:b` if otherwise; returns a Euclidean space of dimension `1` no position attributes is found.
 """
 function Zipper.:getspace(mode::Mode)
-    # :offset have a higher priority in determining the space of the mode.
-    if hasattr(mode, :offset) return getspace(getattr(mode, :offset)) end
+    # :r and :k have a higher priority in determining the space of the mode.
+    if hasattr(mode, :k) return getspace(getattr(mode, :k)) end
+    if hasattr(mode, :r) return getspace(getattr(mode, :r)) end
     if hasattr(mode, :b) return getspace(getattr(mode, :b)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
@@ -62,9 +65,21 @@ Zipper.:Subset(modes::Mode...) = Subset(m for m in modes)
 """
     getpos(mode::Mode)::Point
 
-Get the actual position of the mode, this method only works when `:offset` and `:b` are defined in the same space.
+Get the actual position of the mode, if the mode is associated with a `Momentum` which a `:k` attribute is attached, the return
+value will be the `Momentum`; if the mode is associated with a `Offset` which a `:r` attribute is attached, it will be returned,
+and if there is a intra unit cell offset `:b` attached, it will be added to the `Offset` as the final result.
 """
-Zipper.:getpos(mode::Mode)::Point = convert(Point, mode)
+function Zipper.:getpos(mode::Mode)::Point
+    if hasattr(mode, :k)
+        return getattr(mode, :k)
+    end
+
+    if hasattr(mode, :r)
+        return hasattr(mode, :b) ? getattr(mode, :r) + getattr(mode, :b) : getattr(mode, :r)
+    end
+
+    error("The mode does not have a primary position attribute!")
+end
 
 """
     hasattr(mode::Mode, key::Symbol)::Bool
@@ -102,7 +117,7 @@ export getattrs
 Create a **copy** of `mode` **without** the attributes identified by `keys`.
 
 ### Examples
-- To remove the attribute of `:offset` and `:b`, we use `removeattr(mode, :offset, :b)`.
+- To remove the attribute of `:r` and `:b`, we use `removeattr(mode, :r, :b)`.
 """
 removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
 export removeattr
@@ -124,7 +139,7 @@ Create a **copy** of every `Mode` of `modes` **without** the attributes identifi
 same length as the input `modes` as some `Mode` might be **condensed** into a single one after some unique identifier attributes is removed.
 
 ### Examples
-To remove the attribute of `:offset` and `:b`, we use `removeattr(modes, :offset, :b)`.
+To remove the attribute of `:r` and `:b`, we use `removeattr(modes, :r, :b)`.
 """
 removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
 
@@ -135,7 +150,7 @@ Create a **copy** of `mode` with the new attributes identified by `keys` added t
 record will be overwritten.
 
 ### Examples
-- To add `:offset` and `:flavor`, we use `newmode = setattr(mode, :offset => point, :flavor => 1)`
+- To add `:r` and `:flavor`, we use `newmode = setattr(mode, :r => point, :flavor => 1)`
 """
 setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
 export setattr
@@ -163,7 +178,7 @@ Create a **copy** of `modes` with the new attributes identified by `keys` added 
 exists in the modes, the current record will be overwritten.
 
 ### Examples
-- To add `:offset` and `:flavor`, we use `newmodes = setattr(modes, :offset => point, :flavor => 1)`
+- To add `:r` and `:flavor`, we use `newmodes = setattr(modes, :r => offset, :flavor => 1)`
 """
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
@@ -219,14 +234,12 @@ setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
 """
     spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode}
 
-Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset`, the primary ordering will be
+Given a set of `basismodes`, and the generator `points`, span the basis modes with the primary position attribute `:r` or `:k`, the primary ordering will be
 the ordering of `points`, then follows the ordering of `basismodes`.
 """
-spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, momentums::Subset{Momentum})::Subset{Mode} = Subset(setattr(mode, :k=>k) for k in momentums for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, offsets::Subset{Offset})::Subset{Mode} = Subset(setattr(mode, :r=>point) for point in offsets for mode in basismodes)
 export spanoffset
-
-""" By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:b` are defined in the same space. """
-Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :b)
 
 """ Two `Mode` objects are equivalent if they held the same informations. """
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
@@ -284,15 +297,18 @@ export getreflected
 """
     sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
 
-Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset` and form a `FockSpace`. Not to
-be mistakened with `spanoffset`, this method will partition the modes by the generator points.
+Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `Point` with attribute `:k` or `:r` depending on the type and form
+a `FockSpace`. Not to be mistakened with `spanoffset`, this method will partition the modes by the generator points.
 Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
 """
-function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
-    partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
-    modes::Subset{Mode} = spanoffset(basismodes, points)
+sparsefock(basismodes::Subset{Mode}, points::Subset{Momentum})::FockSpace = sparsefock(basismodes, points, groupidentityattr=:k)
+sparsefock(basismodes::Subset{Mode}, points::Subset{Offset})::FockSpace = sparsefock(basismodes, points, groupidentityattr=:r)
+
+function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point}; groupidentityattr::Symbol)::FockSpace
+    partitions::Subset{Subset{Mode}} = Subset(setattr(basismodes, groupidentityattr=>point) for point in points)
+    modes::Subset{Mode} = flatten(partitions)
     orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
+    return FockSpace(partitions, orderings)
 end
 export sparsefock
 
@@ -394,7 +410,7 @@ Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock |> getreflec
 
     Retrieve mappings from the crystal momentums to the corresponding `Subset{Mode}`.
 """
-crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :offset) => subspace for subspace in crystalfock |> rep)
+crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subset, :k)=>subset for subset in crystalfock|>rep)
 export crystalsubsets
 
 """
@@ -403,11 +419,11 @@ export crystalsubsets
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
 function crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
-    function subsettofockspace(subset::Subset{Mode})::Pair{Momentum, FockSpace}
-        k::Momentum = commonattr(subset, :offset)
-        return k => FockSpace(subset, reflected=k)
+    function makepair(subset::Subset{Mode})::Pair{Momentum, FockSpace}
+        k::Momentum = commonattr(subset, :k)
+        return k=>FockSpace(subset, reflected=k)
     end
-    return (subspace |> subsettofockspace for subspace in crystalfock |> rep)
+    return (subset|>makepair for subset in crystalfock|>rep)
 end
 export crystalsubspaces
 
@@ -443,10 +459,9 @@ export modeattrs
 
 Retrieve the unit cell fockspace of the system from a `CrystalFock`, positioned at the origin of the parent `AffineSpace`.
 """
-function unitcellfock(crystalfock::CrystalFock)::RegionFock
+function unitcellfock(crystalfock::CrystalFock)
     firstpartition::Subset{Mode} = crystalfock|>rep|>first
-    originpoint::Point = firstpartition|>first|>getspace|>getorigin
-    return RegionFock(firstpartition|>setattr(:offset => originpoint))
+    return FockSpace(firstpartition|>removeattr(:k))
 end
 export unitcellfock
 
@@ -1091,10 +1106,9 @@ export CrystalSpectrum
 Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
 """ Shorthand to retrieve the unitcell fockspace from a `CrystalSpectrum`. """
-function unitcellfock(spectrum::CrystalSpectrum)::FockSpace{Region}
+function unitcellfock(spectrum::CrystalSpectrum)
     sourcefock::FockSpace = spectrum |> geteigenvectors |> first |> last |> getoutspace
-    originposition::Offset = sourcefock |> first |> getattr(:b) |> getspace |> getorigin
-    return sourcefock |> orderedmodes |> setattr(:offset => originposition) |> FockSpace{Region}
+    return sourcefock|>orderedmodes|>removeattr(:k)|>FockSpace
 end
 
 """
@@ -1108,7 +1122,7 @@ function crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
     crystaleigenvalues::Dict{Mode, Number} = Dict()
     crystaleigenvectors::Dict{Momentum, FockMap} = Dict()
     for (k, fockmap) in momentumfockmaps
-        eigenspectrum::EigenSpectrum = eigspech(fockmap, :offset => k)
+        eigenspectrum::EigenSpectrum = eigspech(fockmap, :k=>k)
         crystaleigenmodes[k] = Subset(m for (m, _) in eigenspectrum |> geteigenvalues)
         crystaleigenvectors[k] = eigenspectrum |> geteigenvectors
         for (m, v) in eigenspectrum |> geteigenvalues

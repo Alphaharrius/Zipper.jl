@@ -37,9 +37,11 @@ export bondmap
 Compute the momentum space energy spectrum within a `Crystal` brillouin zone for a given `bonds` generated from `bondmap`.
 """
 function computeenergyspectrum(bonds::FockMap; crystal::Crystal)::CrystalSpectrum
-    bz::Subset{Momentum} = crystal |> brillouinzone
-    bondmodes::Subset{Mode} = bonds.outspace |> orderedmodes
-    fouriers::Base.Generator = (k => fourier(k |> Subset, bondmodes |> FockSpace) for k in bz)
+    bondmodes::Subset{Mode} = bonds|>getoutspace|>orderedmodes
+    basismodes::Subset{Mode} = bondmodes|>removeattr(:r)
+    fockspace::CrystalFock = getcrystalfock(basismodes, crystal)
+    transform::FockMap = fourier(fockspace, bondmodes|>RegionFock)
+    fouriers::Base.Generator = (k=>transform[subspace, :] for (k, subspace) in fockspace|>crystalsubspaces)
     momentumhamiltonians::Base.Generator = (k => fourier * bonds * fourier' for (k, fourier) in fouriers)
     return crystalspectrum(momentumhamiltonians, crystal=crystal)
 end

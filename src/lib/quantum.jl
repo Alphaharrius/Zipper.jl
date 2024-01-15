@@ -871,71 +871,39 @@ export eigvecsh
 eigvalsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...) |> geteigenvalues
 export eigvalsh
 
-"""
-    fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
+Base.kron(primary::FockSpace, secondary::FockSpace) = fockspaceunion(FockSpace(merge(pmode, smode) for smode in secondary) for pmode in primary)
 
-Create a `FockMap` corresponds to a Fourier transform of a `FockSpace`. This map assumed orthogonality of modes with the attribute `:offset` dropped, which means
-entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
+function Base.kron(primary::FockMap, secondary::FockMap)
+    outspace::FockSpace = kron(primary|>getoutspace, secondary|>getoutspace)
+    inspace::FockSpace = kron(primary|>getinspace, secondary|>getinspace)
+    data::SparseMatrixCSC = kron(primary|>rep, secondary|>rep)
+    FockMap(outspace, inspace, data)
+end
 
-### Input
-- `momentums` The momentums which spans the output reciprocal subspace, for `getspace(momentum) isa MomentumSpace`.
-- `inspace` The input space, all contituent modes must have the attribute `:offset` defined or result in errors. The `inspace` should include all possible basis modes
-  so that they can be identified and span the momentum `FockSpace`.
+function fourier(crystal::Crystal, region::Region)
+    bz::Subset{Momentum} = crystal|>brillouinzone
+    barepoint::Offset = crystal|>getspace|>getorigin
+    barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
+    outspace::CrystalFock = FockSpace((Mode(:k=>k, :b=>barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
+    
+    latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
+    inspace::FockSpace{Region} = quantize(latticesites, 1)
 
-### Output
-The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = length(momentums) * count` for `count` is the number of fermionic site
-within the translational invariant unit cell, supplied by `inmodes`; `M = length(inmodes)`. The `inspace` of the returned `FockMap` will equates to `FockSpace(inmodes)`;
-the `outspace` is the product of `momentums` and the supplied fermionic sites.
-"""
-function fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
-    ∑𝑘::Matrix{Float64} = hcat([𝑘 |> euclidean |> vec for 𝑘 in momentums]...)
-    inmodes::Subset{Mode} = orderedmodes(inspace)
-    basismodes::Subset{Mode} = removeattr(inmodes, :offset)
-    outspace::FockSpace = sparsefock(basismodes, momentums)
-    return fourier(outspace, inspace, ∑𝑘, basismodes)
+    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in bz)...)
+    offsetmatrix::Matrix = hcat((p|>euclidean|>vec for p in latticesites)...)
+
+    fouriermatrix::SparseMatrixCSC = exp.(-1im * momentummatrix' * offsetmatrix)
+    return FockMap(outspace, inspace, fouriermatrix)
+end
+
+function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellmap::FockMap)
+    baretransform::FockMap = fourier(crystalfock|>getcrystal, regionfock|>getregion)
+    inspace::RegionFock = kron(baretransform|>getinspace, unitcellmap|>getinspace)|>RegionFock
+    matrix::SparseMatrixCSC = kron(baretransform|>rep, unitcellmap|>rep)
+    # The inspace of the result is more than the origin, thus we have to restrict it back.
+    return FockMap(crystalfock, inspace, matrix)[:, regionfock]
 end
 export fourier
-
-"""
-    fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
-
-Create a `FockMap` corresponds to a Fourier transform of a physical fockspace `inspace` to Fourier fockspace `outspace`. This map assumed orthogonality of modes with the
-attribute `:offset` dropped, which means entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
-
-### Input
-- `outspace` The output space of the Fourier transform, which is the momentum `FockSpace`, most likely with type `FockSpace{Crystal}`, noted that the basis modes in
-  each momentum subspace should matches with the possible basis modes within `inspace`.
-- `inspace`  The input space, all contituent modes must have the attribute `:offset` defined or result in errors.
-
-### Output
-The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = dimension(outspace); M = dimension(inspace)`.
-"""
-function fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
-    ∑𝑘::Matrix{Float64} = hcat([getattr(first(partition), :offset) |> euclidean |> vec for partition in rep(outspace)]...)
-    basismodes::Subset{Mode} = removeattr(outspace |> rep |> first, :offset) # Assumed the similarity in structure for each partitions.
-    return fourier(outspace, inspace, ∑𝑘, basismodes)
-end
-
-""" Internal use only. """
-function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix{Float64}, basismodes::Subset{Mode})::FockMap
-    values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), size(momentummatrix, 2), dimension(inspace))
-    for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(orderedmodes(inspace)))
-        if removeattr(inmode, :offset) != basismode continue end
-        offset::Point = inmode |> getattr(:offset) |> euclidean
-        values[n, :, m] = exp.(-1im * momentummatrix' * vec(offset))
-    end
-    spmat::SparseMatrixCSC = SparseMatrixCSC(reshape(values, (length(basismodes) * size(momentummatrix, 2), dimension(inspace))))
-    return FockMap(outspace, inspace, spmat)
-end
-
-function sitefock(site::Offset; flavorcount::Integer = 1)::SiteFock
-    basis::Offset = site|>basispoint
-    offset::Offset = site - basis
-    return FockSpace((Mode(:offset => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
-end
-
-regionfock(region::Region; flavorcount::Integer = 1)::RegionFock = (
-    fockspaceunion(sitefock(r, flavorcount=flavorcount) for r in region)|>RegionFock)
 
 """
 Perform addition of two `FockMap`s, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries

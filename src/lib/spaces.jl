@@ -363,6 +363,8 @@ end
 
 Base.:-(a::Subset, b::Subset)::Subset = setdiff(a, b)
 
+Base.:issubset(a::Subset, b::Subset)::Bool = issubset(a|>rep, b|>rep)
+
 struct SnappingResult
     forvalues::Vector{Number}
     denominator::Integer

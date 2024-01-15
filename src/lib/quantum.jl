@@ -470,6 +470,7 @@ Zipper.:getspace(crystalfock::CrystalFock) = crystalfock|>getreflected|>getspace
 Zipper.:getspace(sitefock::SiteFock) = sitefock|>getreflected|>getspace
 Zipper.:getspace(momentumfock::MomentumFock) = momentumfock|>getreflected|>getspace
 
+unitcellfock(regionfock::RegionFock) = regionfock|>orderedmodes|>removeattr(:r)|>FockSpace
 
 """
     subspaces(fockspace::FockSpace)::Base.Generator

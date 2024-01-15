@@ -465,6 +465,12 @@ function unitcellfock(crystalfock::CrystalFock)
 end
 export unitcellfock
 
+Zipper.:getspace(regionfock::RegionFock) = regionfock|>getreflected|>getspace
+Zipper.:getspace(crystalfock::CrystalFock) = crystalfock|>getreflected|>getspace
+Zipper.:getspace(sitefock::SiteFock) = sitefock|>getreflected|>getspace
+Zipper.:getspace(momentumfock::MomentumFock) = momentumfock|>getreflected|>getspace
+
+
 """
     subspaces(fockspace::FockSpace)::Base.Generator
 

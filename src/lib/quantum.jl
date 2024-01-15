@@ -358,6 +358,9 @@ function fockspaceunion(fockspaces)::FockSpace
 end
 export fockspaceunion
 
+issubspace(super::FockSpace, sub::FockSpace)::Bool = issubset(sub|>orderedmodes, super|>orderedmodes)
+export issubspace
+
 Base.:union(fockspaces::FockSpace...)::FockSpace = fockspaceunion(fockspaces)
 
 Base.:+(a::FockSpace, b::FockSpace)::FockSpace = union(a, b)

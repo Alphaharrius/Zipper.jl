@@ -143,7 +143,7 @@ export crystalprojector
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
     fockmap::FockMap = directsum(spectrum.eigenvectors[k] * spectrum.eigenvectors[k]' for (k, _) in spectrum.eigenmodes)
     basismodes::Subset{Mode} = spectrum |> unitcellfock |> orderedmodes
-    fockspace::CrystalFock = crystalfock(basismodes, spectrum |> getcrystal)
+    fockspace::CrystalFock = getcrystalfock(basismodes, spectrum|>getcrystal)
     if hassamespan(fockmap |> getoutspace, fockspace)
         return FockMap(fockmap, inspace=fockspace, outspace=fockspace, performpermute=true)
     end

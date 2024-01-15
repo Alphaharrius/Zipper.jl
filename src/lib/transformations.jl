@@ -335,13 +335,14 @@ function Base.:*(space::RealSpace, scale::Scale)::Scale
     return Scale(scalematrix, space)
 end
 
-Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space * scale |> rep, space |> rep))
+Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space |> rep, space * scale |> rep))
 
-Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(*(convert(RealSpace, space) * scale |> inv |> rep, space |> rep))
+Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(*(space |> rep, convert(RealSpace, space) * scale |> inv |> rep))
 Base.:*(scale::Scale, point::Point)::Point = *(scale, point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
-function Base.:*(scale::Scale, crystal::Crystal)::Crystal
+
+function Base.:*(scale::Scale, crystal::Crystal)
     realspace::RealSpace = crystal |> getspace
     snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
     U, S, Vd = snfinput |> dosnf
@@ -353,5 +354,5 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     subunitcell = Subset((transpose(Vd) * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
     newscale = Scale(newrelativebasis, realspace)
     newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
-    return Crystal(newunitcell, newsizes)
+    return Crystal(newunitcell, newsizes), newscale
 end

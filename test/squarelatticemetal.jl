@@ -35,11 +35,6 @@ correlations |> crystalspectrum |> visualize
 
 crystalfock = correlations |> getoutspace
 
-function dosnf(matrix::Matrix)
-    snf = smith(matrix)
-    return snf.S, diagm(snf), snf.T
-end
-
     realspace::RealSpace = crystal |> getspace
     snfinput = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
     U, S, Vd = snfinput |> computesnf

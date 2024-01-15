@@ -3,22 +3,38 @@ using Revise
 using Zipper
 using DataFrames
 using SparseArrays
+# using AbstractAlgebra
 
-function Zipper.fourier(crystal::Crystal, region::Region)
-    bz::Subset{Momentum} = crystal|>brillouinzone
-    barepoint::Offset = crystal|>getspace|>getorigin
-    barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
-    outspace::CrystalFock = FockSpace((Mode(:offset => k, :pos => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
+# function Base.:*(scale::Scale, crystal::Crystal)::Crystal
+#     realspace::RealSpace = crystal |> getspace
+#     snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
+#     U, S, Vd = snfinput |> dosnf
+#     snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
+#     _, bS, bVd = snfinput |> dosnf
+#     newsizes = bS |> diag
+#     newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
+
+#     subunitcell = Subset((transpose(Vd) * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
+#     newscale = Scale(newrelativebasis, realspace)
+#     newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
+#     return Crystal(newunitcell, newsizes)
+# end
+
+# function Zipper.fourier(crystal::Crystal, region::Region)
+#     bz::Subset{Momentum} = crystal|>brillouinzone
+#     barepoint::Offset = crystal|>getspace|>getorigin
+#     barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
+#     outspace::CrystalFock = FockSpace((Mode(:offset => k, :pos => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
     
-    latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
-    inspace::FockSpace{Region} = latticesites|>regionfock
+#     latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
+#     inspace::FockSpace{Region} = latticesites|>regionfock
 
-    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in bz)...)
-    offsetmatrix::Matrix = hcat((p|>euclidean|>vec for p in latticesites)...)
+#     momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in bz)...)
+#     offsetmatrix::Matrix = hcat((p|>euclidean|>vec for p in latticesites)...)
 
-    fouriermatrix::SparseMatrixCSC = exp.(-1im * momentummatrix' * offsetmatrix)
-    return FockMap(outspace, inspace, fouriermatrix)
-end
+#     fouriermatrix::SparseMatrixCSC = exp.(-1im * momentummatrix' * offsetmatrix)
+#     return FockMap(outspace, inspace, fouriermatrix)
+# end
 
 function sitefock(site::Offset; flavorcount::Integer = 1)::FockSpace{Offset}
     basis::Offset = site|>basispoint
@@ -34,7 +50,6 @@ Base.:merge(a::Mode, b::Mode)::Mode = Mode(Dict(getattrs(a)..., getattrs(b)...))
 
 regionfock(region::Region; flavorcount::Integer = 1)::FockSpace{Region} = (
     fockspaceunion(sitefock(r, flavorcount=flavorcount) for r in region)|>FockSpace{Region})
-
 
 
 function circularregionmodes(correlations::FockMap, origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
@@ -178,7 +193,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [48, 48])
+crystal = Crystal(unitcell, [24, 24])
 
 reciprocalhashcalibration(crystal.sizes)
 
@@ -233,19 +248,127 @@ localfock = FockSpace{Region}(localmodes)
 visualize(getregion(localfock),visualspace=euclidean(RealSpace, 2))
 visualize(regioncorrelations(blockedcorrelations, localfock) |> eigspec)
 
-# localcenter1::Offset = [1, 0] ∈ (blockedmodes |> getspace)
-# localmodes1 = circularregionmodes(blockedcorrelations, localcenter1 , physicalmodes, 1)
-# localfock1::FockSpace = FockSpace{Region}(localmodes1)
-# localregion1::Subset{Offset} = Subset(m |> getpos for m in localmodes1)
-# modebydist1 = groupmodesbydist(region = localregion1,regionfock = localfock1,center = localcenter1)  
-# # group the eigenvectors to isometries with filled, empty ,courier
-# localiso1 = localisometries(blockedcorrelations, localfock1, selectionstrategy=modeselectionbycount(3))
-# # finding seeds for local frozen (6 modes at the center)
-# frozenseedingfocks1 = (FockSpace{Region}(circularregionmodes(blockedcorrelations, modewithdist[2]|> getpos, physicalmodes, 0.1)) for modewithdist in modebydist1[3])
-# frozenseeds1 = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(_findlocalspstates(statecorrelations = blockedcorrelations, regionfock = frozenseedingfock, 
-# spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for frozenseedingfock in frozenseedingfocks1])
-# extendedfrozenseeds1 = idmap(localfock1, localfock1)[:,frozenseeds1 |> getoutspace] * frozenseeds1
-# wannierizedfrozens1 = _localwannierization(localiso1[:filled]+localiso1[:empty], extendedfrozenseeds1)
+localcenter1::Offset = [1, 0] ∈ (blockedmodes |> getspace)
+localmodes1 = circularregionmodes(blockedcorrelations, localcenter1 , physicalmodes, 1)
+localfock1::FockSpace = FockSpace{Region}(localmodes1)
+localregion1::Subset{Offset} = Subset(m |> getpos for m in localmodes1)
+modebydist1 = groupmodesbydist(region = localregion1,regionfock = localfock1,center = localcenter1)  
+# group the eigenvectors to isometries with filled, empty ,courier
+localiso1 = localisometries(blockedcorrelations, localfock1, selectionstrategy=modeselectionbycount(3))
+# finding seeds for local frozen (6 modes at the center)
+frozenseedingfocks1 = (FockSpace{Region}(circularregionmodes(blockedcorrelations, modewithdist[2]|> getpos, physicalmodes, 0.1)) for modewithdist in modebydist1[3])
+frozenseeds1 = sum([reduce(+ ,FockMap(v,inspace = v |> getinspace |> orderedmodes |> setattr(:dumind => n) |> FockSpace,performpermute = false) for (n, (_ , v)) in enumerate(_findlocalspstates(statecorrelations = blockedcorrelations, regionfock = frozenseedingfock, 
+spectrumextractpredicate = v -> true, symmetry = identitytransform(2)))) for frozenseedingfock in frozenseedingfocks1])
+extendedfrozenseeds1 = idmap(localfock1, localfock1)[:,frozenseeds1 |> getoutspace] * frozenseeds1
+wannierizedfrozens1 = _localwannierization(localiso1[:filled]+localiso1[:empty], extendedfrozenseeds1)
+
+scaleforgmera = Scale([1 2; 2 1], blockedcrystal |> getspace)
+visualize((scaleforgmera*blockedcrystal)|>getunitcell)
+scaleforgmera*blockedcorrelations.outspace
+
+function givenewscale(scale::Scale, crystal::Crystal)
+    realspace::RealSpace = crystal |> getspace
+    snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
+    U, S, Vd = snfinput |> dosnf
+    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
+    _, bS, bVd = snfinput |> dosnf
+    newsizes = bS |> diag
+    newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
+
+    subunitcell = Subset((transpose(Vd) * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
+    newscale = Scale(newrelativebasis, realspace)
+    newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
+    return newscale
+end
+
+blockedbz = blockedcrystal|>brillouinzone
+scaledbrillouinzone = scaleforgmera*blockedbz
+scaledk = Subset(k|>basispoint for k in scaledbrillouinzone)
+scaledk_dict = Dict()
+for kpt in blockedbz
+    key = basispoint(scaleforgmera*kpt)
+    if haskey(scaledk_dict,key)
+        push!(scaledk_dict[key],kpt)
+    else
+        scaledk_dict[key] = [kpt]
+    end
+end
+scaledcrystal = scaleforgmera*blockedcrystal
+scaledunitcell = scaledcrystal|> getunitcell
+newscale = givenewscale(scaleforgmera,blockedcrystal)
+unscaledunicell = inv(newscale)*scaledunitcell
+
+newunitcellft = fourier(blockedcorrelations.inspace,regionfock(unscaledunicell))
+fourier_subspaces = Dict(newunitcellft|>getoutspace|>crystalsubspaces)
+scaled_fourier_list = []
+for (scaled_k,old_ks) in scaledk_dict
+    combined_space = fockspaceunion(fourier_subspaces[k] for k in old_ks)
+    scaled_fourier_block = newunitcellft[combined_space,:]
+    new_inspace = FockSpace(mode|>setattr(:pos=>scaleforgmera*getpos(mode),:offset=>scaled_k) for mode in scaled_fourier_block.inspace)
+    scaled_fourier_block = FockMap(scaled_fourier_block,inspace = new_inspace,performpermute=false)
+    push!(scaled_fourier_list,scaled_fourier_block)
+end
+scaled_fourier = directsum(scaled_fourier_list)
+scaled_crystal_fock = FockSpace(scaled_fourier.inspace,reflected=scaledcrystal)
+scaled_fourier = FockMap(scaled_fourier,inspace = scaled_crystal_fock,outspace = blockedcorrelations.inspace)
+scaledcorrelation = scaled_fourier'*blockedcorrelations*scaled_fourier
+
+# function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
+#     generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
+#     generatinglength::Integer = generatingradius * 2
+#     generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
+#     crystalregion::Region = generatingcrystal|>sitepoints
+#     centeredregion::Region = crystalregion - (crystalregion|>getcenter)
+#     println(crystalregion)
+#     println(centeredregion)
+#     return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
+# end
+
+correlations
+
+visualize(getregion(scaledlocalfock),visualspace=euclidean(RealSpace, 2))
+visualize(regioncorrelations(scaledcorrelation, scaledlocalfock) |> eigspec)
+
+
+blockedcorrelations.inspace |> modeattrs
+regionfock(unscaledunicell) |> modeattrs
+
+visualize(blockedbz, Subset(k|>basispoint for k in scaledbrillouinzone))
+
+wannierizedfrozens1.inspace
+#Construct crystal with this unitcell
+localregion = localfock1|>getregion
+unitcell = Subset(pt|>basispoint for pt in scaleforgmera*localregion)
+gmeracrystal = Crystal(unitcell,[24,8])
+
+crystalmap(blockedcorrelations.inspace,gmeracrystal)
+
+crystalfock = blockedcorrelations.inspace
+crystal = crystalfock |> getcrystal
+scaledcrystal= gmeracrystal
+kspace = scaledcrystal|>getspace
+scale = (scaledcrystal|>getspace)*Scale(scaledcrystal|>getspace|>rep, euclidean(RealSpace,2))
+unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
+bz::Subset{Momentum} = crystal |> brillouinzone
+basismodes::Subset{Mode} = crystalfock |> rep |> first
+scaledbz::Subset{Momentum} = scaledcrystal |> brillouinzone
+
+momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
+mappingpartitions::Dict{Point, Vector{Point}} = foldl(momentummappings; init=Dict{Point, Vector{Point}}()) do d, (k, v)
+        mergewith!(append!, d, LittleDict(k => [v]))
+    end
+ksubsets::Dict{Momentum, Subset{Mode}} = crystalfock |> crystalsubsets
+scaledfock::FockSpace = ((ksubsets[k] for k in mappingpartitions[kscaled]) |> subsetunion |> FockSpace
+    for kscaled in scaledbz) |> fockspaceunion
+ksubsets
+
+for kscaled in scaledbz
+    print(kscaled)
+end
+
+
+(triangular |> rep) * (localregion|>getspace|>rep)
+(triangular |> rep) *((scaleforgmera*localregion)|>getspace|>rep) 
 
 # localcenter2::Offset = [0, 1] ∈ (blockedmodes |> getspace)
 # localmodes2 = circularregionmodes(blockedcorrelations, localcenter2 , physicalmodes, 1)
@@ -316,7 +439,34 @@ visualize(regioncorrelations(blockedcorrelations, localfock) |> eigspec)
 # scaledcorrelations = scaleresult[:correlations]
 # scaler = scaleresult[:transformer]
 
-scaleforgmera = Scale([3 0; 0 3], blockedcrystal |> getspace)
+
+A = map(Integer,vcat(scaleforgmera |> rep,blockedcrystal.sizes|>diagm))
+U,S,Vd = dosnf(A)
+U*S*Vd
+
+(S*Vd)[1:2,1:2]
+inv(U[3:end,1:2])*blockedcrystal.sizes|>diagm
+
+u_tilde,s_tilde,v_tilde = dosnf(U[3:end,1:2])
+v_tilde*(S*Vd)[1:2,1:2]
+v_tilde*inv(U[3:end,1:2])*blockedcrystal.sizes|>diagm
+
+# scaledcrystal = scaleforgmera*blockedcrystal
+# visualize(scaledcrystal|>getunitcell)
+realspace = blockedcrystal|>getspace
+newrelativebasis = v_tilde * (S |> diag |> diagm) * Vd |> transpose
+subunitcell = Subset((transpose(v_tilde) * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
+newscale = Scale(newrelativebasis, realspace)
+newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, blockedcrystal |> getunitcell))
+visualize(newunitcell)
+
+U, S, Vd = snfinput |> dosnf
+    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
+    _, bS, bVd = snfinput |> dosnf
+    newsizes = bS |> diag
+    newrelativebasis = bVd * (S |> diag |> diagm) * Vd |> transpose
+
+
 scalingmap = scaleforgmera*blockedcorrelations.outspace
 scaledcorrelations = scalingmap*blockedcorrelations*scalingmap'
 scaledcrystal = scaledcorrelations.inspace |> getcrystal
@@ -398,21 +548,22 @@ wannierizedfrozen = FockMap(fourieroutspace,fourierinspace, fouriermtrix)
 fourierinspace|> modeattrs |> first
 FockSpace(mode |> setattr(:offset=> (mode |> getattr(:r))) |> removeattr(:r) for mode in (fourierinspace))
 
+72*8*8
 
-# visualize(latticepoints(scaledcorrelations.inspace|>getcrystal))
+visualize(latticepoints(scaledcorrelations.inspace|>getcrystal))
 
-# wanniercrystalisos = _crystalisometries(localisometry=wannierizedfrozens, crystalfock=scaledcorrelations.outspace, addinspacemomentuminfo = true)
-# wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:pos))  for mode in frozenseeds.inspace |> orderedmodes)
-# visualize(wannierunitcell)
-# visualize(latticepoints(scaledcorrelations.outspace |> getcrystal))
+wanniercrystalisos = _crystalisometries(localisometry=wannierizedfrozens, crystalfock=scaledcorrelations.outspace, addinspacemomentuminfo = true)
+wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:pos))  for mode in frozenseeds.inspace |> orderedmodes)
+visualize(wannierunitcell)
+visualize(latticepoints(scaledcorrelations.outspace |> getcrystal))
 
-# wanniercrystall::Crystal = Crystal(wannierunitcell, (scaledcorrelations.outspace |> getcrystal).sizes)
-# # visualize(latticepoints(wanniercrystall))
+wanniercrystall::Crystal = Crystal(wannierunitcell, (scaledcorrelations.outspace |> getcrystal).sizes)
+# visualize(latticepoints(wanniercrystall))
 
-# wannierisometry::FockMap = directsum(wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
-# inspace::FockSpace = FockSpace(wannierisometry.inspace, reflected=wanniercrystall)
-# outspace::FockSpace = FockSpace(wannierisometry.outspace, reflected=scaledcorrelations.outspace)
-# wannierizedfrozen = FockMap(wannierisometry, inspace=inspace, outspace=outspace, performpermute=false)
+wannierisometry::FockMap = directsum(wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
+inspace::FockSpace = FockSpace(wannierisometry.inspace, reflected=wanniercrystall)
+outspace::FockSpace = FockSpace(wannierisometry.outspace, reflected=scaledcorrelations.outspace)
+wannierizedfrozen = FockMap(wannierisometry, inspace=inspace, outspace=outspace, performpermute=false)
 
 frozencorrelation = (wannierizedfrozen'*scaledcorrelations*wannierizedfrozen)
 visualize(frozencorrelation|> eigspec)

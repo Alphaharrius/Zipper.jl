@@ -342,7 +342,7 @@ Base.:*(scale::Scale, point::Point)::Point = *(scale, point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
 
-function Base.:*(scale::Scale, crystal::Crystal)
+function Base.:*(scale::Scale, crystal::Crystal)::Crystal
     realspace::RealSpace = crystal |> getspace
     snfinput::Matrix{Integer} = map(Integer, vcat(scale |> rep, crystal |> size |> diagm))
     U, S, Vd = snfinput |> dosnf
@@ -354,5 +354,5 @@ function Base.:*(scale::Scale, crystal::Crystal)
     subunitcell = Subset((transpose(Vd) * (r |> collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S |> diag)...))
     newscale = Scale(newrelativebasis, realspace)
     newunitcell = Subset(newscale * (a + b) |> basispoint for (a, b) in Iterators.product(subunitcell, crystal |> getunitcell))
-    return Crystal(newunitcell, newsizes), newscale
+    return Crystal(newunitcell, newsizes)
 end

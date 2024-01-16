@@ -181,6 +181,15 @@ function _crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Cry
     return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
 end
 
+function regioncorrelationsmap(correlations::FockMap, regionfock::FockSpace)::FockMap
+    fouriermap::FockMap = fourier(correlations.inspace, regionfock) / (correlations.inspace |> subspacecount |> sqrt)
+    return fouriermap
+end
+
+function scaledrestrictfouriermap(correlations::FockMap, regionfock::FockSpace,scaledft::FockMap)::FockMap
+    fouriermap::FockMap = fourier(correlations.inspace, regionfock) / (correlations.inspace |> subspacecount |> sqrt)
+    return scaledft'*fouriermap
+end
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
@@ -264,7 +273,7 @@ wannierizedfrozens1 = _localwannierization(localiso1[:filled]+localiso1[:empty],
 
 scaleforgmera = Scale([1 2; 2 1], blockedcrystal |> getspace)
 visualize((scaleforgmera*blockedcrystal)|>getunitcell)
-scaleforgmera*blockedcorrelations.outspace
+# scaleforgmera*blockedcorrelations.outspace
 
 function givenewscale(scale::Scale, crystal::Crystal)
     realspace::RealSpace = crystal |> getspace
@@ -324,7 +333,9 @@ scaledcorrelation = scaled_fourier'*blockedcorrelations*scaled_fourier
 #     return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
 # end
 
-correlations
+scaledrestrictmap = scaledrestrictfouriermap(blockedcorrelations,localfock,scaled_fourier)
+visualize(scaledrestrictmap'*scaledcorrelation*scaledrestrictmap|>eigspec)
+visualize(getregion((scaledrestrictmap'*scaledcorrelation*scaledrestrictmap)|>getinspace))
 
 visualize(getregion(scaledlocalfock),visualspace=euclidean(RealSpace, 2))
 visualize(regioncorrelations(scaledcorrelation, scaledlocalfock) |> eigspec)

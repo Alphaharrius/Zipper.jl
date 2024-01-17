@@ -56,8 +56,8 @@ function _globaldistillerhamiltonian(;
     crystalprojectors::Dict{Symbol, FockMap} = Dict(
         name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations.inspace)
         for (name, isometry) in localisometries)
-    # return crystalprojectors
-    return reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
+    return crystalprojectors
+    # return reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
 end
 
     correlations = C
@@ -91,7 +91,7 @@ end
         restrictspace=frozenseedingfock,
         localisometryselectionstrategy=frozenselectionbycount(3))
 
-    globaldistiller |> crystalspectrum|>visualize
+    # globaldistiller |> crystalspectrum|>visualize
 
     globaldistiller[:filled] + globaldistiller[:empty]
     k0 = (0.5,0.5)∈convert(MomentumSpace, blockedcrystal|>getspace)

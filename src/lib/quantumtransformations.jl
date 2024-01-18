@@ -41,23 +41,18 @@ function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})
     # which the basis point set might not include the symmetrized :b. Thus we would like to set
     # the :b to its corresponding basis point, and offload the difference to :r.
     function correctsymmetrizedmode(mode::Mode)::Mode
-        actualposition::Offset = mode |> getattr(:b)
-        basisposition::Offset = actualposition |> basispoint
+        actualposition::Offset = mode|>getattr(:R)
+        basisposition::Offset = actualposition|>basispoint
         offset::Offset = actualposition - basisposition
-        return mode|>setattr(:b=>basisposition)|>setattr(:r=>offset)
+        return mode|>setattr(:b=>basisposition)|>setattr(:r=>offset)|>removeattr(:R)
     end
 
     modemapping::Dict{Mode, Mode} = Dict()
 
-    function mergepositions(mode::Mode)::Mode
-        latticeoffset::Point = mode |> getattr(:r)
-        latticeoffset isa Offset || error("Transforming a mode based on momentum must be done with crystal fockspace!")
-        actualposition::Offset = getattr(mode, :b) + latticeoffset
-        return mode|>setattr(:b=>actualposition)|>removeattr(:r)
-    end
+    mergepositions(mode::Mode)::Mode = mode|>setattr(:R=>getpos(mode))|>removeattr(:r, :b)
 
     function modesymmetrize(mode::Mode)::Mode
-        fixedmode = mode |> mergepositions
+        fixedmode = mode|>mergepositions
         newattrs::Dict{Symbol, Any} = Dict(fixedmode.attrs)
         # TODO: There are some attributes that are not meant to be transformed with the mode.
         filterpredicate = p -> hasmethod(*, Tuple{AffineTransform, p.second |> typeof})

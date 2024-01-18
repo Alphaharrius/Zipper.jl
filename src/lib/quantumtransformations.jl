@@ -135,7 +135,8 @@ function Base.:*(fockmap::FockMap, symmetry::AffineTransform)::FockMap
     phasespectrum::EigenSpectrum = inspacerep |> eigspec
     inspace::FockSpace = FockSpace(
         m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
-          |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
+        # TODO: Requires revisit.  
+        # |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
         for m in phasespectrum |> geteigenvectors |> getinspace)
     return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end

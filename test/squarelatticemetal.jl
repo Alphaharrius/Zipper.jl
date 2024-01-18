@@ -26,12 +26,13 @@ unitcell = Subset(point)
 crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
-m = quantize(:b, unitcell, 1) |> first
+m = quantize(unitcell, 1) |> first
 
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
-    (m, m |> setattr(:offset => [1, 0] ∈ square)) => tₙ,
-    (m, m |> setattr(:offset => [0, 1] ∈ square)) => tₙ])
+    (m, m |> setattr(:r => [1, 0] ∈ square)) => tₙ,
+    (m, m |> setattr(:r => [0, 1] ∈ square)) => tₙ])
+
 
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize
@@ -49,13 +50,15 @@ correlations |> crystalspectrum |> visualize
 crystalfock = correlations |> getoutspace
 
 scale = Scale([4 0; 0 4], square)
-blockresult = blocking(:action => scale, :correlations => correlations, :crystal => crystalfock |> getcrystal)
+
+blocker = scale * crystalfock
+blockedcorrelations = blocker * correlations * blocker'
 
 H = energyspectrum |> FockMap
-blockedH = blockresult[:transformer] * H * blockresult[:transformer]'
-blockedH |> crystalspectrum |> visualize
+blockedH = blocker * H * blocker'
+blockedH|>crystalspectrum|>visualize
 
-blockedcrystal = blockresult[:crystal]
+blockedcrystal = blocker|>getoutspace|>getcrystal
 
 function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)::Scale
     snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector |> vec |> transpose, crystal |> size |> diagm)) 
@@ -63,22 +66,18 @@ function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)::Sca
     return Scale((S |> diag |> diagm) * Vd |> transpose, crystal |> getspace)
 end
 
-blockedcorrelations = blockresult[:correlations]
-
-blockedcrystal = blockresult[:crystal]
-
 normalvector = (1, 1) ∈ (blockedcrystal|>getspace)
 
-function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace)
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace, minbottomheight::Real = 0)
     height::Real = (*(metricspace, normalvector)|>norm)
     sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2)*2, metricspace=metricspace)
 
     normaldirection::Offset = *(metricspace, normalvector)|>normalize
     function crosssectionfilter(point::Point)::Bool
         metricpoint::Point = metricspace * point
-        iswithinheight::Bool = 0 <= dot(metricpoint, normaldirection) <= height
+        iswithinheight::Bool = minbottomheight < dot(metricpoint, normaldirection) <= height
         orthoreminder::Point = metricpoint - dot(metricpoint, normaldirection) * normaldirection
-        iswithinradius::Bool = norm(orthoreminder) < radius
+        iswithinradius::Bool = norm(orthoreminder) <= radius
         return iswithinheight && iswithinradius
     end
 
@@ -101,8 +100,8 @@ end
 regionfock(region::Region; flavorcount::Integer = 1)::FockSpace{Region} = (
     fockspaceunion(sitefock(r, flavorcount=flavorcount) for r in region)|>FockSpace{Region})
 
-crosssectionfock = regionfock(crosssection)
-crosssectionfourier = fourier(blockedcorrelations|>getoutspace, crosssectionfock)
+crosssectionfock = quantize(crosssection, 1)
+crosssectionfourier = Zipper.fourier(blockedcorrelations|>getoutspace, crosssectionfock)
 
 function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)
     snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector|>vec|>transpose, crystal|>size|>diagm)) 
@@ -145,7 +144,7 @@ volumeratio = vol(blockedcrystal) / vol(embeddedcrystal)
 
 function repackfourierblocks(source::FockMap, kscaled::Momentum, partition::Subset{Mode})::FockMap
     partitionrows::FockMap = rows(source, partition |> FockSpace)
-    inspace::FockSpace = FockSpace(setattr(mode, :offset => kscaled, :b => scaledspace * (mode|>getpos)) for mode in partitionrows|>getinspace)
+    inspace::FockSpace = FockSpace(setattr(mode, :k => kscaled, :b => scaledspace * (mode|>getpos))|>removeattr(:r) for mode in partitionrows|>getinspace)
     return FockMap(partitionrows.outspace, inspace, partitionrows |> rep) / sqrt(volumeratio)
 end
 
@@ -163,6 +162,8 @@ extendedCspec = extendedrestrictedC|>crystalspectrum
 
 extendedCspec|>linespectrum|>visualize
 
+extendedrestrictedC|>getoutspace|>getcrystal|>getspace|>rep
+
 extendedfrozenspec = distillation(extendedCspec, :frozen => v -> v < 1e-2 || v > 1 - 1e-2)[:frozen]
 extendedfrozenprojector = extendedfrozenspec|>crystalprojector
 extendedfrozencorrelations = idmap(extendedfrozenprojector|>getoutspace) - extendedfrozenprojector
@@ -171,82 +172,44 @@ extendedCspec = extendedfrozencorrelations|>crystalspectrum
 extendedCspec|>linespectrum|>visualize
 
 scaledspace = extendedrestrictedC|>getoutspace|>getcrystal|>getspace
-truncregion = reduce(+, crosssection + normalvector * n for n in 0:2)
+truncregion = reduce(+, crosssection + normalvector * n for n in 0:23)
 transformedcrosssection = Subset(scaledspace * point for point in truncregion)
 
-visualize(blockedcrystal|>sitepoints, transformedcrosssection)
-visualize(blockedcrystal|>sitepoints, blockedcrystal|>getunitcell)
+visualize(transformedcrosssection, crosssection)
 
-using SparseArrays
-function Zipper.fourier(crystal::Crystal, region::Region)
-    bz::Subset{Momentum} = crystal|>brillouinzone
-    barepoint::Offset = crystal|>getspace|>getorigin
-    barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
-    outspace::CrystalFock = FockSpace((Mode(:offset => k, :b => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
-    
-    latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
-    inspace::FockSpace{Region} = latticesites|>regionfock
-
-    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in bz)...)
-    offsetmatrix::Matrix = hcat((p|>euclidean|>vec for p in latticesites)...)
-
-    fouriermatrix::SparseMatrixCSC = exp.(-1im * momentummatrix' * offsetmatrix)
-    return FockMap(outspace, inspace, fouriermatrix)
-end
-
-function crystaltoregionsublatticemapping(crystalfock::CrystalFock, regionfock::RegionFock)
-    crystalunitfock = crystalfock|>unitcellfock|>orderedmodes|>removeattr(:offset)|>FockSpace
-    regionunitfock = regionfock|>orderedmodes|>removeattr(:offset)|>FockSpace
-    if !hasamespan(crystalunitfock, regionunitfock)
-        @assert(==(crystalunitfock|>dimension, regionunitfock|>dimension))
-        @warn("Abstract mapping between sub-lattice degrees of freedom...")
-    end
-    return idmap(crystalunitfock, regionunitfock)
-end
-
-function tensorproduct(primary::FockSpace, secondary::FockSpace)
-    return fockspaceunion(FockSpace(merge(pmode, smode) for smode in secondary) for pmode in primary)
-end
-
-function Zipper.fourier(crystal::Crystal, regionfock::RegionFock)
-end
-
-function Zipper.fourier(crystalfock::CrystalFock, regionfock::RegionFock, sublatticemapping::FockMap)
-    baretransform::FockMap = fourier(crystalfock|>getcrystal, regionfock|>getregion)
-    ftrep::SparseMatrixCSC = kron(baretransform|>rep, sublatticemapping|>rep)
-    return FockSpace(crystalfock, regionfock, ftrep)
-end
-
-transformedcrosssection
-Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
-Ft|>getinspace|>modeattrs
+# ======================================== Truncation of Strip correlations ========================================
+Ft = Zipper.fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
 Ft|>visualize
 # Compute unit-cell mapping FockMap
-modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:offset))
-truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfock
+modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:k))
+truncregionfock = quantize(transformedcrosssection, 1)|>RegionFock
+truncunitfock = truncregionfock|>unitcellfock
 values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in truncunitfock)
-modemap = FockMap(extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:offset)|>FockSpace, truncunitfock, values)
+modemap = FockMap(extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:k)|>FockSpace, truncunitfock, values)
+modemap|>visualize
 # After this perform tensor product
+rFt = Zipper.fourier(extendedrestrictedC|>getoutspace, truncregionfock, modemap) / 24
+visualize(rFt)
 
-function tensorproduct(primary::FockSpace, secondary::FockSpace; keepprimaryattrs)
-    secondarymodes = (removeattr(mode, keepprimaryattrs...) for mode in secondary)
-    return fockspaceunion(FockSpace(merge(pmode, smode) for smode in secondarymodes) for pmode in primary)
-end
+realspaceextendedC = rFt' * extendedrestrictedC * rFt
 
-Ftinspace = tensorproduct(Ft|>getinspace, modemap|>getinspace, keepprimaryattrs=[:offset])|>FockSpace{Region}
-Ftoutspace = tensorproduct(Ft|>getoutspace, modemap|>getoutspace, keepprimaryattrs=[:offset])
-Ftoutspace = FockSpace(Ftoutspace, reflected=extendedrestrictedC|>getoutspace|>getcrystal)
-Ftrep = kron(Ft|>rep, modemap|>rep)
-newFt = FockMap(Ftoutspace, Ftinspace, Ftrep)
-rFt = columns(newFt, transformedcrosssection|>regionfock)
+keptmodepairs = ((a, b) for (a, b) in Iterators.product(realspaceextendedC|>getoutspace, realspaceextendedC|>getoutspace) if norm(euclidean(getpos(a) - getpos(b))) < 17)
+keptmodepairs|>collect
+trunccorrelationdata = spzero(realspaceextendedC|>getoutspace|>dimension, realspaceextendedC|>getoutspace|>dimension)
 
-tiisometries = (rows(rFt, fockspace) for (_, fockspace) in rFt|>getoutspace|>crystalsubspaces)
-tiprojector = directsum(isometry * isometry' for isometry in tiisometries)
-tiprojector = FockMap(tiprojector, inspace=rFt|>getoutspace, outspace=rFt|>getoutspace)
 
-tiprojector = rFt * rFt'
+rFt * rFt' |>visualize
+
+rFt[(rFt|>getoutspace|>rep)[10]|>FockSpace, :]' * rFt[(rFt|>getoutspace|>rep)[10]|>FockSpace, :] |>visualize
+
+tiprojector = FockMap(directsum(rFt[subspace, :] * rFt[subspace, :]' for (k, subspace) in rFt|>getoutspace|>crystalsubspaces), inspace=rFt|>getoutspace, outspace=rFt|>getoutspace)
+tiprojector|>visualize
 
 truncatedextendedfrozencorrelations = tiprojector * extendedfrozencorrelations * tiprojector'
+truncatedextendedfrozencorrelations|>visualize
+
+
+
 truncextendedCspec = truncatedextendedfrozencorrelations|>crystalspectrum
 
 truncextendedCspec|>linespectrum|>visualize
@@ -257,19 +220,232 @@ truncfilledCspec|>linespectrum|>visualize
 truncfilledprojector = truncfilledCspec|>crystalprojector
 truncfilledcorrelations = idmap(truncfilledprojector|>getoutspace) - truncfilledprojector
 truncfilledcorrelations|>crystalspectrum|>linespectrum|>visualize
+# ======================================== Truncation of Strip correlations ========================================
 
-crosssectionfock|>modeattrs
-truncfilledcorrelations|>getoutspace|>modeattrs
+# ========================================Strip Metal Wannierization========================================
+normalvector*0.875|>norm
+(normalvector|>norm)
 
-wanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.5, radius=0.5)
-wannierregion = Subset(scaledspace * point for point in wanniercrosssection)
-regioncorrelations(truncfilledcorrelations, wannierregion|>regionfock)|>eigspech|>visualize
+p = [3.5,3.5]∈square
+bp = getspace(blockedcrystal) * p
+dot(bp, normalvector|>normalize)
 
-wanniercrosssection2 = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.35, radius=0.5) + normalvector * 0.5
-wannierregion2 = Subset(scaledspace * point for point in wanniercrosssection2)
-regioncorrelations(truncfilledcorrelations, wannierregion2|>regionfock)|>eigspech|>visualize
+function crosssectionlocalstate(wannierregion::Region, predicate::Function)
+    wannierregionfock = quantize(wannierregion, 1)
+    Ft = Zipper.fourier(truncfilledcorrelations|>getoutspace|>getcrystal, wannierregionfock|>getregion)
+    rFt = kron(Ft, modemap)[:, wannierregionfock] / sqrt(Ft|>getoutspace|>dimension)
+    wannierlocalcorrelations = rFt' * truncfilledcorrelations * rFt
+    localspectrum = eigspech(wannierlocalcorrelations, groupingthreshold=1e-3)
+    # localspectrum|>visualize
 
-visualize(crosssection, wanniercrosssection, wanniercrosssection2)
+    groupeigenvalues::Base.Generator = (
+        subset=>(localspectrum|>geteigenvalues)[subset|>first]
+        for subset in localspectrum|>geteigenvectors|>getinspace|>sparsegrouping(:eigenindex)|>rep)
+    selectedgroups = Iterators.filter(p -> p.second|>predicate, groupeigenvalues)
+    selectedisometries = ((localspectrum|>geteigenvectors)[:, group.first|>FockSpace] for group in selectedgroups)
+    selectedstate = selectedisometries|>first
+    stateoutspace = selectedstate|>getoutspace
+    stateoutregion = stateoutspace|>getregion
+    # TODO: The recenter method probably need some look into.
+    offmirror135 = mirror135|>recenter(stateoutregion|>getcenter)
+    # visualize(stateoutregion, offmirror135 * stateoutregion)
+    return selectedstate * offmirror135
+end
+
+function localcrosssectioncorrelations(wannierregion::Region)
+    wannierregionfock = quantize(wannierregion, 1)
+    Ft = Zipper.fourier(truncfilledcorrelations|>getoutspace|>getcrystal, wannierregionfock|>getregion)
+    rFt = kron(Ft, modemap)[:, wannierregionfock] / sqrt(Ft|>getoutspace|>dimension)
+    wannierlocalcorrelations = rFt' * truncfilledcorrelations * rFt
+    return eigspech(wannierlocalcorrelations, groupingthreshold=1e-3)
+end
+
+# For r=1/2
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.25, minbottomheight=0.125)
+wanniercrosssection = basewanniercrosssection
+trialwannierregion1 = Subset(scaledspace * point for point in wanniercrosssection)
+visualize(crosssection, trialwannierregion1)
+
+localcrosssectioncorrelations(trialwannierregion1)|>visualize
+crosssectionlocalstate(trialwannierregion1, v -> v < 1e-3)|>getinspace|>modeattrs
+
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.87, radius=0.5, minbottomheight=0.25)
+wanniercrosssection = basewanniercrosssection
+trialwannierregion2 = Subset(scaledspace * point for point in wanniercrosssection)
+visualize(crosssection, trialwannierregion2)
+
+localcrosssectioncorrelations(trialwannierregion2)|>visualize
+crosssectionlocalstate(trialwannierregion2, v -> v < 1e-3)|>getinspace|>modeattrs
+
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.75, radius=0.5, minbottomheight=0.5)
+wanniercrosssection = basewanniercrosssection
+trialwannierregion3 = Subset(scaledspace * point for point in wanniercrosssection)
+visualize(crosssection, trialwannierregion3)
+
+localcrosssectioncorrelations(trialwannierregion3)|>visualize
+crosssectionlocalstate(trialwannierregion3, v -> v < 1e-3)|>getinspace|>modeattrs
+
+trialwannierregionX = trialwannierregion1 + trialwannierregion2
+visualize(crosssection, trialwannierregionX)
+
+localcrosssectioncorrelations(trialwannierregionX)|>visualize
+
+# For r=0
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.6, minbottomheight=0.125)
+wanniercrosssection = basewanniercrosssection - normalvector/2
+trialwannierregion4 = Subset(scaledspace * point for point in wanniercrosssection)
+visualize(crosssection, trialwannierregion4)
+
+localcrosssectioncorrelations(trialwannierregion4)|>visualize
+crosssectionlocalstate(trialwannierregion4, v -> v < 1e-3)|>getinspace|>modeattrs
+
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.87, radius=0.25, minbottomheight=0.25)
+wanniercrosssection = basewanniercrosssection - normalvector/2
+trialwannierregion5 = Subset(scaledspace * point for point in wanniercrosssection)
+visualize(crosssection, trialwannierregion5)
+
+localcrosssectioncorrelations(trialwannierregion5)|>visualize
+crosssectionlocalstate(trialwannierregion5, true)|>getinspace|>modeattrs
+crosssectionlocalstate(trialwannierregion5, false)|>getinspace|>modeattrs
+
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.75, radius=0.5, minbottomheight=0.5)
+wanniercrosssection = basewanniercrosssection - normalvector/2
+trialwannierregion6 = Subset(scaledspace * point for point in wanniercrosssection)
+visualize(crosssection, trialwannierregion6)
+
+crosssectionlocalstate(trialwannierregion6, true)|>getinspace|>modeattrs
+crosssectionlocalstate(trialwannierregion6, false)|>getinspace|>modeattrs
+
+offwanniercrosssection = wanniercrosssection + normalvector / 2
+visualize(crosssection, offwanniercrosssection)
+wannierregion = Subset(scaledspace * point for point in offwanniercrosssection)
+wannierregionfock = quantize(wannierregion, 1)
+Ft = Zipper.fourier(truncfilledcorrelations|>getoutspace|>getcrystal, wannierregionfock|>getregion)
+rFt = kron(Ft, modemap)[:, wannierregionfock]
+wannierlocalcorrelations2 = rFt' * truncfilledcorrelations * rFt
+wannierlocalcorrelations2|>eigspech|>visualize
+
+newwanniercrosssection = offwanniercrosssection - normalvector / 2
+visualize(crosssection, newwanniercrosssection)
+
+mirror135 = AffineTransform([-1 0; 0 -1], localspace=square)
+
+visualize(crosssection, wanniercrosssection, offwanniercrosssection)
+
+localspectrum2 = eigspech(wannierlocalcorrelations2, groupingthreshold=1e-3)
+localspectrum2|>visualize
+
+groupeigenvalues::Base.Generator = (
+    subset=>(localspectrum|>geteigenvalues)[subset|>first]
+    for subset in localspectrum|>geteigenvectors|>getinspace|>sparsegrouping(:eigenindex)|>rep)
+selectedgroups = Iterators.filter(p -> p.second|>(v -> v > 0.98), groupeigenvalues)
+selectedisometries = ((localspectrum|>geteigenvectors)[:, group.first|>FockSpace] for group in selectedgroups)
+# offmirror135 = recenter(mirrow135, wanniercrosssection|>getcenter)
+# visualize(wanniercrosssection, offmirror135 * wanniercrosssection)
+# quantize(offmirror135 * wanniercrosssection, 1)|>getregion
+# visualize(wanniercrosssection, quantize(offmirror135 * wanniercrosssection, 1)|>getregion)
+# quantize(offmirror135 * wanniercrosssection, 1)|>modeattrs
+
+function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})::FockMap
+    # This is used to correct the :b attribute, since the :b as a Point will be symmetrized,
+    # which the basis point set might not include the symmetrized :b. Thus we would like to set
+    # the :b to its corresponding basis point, and offload the difference to :r.
+    function correctsymmetrizedmode(mode::Mode)::Mode
+        actualposition::Offset = mode|>getattr(:R)
+        basisposition::Offset = actualposition|>basispoint
+        offset::Offset = actualposition - basisposition
+        return mode|>setattr(:b=>basisposition)|>setattr(:r=>offset)|>removeattr(:R)
+    end
+
+    modemapping::Dict{Mode, Mode} = Dict()
+
+    mergepositions(mode::Mode)::Mode = mode|>setattr(:R=>getpos(mode))|>removeattr(:r, :b)
+
+    function modesymmetrize(mode::Mode)::Mode
+        fixedmode = mode |> mergepositions
+        newattrs::Dict{Symbol, Any} = Dict(fixedmode.attrs)
+        # TODO: There are some attributes that are not meant to be transformed with the mode.
+        filterpredicate = p -> hasmethod(*, Tuple{AffineTransform, p.second |> typeof})
+        foreach(p -> newattrs[p.first] = transformation * p.second, Iterators.filter(filterpredicate, fixedmode.attrs))
+        newmode::Mode = Mode(newattrs)|>correctsymmetrizedmode
+        modemapping[newmode] = mode
+        return newmode
+    end
+
+    connections::Dict{Tuple{Mode, Mode}, ComplexF64} = Dict()
+
+    function rebaseorbital(mode::Mode)::Mode
+        frommode::Mode = modemapping[mode]
+        tomode::Mode = mode |> setattr(:orbital => (frommode |> getorbital()))
+        connections[(tomode, frommode)] = (mode |> getorbital()) |> relativephase(frommode |> getorbital())
+        return tomode
+    end
+
+    outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in regionfock)
+    
+    return FockMap(outmodes |> FockSpace{Region}, regionfock, connections)
+end
+
+selectedstate = selectedisometries|>first
+stateoutspace = state|>getoutspace
+stateoutregion = stateoutspace|>getregion
+visualize(stateoutregion)
+# TODO: The recenter method probably need some look into.
+offmirror135 = mirror135|>recenter(stateoutregion|>getcenter)
+# visualize(stateoutregion, offmirror135 * stateoutregion)
+selectedstate * offmirror135
+
+symmetricspstates = (state * *(state, offmirror135) for state in selectedisometries)
+spstates = (state * spatialmap(state)' for state in symmetricspstates)
+
+localstate = Dict(state|>getinspace|>dimension => state for state in spstates)[4]
+localstate|>getinspace|>modeattrs
+localstate|>getoutspace|>modeattrs
+
+
+groupeigenvalues::Base.Generator = (
+    subset => (localspectrum2 |> geteigenvalues)[subset |> first]
+    for subset in localspectrum2 |> geteigenvectors |> getinspace |> sparsegrouping(:eigenindex) |> rep)
+selectedgroups = Iterators.filter(p -> p.second|>(v -> v < 1e-3), groupeigenvalues)
+
+selectedisometries = ((localspectrum2|>geteigenvectors)[:, group.first|>FockSpace] for group in selectedgroups)
+state = selectedisometries|>first
+stateoutspace = state|>getoutspace
+stateoutregion = stateoutspace|>getregion
+# TODO: The recenter method probably need some look into.
+offmirror135 = offmirror135|>recenter(stateoutregion|>getcenter)
+visualize(stateoutregion, offmirror135 * stateoutregion)
+
+*(state, offmirror135)
+
+symmetricspstates = (state * *(state, offmirror135) for state in selectedisometries)
+spstates = (state * spatialmap(state)' for state in symmetricspstates)
+
+localstate = Dict(state|>getinspace|>dimension => state for state in spstates)[5]
+localstate|>getinspace|>modeattrs
+localstate|>getoutspace|>modeattrs
+
+
+function findlocalstate(;
+    regioncorrelations::FockMap{RegionFock, RegionFock},
+    symmetry::AffineTransform = identitytransform(regioncorrelations|>getoutspace|>getspace|>dimension),
+    spectrumfilterpredicate::Function,
+    spectrumdegeneracythreshold::Real = 1e-3)
+
+    localspectrum::EigenSpectrum = eigspech(regioncorrelations, groupingthreshold=spectrumdegeneracythreshold)
+    groupeigenvalues::Base.Generator = (
+        subset => (localspectrum|>geteigenvalues)[subset|>first]
+        for subset in localspectrum|>geteigenvectors|>getinspace|>sparsegrouping(:eigenindex)|>rep)
+    selectedgroups = Iterators.filter(p -> p.second|>spectrumfilterpredicate, groupeigenvalues)
+    
+    selectedisometries = ((localspectrum|>geteigenvectors)[:, group.first|>FockSpace] for group in selectedgroups)
+    symmetricspstates = (state * *(state, symmetry) for state in selectedisometries)
+    spstates = (state * spatialmap(state)' for state in symmetricspstates)
+
+    return Dict(state|>getinspace|>dimension => state for state in spstates)
+end
+# ========================================Strip Metal Wannierization========================================
+
 
 function _findlocalspstates(;
     statecorrelations::FockMap, regionfock::FockSpace,

@@ -16,7 +16,7 @@ unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
-modes::Subset{Mode} = quantize(:b, unitcell, 1)
+modes::Subset{Mode} = Subset(m for m in quantize(unitcell, 1))
 m0, m1 = members(modes)
 
 tₙ = -1 + 0im
@@ -173,7 +173,7 @@ function zer(correlations::FockMap)
 
     crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
     samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
-    blockedmodes::Subset{Mode} = quantize(:b, blockedcrystal.unitcell, 1)
+    blockedmodes::Subset{Mode} = quantize(blockedcrystal.unitcell, 1)|>orderedmodes
     physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
 
 
@@ -253,7 +253,7 @@ function zer(correlations::FockMap)
         :filledcorrelations => filledcorrelations, 
         :emptycorrelations => emptycorrelations,
         :frozenseedingfock => frozenseedingfock,
-        :entanglemententropy => entanglemententropy(couriercorrelationspectrum))
+        :entanglemententropy => entanglemententropy(couriercorrelationspectrum) / (couriercorrelations|>getoutspace|>getcrystal|>vol))
 end
 
 rg1 = zer(C)
@@ -270,6 +270,8 @@ rg2 = zer(rg1[:correlations])
 rg3 = zer(rg2[:correlations])
 
 rg4 = zer(rg3[:correlations])
+
+rg5 = zer(rg4[:correlations])
 
 rg1[:entanglemententropy] / (rg1[:correlations]|>getoutspace|>getcrystal|>vol)
 rg2[:entanglemententropy] / (rg2[:correlations]|>getoutspace|>getcrystal|>vol)

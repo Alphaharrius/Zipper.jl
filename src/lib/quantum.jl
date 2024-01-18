@@ -905,6 +905,15 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellmap::
     # The inspace of the result is more than the origin, thus we have to restrict it back.
     return FockMap(crystalfock, inspace, matrix)[:, regionfock]
 end
+
+function fourier(crystalfock::CrystalFock, regionfock::RegionFock)
+    crystalhomefock::FockSpace = crystalfock|>unitcellfock
+    regionhomefock::FockSpace = regionfock|>unitcellfock
+    @assert(hassamespan(crystalhomefock, regionhomefock) || issubspace(crystalhomefock, regionhomefock))
+    unitcellmap::FockMap = idmap(crystalfock|>unitcellfock)
+    return fourier(crystalfock, regionfock, unitcellmap)[:, regionfock]
+end
+
 export fourier
 
 """

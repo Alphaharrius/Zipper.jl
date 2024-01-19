@@ -19,7 +19,7 @@ modes::Subset{Mode} = quantize(:pos, unitcell, 1)
 m0, m1 = members(modes)
 
 tₙ = -1 + 0im
-tₕ = 0.1im
+tₕ = 0.0im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
@@ -96,6 +96,7 @@ function zer(correlations)
 
     couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
     couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+    nonpurifiedcorrelationspectrum = couriercorrelationspectrum
     purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
     couriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
@@ -141,7 +142,8 @@ function zer(correlations)
         :globaldistiller => globaldistiller,
         :filledcorrelations => filledcorrelations, 
         :emptycorrelations => emptycorrelations,
-        :frozenseedingfock => frozenseedingfock)
+        :frozenseedingfock => frozenseedingfock,
+        :nonpurifiedcorrelationspectrum => nonpurifiedcorrelationspectrum)
 end
 
 rg1 = @time zer(correlations)
@@ -153,6 +155,14 @@ rg3 = @time zer(rg2[:correlations])
 rg4 = @time zer(rg3[:correlations])
 
 rg5 = @time zer(rg4[:correlations])
+
+entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(rg3[:filledcorrelations]|>crystalspectrum) / (rg3[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(rg4[:filledcorrelations]|>crystalspectrum) / (rg4[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(groundstatespectrum(rg4[:nonpurifiedcorrelationspectrum], perunitcellfillings=1)) / (rg4[:correlations]|>getoutspace|>getcrystal|>vol)
+
+rg5[:globaldistiller]|>crystalspectrum|>visualize
 
 rg1[:entanglemententropy] / (rg1[:correlations]|>getoutspace|>getcrystal|>vol)
 rg2[:entanglemententropy] / (rg2[:correlations]|>getoutspace|>getcrystal|>vol)

@@ -24,16 +24,16 @@ tₕ = 0.4im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
-    (m0, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₙ,
-    (m0, m1 |> setattr(:offset => [0, 1] ∈ triangular)) => tₙ]
+    (m0, m1 |> setattr(:r => [-1, 0] ∈ triangular)) => tₙ,
+    (m0, m1 |> setattr(:r => [0, 1] ∈ triangular)) => tₙ]
 
 haldane = [
-    (m0, setattr(m0, :offset => Point([1, 1], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([-1, 0], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([0, -1], triangular))) => tₕ,
-    (m1, setattr(m1, :offset => Point([1, 1], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([-1, 0], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([0, -1], triangular))) => -tₕ]
+    (m0, setattr(m0, :r => Point([1, 1], triangular))) => tₕ,
+    (m0, setattr(m0, :r => Point([-1, 0], triangular))) => tₕ,
+    (m0, setattr(m0, :r => Point([0, -1], triangular))) => tₕ,
+    (m1, setattr(m1, :r => Point([1, 1], triangular))) => -tₕ,
+    (m1, setattr(m1, :r => Point([-1, 0], triangular))) => -tₕ,
+    (m1, setattr(m1, :r => Point([0, -1], triangular))) => -tₕ]
 
 bonds::FockMap = bondmap([nearestneighbor..., haldane...])
 

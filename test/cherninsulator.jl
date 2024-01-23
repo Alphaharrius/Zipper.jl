@@ -62,7 +62,7 @@ function zer(correlations)
     blockedspace::RealSpace = blockedcrystal|>getspace
 
     distillregion::Region = getsphericalregion(crystal=blockedcrystal, radius=1, metricspace=blockedspace|>orthospace)
-    frozenseedingfock::RegionFock = regionfock(distillregion)
+    frozenseedingfock::RegionFock = quantize(distillregion, 1)
 
     @info("Computing global distill Hamiltonian...")
     globaldistiller = @time globaldistillerhamiltonian(

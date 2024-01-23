@@ -64,9 +64,21 @@ Zipper.:Subset(modes::Mode...) = Subset(m for m in modes)
 """
     getpos(mode::Mode)::Point
 
-Get the actual position of the mode, this method only works when `:offset` and `:b` are defined in the same space.
+Get the actual position of the mode, if the mode is associated with a `Momentum` which a `:k` attribute is attached, the return
+value will be the `Momentum`; if the mode is associated with a `Offset` which a `:r` attribute is attached, it will be returned,
+and if there is a intra unit cell offset `:b` attached, it will be added to the `Offset` as the final result.
 """
-Zipper.:getpos(mode::Mode)::Point = convert(Point, mode)
+function Zipper.:getpos(mode::Mode)::Point
+    if hasattr(mode, :k)
+        return getattr(mode, :k)
+    end
+
+    if hasattr(mode, :r)
+        return hasattr(mode, :b) ? getattr(mode, :r) + getattr(mode, :b) : getattr(mode, :r)
+    end
+
+    error("The mode does not have a primary position attribute!")
+end
 
 """
     hasattr(mode::Mode, key::Symbol)::Bool

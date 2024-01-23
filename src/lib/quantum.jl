@@ -34,8 +34,9 @@ Base.:string(mode::Mode)::String = join((k => v for (k, v) in mode |> getattrs),
 """ Display the number of attributes that identifies this `Mode`. """
 Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
 
-""" Allow for offset the `:offset` attribute of a mode. """
-Base.:+(mode::Mode, offset::Point)::Mode = setattr(mode, :offset => getattr(mode, :offset) + offset)
+""" Allow for offset the primary attribute of a mode. """
+Base.:+(mode::Mode, offset::Offset)::Mode = setattr(mode, :r => getattr(mode, :r) + offset)
+Base.:+(mode::Mode, offset::Momentum)::Mode = setattr(mode, :k => getattr(mode, :k) + offset)
 Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)
 
 """

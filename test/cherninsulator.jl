@@ -19,7 +19,7 @@ modes::Subset{Mode} = quantize(:b, unitcell, 1)
 m0, m1 = members(modes)
 
 tₙ = -1 + 0im
-tₕ = 0.4im
+tₕ = 0.1im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
@@ -43,18 +43,20 @@ groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellf
 groundstates |> visualize
 
 groundstateprojector = groundstates |> crystalprojector
-correlations = crystalidmap(groundstateprojector|>getoutspace) - groundstateprojector
+correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 
-function Base.:show(io::IO, fockmap::CrystalFockMap)
-    print(io, string("CrystalFockMap"))
-end
+Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
 
 function zer(correlations)
+    @info("Starting RG...")
     crystalfock = correlations|>getoutspace
 
     scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
-    blocker = scale * crystalfock
-    blockedcorrelations = blocker * correlations * blocker'
+    @info("Performing blocking...")
+    @info("Generating blocking transformation...")
+    blocker = @time scale * crystalfock
+    @info("Performing blocking on correlations...")
+    blockedcorrelations = @time blocker * correlations * blocker'
     blockedcrystalfock = blockedcorrelations|>getoutspace
     blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
     blockedspace::RealSpace = blockedcrystal|>getspace
@@ -62,14 +64,16 @@ function zer(correlations)
     distillregion::Region = getsphericalregion(crystal=blockedcrystal, radius=1, metricspace=blockedspace|>orthospace)
     frozenseedingfock::RegionFock = regionfock(distillregion)
 
-    globaldistiller = globaldistillerhamiltonian(
+    @info("Computing global distill Hamiltonian...")
+    globaldistiller = @time globaldistillerhamiltonian(
         correlations=blockedcorrelations,
         restrictspace=frozenseedingfock,
         localisometryselectionstrategy=frozenselectionbycount(3))
 
     globaldistillerspectrum = globaldistiller|>crystalspectrum
 
-    distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
+    @info("Performing distillation...")
+    distillresult = @time distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
 
     couriersamplingregion::Region = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace|>orthospace)
     courierseedingcenter::Offset = [2/3, 1/3] ∈ blockedspace
@@ -79,9 +83,10 @@ function zer(correlations)
     c3 = c6^2 |> recenter(courierseedingcenter)
 
     blockedcourierprojector = distillresult[:courier]|>crystalprojector
-    blockedcouriercorrelation = crystalidmap(blockedcourierprojector|>getoutspace) - blockedcourierprojector
+    blockedcouriercorrelation = idmap(blockedcourierprojector|>getoutspace) - blockedcourierprojector
 
-    localcourierseed = findlocalspstates(
+    @info("Searching for courier Wannier seeds...")
+    localcourierseed = @time findlocalspstates(
         statecorrelations=blockedcouriercorrelation,
         regionfock=courierseedingfock,
         symmetry=c3,
@@ -90,20 +95,24 @@ function zer(correlations)
     fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
 
     crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
-
-    wanniercourierisometry = wannierprojection(
+    @info("Performing Wannierization on courier modes...")
+    wanniercourierisometry = @time wannierprojection(
         crystalisometries=distillresult[:courier].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds)
 
-    couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
+    @info("Computing the courier correlations...")
+    couriercorrelations = @time wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
     couriercorrelationspectrum = couriercorrelations |> crystalspectrum
     nonpurifiedcorrelationspectrum = couriercorrelationspectrum
-    purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+    @info("Apply purification to courier correlations...")
+    purifiedcorrelationspectrum = @time couriercorrelationspectrum |> roundingpurification
     couriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
+    @info("Successfully renormalized courier correlations!")
 
     blockedfilledprojector = distillresult[:filled]|>crystalprojector
-    blockedfilledcorrelations = crystalidmap(blockedfilledprojector|>getoutspace) - blockedfilledprojector
+    blockedfilledcorrelations = idmap(blockedfilledprojector|>getoutspace) - blockedfilledprojector
 
-    filledseed = findlocalspstates(
+    @info("Searching for filled Wannier seeds...")
+    filledseed = @time findlocalspstates(
         statecorrelations=blockedfilledcorrelations,
         regionfock=frozenseedingfock,
         symmetry=c6,
@@ -112,13 +121,19 @@ function zer(correlations)
         statecrystalfock=blockedcrystalfock)[3]
 
     crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
-    wannierfilledisometry = wannierprojection(
+    @info("Performing Wannierization on filled modes...")
+    wannierfilledisometry = @time wannierprojection(
         crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
 
-    blockedemptyprojector = distillresult[:empty]|>crystalprojector
-    blockedemptycorrelations = crystalidmap(blockedemptyprojector|>getoutspace) - blockedemptyprojector
+    @info("Computing the filled correlations...")
+    filledcorrelations = @time wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
+    @info("Successfully renormalized filled correlations!")
 
-    emptyseed = findlocalspstates(
+    blockedemptyprojector = distillresult[:empty]|>crystalprojector
+    blockedemptycorrelations = idmap(blockedemptyprojector|>getoutspace) - blockedemptyprojector
+
+    @info("Searching for empty Wannier seeds...")
+    emptyseed = @time findlocalspstates(
         statecorrelations=blockedemptycorrelations,
         regionfock=frozenseedingfock,
         symmetry=c6,
@@ -127,11 +142,13 @@ function zer(correlations)
         statecrystalfock=blockedcrystalfock)[3]
 
     crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
-    wannieremptyisometry = wannierprojection(
+    @info("Performing Wannierization on empty modes...")
+    wannieremptyisometry = @time wannierprojection(
         crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
 
-    filledcorrelations = wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
-    emptycorrelations = wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
+    @info("Computing the empty correlations...")
+    emptycorrelations = @time wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
+    @info("Successfully renormalized empty correlations!")
 
     return Dict(
         :blocker => blocker,
@@ -146,7 +163,7 @@ function zer(correlations)
         :nonpurifiedcorrelationspectrum => nonpurifiedcorrelationspectrum)
 end
 
-rg1 = @time zer(correlations)
+rg1 = zer(correlations)
 
 rg2 = @time zer(rg1[:correlations])
 
@@ -278,7 +295,7 @@ function berrycurvaturemultiband(state::CrystalSpectrum)
     end
 
     function kberrycurvature(k)
-        mode = Mode(:offset => k, :pos => statecrystal|>getspace|>getorigin)
+        mode = Mode(:offset => k, :b => statecrystal|>getspace|>getorigin)
         fockspace = FockSpace(mode)
         return FockMap(fockspace, fockspace, [Berry_curvature(k)][:, :])
     end
@@ -310,7 +327,7 @@ function quantummetricdeterminants(state::CrystalSpectrum)
     barecrystal = Crystal(spatialorigin|>Subset, state|>getcrystal|>size)
     
     function makedetblock(k, kgeometrictensor)
-        mode = Mode(:offset => k, :pos => spatialorigin)
+        mode = Mode(:offset => k, :b => spatialorigin)
         fockspace = FockSpace(mode)
         return FockMap(fockspace, fockspace, [kgeometrictensor|>rep|>imag|>det][:, :]|>SparseMatrixCSC)
     end

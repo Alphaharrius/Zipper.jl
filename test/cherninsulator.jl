@@ -165,13 +165,13 @@ end
 
 rg1 = zer(correlations)
 
-rg2 = @time zer(rg1[:correlations])
+rg2 = zer(rg1[:correlations])
 
-rg3 = @time zer(rg2[:correlations])
+rg3 = zer(rg2[:correlations])
 
-rg4 = @time zer(rg3[:correlations])
+rg4 = zer(rg3[:correlations])
 
-rg5 = @time zer(rg4[:correlations])
+rg5 = zer(rg4[:correlations])
 
 entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
 entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)

@@ -21,7 +21,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
         kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
         if !haskey(scaledksubspaces, scaledk)
             scaledksubspaces[scaledk] = FockSpace(
-                setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode))) for mode in kfourier|>getoutspace)
+                setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
         end
         blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
     end

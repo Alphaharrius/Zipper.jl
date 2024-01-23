@@ -133,7 +133,7 @@ The line `mode |> removeattr(:flavor, :index)` is equal to `removeattr(mode, :fl
 removeattr(keys::Symbol...) = v -> removeattr(v, keys...)
 
 """
-    removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode}
+    removeattr(modes, keys::Symbol...)::Subset{Mode}
 
 Create a **copy** of every `Mode` of `modes` **without** the attributes identified by `keys`, the resulting `Subset` might not have the
 same length as the input `modes` as some `Mode` might be **condensed** into a single one after some unique identifier attributes is removed.
@@ -141,7 +141,7 @@ same length as the input `modes` as some `Mode` might be **condensed** into a si
 ### Examples
 To remove the attribute of `:r` and `:b`, we use `removeattr(modes, :r, :b)`.
 """
-removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
+removeattr(modes, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
 
 """
     setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode
@@ -172,7 +172,7 @@ Base.:merge(a::Mode, b::Mode)::Mode = Mode(Dict(getattrs(a)..., getattrs(b)...))
 Base.:&(mode::Mode, attr::Pair{Symbol}) = setattr(mode, attr)
 
 """
-    setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode}
+    setattr(subset, attrs::Pair{Symbol}...)::Subset{Mode}
 
 Create a **copy** of `modes` with the new attributes identified by `keys` added to the current attributes for each mode in `modes`, if the attribute
 exists in the modes, the current record will be overwritten.
@@ -180,7 +180,7 @@ exists in the modes, the current record will be overwritten.
 ### Examples
 - To add `:r` and `:flavor`, we use `newmodes = setattr(modes, :r => point, :flavor => 1)`
 """
-setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
+setattr(subset, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
 """
     renameattr(mode::Mode, oldkey::Symbol, newkey::Symbol)::Mode

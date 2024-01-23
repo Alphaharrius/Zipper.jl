@@ -102,7 +102,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
         if !addinspacemomentuminfo
             return localisometry
         end
-        inspace::FockSpace = localisometry|>getinspace|>orderedmodes|>setattr(:k=>k)|>FockSpace
+        inspace::FockSpace = localisometry|>getinspace|>orderedmodes|>setattr(:k=>k)|>removeattr(:r)|>FockSpace
         return FockMap(localisometry, inspace=inspace, performpermute=false)
     end
 

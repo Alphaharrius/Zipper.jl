@@ -294,19 +294,22 @@ getreflected(fockspace::FockSpace) = fockspace.reflected
 export getreflected
 
 """
-    sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
+    getsparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
 
-Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset` and form a `FockSpace`. Not to
-be mistakened with `spanoffset`, this method will partition the modes by the generator points.
+Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `Point` with attribute `:k` or `:r` depending on the type and form
+a `FockSpace`. Not to be mistakened with `spanoffset`, this method will partition the modes by the generator points.
 Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
 """
-function sparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
-    partitions::Vector{Subset{Mode}} = [setattr(basismodes, :offset => point) for point in points]
-    modes::Subset{Mode} = spanoffset(basismodes, points)
+getsparsefock(basismodes::Subset{Mode}, points::Subset{Momentum})::FockSpace = getsparsefock(basismodes, points, groupidentityattr=:k)
+getsparsefock(basismodes::Subset{Mode}, points::Subset{Offset})::FockSpace = getsparsefock(basismodes, points, groupidentityattr=:r)
+
+function getsparsefock(basismodes::Subset{Mode}, points::Subset{<: Point}; groupidentityattr::Symbol)::FockSpace
+    partitions::Subset{Subset{Mode}} = Subset(setattr(basismodes, groupidentityattr=>point) for point in points)
+    modes::Subset{Mode} = flatten(partitions)
     orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(Subset(partitions::Vector{Subset{Mode}}), orderings)
+    return FockSpace(partitions, orderings)
 end
-export sparsefock
+export getsparsefock
 
 """
     getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace

@@ -132,7 +132,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         modecenter::Offset = sort(absmap |> Zipper.columnspec, by=p->p.second |> real) |> last |> first |> getpos
         basis::Offset = modecenter |> basispoint
         offset::Offset = modecenter - basis
-        return inmode |> setattr(:offset => offset) |> setattr(:b => basis) |> setattr(:ind => ind)
+        return inmode |> setattr(:r => offset) |> setattr(:b => basis) |> setattr(:ind => ind)
     end
 
     spatialinspace::FockSpace{Region} = FockSpace{Region}( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
@@ -224,16 +224,16 @@ tₕ = 0.1im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
-    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ]
+    (m0, setattr(m1, :r => Point([-1, 0], triangular))) => tₙ,
+    (m0, setattr(m1, :r => Point([0, 1], triangular))) => tₙ]
 
 haldane = [
-    (m0, setattr(m0, :offset => Point([1, 1], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([-1, 0], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([0, -1], triangular))) => tₕ,
-    (m1, setattr(m1, :offset => Point([1, 1], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([-1, 0], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([0, -1], triangular))) => -tₕ]
+    (m0, setattr(m0, :r => Point([1, 1], triangular))) => tₕ,
+    (m0, setattr(m0, :r => Point([-1, 0], triangular))) => tₕ,
+    (m0, setattr(m0, :r => Point([0, -1], triangular))) => tₕ,
+    (m1, setattr(m1, :r => Point([1, 1], triangular))) => -tₕ,
+    (m1, setattr(m1, :r => Point([-1, 0], triangular))) => -tₕ,
+    (m1, setattr(m1, :r => Point([0, -1], triangular))) => -tₕ]
 
 bonds::FockMap = bondmap([nearestneighbor..., haldane...])
 

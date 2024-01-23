@@ -55,7 +55,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         modecenter::Offset = reduce(+, (outmode |> getpos) |> real for outmode in colmap |> getoutspace)
         basis::Offset = modecenter |> basispoint
         offset::Offset = modecenter - basis
-        return inmode |> setattr(:offset => offset) |> setattr(:b => basis)
+        return inmode |> setattr(:r => offset) |> setattr(:b => basis)
     end
 
     spatialinspace::FockSpace{Region} = FockSpace{Region}(fockmap[:, m] |> _spatialinmode for m in fockmap |> getinspace)
@@ -101,8 +101,8 @@ bonds::FockMap = bondmap([
     (m0, m0) => t_a,
     (m1, m1) => t_b,
     (m0, m1) => t_n,
-    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => t_n,
-    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => t_n])
+    (m0, setattr(m1, :r => Point([-1, 0], triangular))) => t_n,
+    (m0, setattr(m1, :r => Point([0, 1], triangular))) => t_n])
 
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize

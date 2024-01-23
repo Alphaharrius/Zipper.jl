@@ -20,7 +20,7 @@ t_nn = ComplexF64(-0.6)
 
 bonds::FockMap = bondmap([
     (m0, m1) => t_n,
-    (m1, setattr(m0, :offset => Point([1], chain))) => t_nn])
+    (m1, setattr(m0, :r => Point([1], chain))) => t_nn])
 
 sampling::Vector{Point} = interpolate(Point([-4], k_space), Point([4], k_space), 1000)
 spectrum = espec(bonds, sampling)

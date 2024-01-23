@@ -22,8 +22,8 @@ m0, m1 = members(modes)
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
-    (m0, m1 |> setattr(:offset => triangular & [-1, 0])) => tₙ,
-    (m0, m1 |> setattr(:offset => triangular & [0, 1])) => tₙ])
+    (m0, m1 |> setattr(:r => triangular & [-1, 0])) => tₙ,
+    (m0, m1 |> setattr(:r => triangular & [0, 1])) => tₙ])
 
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize

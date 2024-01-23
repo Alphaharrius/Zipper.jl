@@ -30,8 +30,8 @@ m = quantize(:b, unitcell, 1) |> first
 
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
-    (m, m |> setattr(:offset => [1, 0] ∈ square)) => tₙ,
-    (m, m |> setattr(:offset => [0, 1] ∈ square)) => tₙ])
+    (m, m |> setattr(:r => [1, 0] ∈ square)) => tₙ,
+    (m, m |> setattr(:r => [0, 1] ∈ square)) => tₙ])
 
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize
@@ -102,7 +102,7 @@ visualize(getsphericalregion(crystal=blockedcrystal, radius=5, metricspace=block
 function sitefock(site::Offset; flavorcount::Integer = 1)::FockSpace{Offset}
     basis::Offset = site|>basispoint
     offset::Offset = site - basis
-    return FockSpace((Mode(:offset => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
+    return FockSpace((Mode(:r => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
 end
 
 regionfock(region::Region; flavorcount::Integer = 1)::FockSpace{Region} = (
@@ -126,7 +126,7 @@ visualize(scaledcrystal|>sitepoints, scaledcrystal|>getunitcell)
 
 scaledspace = scaledcrystal|>getspace
 
-embeddedfock = FockSpace(mode|>setattr(:b=>(scaledspace * getpos(mode)))|>removeattr(:offset) for mode in crosssectionfock)
+embeddedfock = FockSpace(mode|>setattr(:b=>(scaledspace * getpos(mode)))|>removeattr(:r) for mode in crosssectionfock)
 embeddedfock|>modeattrs
 
 scaledkspace = convert(MomentumSpace, scaledspace)
@@ -152,7 +152,7 @@ volumeratio = vol(blockedcrystal) / vol(embeddedcrystal)
 
 function repackfourierblocks(source::FockMap, kscaled::Momentum, partition::Subset{Mode})::FockMap
     partitionrows::FockMap = rows(source, partition |> FockSpace)
-    inspace::FockSpace = FockSpace(setattr(mode, :offset => kscaled, :b => scaledspace * (mode|>getpos)) for mode in partitionrows|>getinspace)
+    inspace::FockSpace = FockSpace(setattr(mode, :r => kscaled, :b => scaledspace * (mode|>getpos)) for mode in partitionrows|>getinspace)
     return FockMap(partitionrows.outspace, inspace, partitionrows |> rep) / sqrt(volumeratio)
 end
 
@@ -189,7 +189,7 @@ function Zipper.fourier(crystal::Crystal, region::Region)
     bz::Subset{Momentum} = crystal|>brillouinzone
     barepoint::Offset = crystal|>getspace|>getorigin
     barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
-    outspace::CrystalFock = FockSpace((Mode(:offset => k, :b => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
+    outspace::CrystalFock = FockSpace((Mode(:r => k, :b => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
     
     latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
     inspace::FockSpace{Region} = latticesites|>regionfock
@@ -202,8 +202,8 @@ function Zipper.fourier(crystal::Crystal, region::Region)
 end
 
 function crystaltoregionsublatticemapping(crystalfock::CrystalFock, regionfock::RegionFock)
-    crystalunitfock = crystalfock|>unitcellfock|>orderedmodes|>removeattr(:offset)|>FockSpace
-    regionunitfock = regionfock|>orderedmodes|>removeattr(:offset)|>FockSpace
+    crystalunitfock = crystalfock|>unitcellfock|>orderedmodes|>removeattr(:r)|>FockSpace
+    regionunitfock = regionfock|>orderedmodes|>removeattr(:r)|>FockSpace
     if !hasamespan(crystalunitfock, regionunitfock)
         @assert(==(crystalunitfock|>dimension, regionunitfock|>dimension))
         @warn("Abstract mapping between sub-lattice degrees of freedom...")
@@ -229,10 +229,10 @@ Ft = fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssecti
 Ft|>getinspace|>modeattrs
 Ft|>visualize
 # Compute unit-cell mapping FockMap
-modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:offset))
+modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:r))
 truncunitfock = Subset(p|>basispoint for p in transformedcrosssection)|>regionfock
 values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in truncunitfock)
-modemap = FockMap(extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:offset)|>FockSpace, truncunitfock, values)
+modemap = FockMap(extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:r)|>FockSpace, truncunitfock, values)
 # After this perform tensor product
 
 function tensorproduct(primary::FockSpace, secondary::FockSpace; keepprimaryattrs)
@@ -240,8 +240,8 @@ function tensorproduct(primary::FockSpace, secondary::FockSpace; keepprimaryattr
     return fockspaceunion(FockSpace(merge(pmode, smode) for smode in secondarymodes) for pmode in primary)
 end
 
-Ftinspace = tensorproduct(Ft|>getinspace, modemap|>getinspace, keepprimaryattrs=[:offset])|>FockSpace{Region}
-Ftoutspace = tensorproduct(Ft|>getoutspace, modemap|>getoutspace, keepprimaryattrs=[:offset])
+Ftinspace = tensorproduct(Ft|>getinspace, modemap|>getinspace, keepprimaryattrs=[:r])|>FockSpace{Region}
+Ftoutspace = tensorproduct(Ft|>getoutspace, modemap|>getoutspace, keepprimaryattrs=[:r])
 Ftoutspace = FockSpace(Ftoutspace, reflected=extendedrestrictedC|>getoutspace|>getcrystal)
 Ftrep = kron(Ft|>rep, modemap|>rep)
 newFt = FockMap(Ftoutspace, Ftinspace, Ftrep)
@@ -348,8 +348,8 @@ values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in
 modemap = FockMap(extendedrestrictedC|>getoutspace|>unitcellfock, truncunitfock, values)
 # After this perform tensor product
 
-Ftinspace = tensorproduct(Ft|>getinspace, modemap|>getinspace, keepprimaryattrs=[:offset])|>FockSpace{Region}
-Ftoutspace = tensorproduct(Ft|>getoutspace, modemap|>getoutspace, keepprimaryattrs=[:offset])
+Ftinspace = tensorproduct(Ft|>getinspace, modemap|>getinspace, keepprimaryattrs=[:r])|>FockSpace{Region}
+Ftoutspace = tensorproduct(Ft|>getoutspace, modemap|>getoutspace, keepprimaryattrs=[:r])
 Ftoutspace = FockSpace(Ftoutspace, reflected=extendedrestrictedC|>getoutspace|>getcrystal)
 Ftrep = kron(Ft|>rep, modemap|>rep)
 newFt = FockMap(Ftoutspace, Ftinspace, Ftrep)
@@ -363,7 +363,7 @@ comparefock = FockSpace(mode|>fixposition for mode in extendedrestrictedC|>getou
 
 
 
-truncfock = FockSpace{Region}(mode|>setattr(:b => mode|>getpos)|>setattr(:offset => mode|>getpos|>getspace|>getorigin) for mode in regionfock(transformedcrosssection))
+truncfock = FockSpace{Region}(mode|>setattr(:b => mode|>getpos)|>setattr(:r => mode|>getpos|>getspace|>getorigin) for mode in regionfock(transformedcrosssection))
 truncfourier = fourier(extendedfrozencorrelations|>getoutspace, truncfock)
 truncfourier|>visualize
 truncator = truncfourier * truncfourier'

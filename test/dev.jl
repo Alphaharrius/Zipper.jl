@@ -30,8 +30,8 @@ m0, m1 = members(modes)
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
-    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
+    (m0, setattr(m1, :r => Point([-1, 0], triangular))) => tₙ,
+    (m0, setattr(m1, :r => Point([0, 1], triangular))) => tₙ])
 
 H::FockMap = hamiltonian(crystal, bonds)
 C::FockMap = groundstatecorrelations(H)
@@ -276,7 +276,7 @@ function Renormalization.wannierprojection(; crystalisometries::Dict{Momentum, F
         unitary::FockMap = U * Vt
         approximated::FockMap = isometry * unitary
 
-        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:offset => k)), performpermute=false)
+        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:r => k)), performpermute=false)
     end
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
@@ -530,7 +530,7 @@ function blockdiageigenspectrum(fockmap::FockMap, groupkey::Symbol; renamekey::S
     return BlockDiagEigenSpectrum{T}(groupedeigenmodes, eigenvalues, eigenvectors)
 end
 
-pseudospec = blockdiageigenspectrum(pseudoiden, :offset; renamekey=(:offset))
+pseudospec = blockdiageigenspectrum(pseudoiden, :r; renamekey=(:r))
 pseudospec.eigenvalues
 
 seed = [regionalwannierseeding(blockresult[:correlations], restrictedfock, symmetry=c6)...][1]

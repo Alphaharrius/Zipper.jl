@@ -23,8 +23,8 @@ m0, m1 = members(modes)
 
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
-    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
+    (m0, setattr(m1, :r => Point([-1, 0], triangular))) => tₙ,
+    (m0, setattr(m1, :r => Point([0, 1], triangular))) => tₙ])
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
 𝐶::FockMap = groundstatecorrelations(𝐻)

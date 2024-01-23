@@ -546,6 +546,9 @@ Check if `fockspace` is a sparse fockspace.
 issparse(fockspace::FockSpace)::Bool = subspacecount(fockspace) > 1
 export issparse
 
+""" Tensor product between two `FockSpace` objects. """
+Base.kron(primary::FockSpace, secondary::FockSpace) = fockspaceunion(FockSpace(merge(pmode, smode) for smode in secondary) for pmode in primary)
+
 """
     sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
 

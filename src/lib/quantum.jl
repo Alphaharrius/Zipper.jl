@@ -1542,8 +1542,7 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
     return FockMap(outspace, inspace, data)
 end
 
-function crystalidmap(fockspace::CrystalFock)
+function idmap(fockspace::CrystalFock)
     blocks::Dict = Dict((k, k)=>idmap(fock) for (k, fock) in fockspace|>crystalsubspaces)
     return CrystalFockMap(fockspace|>getcrystal, fockspace|>getcrystal, blocks)
 end
-export crystalidmap

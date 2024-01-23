@@ -23,16 +23,16 @@ tₕ = 0.1im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
-    (m0, m1 |> setattr(:offset => [-1, 0] ∈ triangular)) => tₙ,
-    (m0, m1 |> setattr(:offset => [0, 1] ∈ triangular)) => tₙ]
+    (m0, m1 |> setattr(:r => [-1, 0] ∈ triangular)) => tₙ,
+    (m0, m1 |> setattr(:r => [0, 1] ∈ triangular)) => tₙ]
 
 haldane = [
-    (m0, setattr(m0, :offset => Point([1, 1], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([-1, 0], triangular))) => tₕ,
-    (m0, setattr(m0, :offset => Point([0, -1], triangular))) => tₕ,
-    (m1, setattr(m1, :offset => Point([1, 1], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([-1, 0], triangular))) => -tₕ,
-    (m1, setattr(m1, :offset => Point([0, -1], triangular))) => -tₕ]
+    (m0, setattr(m0, :r => Point([1, 1], triangular))) => tₕ,
+    (m0, setattr(m0, :r => Point([-1, 0], triangular))) => tₕ,
+    (m0, setattr(m0, :r => Point([0, -1], triangular))) => tₕ,
+    (m1, setattr(m1, :r => Point([1, 1], triangular))) => -tₕ,
+    (m1, setattr(m1, :r => Point([-1, 0], triangular))) => -tₕ,
+    (m1, setattr(m1, :r => Point([0, -1], triangular))) => -tₕ]
 
 bonds::FockMap = bondmap([nearestneighbor..., haldane...])
 
@@ -295,7 +295,7 @@ function berrycurvaturemultiband(state::CrystalSpectrum)
     end
 
     function kberrycurvature(k)
-        mode = Mode(:offset => k, :b => statecrystal|>getspace|>getorigin)
+        mode = Mode(:k => k, :b => statecrystal|>getspace|>getorigin)
         fockspace = FockSpace(mode)
         return FockMap(fockspace, fockspace, [Berry_curvature(k)][:, :])
     end
@@ -327,7 +327,7 @@ function quantummetricdeterminants(state::CrystalSpectrum)
     barecrystal = Crystal(spatialorigin|>Subset, state|>getcrystal|>size)
     
     function makedetblock(k, kgeometrictensor)
-        mode = Mode(:offset => k, :b => spatialorigin)
+        mode = Mode(:k => k, :b => spatialorigin)
         fockspace = FockSpace(mode)
         return FockMap(fockspace, fockspace, [kgeometrictensor|>rep|>imag|>det][:, :]|>SparseMatrixCSC)
     end

@@ -297,12 +297,12 @@ end
 export sparsefock
 
 """
-    crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
+    getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-crystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
-export crystalfock
+getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
+export getcrystalfock
 
 """ To create a regional `FockSpace`."""
 function FockSpace{Region}(input)
@@ -1424,10 +1424,10 @@ end
 export CrystalFockMap
 
 """ Generates the input `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
-Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock = crystalfock(fockmap.blocks|>first|>last|>getinspace|>orderedmodes, fockmap.incrystal)
+Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock = getcrystalfock(fockmap.blocks|>first|>last|>getinspace|>orderedmodes, fockmap.incrystal)
 
 """ Generates the output `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
-Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock = crystalfock(fockmap.blocks|>first|>last|>getoutspace|>orderedmodes, fockmap.outcrystal)
+Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock = getcrystalfock(fockmap.blocks|>first|>last|>getoutspace|>orderedmodes, fockmap.outcrystal)
 
 """ Convert a `CrystalFockMap` into a `SparseFockMap`. """
 function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, CrystalFock}

@@ -456,10 +456,9 @@ export modeattrs
 
 Retrieve the unit cell fockspace of the system from a `CrystalFock`, positioned at the origin of the parent `AffineSpace`.
 """
-function unitcellfock(crystalfock::CrystalFock)::RegionFock
+function unitcellfock(crystalfock::CrystalFock)
     firstpartition::Subset{Mode} = crystalfock|>rep|>first
-    originpoint::Point = firstpartition|>first|>getspace|>getorigin
-    return RegionFock(firstpartition|>setattr(:offset => originpoint))
+    return FockSpace(firstpartition|>removeattr(:k))
 end
 export unitcellfock
 
@@ -1122,10 +1121,9 @@ export CrystalSpectrum
 Base.:show(io::IO, spectrum::CrystalSpectrum) = print(io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
 
 """ Shorthand to retrieve the unitcell fockspace from a `CrystalSpectrum`. """
-function unitcellfock(spectrum::CrystalSpectrum)::FockSpace{Region}
+function unitcellfock(spectrum::CrystalSpectrum)
     sourcefock::FockSpace = spectrum |> geteigenvectors |> first |> last |> getoutspace
-    originposition::Offset = sourcefock |> first |> getattr(:b) |> getspace |> getorigin
-    return sourcefock |> orderedmodes |> setattr(:offset => originposition) |> FockSpace{Region}
+    return sourcefock|>orderedmodes|>removeattr(:k)|>FockSpace
 end
 
 """

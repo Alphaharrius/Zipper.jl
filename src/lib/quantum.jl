@@ -41,15 +41,16 @@ Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)
 """
     getspace(mode::Mode)
 
-The space of a `Mode` comes from the physical quantities its defined on, such as `:offset` and `:b`, if none of those are defined,
+The space of a `Mode` comes from the physical quantities its defined on, such as `:r`, `:k` and `:b`, if none of those are defined,
 it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
 
 ### Output
-The space of the attribute `:offset` if available, fall back to `:b` if otherwise; returns a Euclidean space of dimension `1` if both `:offset` & `:b` is missing.
+The space of the attribute `:k` or `:r` if available, fall back to `:b` if otherwise; returns a Euclidean space of dimension `1` no position attributes is found.
 """
 function Zipper.:getspace(mode::Mode)
-    # :offset have a higher priority in determining the space of the mode.
-    if hasattr(mode, :offset) return getspace(getattr(mode, :offset)) end
+    # :r and :k have a higher priority in determining the space of the mode.
+    if hasattr(mode, :k) return getspace(getattr(mode, :k)) end
+    if hasattr(mode, :r) return getspace(getattr(mode, :r)) end
     if hasattr(mode, :b) return getspace(getattr(mode, :b)) end
     # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
     # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.

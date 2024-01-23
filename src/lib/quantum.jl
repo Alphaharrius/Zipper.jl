@@ -463,6 +463,8 @@ function unitcellfock(crystalfock::CrystalFock)
 end
 export unitcellfock
 
+unitcellfock(regionfock::RegionFock) = regionfock|>removeattr(:r)|>FockSpace
+
 """
     subspaces(fockspace::FockSpace)::Base.Generator
 

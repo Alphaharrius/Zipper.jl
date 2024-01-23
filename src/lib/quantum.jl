@@ -914,7 +914,7 @@ end
 function sitefock(site::Offset; flavorcount::Integer = 1)::FockSpace{Offset}
     basis::Offset = site|>basispoint
     offset::Offset = site - basis
-    return FockSpace((Mode(:offset => offset, :pos => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
+    return FockSpace((Mode(:offset => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
 end
 export sitefock
 
@@ -926,7 +926,7 @@ function fourier(crystal::Crystal, region::Region)
     bz::Subset{Momentum} = crystal|>brillouinzone
     barepoint::Offset = crystal|>getspace|>getorigin
     barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
-    outspace::CrystalFock = FockSpace((Mode(:offset => k, :pos => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
+    outspace::CrystalFock = FockSpace((Mode(:offset => k, :b => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
     
     latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
     inspace::FockSpace{Region} = latticesites|>regionfock

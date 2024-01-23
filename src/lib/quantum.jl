@@ -316,7 +316,7 @@ export getsparsefock
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(sparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
+getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(getsparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
 export getcrystalfock
 
 """ To create a regional `FockSpace`."""

@@ -580,44 +580,39 @@ Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset,
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source) # Added for completeness.
 
 """
-    quantize(index::Integer, identifier::Symbol, point::Point, flavor::Integer)::Mode
+    quantize(position::Offset, flavorcount::Integer)::SiteFock
 
-Quantizing a mode from a given `Point`.
+Quantizes a position into a `SiteFock` object.
 
 ### Input
-- `identifier` The identifying atttibute key which the `point` object will be linked to.
-- `point` The `Point` as the physical attribute or object to be quantized.
-- `flavor` The flavor index of the `Mode`, don't mistaken this with the flavor count.
+- `position` The position to be quantized. This is an `Offset` object that represents a point in a quantum system.
+- `flavorcount` The number of flavors (types) of particles each site.
 
 ### Output
-The quantized `Mode` object.
+- `SiteFock`: A `SiteFock` object that represents the quantum state of the position in the Fock space.
 """
-function quantize(identifier::Symbol, point::Point, flavor::Integer)::Mode
-    @assert(identifier == :offset || identifier == :b)
-    home::Point = getorigin(getspace(point))
-    # Since there are only one of the attribute :offset or :b will take the point, the left over shall take the origin.
-    couple::Pair{Symbol, Point} = identifier == :offset ? :b => home : :offset => home
-    # The new mode will take a group of q:$(name).
-    return Mode([identifier => point, :flavor => flavor, couple])
+function quantize(position::Offset, flavorcount::Integer)::SiteFock
+    b::Offset = position|>basispoint
+    r::Offset = position - b
+    return FockSpace((Mode(:r=>r, :b=>b, :flavor=>flavor) for flavor in 1:flavorcount), reflected=r)
 end
 export quantize
 
 """
-    quantize(identifier::Symbol, subset::Subset{Offset}, count::Integer)::Subset{Mode}
+    quantize(region::Region, flavorcount::Integer)::RegionFock
 
-Quantizing a set of mode from a given set of `Point`.
+Quantizes a region into a `RegionFock`.
 
 ### Input
-- `identifier` The identifying atttibute key which the `point` object will be linked to.
-- `subset` The set of `Point` provided as the physical attributes or objects to be quantized.
-- `count` The flavor count of the quantization, if it is greater than `1`, it means the given site defined by a `Point` in `subset` has more
-  than one fermionic degree of freedom.
+- `region` The region to be quantized. This is a `Region` object that represents a part of a quantum system.
+- `flavorcount` The number of flavors (types) of particles in the system.
 
 ### Output
-The quantized set of `Mode` objects.
+- `RegionFock`: A `RegionFock` object that represents the quantum state of the region in the Fock space.
 """
-quantize(identifier::Symbol, subset::Subset{Offset}, count::Int64)::Subset{Mode} = (
-    Subset(quantize(identifier, point, flavor) for point in subset for flavor in 1:count))
+quantize(region::Region, flavorcount::Integer)::RegionFock = FockSpace(
+    fockspaceunion(quantize(position, flavorcount) for position in region),
+    reflected=region)
 
 abstract type FockMap{A <: FockSpace, B <: FockSpace} <: Element{SparseMatrixCSC{ComplexF64, Int64}} end
 export FockMap

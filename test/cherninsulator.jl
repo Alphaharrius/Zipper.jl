@@ -15,7 +15,7 @@ unitcell = Subset(pa, pb)
 crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
-modes::Subset{Mode} = quantize(:b, unitcell, 1)
+modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
 m0, m1 = members(modes)
 
 tₙ = -1 + 0im

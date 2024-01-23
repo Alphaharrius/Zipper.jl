@@ -888,7 +888,7 @@ function fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
     ∑𝑘::Matrix{Float64} = hcat([𝑘 |> euclidean |> vec for 𝑘 in momentums]...)
     inmodes::Subset{Mode} = orderedmodes(inspace)
     basismodes::Subset{Mode} = removeattr(inmodes, :offset)
-    outspace::FockSpace = sparsefock(basismodes, momentums)
+    outspace::FockSpace = getsparsefock(basismodes, momentums)
     return fourier(outspace, inspace, ∑𝑘, basismodes)
 end
 export fourier

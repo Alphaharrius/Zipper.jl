@@ -34,6 +34,9 @@ Zipper.:getregion(crystal::Crystal) = sitepoints(crystal)
 getunitcell(crystal::Crystal) = crystal.unitcell
 export getunitcell
 
+getbarecrystal(crystal::Crystal)::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, crystal|>size)
+return getbarecrystal
+
 Base.:size(crystal::Crystal) = crystal.sizes
 
 """

@@ -19,8 +19,8 @@ The `FockMap` object that contains the bonding information.
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
     (modeA, modeB) => tₙ,
-    (modeA, modeB |> setattr(:offset => [-1, 0] ∈ triangularspace)) => tₙ,
-    (modeA, modeB |> setattr(:offset => [0, 1] ∈ triangularspace)) => tₙ])
+    (modeA, modeB |> setattr(:r => [-1, 0] ∈ triangularspace)) => tₙ,
+    (modeA, modeB |> setattr(:r => [0, 1] ∈ triangularspace)) => tₙ])
 ```
 """
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, T}})::FockMap where {T <: Complex}
@@ -74,7 +74,7 @@ function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfilling
     groundstatemodesets::Base.Generator = (modeset for (_, modeset) in contributions)
     groundstatemodes::Subset{Mode} = groundstatemodesets |> subsetunion
 
-    decoratedmodes::Base.Generator = ((m |> getattr(:offset)) => m for m in groundstatemodes)
+    decoratedmodes::Base.Generator = ((m |> getattr(:k)) => m for m in groundstatemodes)
     momentummodes::Dict = foldl(decoratedmodes; init=Dict()) do d, (k, v)
         mergewith!(append!, d, LittleDict(k => [v]))
     end
@@ -129,7 +129,7 @@ function momentumoccupations(correlations::FockMap)::FockMap
     mode::Mode = Mode(:b => center)
 
     function tracing(k::Momentum, corr::FockMap)::FockMap
-        space::FockSpace = mode |> setattr(:offset => k) |> FockSpace
+        space::FockSpace = mode |> setattr(:k => k) |> FockSpace
         return FockMap(space, space, [corr |> tr][:, :] |> SparseMatrixCSC) / dimension(corr |> getoutspace)
     end
 

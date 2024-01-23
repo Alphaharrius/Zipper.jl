@@ -7,7 +7,8 @@
 Represents an element in a `FockSpace`, and uniquely identifies a physical mode. The attribute `:orbital` is defaulted to `swave` if not specified.
 
 ### Attributes to put in `attrs`
-- `:offset` stores a `Point` which is the offset in lattice unit, of this mode relative to the associated basis mode.
+- `:r` stores a `Offset` which is the offset in lattice unit.
+- `:k` stores a `Momentum` which is the offset in reciprocal lattice unit.
 - `:b` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
 - `:orbital` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
@@ -116,7 +117,7 @@ export getattrs
 Create a **copy** of `mode` **without** the attributes identified by `keys`.
 
 ### Examples
-- To remove the attribute of `:offset` and `:b`, we use `removeattr(mode, :offset, :b)`.
+- To remove the attribute of `:r` and `:b`, we use `removeattr(mode, :r, :b)`.
 """
 removeattr(mode::Mode, keys::Symbol...)::Mode = Mode(Dict(filter(p -> !(p.first ∈ keys), mode.attrs)))
 export removeattr
@@ -138,7 +139,7 @@ Create a **copy** of every `Mode` of `modes` **without** the attributes identifi
 same length as the input `modes` as some `Mode` might be **condensed** into a single one after some unique identifier attributes is removed.
 
 ### Examples
-To remove the attribute of `:offset` and `:b`, we use `removeattr(modes, :offset, :b)`.
+To remove the attribute of `:r` and `:b`, we use `removeattr(modes, :r, :b)`.
 """
 removeattr(modes::Subset{Mode}, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
 
@@ -149,7 +150,7 @@ Create a **copy** of `mode` with the new attributes identified by `keys` added t
 record will be overwritten.
 
 ### Examples
-- To add `:offset` and `:flavor`, we use `newmode = setattr(mode, :offset => point, :flavor => 1)`
+- To add `:r` and `:flavor`, we use `newmode = setattr(mode, :r => point, :flavor => 1)`
 """
 setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode = Mode(Dict(mode.attrs..., attrs...))
 export setattr
@@ -177,7 +178,7 @@ Create a **copy** of `modes` with the new attributes identified by `keys` added 
 exists in the modes, the current record will be overwritten.
 
 ### Examples
-- To add `:offset` and `:flavor`, we use `newmodes = setattr(modes, :offset => point, :flavor => 1)`
+- To add `:r` and `:flavor`, we use `newmodes = setattr(modes, :r => point, :flavor => 1)`
 """
 setattr(subset::Subset{Mode}, attrs::Pair{Symbol}...)::Subset{Mode} = Subset(setattr(mode, attrs...) for mode in subset)
 
@@ -407,7 +408,7 @@ Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock |> getreflec
 
     Retrieve mappings from the crystal momentums to the corresponding `Subset{Mode}`.
 """
-crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :offset) => subspace for subspace in crystalfock |> rep)
+crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :k) => subspace for subspace in crystalfock |> rep)
 export crystalsubsets
 
 """
@@ -417,7 +418,7 @@ Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
 function crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
     function subsettofockspace(subset::Subset{Mode})::Pair{Momentum, FockSpace}
-        k::Momentum = commonattr(subset, :offset)
+        k::Momentum = commonattr(subset, :k)
         return k => FockSpace(subset, reflected=k)
     end
     return (subspace |> subsettofockspace for subspace in crystalfock |> rep)
@@ -871,12 +872,12 @@ export eigvalsh
 """
     fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
 
-Create a `FockMap` corresponds to a Fourier transform of a `FockSpace`. This map assumed orthogonality of modes with the attribute `:offset` dropped, which means
+Create a `FockMap` corresponds to a Fourier transform of a `FockSpace`. This map assumed orthogonality of modes with the attribute `:r` dropped, which means
 entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
 - `momentums` The momentums which spans the output reciprocal subspace, for `getspace(momentum) isa MomentumSpace`.
-- `inspace` The input space, all contituent modes must have the attribute `:offset` defined or result in errors. The `inspace` should include all possible basis modes
+- `inspace` The input space, all contituent modes must have the attribute `:r` defined or result in errors. The `inspace` should include all possible basis modes
   so that they can be identified and span the momentum `FockSpace`.
 
 ### Output
@@ -887,7 +888,7 @@ the `outspace` is the product of `momentums` and the supplied fermionic sites.
 function fourier(momentums::Subset{Momentum}, inspace::FockSpace)::FockMap
     ∑𝑘::Matrix{Float64} = hcat([𝑘 |> euclidean |> vec for 𝑘 in momentums]...)
     inmodes::Subset{Mode} = orderedmodes(inspace)
-    basismodes::Subset{Mode} = removeattr(inmodes, :offset)
+    basismodes::Subset{Mode} = removeattr(inmodes, :r)
     outspace::FockSpace = getsparsefock(basismodes, momentums)
     return fourier(outspace, inspace, ∑𝑘, basismodes)
 end
@@ -897,19 +898,19 @@ export fourier
     fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
 
 Create a `FockMap` corresponds to a Fourier transform of a physical fockspace `inspace` to Fourier fockspace `outspace`. This map assumed orthogonality of modes with the
-attribute `:offset` dropped, which means entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
+attribute `:r` dropped, which means entries corresponds to different fermionic site within the same translational invariant unit cell will be default to `0 + 0im`.
 
 ### Input
 - `outspace` The output space of the Fourier transform, which is the momentum `FockSpace`, most likely with type `FockSpace{Crystal}`, noted that the basis modes in
   each momentum subspace should matches with the possible basis modes within `inspace`.
-- `inspace`  The input space, all contituent modes must have the attribute `:offset` defined or result in errors.
+- `inspace`  The input space, all contituent modes must have the attribute `:r` defined or result in errors.
 
 ### Output
 The `FockMap` represents this specific Fourier transform, with sizes `(N, M)` which `N = dimension(outspace); M = dimension(inspace)`.
 """
 function fourier(outspace::FockSpace, inspace::FockSpace)::FockMap
-    ∑𝑘::Matrix{Float64} = hcat([getattr(first(partition), :offset) |> euclidean |> vec for partition in rep(outspace)]...)
-    basismodes::Subset{Mode} = removeattr(outspace |> rep |> first, :offset) # Assumed the similarity in structure for each partitions.
+    ∑𝑘::Matrix{Float64} = hcat([getattr(first(partition), :k) |> euclidean |> vec for partition in rep(outspace)]...)
+    basismodes::Subset{Mode} = removeattr(outspace |> rep |> first, :k) # Assumed the similarity in structure for each partitions.
     return fourier(outspace, inspace, ∑𝑘, basismodes)
 end
 
@@ -917,8 +918,8 @@ end
 function fourier(outspace::FockSpace, inspace::FockSpace, momentummatrix::Matrix{Float64}, basismodes::Subset{Mode})::FockMap
     values::Array{ComplexF64} = zeros(ComplexF64, length(basismodes), size(momentummatrix, 2), dimension(inspace))
     for ((n, basismode), (m, inmode)) in Iterators.product(enumerate(basismodes), enumerate(orderedmodes(inspace)))
-        if removeattr(inmode, :offset) != basismode continue end
-        offset::Point = inmode |> getattr(:offset) |> euclidean
+        if removeattr(inmode, :r) != basismode continue end
+        offset::Point = inmode |> getattr(:r) |> euclidean
         values[n, :, m] = exp.(-1im * momentummatrix' * vec(offset))
     end
     spmat::SparseMatrixCSC = SparseMatrixCSC(reshape(values, (length(basismodes) * size(momentummatrix, 2), dimension(inspace))))
@@ -928,7 +929,7 @@ end
 function sitefock(site::Offset; flavorcount::Integer = 1)::FockSpace{Offset}
     basis::Offset = site|>basispoint
     offset::Offset = site - basis
-    return FockSpace((Mode(:offset => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
+    return FockSpace((Mode(:r => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
 end
 export sitefock
 
@@ -940,7 +941,7 @@ function fourier(crystal::Crystal, region::Region)
     bz::Subset{Momentum} = crystal|>brillouinzone
     barepoint::Offset = crystal|>getspace|>getorigin
     barecrystal::Crystal = Crystal(barepoint|>Subset, crystal|>size)
-    outspace::CrystalFock = FockSpace((Mode(:offset => k, :b => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
+    outspace::CrystalFock = FockSpace((Mode(:k => k, :b => barepoint, :flavor => 1) for k in bz), reflected=barecrystal)
     
     latticesites::Region = Subset(p - (p|>basispoint) for p in region) # Removing all sub-lattice degrees of freedom.
     inspace::FockSpace{Region} = latticesites|>regionfock
@@ -1137,7 +1138,7 @@ function crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
     crystaleigenvalues::Dict{Mode, Number} = Dict()
     crystaleigenvectors::Dict{Momentum, FockMap} = Dict()
     for (k, fockmap) in momentumfockmaps
-        eigenspectrum::EigenSpectrum = eigspech(fockmap, :offset => k)
+        eigenspectrum::EigenSpectrum = eigspech(fockmap, :k => k)
         crystaleigenmodes[k] = Subset(m for (m, _) in eigenspectrum |> geteigenvalues)
         crystaleigenvectors[k] = eigenspectrum |> geteigenvectors
         for (m, v) in eigenspectrum |> geteigenvalues
@@ -1527,7 +1528,7 @@ end
 If the `FockMap` blocks are direct summed to form a `FockMap{CrystalFock, CrystalFock}`, this will be a more efficient way than using `directsum`.
 """
 function crystaldirectsum(kfockmaps; outcrystal::Crystal, incrystal::Crystal)::CrystalFockMap
-    blocks::Dict = Dict((commonattr(block|>getoutspace, :offset), commonattr(block|>getinspace, :offset))=>block for block in kfockmaps)
+    blocks::Dict = Dict((commonattr(block|>getoutspace, :k), commonattr(block|>getinspace, :k))=>block for block in kfockmaps)
     return CrystalFockMap(outcrystal, incrystal, blocks)
 end
 export crystaldirectsum

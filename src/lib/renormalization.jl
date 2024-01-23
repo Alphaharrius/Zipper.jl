@@ -89,7 +89,7 @@ and store as a dictionary of bloch isometries keyed by the momentum of the `crys
 ### Input
 - `localisometry::FockMap`: The local isometry defined within a `FockSpace{Region}`.
 - `crystalfock::FockSpace{Crystal}`: The crystal `FockSpace`.
-- `addinspacemomentuminfo::Bool`: Whether to add the momentum information into the `inspace` as attribute `:offset` of the returned `FockMap`.
+- `addinspacemomentuminfo::Bool`: Whether to add the momentum information into the `inspace` as attribute `:k` of the returned `FockMap`.
 """
 function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal},
     addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
@@ -103,7 +103,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
         if !addinspacemomentuminfo
             return localisometry
         end
-        inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:offset => k) |> FockSpace
+        inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:k => k) |> FockSpace
         return FockMap(localisometry, inspace=inspace, performpermute=false)
     end
 
@@ -171,7 +171,7 @@ end
 
 function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol, CrystalSpectrum}
     groupingfunction::Function = bandpredicates |> generategroupingfunction
-    labeled::Base.Generator = ((mode |> getattr(:offset), v |> groupingfunction) => mode for (mode, v) in spectrum |> geteigenvalues)
+    labeled::Base.Generator = ((mode |> getattr(:k), v |> groupingfunction) => mode for (mode, v) in spectrum |> geteigenvalues)
     momentumgroups::Dict{Tuple, Vector{Mode}} = foldl(labeled; init=Dict{Tuple, Vector{Mode}}()) do d,(k, v)
         mergewith!(append!, d, LittleDict(k => [v]))
     end
@@ -254,7 +254,7 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
         unitary::FockMap = U * Vt
         approximated::FockMap = isometry * unitary
 
-        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:offset => k)), performpermute=false)
+        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:k => k)), performpermute=false)
     end
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"

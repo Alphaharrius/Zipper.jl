@@ -857,6 +857,17 @@ Base.:transpose(source::FockMap)::FockMap = FockMap(source|>getinspace, source|>
 """ Corresponds to the Hermitian adjoint. """
 Base.:adjoint(source::FockMap)::FockMap = FockMap(source|>getinspace, source|>getoutspace, rep(source)')
 
+"""
+Tensor product between two `FockMap` objects, the outspace and inspace of the result `FockMap` is the tensor product 
+between the `FockSpace` of the parameter `primary` and `secondary`.
+"""
+function Base.kron(primary::FockMap, secondary::FockMap)
+    outspace::FockSpace = kron(primary|>getoutspace, secondary|>getoutspace)
+    inspace::FockSpace = kron(primary|>getinspace, secondary|>getinspace)
+    data::SparseMatrixCSC = kron(primary|>rep, secondary|>rep)
+    FockMap(outspace, inspace, data)
+end
+
 LinearAlgebra.:norm(fockmap::FockMap)::Number = norm(fockmap |> rep)
 LinearAlgebra.:normalize(fockmap::FockMap)::FockMap = FockMap(fockmap |> getoutspace, fockmap |> getinspace, fockmap |> rep |> normalize)
 Base.:abs(fockmap::FockMap)::FockMap = FockMap(fockmap |> getoutspace, fockmap |> getinspace, map(abs, fockmap |> rep))

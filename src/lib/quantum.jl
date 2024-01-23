@@ -233,14 +233,12 @@ setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
 """
     spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode}
 
-Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `points` with attribute `:offset`, the primary ordering will be
+Given a set of `basismodes`, and the generator `points`, span the basis modes with the primary position attribute `:r` or `:k`, the primary ordering will be
 the ordering of `points`, then follows the ordering of `basismodes`.
 """
-spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode} = Subset(setattr(mode, :offset => point) for point in points for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, momentums::Subset{Momentum})::Subset{Mode} = Subset(setattr(mode, :k=>k) for k in momentums for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, offsets::Subset{Offset})::Subset{Mode} = Subset(setattr(mode, :r=>point) for point in offsets for mode in basismodes)
 export spanoffset
-
-""" By this conversion, one can obtain the actual position of the mode, this method only works when `:offset` and `:b` are defined in the same space. """
-Base.:convert(::Type{Point}, source::Mode)::Point = getattr(source, :offset) + getattr(source, :b)
 
 """ Two `Mode` objects are equivalent if they held the same informations. """
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs

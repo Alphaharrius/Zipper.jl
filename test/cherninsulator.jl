@@ -12,7 +12,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [96, 96])
+crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -36,7 +36,7 @@ haldane = [
 
 bonds::FockMap = bondmap([nearestneighbor..., haldane...])
 
-energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
+energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize
 
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)

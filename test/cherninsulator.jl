@@ -46,115 +46,6 @@ groundstates |> visualize
 groundstateprojector = groundstates |> crystalprojector
 C = idmap(groundstateprojector.outspace) - groundstateprojector
 
-inplaceadd(a::FockMap, b::FockMap)::FockMap = a + FockMap(b, outspace=a|>getoutspace, inspace=a|>getinspace, performpermute=false)
-
-function computequantumgeometrictensor2d(state::CrystalSpectrum)
-    statevectors::Dict{Momentum, FockMap} = state|>geteigenvectors
-    Δkx = (1 / size(state|>getcrystal)[1], 0) ∈ (convert(MomentumSpace, state|>getcrystal|>getspace))
-    Δky = (0, 1 / size(state|>getcrystal)[2]) ∈ (convert(MomentumSpace, state|>getcrystal|>getspace))
-
-    kprojectors::Dict{Momentum, FockMap} = Dict(k => kstate * kstate' for (k, kstate) in statevectors)
-    kcorrelations::Dict{Momentum, FockMap} = Dict(k => idmap(projector|>getoutspace) - projector for (k, projector) in kprojectors)
-    ΔCkxs::Dict{Momentum, FockMap} = Dict(k => inplaceadd(-kcorr, kcorrelations[k + Δkx |> basispoint]) for (k, kcorr) in kcorrelations)
-    ΔCkys::Dict{Momentum, FockMap} = Dict(k => inplaceadd(-kcorr, kcorrelations[k + Δky |> basispoint]) for (k, kcorr) in kcorrelations)
-    
-    function kqgtensor(k::Momentum)::FockMap
-        gxx = statevectors[k]' * (ΔCkxs[k]' * kcorrelations[k] * ΔCkxs[k]) * statevectors[k]
-        gxy = statevectors[k]' * (ΔCkxs[k]' * kcorrelations[k] * ΔCkys[k]) * statevectors[k]
-        gyx = statevectors[k]' * (ΔCkys[k]' * kcorrelations[k] * ΔCkxs[k]) * statevectors[k]
-        gyy = statevectors[k]' * (ΔCkys[k]' * kcorrelations[k] * ΔCkys[k]) * statevectors[k]
-
-        xmode::Mode = Mode(:offset=>k, :axis=>(:x))
-        ymode::Mode = Mode(:offset=>k, :axis=>(:y))
-
-        fockspace::FockSpace = FockSpace([xmode, ymode])
-        return FockMap(fockspace, fockspace, [rep(gxx)[1,1] rep(gxy)[1,1]; rep(gyx)[1,1] rep(gyy)[1,1]])
-    end
-
-    return Dict(k=>k|>kqgtensor for (k, _) in statevectors)
-end
-
-Base.:real(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>real)
-Base.:imag(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>imag)
-
-function computequantummetric(state::CrystalSpectrum)
-    gtensors = computequantumgeometrictensor2d(state)
-    barecrystal = Crystal(state|>getcrystal|>getspace|>getorigin, state|>getcrystal|>size)
-
-    gxx = directsum(tensor[1,1] for (k, tensor) in gtensors)
-    gxxbarecrystalfock = FockSpace(gxx|>getoutspace, reflected=barecrystal)
-    gxx = FockMap(gxx, inspace=gxxbarecrystalfock, outspace=gxxbarecrystalfock, performpermute=false)|>real
-
-    gyy = directsum(tensor[2,2] for (k, tensor) in gtensors)
-    gyybarecrystalfock = FockSpace(gyy|>getoutspace, reflected=barecrystal)
-    gyy = FockMap(gyy, inspace=gyybarecrystalfock, outspace=gyybarecrystalfock, performpermute=false)|>real
-
-    gxy = directsum(tensor[1,2] for (k, tensor) in gtensors)
-    gxybarecrystalfock = FockSpace(gxy|>getoutspace, reflected=barecrystal)
-    gxy = FockMap(gxy, inspace=gxybarecrystalfock, outspace=gxybarecrystalfock, performpermute=false)|>real
-
-    gyx = directsum(tensor[2,1] for (k, tensor) in gtensors)
-    gyxbarecrystalfock = FockSpace(gyx|>getoutspace, reflected=barecrystal)
-    gyx = FockMap(gyx, inspace=gyxbarecrystalfock, outspace=gyxbarecrystalfock, performpermute=false)|>real
-
-    return Dict(:gxx => gxx, :gyy => gyy, :gxy => gxy, :gyx => gyx)
-end
-
-scale = Scale([2 0; 0 2], crystal|>getspace)
-
-bz = crystal|>brillouinzone
-ka = bz[278]
-
-bbz = Subset(scale * k |>basispoint for k in bz)
-kspace|>rep
-
-(ka|>euclidean)
-(scale*ka|>euclidean)
-
-scale * kspace |>rep
-visualize(bz, bbz, ka|>Subset, scale * ka |>basispoint|>Subset, scale * ka |>Subset)
-
-
-
-# gsqm = computequantummetric(groundstates)
-# visualize(gsqm[:gxx]|>crystalspectrum, usecontour=true, title="gxx-GS")
-# visualize(gsqm[:gyy]|>crystalspectrum, usecontour=true, title="gyy-GS")
-
-# gsqmdet = quantummetricdeterminants(groundstates)
-# visualize(gsqmdet|>crystalspectrum, usecontour=true, title="qgtdet-GS")
-
-# kqgtensors = computequantumgeometrictensor2d(groundstates)
-# bc = directsum(tensor[1,2]|>imag for (k, tensor) in kqgtensors)
-# barecrystal = Crystal(groundstates|>getcrystal|>getspace|>getorigin, groundstates|>getcrystal|>size)
-# barecrystalfock = FockSpace(bc|>getoutspace, reflected=barecrystal)
-# berrycurvature = 2 * FockMap(bc, inspace=barecrystalfock, outspace=barecrystalfock, performpermute=false)
-
-# (berrycurvature|>rep|>sum) / (2π)
-
-# visualize(berrycurvature|>crystalspectrum, usecontour=true, title="berrycurvature-GS")
-
-# groundstateeigenvectors = groundstates |> geteigenvectors
-# δkx = (1 / size(crystal)[1], 0) ∈ kspace
-# δky = (0, 1 / size(crystal)[2]) ∈ kspace
-
-# δIxs = Dict(k => FockMap(groundstateeigenvectors[k + δkx |> basispoint], inspace=I|>getinspace, outspace=I|>getoutspace, performpermute=false) - I for (k, I) in groundstateeigenvectors)
-# δIys = Dict(k => FockMap(groundstateeigenvectors[k + δky |> basispoint], inspace=I|>getinspace, outspace=I|>getoutspace, performpermute=false) - I for (k, I) in groundstateeigenvectors)
-# δIx = directsum(I for (_, I) in δIxs)
-# δIy = directsum(I for (_, I) in δIys)
-
-# Base.:real(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>real)
-
-# qgtcrystal = Crystal(triangular |> getorigin, crystal|>size)
-# qgt = δIx' * groundstateprojector * δIy
-# qgtoutspace = FockSpace(qmt|>getoutspace, reflected=qmtcrystal)
-# quantumgeometrictensor = idmap(qgtoutspace) - FockMap(qmt, inspace=qmtoutspace, outspace=qmtoutspace)
-# quantummetrictensor = quantumgeometrictensor |> real
-# quantummetrictensor |> crystalspectrum |> visualize
-
-# C |> crystalspectrum |> visualize
-
-entanglemententropy(C |> crystalspectrum)
-
 function zer(correlations::FockMap)
     crystalfock = correlations.outspace
 
@@ -258,18 +149,13 @@ end
 
 rg1 = zer(C)
 
-rg1C = rg1[:correlations]
-rg1courierzipper = rg1[:courierzipper]
-
-rg1Cphys = rg1courierzipper' * rg1C * rg1courierzipper
-
-visualize(rg1Cphys, colrange=1:512, rowrange=1:512)
-
 rg2 = zer(rg1[:correlations])
 
 rg3 = zer(rg2[:correlations])
 
 rg4 = zer(rg3[:correlations])
+
+rg5 = zer(rg4[:correlations])
 
 rg1[:entanglemententropy] / (rg1[:correlations]|>getoutspace|>getcrystal|>vol)
 rg2[:entanglemententropy] / (rg2[:correlations]|>getoutspace|>getcrystal|>vol)

@@ -64,6 +64,8 @@ pbc(crystal::Crystal)::Function = p -> pbc(crystal, p)
 latticeoff(point::Point)::Point = Point([trunc(v) for v in point |> vec], getspace(point))
 export latticeoff
 
+getorigin(crystal::Crystal)::Offset = crystal|>getspace|>getorigin
+
 """
     basispoint(point::Point)::Point
 

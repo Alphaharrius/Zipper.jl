@@ -172,14 +172,13 @@ extendedCspec = extendedfrozencorrelations|>crystalspectrum
 extendedCspec|>linespectrum|>visualize
 
 scaledspace = extendedrestrictedC|>getoutspace|>getcrystal|>getspace
-truncregion = reduce(+, crosssection + normalvector * n for n in 0:23)
+truncregion = reduce(+, crosssection + normalvector * n for n in 0:2)
 transformedcrosssection = Subset(scaledspace * point for point in truncregion)
 
 visualize(transformedcrosssection, crosssection)
 
 # ======================================== Truncation of Strip correlations ========================================
 Ft = Zipper.fourier(extendedrestrictedC|>getoutspace|>getcrystal, transformedcrosssection)
-Ft|>visualize
 # Compute unit-cell mapping FockMap
 modefrombasis = Dict((mode|>getattr(:b)|>basispoint) => mode for mode in extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:k))
 truncregionfock = quantize(transformedcrosssection, 1)|>RegionFock
@@ -188,33 +187,16 @@ values = Dict((modefrombasis[rmode|>getattr(:b)], rmode) => 1 + 0im for rmode in
 modemap = FockMap(extendedrestrictedC|>getoutspace|>orderedmodes|>removeattr(:k)|>FockSpace, truncunitfock, values)
 modemap|>visualize
 # After this perform tensor product
-rFt = Zipper.fourier(extendedrestrictedC|>getoutspace, truncregionfock, modemap) / 24
-visualize(rFt)
+rFt = Zipper.fourier(extendedrestrictedC|>getoutspace, truncregionfock, modemap)[:, truncregionfock]
 
-realspaceextendedC = rFt' * extendedrestrictedC * rFt
+realspaceextendedC = rFt' * extendedfrozencorrelations * rFt
+realspaceextendedC|>visualize
 
-keptmodepairs = ((a, b) for (a, b) in Iterators.product(realspaceextendedC|>getoutspace, realspaceextendedC|>getoutspace) if norm(euclidean(getpos(a) - getpos(b))) < 17)
-keptmodepairs|>collect
-trunccorrelationdata = spzero(realspaceextendedC|>getoutspace|>dimension, realspaceextendedC|>getoutspace|>dimension)
+truncatedextendedC = directsum(rFt[subspace, :] * realspaceextendedC * rFt[subspace, :]' for (_, subspace) in rFt|>getoutspace|>crystalsubspaces)
+truncatedextendedC = FockMap(truncatedextendedC, outspace=rFt|>getoutspace, inspace=rFt|>getoutspace)
+truncatedextendedC|>crystalspectrum|>linespectrum|>visualize
 
-
-rFt * rFt' |>visualize
-
-rFt[(rFt|>getoutspace|>rep)[10]|>FockSpace, :]' * rFt[(rFt|>getoutspace|>rep)[10]|>FockSpace, :] |>visualize
-
-tiprojector = FockMap(directsum(rFt[subspace, :] * rFt[subspace, :]' for (k, subspace) in rFt|>getoutspace|>crystalsubspaces), inspace=rFt|>getoutspace, outspace=rFt|>getoutspace)
-tiprojector|>visualize
-
-truncatedextendedfrozencorrelations = tiprojector * extendedfrozencorrelations * tiprojector'
-truncatedextendedfrozencorrelations|>visualize
-
-
-
-truncextendedCspec = truncatedextendedfrozencorrelations|>crystalspectrum
-
-truncextendedCspec|>linespectrum|>visualize
-
-truncfilledCspec = groundstatespectrum(truncextendedCspec, perunitcellfillings=8)
+truncfilledCspec = groundstatespectrum(truncatedextendedC|>crystalspectrum, perunitcellfillings=8)
 truncfilledCspec|>linespectrum|>visualize
 
 truncfilledprojector = truncfilledCspec|>crystalprojector
@@ -260,8 +242,10 @@ function localcrosssectioncorrelations(wannierregion::Region)
     return eigspech(wannierlocalcorrelations, groupingthreshold=1e-3)
 end
 
+mirror135 = AffineTransform([-1 0; 0 -1], localspace=square)
+
 # For r=1/2
-basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.25, minbottomheight=0.125)
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.125)
 wanniercrosssection = basewanniercrosssection
 trialwannierregion1 = Subset(scaledspace * point for point in wanniercrosssection)
 visualize(crosssection, trialwannierregion1)
@@ -291,7 +275,7 @@ visualize(crosssection, trialwannierregionX)
 localcrosssectioncorrelations(trialwannierregionX)|>visualize
 
 # For r=0
-basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.6, minbottomheight=0.125)
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.125)
 wanniercrosssection = basewanniercrosssection - normalvector/2
 trialwannierregion4 = Subset(scaledspace * point for point in wanniercrosssection)
 visualize(crosssection, trialwannierregion4)
@@ -299,7 +283,7 @@ visualize(crosssection, trialwannierregion4)
 localcrosssectioncorrelations(trialwannierregion4)|>visualize
 crosssectionlocalstate(trialwannierregion4, v -> v < 1e-3)|>getinspace|>modeattrs
 
-basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.87, radius=0.25, minbottomheight=0.25)
+basewanniercrosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.87, radius=0.5, minbottomheight=0.25)
 wanniercrosssection = basewanniercrosssection - normalvector/2
 trialwannierregion5 = Subset(scaledspace * point for point in wanniercrosssection)
 visualize(crosssection, trialwannierregion5)
@@ -327,8 +311,6 @@ wannierlocalcorrelations2|>eigspech|>visualize
 
 newwanniercrosssection = offwanniercrosssection - normalvector / 2
 visualize(crosssection, newwanniercrosssection)
-
-mirror135 = AffineTransform([-1 0; 0 -1], localspace=square)
 
 visualize(crosssection, wanniercrosssection, offwanniercrosssection)
 

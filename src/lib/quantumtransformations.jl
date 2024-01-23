@@ -3,7 +3,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     scaledcrystal::Crystal = scale * crystal
     unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
     bz::Subset{Momentum} = crystal |> brillouinzone
-    basismodes::Subset{Mode} = crystalfock |> rep |> first
+    basismodes::Subset{Mode} = crystalfock|>unitcellfock|>orderedmodes
 
     momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
 

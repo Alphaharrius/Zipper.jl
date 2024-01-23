@@ -46,8 +46,9 @@ Restrict the crystal correlations to a real space regional local correlations.
 The real space local correlation with `inspace` and `outspace` as the `regionfock`.
 """
 function regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockMap
-    fouriermap::FockMap = fourier(correlations.inspace, regionfock) / (correlations.inspace |> subspacecount |> sqrt)
-    return fouriermap' * correlations * fouriermap
+    fock::FockSpace = correlations|>getinspace
+    transform = fourier(fock, regionfock) / (fock|>subspacecount|>sqrt)
+    return transform' * correlations * transform
 end
 export regioncorrelations
 
@@ -133,22 +134,14 @@ function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Cryst
     crystal::Crystal = getcrystal(crystalfock)
     bz::Subset{Momentum} = brillouinzone(crystal)
 
-    projectors::Base.Generator = (k => momentumisometries[k] * momentumisometries[k]' for k in bz)
-    subspaces::Dict{Momentum, FockSpace} = Dict(k => projector|>getoutspace for (k, projector) in projectors)
-    momentummappings::Dict{Momentum, Momentum} = Dict(k => k for k in bz)
-    return CrystalFockMap(crystal, crystal, subspaces, subspaces, bz, momentummappings, projectors|>Dict)
+    projectors::Dict = Dict((k, k) => momentumisometries[k] * momentumisometries[k]' for k in bz)
+    return CrystalFockMap(crystal, crystal, projectors)
 end
 export crystalprojector
 
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
-    fockmap::FockMap = directsum(spectrum.eigenvectors[k] * spectrum.eigenvectors[k]' for (k, _) in spectrum.eigenmodes)
-    basismodes::Subset{Mode} = spectrum |> unitcellfock |> orderedmodes
-    fockspace::CrystalFock = crystalfock(basismodes, spectrum |> getcrystal)
-    if hassamespan(fockmap |> getoutspace, fockspace)
-        return FockMap(fockmap, inspace=fockspace, outspace=fockspace, performpermute=true)
-    end
-    # If some of the modes of the crystalfock is not included within the spectrum, we have to include them back into the nullspace of the projector.
-    return zerosmap(fockspace, fockspace) + fockmap
+    blocks::Dict = Dict((k, k)=>(u * u') for (k, u) in spectrum|>geteigenvectors)
+    return CrystalFockMap(spectrum|>getcrystal, spectrum|>getcrystal, blocks)
 end
 
 function globaldistillerhamiltonian(;
@@ -157,7 +150,7 @@ function globaldistillerhamiltonian(;
 
     localisometries::Dict{Symbol} = localfrozenisometries(correlations, restrictspace, selectionstrategy=localisometryselectionstrategy)
     crystalprojectors::Dict{Symbol, FockMap} = Dict(
-        name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations.inspace)
+        name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations|>getinspace)
         for (name, isometry) in localisometries)
     return reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
 end
@@ -220,10 +213,11 @@ function findlocalspstates(;
     symmetry::AffineTransform = identitytransform(statecorrelations|>getoutspace|>getcrystal|>dimension),
     spectrumextractpredicate::Function = v -> v < 1e-2,
     linearindependencethreshold::Real = 5e-2,
-    degeneracythreshold::Real = 1e-7)::Dict{Integer, FockMap}
+    degeneracythreshold::Real = 1e-7,
+    statecrystalfock::CrystalFock = statecorrelations|>getoutspace)::Dict{Integer, FockMap}
 
     function lineardependencefilter(spstate::FockMap)::Bool
-        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecorrelations.outspace)
+        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecrystalfock)
         crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
         pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
         mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
@@ -265,9 +259,7 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
     end
-    wannierisometry::FockMap = directsum(approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
-    inspace::FockSpace = FockSpace(wannierisometry.inspace, reflected=wanniercrystal)
-    outspace::FockSpace = FockSpace(wannierisometry.outspace, reflected=crystal)
-    return FockMap(wannierisometry, inspace=inspace, outspace=outspace, performpermute=false)
+    blocks::Dict = Dict((k, k)=>approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
+    return CrystalFockMap(crystal, wanniercrystal, blocks)
 end
 export wannierprojection

@@ -1,5 +1,4 @@
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-using Revise
 using Zipper
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -44,86 +43,90 @@ groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellf
 groundstates |> visualize
 
 groundstateprojector = groundstates |> crystalprojector
-C = idmap(groundstateprojector.outspace) - groundstateprojector
+correlations = crystalidmap(groundstateprojector|>getoutspace) - groundstateprojector
 
-function zer(correlations::FockMap)
-    crystalfock = correlations.outspace
+function Base.:show(io::IO, fockmap::CrystalFockMap)
+    print(io, string("CrystalFockMap"))
+end
 
-    scale = Scale([2 0; 0 2], crystalfock |> getcrystal |> getspace)
-    @time blockresult = blocking(:action => scale, :correlations => correlations, :crystal => crystalfock |> getcrystal)
+function zer(correlations)
+    crystalfock = correlations|>getoutspace
 
-    blockedcrystal::Crystal = blockresult[:crystal]
-    blockedcorrelations::FockMap = blockresult[:correlations]
-    blocker = blockresult[:transformer]
+    scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
+    blocker = scale * crystalfock
+    blockedcorrelations = blocker * correlations * blocker'
+    blockedcrystalfock = blockedcorrelations|>getoutspace
+    blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
+    blockedspace::RealSpace = blockedcrystal|>getspace
 
-    function circularregionmodes(origin::Offset, physicalmodes::Subset{Mode}, radius::Number)::Subset{Mode}
-        currentspace::RealSpace = correlations.outspace |> getcrystal |> getspace |> orthospace
-        physicalnorm = m -> lineartransform(currentspace, m |> getpos) |> norm
-        return filter(p -> physicalnorm(p - origin) < radius, physicalmodes)
-    end
+    distillregion::Region = getsphericalregion(crystal=blockedcrystal, radius=1, metricspace=blockedspace|>orthospace)
+    frozenseedingfock::RegionFock = regionfock(distillregion)
 
-    crystalpoints::Subset{Offset} = latticepoints(blockedcrystal)
-    samplepoints::Subset{Offset} = crystalpoints + c6^2 * crystalpoints + c6^4 * crystalpoints
-    blockedmodes::Subset{Mode} = quantize(:b, blockedcrystal.unitcell, 1)
-    physicalmodes::Subset{Mode} = spanoffset(blockedmodes, samplepoints)
-
-
-    frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2)
-    # visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
-    frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
-
-    @time globaldistiller = globaldistillerhamiltonian(
-        correlations=blockresult[:correlations],
+    globaldistiller = globaldistillerhamiltonian(
+        correlations=blockedcorrelations,
         restrictspace=frozenseedingfock,
         localisometryselectionstrategy=frozenselectionbycount(3))
 
-    globaldistillerspectrum = globaldistiller |> crystalspectrum
-    # visualize(globaldistillerspectrum, title="Global Distiller")
+    globaldistillerspectrum = globaldistiller|>crystalspectrum
 
-    @time distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
+    distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
 
-    courierseedingcenter::Offset = [2/3, 1/3] ∈ (blockedmodes |> getspace)
-    courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
-    courierseedingregion::Subset{Offset} = Subset(m |> getpos for m in courierseedingmodes)
-    # visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))
-    courierseedingfock::FockSpace{Region} = FockSpace{Region}(courierseedingmodes)
+    couriersamplingregion::Region = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace|>orthospace)
+    courierseedingcenter::Offset = [2/3, 1/3] ∈ blockedspace
+    courierseedingregion::Region = couriersamplingregion|>filter(p -> norm((blockedspace|>orthospace) * (p - courierseedingcenter)) < 0.9)
+    courierseedingfock::RegionFock = courierseedingregion|>regionfock
 
     c3 = c6^2 |> recenter(courierseedingcenter)
 
-    blockedcourierprojector = distillresult[:courier] |> crystalprojector
-    blockedcouriercorrelation = idmap(blockedcourierprojector.outspace, blockedcourierprojector.outspace) - blockedcourierprojector
+    blockedcourierprojector = distillresult[:courier]|>crystalprojector
+    blockedcouriercorrelation = crystalidmap(blockedcourierprojector|>getoutspace) - blockedcourierprojector
 
-    @time localcourierseed = findlocalspstates(statecorrelations=blockedcouriercorrelation, regionfock=courierseedingfock, symmetry=c3, spectrumextractpredicate=v -> v < 5e-2)[1]
+    localcourierseed = findlocalspstates(
+        statecorrelations=blockedcouriercorrelation,
+        regionfock=courierseedingfock,
+        symmetry=c3,
+        spectrumextractpredicate=v -> v < 5e-2,
+        statecrystalfock=blockedcrystalfock)[1]
     fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
 
-    crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
+    crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
 
     wanniercourierisometry = wannierprojection(
         crystalisometries=distillresult[:courier].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds)
 
-    # regionalrestriction(wanniercourierisometry, courierseedingfock) |> visualize
-
     couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
-    # couriercorrelations |> crystalspectrum |> visualize
     couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+    nonpurifiedcorrelationspectrum = couriercorrelationspectrum
     purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
-    # purifiedcorrelationspectrum |> visualize
-    unpurecorrelations = couriercorrelations
-    couriercorrelations = purifiedcorrelationspectrum |> FockMap
+    couriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
-    blockedfilledprojector = distillresult[:filled] |> crystalprojector
-    blockedfilledcorrelation = idmap(blockedfilledprojector.outspace, blockedfilledprojector.outspace) - blockedfilledprojector
-    @time filledseed = findlocalspstates(statecorrelations=blockedfilledcorrelation, regionfock=frozenseedingfock, symmetry=c6, spectrumextractpredicate=v -> v < 1e-2, degeneracythreshold=1e-3)[3]
+    blockedfilledprojector = distillresult[:filled]|>crystalprojector
+    blockedfilledcorrelations = crystalidmap(blockedfilledprojector|>getoutspace) - blockedfilledprojector
 
-    crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
+    filledseed = findlocalspstates(
+        statecorrelations=blockedfilledcorrelations,
+        regionfock=frozenseedingfock,
+        symmetry=c6,
+        spectrumextractpredicate=v -> v < 1e-2,
+        degeneracythreshold=1e-3,
+        statecrystalfock=blockedcrystalfock)[3]
+
+    crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
     wannierfilledisometry = wannierprojection(
         crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
 
-    blockedemptyprojector = distillresult[:empty] |> crystalprojector
-    blockedemptycorrelation = idmap(blockedemptyprojector.outspace, blockedemptyprojector.outspace) - blockedemptyprojector
-    @time emptyseed = findlocalspstates(statecorrelations=blockedemptycorrelation, regionfock=frozenseedingfock, symmetry=c6, spectrumextractpredicate=v -> v < 1e-2, degeneracythreshold=1e-3)[3]
+    blockedemptyprojector = distillresult[:empty]|>crystalprojector
+    blockedemptycorrelations = crystalidmap(blockedemptyprojector|>getoutspace) - blockedemptyprojector
 
-    crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
+    emptyseed = findlocalspstates(
+        statecorrelations=blockedemptycorrelations,
+        regionfock=frozenseedingfock,
+        symmetry=c6,
+        spectrumextractpredicate=v -> v < 1e-2,
+        degeneracythreshold=1e-3,
+        statecrystalfock=blockedcrystalfock)[3]
+
+    crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
     wannieremptyisometry = wannierprojection(
         crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
 
@@ -133,10 +136,6 @@ function zer(correlations::FockMap)
     return Dict(
         :blocker => blocker,
         :correlations => couriercorrelations,
-        :unpurecorrelations => unpurecorrelations,
-        :courierzipper => wanniercourierisometry' * blocker, 
-        :filledzipper => wannierfilledisometry' * blocker,
-        :emptyzipper => wannieremptyisometry' * blocker,
         :emptyisometry => wannieremptyisometry,
         :filledisometry => wannierfilledisometry,
         :courierisometry => wanniercourierisometry,
@@ -144,18 +143,26 @@ function zer(correlations::FockMap)
         :filledcorrelations => filledcorrelations, 
         :emptycorrelations => emptycorrelations,
         :frozenseedingfock => frozenseedingfock,
-        :entanglemententropy => entanglemententropy(couriercorrelationspectrum))
+        :nonpurifiedcorrelationspectrum => nonpurifiedcorrelationspectrum)
 end
 
-rg1 = zer(C)
+rg1 = @time zer(correlations)
 
-rg2 = zer(rg1[:correlations])
+rg2 = @time zer(rg1[:correlations])
 
-rg3 = zer(rg2[:correlations])
+rg3 = @time zer(rg2[:correlations])
 
-rg4 = zer(rg3[:correlations])
+rg4 = @time zer(rg3[:correlations])
 
-rg5 = zer(rg4[:correlations])
+rg5 = @time zer(rg4[:correlations])
+
+entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(rg3[:filledcorrelations]|>crystalspectrum) / (rg3[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(rg4[:filledcorrelations]|>crystalspectrum) / (rg4[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
+entanglemententropy(groundstatespectrum(rg4[:nonpurifiedcorrelationspectrum], perunitcellfillings=1)) / (rg4[:correlations]|>getoutspace|>getcrystal|>vol)
+
+rg5[:globaldistiller]|>crystalspectrum|>visualize
 
 rg1[:entanglemententropy] / (rg1[:correlations]|>getoutspace|>getcrystal|>vol)
 rg2[:entanglemententropy] / (rg2[:correlations]|>getoutspace|>getcrystal|>vol)

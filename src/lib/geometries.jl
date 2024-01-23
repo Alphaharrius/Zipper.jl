@@ -34,6 +34,12 @@ Zipper.:getregion(crystal::Crystal) = sitepoints(crystal)
 getunitcell(crystal::Crystal) = crystal.unitcell
 export getunitcell
 
+"""
+    getbarecrystal(crystal::Crystal)::Crystal
+
+A bare crystal defines a crystal that have a singlar zero offset position as the unit-cell, and the provided 
+argument `crystal` is used to supply the `RealSpace` and the size information to the bare crystal.
+"""
 getbarecrystal(crystal::Crystal)::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, crystal|>size)
 return getbarecrystal
 

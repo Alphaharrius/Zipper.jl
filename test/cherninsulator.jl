@@ -12,7 +12,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [24, 24])
+crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -163,34 +163,7 @@ function zer(correlations)
         :nonpurifiedcorrelationspectrum => nonpurifiedcorrelationspectrum)
 end
 
-function Zipper.regioncorrelations(correlations::FockMap, regionfock::RegionFock)::FockMap
-    crystalfock::CrystalFock = correlations|>getinspace
-    transform = fourier(crystalfock, regionfock) / (crystalfock|>subspacecount|>sqrt)
-    return transform' * correlations * transform
-end
-
-function Zipper.fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
-    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystalfock|>getcrystal|>brillouinzone)...)
-    momentumhomemodes = unitcellfockmapping|>keys|>Subset
-    values::Array = zeros(Complex, momentumhomemodes|>length, size(momentummatrix, 2), regionfock|>dimension)
-    for (n, homemode) in momentumhomemodes|>enumerate, (m, inmode) in regionfock|>enumerate
-        if unitcellfockmapping[homemode] != inmode|>removeattr(:r) continue end
-        offsetvector::Vector = inmode|>getattr(:r)|>euclidean|>vec
-        values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
-    end
-    data::SparseMatrixCSC = reshape(values, (length(momentumhomemodes) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
-    return FockMap(crystalfock, regionfock, data)
-end
-
 rg1 = zer(correlations)
-
-bc, fsf = zer(correlations)
-
-mapunitcellfock(bc|>getinspace, fsf)|>first|>first|>getattrs
-mapunitcellfock(bc|>getinspace, fsf)|>first|>last|>getattrs
-
-Ft = fourier(bc|>getinspace, fsf)
-Ft' * bc * Ft|>eigspech|>visualize
 
 rg2 = zer(rg1[:correlations])
 

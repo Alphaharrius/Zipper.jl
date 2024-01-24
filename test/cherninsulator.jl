@@ -19,7 +19,7 @@ modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
 m0, m1 = members(modes)
 
 tₙ = -1 + 0im
-tₕ = 0.1im
+tₕ = 0.4im
 
 nearestneighbor = [
     (m0, m1) => tₙ,
@@ -37,10 +37,10 @@ haldane = [
 bonds::FockMap = bondmap([nearestneighbor..., haldane...])
 
 energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
-energyspectrum |> visualize
+energyspectrum|>visualize
 
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
-groundstates |> visualize
+groundstates|>visualize
 
 groundstateprojector = groundstates |> crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
@@ -78,7 +78,7 @@ function zer(correlations)
     couriersamplingregion::Region = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace|>orthospace)
     courierseedingcenter::Offset = [2/3, 1/3] ∈ blockedspace
     courierseedingregion::Region = couriersamplingregion|>filter(p -> norm((blockedspace|>orthospace) * (p - courierseedingcenter)) < 0.9)
-    courierseedingfock::RegionFock = courierseedingregion|>regionfock
+    courierseedingfock::RegionFock = quantize(courierseedingregion, 1)
 
     c3 = c6^2 |> recenter(courierseedingcenter)
 
@@ -163,7 +163,34 @@ function zer(correlations)
         :nonpurifiedcorrelationspectrum => nonpurifiedcorrelationspectrum)
 end
 
+function Zipper.regioncorrelations(correlations::FockMap, regionfock::RegionFock)::FockMap
+    crystalfock::CrystalFock = correlations|>getinspace
+    transform = fourier(crystalfock, regionfock) / (crystalfock|>subspacecount|>sqrt)
+    return transform' * correlations * transform
+end
+
+function Zipper.fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
+    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystalfock|>getcrystal|>brillouinzone)...)
+    momentumhomemodes = unitcellfockmapping|>keys|>Subset
+    values::Array = zeros(Complex, momentumhomemodes|>length, size(momentummatrix, 2), regionfock|>dimension)
+    for (n, homemode) in momentumhomemodes|>enumerate, (m, inmode) in regionfock|>enumerate
+        if unitcellfockmapping[homemode] != inmode|>removeattr(:r) continue end
+        offsetvector::Vector = inmode|>getattr(:r)|>euclidean|>vec
+        values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
+    end
+    data::SparseMatrixCSC = reshape(values, (length(momentumhomemodes) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
+    return FockMap(crystalfock, regionfock, data)
+end
+
 rg1 = zer(correlations)
+
+bc, fsf = zer(correlations)
+
+mapunitcellfock(bc|>getinspace, fsf)|>first|>first|>getattrs
+mapunitcellfock(bc|>getinspace, fsf)|>first|>last|>getattrs
+
+Ft = fourier(bc|>getinspace, fsf)
+Ft' * bc * Ft|>eigspech|>visualize
 
 rg2 = zer(rg1[:correlations])
 

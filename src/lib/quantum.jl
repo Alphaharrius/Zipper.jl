@@ -199,6 +199,19 @@ renameattr(mode::Mode, oldkey::Symbol, newkey::Symbol)::Mode = mode|>setattr(new
 renameattr(input, oldkey::Symbol, newkey::Symbol) = Subset(renameattr(mode, oldkey, newkey) for mode in input)
 renameattr(oldkey, newkey)::Function = m -> renameattr(m, oldkey, newkey)
 
+function renameattr(renamings::Pair{Symbol, Symbol}...)::Function
+    function rename(mode::Mode)::Mode
+        ret::Mode = mode
+        for (oldkey, newkey) in renamings
+            ret = renameattr(ret, oldkey, newkey)
+        end
+        return ret
+    end
+    return rename
+end
+
+export renameattr
+
 """
     commonattrs(modes)::Base.Generator
 

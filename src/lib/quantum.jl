@@ -1381,11 +1381,11 @@ Base.:show(io::IO, state::RegionState) = print(io, string("$(typeof(state))(coun
 
 Base.:convert(::Type{FockMap}, source::RegionState)::FockMap = reduce(+, spstate for (_, spstate) in spstates)
 
-function regionalrestriction(crystalstate::FockMap, regionfock::FockSpace)::RegionState
+function regionalrestriction(crystalstate::FockMap, regionfock::RegionFock)::RegionState
     eigenmodes::Subset{Mode} = crystalstate |> getinspace |> unitcellfock |> orderedmodes
 
     function extractregionstate(mode::Mode)
-        rightfourier::FockMap = fourier(crystalstate |> getinspace, mode |> FockSpace)
+        rightfourier::FockMap = fourier(crystalstate |> getinspace, mode |> RegionFock)
         leftfourier::FockMap = fourier(crystalstate |> getoutspace, regionfock)
         return leftfourier' * crystalstate * rightfourier
     end

@@ -40,14 +40,14 @@ Restrict the crystal correlations to a real space regional local correlations.
 
 ### Input
 - `correlations::FockMap`: The crystal correlations.
-- `regionfock::FockSpace`: The real space regional `FockSpace`.
+- `regionfock::RegionFock`: The real space regional `RegionFock`.
 
 ### Output
 The real space local correlation with `inspace` and `outspace` as the `regionfock`.
 """
-function regioncorrelations(correlations::FockMap, regionfock::FockSpace)::FockMap
-    fock::FockSpace = correlations|>getinspace
-    transform = fourier(fock, regionfock) / (fock|>subspacecount|>sqrt)
+function regioncorrelations(correlations::FockMap, regionfock::RegionFock)::FockMap
+    crystalfock::CrystalFock = correlations|>getinspace
+    transform = fourier(crystalfock, regionfock) / (crystalfock|>subspacecount|>sqrt)
     return transform' * correlations * transform
 end
 export regioncorrelations

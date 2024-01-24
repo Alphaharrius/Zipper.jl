@@ -320,12 +320,6 @@ A short hand to build the crystal fockspace, which is the fockspace containing a
 getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(getsparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
 export getcrystalfock
 
-""" To create a regional `FockSpace`."""
-function FockSpace{Region}(input)
-    region::Region = Subset(m |> getpos for m in input)
-    return FockSpace(input, reflected=region)
-end
-
 """ Get the reflected region of the regional `FockSpace`. """
 Zipper.:getregion(regionfock::FockSpace{Region})::Region = regionfock |> getreflected
 
@@ -344,6 +338,31 @@ export MomentumFock
 """ Shorthand alias for `FockSpace{Offset}`. """
 SiteFock = FockSpace{Offset}
 export SiteFock
+
+"""
+    RegionFock(input)
+
+From the input modes, reformat the mode format to have both `:r` and `:b` 
+attribute and output the set as a `RegionFock`.
+
+### Error
+- If the input mode already has a `:k` attribute, an error will be thrown.
+"""
+function Zipper.RegionFock(input)
+    function preprocess(mode::Mode)::Mode
+        if hasattr(mode, :k)
+            error("The mode has a momentum space position attribute!")
+        end
+        if !hasattr(mode, :r)
+            return mode|>setattr(:r=>mode|>getattr(:b)|>getspace|>origin)
+        end
+        return mode
+    end
+
+    processedinput = (m|>preprocess for m in input)
+    region::Region = Subset(m|>getpos for m in processedinput)
+    return FockSpace(processedinput, reflected=region)
+end
 
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))

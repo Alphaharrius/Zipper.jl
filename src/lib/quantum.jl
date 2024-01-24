@@ -925,14 +925,14 @@ export rulemapunitcellfock
 
 function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
     momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystalfock|>getcrystal|>brillouinzone)...)
-    momentumhomemodes = unitcellfockmapping|>keys|>Subset
-    values::Array = zeros(Complex, momentumhomemodes|>length, size(momentummatrix, 2), regionfock|>dimension)
-    for (n, homemode) in momentumhomemodes|>enumerate, (m, inmode) in regionfock|>enumerate
-        if unitcellfockmapping[homemode] != inmode|>removeattr(:r) continue end
+    momentumhomefock = crystalfock|>unitcellfock
+    values::Array = zeros(Complex, momentumhomefock|>length, size(momentummatrix, 2), regionfock|>dimension)
+    for (n, homemode) in momentumhomefock|>enumerate, (m, inmode) in regionfock|>enumerate
+        if !haskey(unitcellfockmapping, homemode) || unitcellfockmapping[homemode] != inmode|>removeattr(:r) continue end
         offsetvector::Vector = inmode|>getattr(:r)|>euclidean|>vec
         values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
     end
-    data::SparseMatrixCSC = reshape(values, (length(momentumhomemodes) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
+    data::SparseMatrixCSC = reshape(values, (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
     return FockMap(crystalfock, regionfock, data)
 end
 export fourier

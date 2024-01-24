@@ -78,8 +78,8 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
     homefock::FockSpace = crystalfock |> unitcellfock
     homefocktransform::FockMap = transformation * homefock
     ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces |> Dict
-    fouriertransform::FockMap = fourier(crystalfock, homefock)
-    transformedfourier::FockMap = fourier(crystalfock, homefocktransform.outspace)
+    fouriertransform::FockMap = fourier(crystalfock, homefock|>RegionFock)
+    transformedfourier::FockMap = fourier(crystalfock, homefocktransform|>getoutspace|>RegionFock)
     transform::FockMap = directsum(
         rows(transformedfourier, ksubspaces[transformation * k |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
         for (k, fockspace) in ksubspaces)

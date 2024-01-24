@@ -899,41 +899,42 @@ export eigvecsh
 eigvalsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...) |> geteigenvalues
 export eigvalsh
 
-function fourier(crystal::Crystal, region::Region)::FockMap{CrystalFock, RegionFock}
-    barecrystal::Crystal = crystal|>getbarecrystal
-    baremode::Mode = Mode(:b=>barecrystal|>getorigin, :flavor=>1)
-    crystalfock::CrystalFock = getcrystalfock(baremode|>Subset, barecrystal)
+function mapunitcellfock(to::FockSpace, from::FockSpace)
+    tohomefock::FockSpace = to|>unitcellfock
+    fromhomefock::FockSpace = from|>unitcellfock
+    
+    if hassamespan(tohomefock, fromhomefock) || issubspace(fromhomefock, tohomefock)
+        return Dict(mode=>mode for mode in tohomefock)
+    end
+    if issubspace(tohomefock, fromhomefock)
+        return Dict(mode=>mode for mode in fromhomefock)
+    end
 
-    regionoffsets::Subset{Offset} = Subset(r - basispoint(r) for r in region)
-    inspace::RegionFock = quantize(regionoffsets, 1)
-
-    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystal|>brillouinzone)...)
-    offsetmatrix::Matrix = hcat((p|>euclidean|>vec for p in regionoffsets)...)
-
-    fouriermatrix::SparseMatrixCSC = exp.(-1im * momentummatrix' * offsetmatrix)
-    return FockMap(crystalfock, inspace, fouriermatrix)
+    error("This method requires the two fockspaces to have intersections!")
 end
+export mapunitcellfock
 
-function fourier(crystalfock::CrystalFock, regionfock::RegionFock, basismodemapping::FockMap)
-    baretransform::FockMap = fourier(crystalfock|>getcrystal, regionfock|>getregion)
-    transform::FockMap = kron(baretransform, basismodemapping)[:, regionfock]
-    return FockMap(transform, outspace=crystalfock)
+function rulemapunitcellfock(to::FockSpace, from::FockSpace, rule::Function = (a, b) -> (a == b))
+    tohomefock::FockSpace = to|>unitcellfock
+    fromhomefock::FockSpace = from|>unitcellfock
+
+    pairs = product(tohomefock, fromhomefock)
+    return Dict(tomode=>frommode for (tomode, frommode) in pairs if rule(tomode, frommode))
 end
+export rulemapunitcellfock
 
-function fourier(crystalfock::CrystalFock, regionfock::RegionFock)
-    crystalhomefock::FockSpace = crystalfock|>unitcellfock
-    regionhomefock::FockSpace = regionfock|>unitcellfock
-    @assert(hassamespan(crystalhomefock, regionhomefock) || issubspace(crystalhomefock, regionhomefock))
-
-    basismodemapping::FockMap = idmap(crystalhomefock, regionhomefock)
-    return fourier(crystalfock, regionfock, basismodemapping)
+function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
+    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystalfock|>getcrystal|>brillouinzone)...)
+    momentumhomemodes = unitcellfockmapping|>keys|>Subset
+    values::Array = zeros(Complex, momentumhomemodes|>length, size(momentummatrix, 2), regionfock|>dimension)
+    for (n, homemode) in momentumhomemodes|>enumerate, (m, inmode) in regionfock|>enumerate
+        if unitcellfockmapping[homemode] != inmode|>removeattr(:r) continue end
+        offsetvector::Vector = inmode|>getattr(:r)|>euclidean|>vec
+        values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
+    end
+    data::SparseMatrixCSC = reshape(values, (length(momentumhomemodes) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
+    return FockMap(crystalfock, regionfock, data)
 end
-
-function fourier(crystal::Crystal, regionfock::RegionFock)
-    crystalfock::CrystalFock = getcrystalfock(regionfock|>unitcellfock|>orderedmodes, crystal)
-    return fourier(crystalfock, regionfock)
-end
-
 export fourier
 
 """

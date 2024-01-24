@@ -95,7 +95,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
     addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
 
     crystal::Crystal = getcrystal(crystalfock)
-    fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
+    fouriermap::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
     momentumfouriers::Base.Generator = rowsubmaps(fouriermap)
     bz::Subset{Momentum} = brillouinzone(crystal)
 

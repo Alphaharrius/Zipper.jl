@@ -13,7 +13,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
 
     crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
-    restrictedfourier::FockMap = fourier(bz, unscaledblockedunitcellfock)'
+    restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
     blocks::Dict = Dict()
 
     scaledksubspaces::Dict{Momentum, FockSpace} = Dict()

@@ -903,11 +903,11 @@ function mapunitcellfock(to::FockSpace, from::FockSpace)
     tohomefock::FockSpace = to|>unitcellfock
     fromhomefock::FockSpace = from|>unitcellfock
     
-    if hassamespan(tohomefock, fromhomefock) || issubspace(fromhomefock, tohomefock)
-        return Dict(mode=>mode for mode in tohomefock)
-    end
-    if issubspace(tohomefock, fromhomefock)
+    if hassamespan(tohomefock, fromhomefock) || issubspace(tohomefock, fromhomefock)
         return Dict(mode=>mode for mode in fromhomefock)
+    end
+    if issubspace(fromhomefock, tohomefock)
+        return Dict(mode=>mode for mode in tohomefock)
     end
 
     error("This method requires the two fockspaces to have intersections!")

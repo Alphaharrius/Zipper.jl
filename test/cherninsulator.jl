@@ -1,5 +1,9 @@
-using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-using Zipper
+using Distributed
+procs = addprocs(5)
+@info("Using $(nworkers()) threads...")
+
+@everywhere using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+@everywhere using Zipper
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
@@ -47,7 +51,7 @@ correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 
 Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
 
-function zer(correlations)
+@everywhere function zer(correlations)
     @info("Starting RG...")
     crystalfock = correlations|>getoutspace
 
@@ -82,73 +86,84 @@ function zer(correlations)
 
     c3 = c6^2 |> recenter(courierseedingcenter)
 
-    blockedcourierprojector = distillresult[:courier]|>crystalprojector
-    blockedcouriercorrelation = idmap(blockedcourierprojector|>getoutspace) - blockedcourierprojector
+    function renormalizecourier()
+        blockedcourierprojector = distillresult[:courier]|>crystalprojector
+        blockedcouriercorrelation = idmap(blockedcourierprojector|>getoutspace) - blockedcourierprojector
 
-    @info("Searching for courier Wannier seeds...")
-    localcourierseed = @time findlocalspstates(
-        statecorrelations=blockedcouriercorrelation,
-        regionfock=courierseedingfock,
-        symmetry=c3,
-        spectrumextractpredicate=v -> v < 5e-2,
-        statecrystalfock=blockedcrystalfock)[1]
-    fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
+        localcourierseed = findlocalspstates(
+            statecorrelations=blockedcouriercorrelation,
+            regionfock=courierseedingfock,
+            symmetry=c3,
+            spectrumextractpredicate=v -> v < 5e-2,
+            statecrystalfock=blockedcrystalfock)[1]
+        fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
 
-    crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
-    @info("Performing Wannierization on courier modes...")
-    wanniercourierisometry = @time wannierprojection(
-        crystalisometries=distillresult[:courier].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds)
+        crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
+        wanniercourierisometry = wannierprojection(
+            crystalisometries=distillresult[:courier].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds)
 
-    @info("Computing the courier correlations...")
-    couriercorrelations = @time wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
-    couriercorrelationspectrum = couriercorrelations |> crystalspectrum
-    nonpurifiedcorrelationspectrum = couriercorrelationspectrum
-    @info("Apply purification to courier correlations...")
-    purifiedcorrelationspectrum = @time couriercorrelationspectrum |> roundingpurification
-    couriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
-    @info("Successfully renormalized courier correlations!")
+        couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
+        couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+        nonpurifiedcorrelationspectrum = couriercorrelationspectrum
 
-    blockedfilledprojector = distillresult[:filled]|>crystalprojector
-    blockedfilledcorrelations = idmap(blockedfilledprojector|>getoutspace) - blockedfilledprojector
+        purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+        couriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
-    @info("Searching for filled Wannier seeds...")
-    filledseed = @time findlocalspstates(
-        statecorrelations=blockedfilledcorrelations,
-        regionfock=frozenseedingfock,
-        symmetry=c6,
-        spectrumextractpredicate=v -> v < 1e-2,
-        degeneracythreshold=1e-3,
-        statecrystalfock=blockedcrystalfock)[3]
+        return couriercorrelations, wanniercourierisometry, nonpurifiedcorrelationspectrum
+    end
+    
+    function renormalizefilled()
+        blockedfilledprojector = distillresult[:filled]|>crystalprojector
+        blockedfilledcorrelations = idmap(blockedfilledprojector|>getoutspace) - blockedfilledprojector
 
-    crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
-    @info("Performing Wannierization on filled modes...")
-    wannierfilledisometry = @time wannierprojection(
-        crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
+        filledseed = findlocalspstates(
+            statecorrelations=blockedfilledcorrelations,
+            regionfock=frozenseedingfock,
+            symmetry=c6,
+            spectrumextractpredicate=v -> v < 1e-2,
+            degeneracythreshold=1e-3,
+            statecrystalfock=blockedcrystalfock)[3]
 
-    @info("Computing the filled correlations...")
-    filledcorrelations = @time wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
-    @info("Successfully renormalized filled correlations!")
+        crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
+        wannierfilledisometry = wannierprojection(
+            crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
 
-    blockedemptyprojector = distillresult[:empty]|>crystalprojector
-    blockedemptycorrelations = idmap(blockedemptyprojector|>getoutspace) - blockedemptyprojector
+        filledcorrelations = wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
+        return filledcorrelations, wannierfilledisometry
+    end
 
-    @info("Searching for empty Wannier seeds...")
-    emptyseed = @time findlocalspstates(
-        statecorrelations=blockedemptycorrelations,
-        regionfock=frozenseedingfock,
-        symmetry=c6,
-        spectrumextractpredicate=v -> v < 1e-2,
-        degeneracythreshold=1e-3,
-        statecrystalfock=blockedcrystalfock)[3]
+    function renormalizeempty()
+        blockedemptyprojector = distillresult[:empty]|>crystalprojector
+        blockedemptycorrelations = idmap(blockedemptyprojector|>getoutspace) - blockedemptyprojector
 
-    crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
-    @info("Performing Wannierization on empty modes...")
-    wannieremptyisometry = @time wannierprojection(
-        crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
+        emptyseed = findlocalspstates(
+            statecorrelations=blockedemptycorrelations,
+            regionfock=frozenseedingfock,
+            symmetry=c6,
+            spectrumextractpredicate=v -> v < 1e-2,
+            degeneracythreshold=1e-3,
+            statecrystalfock=blockedcrystalfock)[3]
 
-    @info("Computing the empty correlations...")
-    emptycorrelations = @time wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
-    @info("Successfully renormalized empty correlations!")
+        crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
+
+        wannieremptyisometry = wannierprojection(
+            crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
+
+        emptycorrelations = wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
+
+        return emptycorrelations, wannieremptyisometry
+    end
+
+    courierrenormalization = @spawnat :any renormalizecourier()
+    filledrenormalization = @spawnat :any renormalizefilled()
+    emptyrenormalization = @spawnat :any renormalizeempty()
+
+    @info ("Renormalizing courier...")
+    couriercorrelations, wanniercourierisometry, nonpurifiedcorrelationspectrum = @time fetch(courierrenormalization)
+    @info ("Renormalizing filled...")
+    filledcorrelations, wannierfilledisometry = @time fetch(filledrenormalization)
+    @info ("Renormalizing empty...")
+    emptycorrelations, wannieremptyisometry = @time fetch(emptyrenormalization)
 
     return Dict(
         :blocker => blocker,
@@ -163,7 +178,7 @@ function zer(correlations)
         :nonpurifiedcorrelationspectrum => nonpurifiedcorrelationspectrum)
 end
 
-rg1 = zer(correlations)
+rg1 = @time zer(correlations)
 
 rg2 = zer(rg1[:correlations])
 
@@ -172,6 +187,9 @@ rg3 = zer(rg2[:correlations])
 rg4 = zer(rg3[:correlations])
 
 rg5 = zer(rg4[:correlations])
+
+# Remove all the distributed workers.
+rmprocs(procs...)
 
 entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
 entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)

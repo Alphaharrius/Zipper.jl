@@ -367,7 +367,7 @@ function Zipper.RegionFock(input)
             error("The mode has a momentum space position attribute!")
         end
         if !hasattr(mode, :r)
-            return mode|>setattr(:r=>mode|>getattr(:b)|>getspace|>origin)
+            return mode|>setattr(:r=>mode|>getattr(:b)|>getspace|>getorigin)
         end
         return mode
     end

@@ -244,13 +244,11 @@ Base.:-(point::Point)::Point = Point(-vec(point), getspace(point))
 
 function Base.:+(a::Point, b::Point)::Point
     @assert(typeof(getspace(a)) == typeof(getspace(b)))
-    return Point(vec(a) + vec(b), getspace(a))
+    localb::Point = (a|>getspace) * b
+    return Point(vec(a) + vec(localb), getspace(a))
 end
 
-function Base.:-(a::Point, b::Point)::Point
-    @assert(typeof(getspace(a)) == typeof(getspace(b)))
-    return Point(vec(a) - vec(b), getspace(a))
-end
+Base.:-(a::Point, b::Point)::Point = a + (-b)
 
 """ Performing linear transform of a `point` to `space`. """
 Base.:*(space::T, point::Point{T}) where {T <: AffineSpace} = lineartransform(space, point)

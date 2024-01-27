@@ -23,10 +23,10 @@ kspace = convert(MomentumSpace, square)
 c4 = pointgrouptransform([0 -1; 1 0])
 
 unitcell = Subset(point)
-crystal = Crystal(unitcell, [48, 48])
+crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
-m = quantize(:b, unitcell, 1) |> first
+m = quantize(unitcell, 1)|>first
 
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
@@ -36,54 +36,32 @@ bonds::FockMap = bondmap([
 energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
 energyspectrum |> visualize
 
-H = energyspectrum|>FockMap
-crystalH = crystaldirectsum((block for (_, block) in H|>crystalsubmaps), outcrystal=crystal, incrystal=crystal)
-# crystalH|>crystalspectrum|>visualize
-
-Hprime = crystalH|>FockMap
-Hprime|>crystalspectrum|>visualize
-
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=0.5)
 groundstates |> visualize
 groundstateprojector = groundstates |> crystalprojector
 
-C = idmap(groundstateprojector.outspace) - groundstateprojector
-
-correlations = C
+correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 
 correlations |> crystalspectrum |> visualize
 
 crystalfock = correlations |> getoutspace
 
 scale = Scale([4 0; 0 4], square)
-blockresult = blocking(:action => scale, :correlations => correlations, :crystal => crystalfock |> getcrystal)
-
-H = energyspectrum |> FockMap
-blockedH = blockresult[:transformer] * H * blockresult[:transformer]'
-blockedH |> crystalspectrum |> visualize
-
-blockedcrystal = blockresult[:crystal]
-
-function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)::Scale
-    snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector |> vec |> transpose, crystal |> size |> diagm)) 
-    _, S, Vd = snfinput |> dosnf
-    return Scale((S |> diag |> diagm) * Vd |> transpose, crystal |> getspace)
-end
-
-blockedcorrelations = blockresult[:correlations]
-
-blockedcrystal = blockresult[:crystal]
+blocker = scale * (correlations|>getoutspace)
+blockedcorrelations = blocker * correlations * blocker'
+blockedcrystalfock = blockedcorrelations|>getoutspace
+blockedcrystal = blockedcrystalfock|>getcrystal
 
 normalvector = (1, 1) ∈ (blockedcrystal|>getspace)
 
-function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace)
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace, minbottomheight::Real = 0)
     height::Real = (*(metricspace, normalvector)|>norm)
     sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2)*2, metricspace=metricspace)
 
     normaldirection::Offset = *(metricspace, normalvector)|>normalize
     function crosssectionfilter(point::Point)::Bool
         metricpoint::Point = metricspace * point
-        iswithinheight::Bool = 0 <= dot(metricpoint, normaldirection) <= height
+        iswithinheight::Bool = minbottomheight <= dot(metricpoint, normaldirection) <= height
         orthoreminder::Point = metricpoint - dot(metricpoint, normaldirection) * normaldirection
         iswithinradius::Bool = norm(orthoreminder) < radius
         return iswithinheight && iswithinradius
@@ -95,20 +73,154 @@ function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real,
     return rawregion - intersect(rawregion, proximityregion)
 end
 
-crosssection = getcrosssection(crystal=blockedcrystal, normalvector=normalvector, radius=0.5)
+struct ExtendedRestrict <: Transformation{Matrix{Float64}}
+    scale::Scale
+    normalvector::Offset
+    stripradius::Real
+end
+
+Base.:convert(::Type{Matrix{Float64}}, restrict::ExtendedRestrict) = restrict.scale|>rep
+Zipper.getspace(restrict::ExtendedRestrict) = restrict.scale|>getspace
+
+function extendedcrystalrestrict(; crystal::Crystal, normalvector::Offset, stripradius::Real)::ExtendedRestrict
+    snfinput::Matrix{Integer} = map(Integer, vcat(normalvector|>vec|>transpose, crystal|>size|>diagm)) 
+    _, S, Vd = snfinput|>dosnf
+    scale = Scale((S|>diag|>diagm) * Vd |>transpose, crystal|>getspace)
+    return ExtendedRestrict(scale, normalvector, stripradius)
+end
+
+function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
+    crystal::Crystal = crystalfock|>getcrystal
+    scaledcrystal::Crystal = (restrict.scale) * crystal
+    scaledspace::RealSpace = scaledcrystal|>getspace
+    scaledkspace::MomentumSpace = convert(MomentumSpace, scaledspace)
+    # This is the unit cell of the 1-D embedded crystal defining the strip region in the blocked crystal metric space.
+    unscaledextendedunitcell::Region = getcrosssection(crystal=crystal, normalvector=restrict.normalvector, radius=restrict.stripradius)
+    # TODO: What if there are more attributes exists in the home modes? Such as :flavor, :orbital, etc.
+    unscaledextendedhomefock::RegionFock = quantize(unscaledextendedunitcell, 1)
+
+    bz::Subset{Momentum} = crystal|>brillouinzone
+    momentummappings::Base.Generator = (basispoint(scaledkspace * k) => k for k in bz)
+
+    crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
+    restrictedfourier::FockMap = fourier(crystalfock, unscaledextendedhomefock)'
+    blocks::Dict = Dict()
+
+    stripunitcell::Region = Subset(scaledspace * r for r in unscaledextendedunitcell)
+    stripcrystal::Crystal = Crystal(stripunitcell, scaledcrystal|>size)
+    volumeratio::Real = vol(crystal) / vol(stripcrystal)
+
+    scaledksubspaces::Dict{Momentum, FockSpace} = Dict()
+    for (scaledk, k) in momentummappings
+        kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
+        if !haskey(scaledksubspaces, scaledk)
+            scaledksubspaces[scaledk] = FockSpace(
+                setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
+        end
+        blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
+    end
+
+    return CrystalFockMap(stripcrystal, crystal, blocks)
+end
+
+extendedrestrict = extendedcrystalrestrict(crystal=blockedcrystal, normalvector=normalvector, stripradius=0.5)
+
+restriction = extendedrestrict * blockedcrystalfock
+stripcorrelations = restriction * blockedcorrelations * restriction'
+stripcorrelationspectrum = stripcorrelations|>crystalspectrum
+stripcorrelationspectrum|>linespectrum|>visualize
+
+stripfrozenstates = distillation(stripcorrelationspectrum, :frozen => v -> v < 0.003 || v > 0.99)[:frozen]
+
+stripfrozenprojector = stripfrozenstates|>crystalprojector
+stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
+
+stripfrozencorrelationspectrum = stripfrozencorrelations|>crystalspectrum
+stripfrozencorrelationspectrum|>linespectrum|>visualize
+
+striphomefock = stripfrozencorrelations|>getoutspace|>unitcellfock
+stripcrystal = stripfrozencorrelations|>getoutspace|>getcrystal
+stripspace = stripcrystal|>getspace
+truncationregionfock = reduce(+, setattr(striphomefock, :r=>(stripspace * (normalvector * n))) for n in 0:2)|>RegionFock
+truncation = fourier(stripfrozencorrelations|>getoutspace, truncationregionfock) / sqrt(stripfrozencorrelations|>getoutspace|>getcrystal|>vol)
+truncation|>visualize
+truncationregioncorrelations = truncation' * stripfrozencorrelations * truncation
+truncationregioncorrelations|>eigspech|>visualize
+
+truncationregionindices = Iterators.product(truncationregionfock, truncationregionfock)
+truncationregionbonds = Dict((getattr(tomode, :r) - getattr(frommode, :r), frommode|>removeattr(:r), tomode|>removeattr(:r)) => (frommode, tomode) for (frommode, tomode) in truncationregionindices)
+
+using SparseArrays
+function extractindices(fockmap::FockMap, indices)
+    function getindex(index)::Tuple{Integer, Integer}
+        frommode, tomode = index
+        return fockorder(fockmap|>getoutspace, tomode), fockorder(fockmap|>getinspace, frommode)
+    end
+
+    extracted::SparseMatrixCSC = spzeros(Complex, fockmap|>getoutspace|>dimension, fockmap|>getinspace|>dimension)
+    for index in indices
+        fromindex, toindex = getindex(index)
+        extracted[fromindex, toindex] = (fockmap|>rep)[fromindex, toindex]
+    end
+    return FockMap(fockmap|>getoutspace, fockmap|>getinspace, extracted)
+end
+
+pruningindices = (index for (_, index) in truncationregionbonds)
+prunedcorrelations = extractindices(truncationregioncorrelations, pruningindices)
+stripfouriers = (truncation[subspace, :] for (_, subspace) in truncation|>getoutspace|>crystalsubspaces)
+truncatedstripfrozencorrelations = crystaldirectsum((transform * prunedcorrelations * transform' for transform in stripfouriers), outcrystal=stripcrystal, incrystal=stripcrystal)
+truncatedstripfrozencorrelations = directsum(transform * truncationregioncorrelations * transform' for transform in stripfouriers)
+truncatedstripfrozencorrelations = FockMap(truncatedstripfrozencorrelations, inspace=truncation|>getoutspace, outspace=truncation|>getoutspace)
+truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
+truncatedstripfrozencorrelationspectrum|>linespectrum|>visualize
+
+stripmetalstates = groundstatespectrum(truncatedstripfrozencorrelationspectrum, perunitcellfillings=8)
+stripmetalstates|>linespectrum|>visualize
+
+stripmetalprojector = stripmetalstates|>crystalprojector
+stripmetalcorrelations = idmap(stripmetalprojector|>getoutspace) - stripmetalprojector
+
+function getregionfock(crystalfock::CrystalFock, region::Region)
+    crystalspace::RealSpace = crystalfock|>getcrystal|>getspace
+    crystalregion::Region = Subset(crystalspace * r for r in region)
+    
+    homemodes::Dict{Offset, Mode} = Dict(getattr(mode, :b)=>mode for mode in crystalfock|>unitcellfock)
+    basispoints = (r|>basispoint for r in crystalregion)
+    crystalpositions = ((r - b, b) for (r, b) in zip(crystalregion, basispoints))
+    return FockSpace(homemodes[b]|>setattr(:r=>r) for (r, b) in crystalpositions)|>RegionFock
+end
+
+function Zipper.RegionFock(input)
+    function preprocess(mode::Mode)::Mode
+        if hasattr(mode, :k)
+            error("The mode has a momentum space position attribute!")
+        end
+        if !hasattr(mode, :r)
+            return mode|>setattr(:r=>mode|>getattr(:b)|>getspace|>getorigin)
+        end
+        return mode
+    end
+
+    processedinput = (m|>preprocess for m in input)
+    region::Region = Subset(m|>getpos for m in processedinput)
+    return FockSpace(processedinput, reflected=region)
+end
+
+wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector * 0.875, radius=0.5, minbottomheight=0.15)
+wannierregion|>visualize
+basistohomemodes = ((mode|>getattr(:b))=>mode for mode in stripmetalcorrelations|>getoutspace|>unitcellfock)
+selectedhomemodes = (mode for (b, mode) in basistohomemodes if b∈wannierregion)
+wannierregionfock = selectedhomemodes|>RegionFock
+wannierregionfock = FockSpace(mode|>setattr(:r=>-normalvector*0.5) for mode in wannierregionfock)|>RegionFock
+wannierregionfock|>getregion|>visualize
+wannierregionrestriction = fourier(stripmetalcorrelations|>getoutspace, wannierregionfock)
+wannierregionrestriction|>visualize
+wannierlocalcorrelations = wannierregionrestriction' * stripmetalcorrelations * wannierregionrestriction / 24
+wannierlocalcorrelations|>eigspech|>visualize
 
 visualize(getsphericalregion(crystal=blockedcrystal, radius=5, metricspace=blockedcrystal|>getspace), crosssection, crosssection + normalvector)
 
-function sitefock(site::Offset; flavorcount::Integer = 1)::FockSpace{Offset}
-    basis::Offset = site|>basispoint
-    offset::Offset = site - basis
-    return FockSpace((Mode(:r => offset, :b => basis, :flavor => f) for f in 1:flavorcount), reflected=site)
-end
-
-regionfock(region::Region; flavorcount::Integer = 1)::FockSpace{Region} = (
-    fockspaceunion(sitefock(r, flavorcount=flavorcount) for r in region)|>FockSpace{Region})
-
-crosssectionfock = regionfock(crosssection)
+crosssectionfock = quantize(crosssection, 1)
 crosssectionfourier = fourier(blockedcorrelations|>getoutspace, crosssectionfock)
 
 function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)
@@ -126,12 +238,10 @@ visualize(scaledcrystal|>sitepoints, scaledcrystal|>getunitcell)
 
 scaledspace = scaledcrystal|>getspace
 
-embeddedfock = FockSpace(mode|>setattr(:b=>(scaledspace * getpos(mode)))|>removeattr(:r) for mode in crosssectionfock)
+embeddedfock = FockSpace(m|>setattr(:R=>(scaledspace * getpos(m)))|>removeattr(:r, :b) for m in crosssectionfock)
 embeddedfock|>modeattrs
 
 scaledkspace = convert(MomentumSpace, scaledspace)
-
-blockedcrystalfock = blockedcorrelations|>getoutspace
 
 using OrderedCollections
 momentummappings = (scaledkspace * k |> basispoint => k for k in blockedcrystal|>brillouinzone)
@@ -143,8 +253,7 @@ scaledfock::FockSpace = ((ksubsets[k] for k in mappingpartitions[kscaled])|>subs
         for kscaled in mappingpartitions|>keys)|>fockspaceunion
 scaledbz = Subset(sk for sk in mappingpartitions|>keys)
 
-embeddedunitcell = Subset(mode|>getattr(:b) for mode in embeddedfock)
-embeddedunitcell|>collect
+embeddedunitcell = Subset(mode|>getattr(:R) for mode in embeddedfock)
 
 embeddedcrystal = Crystal(embeddedunitcell, scaledcrystal|>size)
 
@@ -159,8 +268,9 @@ end
 repackedblocks::Base.Generator = (
     repackfourierblocks(crosssectionfourier, kscaled, partition)
     for (kscaled, partition) in Iterators.zip(scaledbz, scaledfock|>rep))
-blockmap::FockMap = directsum(repackedblocks)
-embeddedcrystalfock = FockSpace(blockmap|>getinspace, reflected=embeddedcrystal)
+
+Subset(m|>getattr(:k) for m in repackedblocks|>collect|>first|>getoutspace)|>collect
+blockmap::FockMap = crystaldirectsum(repackedblocks, outcrystal=blockedcrystal, incrystal=embeddedcrystal)
 blockmap = FockMap(blockmap, inspace=embeddedcrystalfock, outspace=blockedcrystalfock)
 
 extendedrestrictedC = blockmap' * blockedcorrelations * blockmap

@@ -3,6 +3,7 @@ struct ExtendedRestrict <: Transformation{Matrix{Float64}}
     normalvector::Offset
     stripradius::Real
 end
+export ExtendedRestrict
 
 Base.:convert(::Type{Matrix{Float64}}, restrict::ExtendedRestrict) = restrict.scale|>rep
 Zipper.getspace(restrict::ExtendedRestrict) = restrict.scale|>getspace
@@ -13,6 +14,7 @@ function extendedcrystalrestrict(; crystal::Crystal, normalvector::Offset, strip
     scale = Scale((S|>diag|>diagm) * Vd |>transpose, crystal|>getspace)
     return ExtendedRestrict(scale, normalvector, stripradius)
 end
+export extendedcrystalrestrict
 
 function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
     crystal::Crystal = crystalfock|>getcrystal

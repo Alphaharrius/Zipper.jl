@@ -1435,6 +1435,12 @@ function regionalrestriction(crystalstate::FockMap, regionfock::RegionFock)::Reg
 end
 export regionalrestriction
 
+""" Convert a state like `FockMap` with outspace type of `RegionFock` to a `RegionState`. """
+function Zipper.RegionState(localstate::FockMap{RegionFock, <:FockSpace})
+    dim::Integer = localstate|>getoutspace|>getregion|>getspace|>dimension
+    return Dict(mode=>localstate[:, mode] for mode in localstate|>getinspace)|>RegionState{dim}
+end
+
 Zipper.:getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
 Zipper.:getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace
 

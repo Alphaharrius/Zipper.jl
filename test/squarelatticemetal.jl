@@ -33,24 +33,27 @@ bonds::FockMap = bondmap([
     (m, m |> setattr(:r => [1, 0] ∈ square)) => tₙ,
     (m, m |> setattr(:r => [0, 1] ∈ square)) => tₙ])
 
-energyspectrum = computeenergyspectrum(bonds, crystal=crystal)
-energyspectrum |> visualize
+@info("Computing energy spectrum...")
+energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
 
-groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=0.5)
-groundstates |> visualize
-groundstateprojector = groundstates |> crystalprojector
+@info("Computing ground state correlations...")
+@time begin
+    groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=0.5)
+    groundstateprojector = groundstates |> crystalprojector
+    correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
+end
 
-correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
-
-correlations |> crystalspectrum |> visualize
-
-crystalfock = correlations |> getoutspace
+crystalfock = correlations|>getoutspace
 
 scale = Scale([4 0; 0 4], square)
-blocker = scale * (correlations|>getoutspace)
-blockedcorrelations = blocker * correlations * blocker'
-blockedcrystalfock = blockedcorrelations|>getoutspace
-blockedcrystal = blockedcrystalfock|>getcrystal
+
+@info("Performing blocking...")
+@time begin
+    blocker = scale * (correlations|>getoutspace)
+    blockedcorrelations = blocker * correlations * blocker'
+    blockedcrystalfock = blockedcorrelations|>getoutspace
+    blockedcrystal = blockedcrystalfock|>getcrystal
+end
 
 normalvector = (1, 1) ∈ (blockedcrystal|>getspace)
 
@@ -73,173 +76,170 @@ function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real,
     return rawregion - intersect(rawregion, proximityregion)
 end
 
-struct ExtendedRestrict <: Transformation{Matrix{Float64}}
-    scale::Scale
-    normalvector::Offset
-    stripradius::Real
-end
-
-Base.:convert(::Type{Matrix{Float64}}, restrict::ExtendedRestrict) = restrict.scale|>rep
-Zipper.getspace(restrict::ExtendedRestrict) = restrict.scale|>getspace
-
-function extendedcrystalrestrict(; crystal::Crystal, normalvector::Offset, stripradius::Real)::ExtendedRestrict
-    snfinput::Matrix{Integer} = map(Integer, vcat(normalvector|>vec|>transpose, crystal|>size|>diagm)) 
-    _, S, Vd = snfinput|>dosnf
-    scale = Scale((S|>diag|>diagm) * Vd |>transpose, crystal|>getspace)
-    return ExtendedRestrict(scale, normalvector, stripradius)
-end
-
-function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
-    crystal::Crystal = crystalfock|>getcrystal
-    scaledcrystal::Crystal = (restrict.scale) * crystal
-    scaledspace::RealSpace = scaledcrystal|>getspace
-    scaledkspace::MomentumSpace = convert(MomentumSpace, scaledspace)
-    # This is the unit cell of the 1-D embedded crystal defining the strip region in the blocked crystal metric space.
-    unscaledextendedunitcell::Region = getcrosssection(crystal=crystal, normalvector=restrict.normalvector, radius=restrict.stripradius)
-    # TODO: What if there are more attributes exists in the home modes? Such as :flavor, :orbital, etc.
-    unscaledextendedhomefock::RegionFock = quantize(unscaledextendedunitcell, 1)
-
-    bz::Subset{Momentum} = crystal|>brillouinzone
-    momentummappings::Base.Generator = (basispoint(scaledkspace * k) => k for k in bz)
-
-    crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
-    restrictedfourier::FockMap = fourier(crystalfock, unscaledextendedhomefock)'
-    blocks::Dict = Dict()
-
-    stripunitcell::Region = Subset(scaledspace * r for r in unscaledextendedunitcell)
-    stripcrystal::Crystal = Crystal(stripunitcell, scaledcrystal|>size)
-    volumeratio::Real = vol(crystal) / vol(stripcrystal)
-
-    scaledksubspaces::Dict{Momentum, FockSpace} = Dict()
-    for (scaledk, k) in momentummappings
-        kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
-        if !haskey(scaledksubspaces, scaledk)
-            scaledksubspaces[scaledk] = FockSpace(
-                setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
-        end
-        blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
-    end
-
-    return CrystalFockMap(stripcrystal, crystal, blocks)
-end
-
 extendedrestrict = extendedcrystalrestrict(crystal=blockedcrystal, normalvector=normalvector, stripradius=0.5)
 
-restriction = extendedrestrict * blockedcrystalfock
-stripcorrelations = restriction * blockedcorrelations * restriction'
-stripcorrelationspectrum = stripcorrelations|>crystalspectrum
+@info("Performing strip restriction...")
+@time begin
+    restriction = extendedrestrict * blockedcrystalfock
+    stripcorrelations = restriction * blockedcorrelations * restriction'
+    stripcorrelationspectrum = stripcorrelations|>crystalspectrum
+end
 stripcorrelationspectrum|>linespectrum|>visualize
 
-stripfrozenstates = distillation(stripcorrelationspectrum, :frozen => v -> v < 0.003 || v > 0.99)[:frozen]
-
-stripfrozenprojector = stripfrozenstates|>crystalprojector
-stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
-
-stripfrozencorrelationspectrum = stripfrozencorrelations|>crystalspectrum
+@info("Computing strip frozen correlations...")
+@time begin
+    stripfrozenstates = distillation(stripcorrelationspectrum, :frozen => v -> v < 0.003 || v > 0.99)[:frozen]
+    stripfrozenprojector = stripfrozenstates|>crystalprojector
+    stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
+    stripfrozencorrelationspectrum = stripfrozencorrelations|>crystalspectrum
+end
 stripfrozencorrelationspectrum|>linespectrum|>visualize
 
-striphomefock = stripfrozencorrelations|>getoutspace|>unitcellfock
-stripcrystal = stripfrozencorrelations|>getoutspace|>getcrystal
-stripspace = stripcrystal|>getspace
-truncationregionfock = reduce(+, setattr(striphomefock, :r=>(stripspace * (normalvector * n))) for n in 0:2)|>RegionFock
-truncation = fourier(stripfrozencorrelations|>getoutspace, truncationregionfock) / sqrt(stripfrozencorrelations|>getoutspace|>getcrystal|>vol)
-truncation|>visualize
-truncationregioncorrelations = truncation' * stripfrozencorrelations * truncation
-truncationregioncorrelations|>eigspech|>visualize
-
-truncationregionindices = Iterators.product(truncationregionfock, truncationregionfock)
-truncationregionbonds = Dict((getattr(tomode, :r) - getattr(frommode, :r), frommode|>removeattr(:r), tomode|>removeattr(:r)) => (frommode, tomode) for (frommode, tomode) in truncationregionindices)
-
-using SparseArrays
-function extractindices(fockmap::FockMap, indices)
-    function getindex(index)::Tuple{Integer, Integer}
-        frommode, tomode = index
-        return fockorder(fockmap|>getoutspace, tomode), fockorder(fockmap|>getinspace, frommode)
-    end
-
-    extracted::SparseMatrixCSC = spzeros(Complex, fockmap|>getoutspace|>dimension, fockmap|>getinspace|>dimension)
-    for index in indices
-        fromindex, toindex = getindex(index)
-        extracted[fromindex, toindex] = (fockmap|>rep)[fromindex, toindex]
-    end
-    return FockMap(fockmap|>getoutspace, fockmap|>getinspace, extracted)
+@info("Computing strip truncation restricted Fourier transform...")
+@time begin
+    stripunitcell = getcrosssection(crystal=blockedcrystal, normalvector=normalvector, radius=0.5)
+    striphomefock = stripfrozencorrelations|>getoutspace|>unitcellfock
+    basistohomemodes = ((mode|>getattr(:b)|>basispoint)=>mode for mode in striphomefock)
+    conversionmappings = Dict(mode=>(mode|>setattr(:r=>getattr(mode, :b)-b)|>setattr(:b=>b)) for (b, mode) in basistohomemodes)
+    actualstriphomefock = conversionmappings|>values|>RegionFock
+    truncationregionfock = RegionFock(mode|>setattr(:r=>getattr(mode, :r)+normalvector*n) for mode in actualstriphomefock for n in 0:2)
+    homemappings = Dict(tomode=>frommode|>removeattr(:r) for (tomode, frommode) in conversionmappings)
+    truncator = fourier(stripfrozencorrelations|>getoutspace, truncationregionfock, homemappings) / sqrt(stripfrozencorrelations|>getoutspace|>getcrystal|>vol)
 end
 
-pruningindices = (index for (_, index) in truncationregionbonds)
-prunedcorrelations = extractindices(truncationregioncorrelations, pruningindices)
-stripfouriers = (truncation[subspace, :] for (_, subspace) in truncation|>getoutspace|>crystalsubspaces)
-truncatedstripfrozencorrelations = crystaldirectsum((transform * prunedcorrelations * transform' for transform in stripfouriers), outcrystal=stripcrystal, incrystal=stripcrystal)
-truncatedstripfrozencorrelations = directsum(transform * truncationregioncorrelations * transform' for transform in stripfouriers)
-truncatedstripfrozencorrelations = FockMap(truncatedstripfrozencorrelations, inspace=truncation|>getoutspace, outspace=truncation|>getoutspace)
-truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
+truncationregioncorrelations = truncator' * stripfrozencorrelations * truncator
+
+@info("Performing truncation on strip frozen correlations...")
+@time begin
+    truncationregionindices = Iterators.product(truncationregionfock, truncationregionfock)
+    truncationregionbonds = Dict((getattr(tomode, :r) - getattr(frommode, :r), frommode|>removeattr(:r), tomode|>removeattr(:r)) => (frommode, tomode) for (frommode, tomode) in truncationregionindices)
+    pruningindices = (index for (_, index) in truncationregionbonds)
+    prunedcorrelations = extractindices(truncationregioncorrelations, pruningindices)
+    stripfouriers = (truncator[subspace, :] for (_, subspace) in truncator|>getoutspace|>crystalsubspaces)
+    stripcrystal = truncator|>getoutspace|>getcrystal
+    truncatedstripfrozencorrelations = crystaldirectsum((transform * prunedcorrelations * transform' for transform in stripfouriers), outcrystal=stripcrystal, incrystal=stripcrystal)
+    truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
+end
 truncatedstripfrozencorrelationspectrum|>linespectrum|>visualize
 
-stripmetalstates = groundstatespectrum(truncatedstripfrozencorrelationspectrum, perunitcellfillings=8)
+@info("Retrieving strip metallic states...")
+@time begin
+    stripmetalstates = @time groundstatespectrum(truncatedstripfrozencorrelationspectrum, perunitcellfillings=8)
+    stripmetalprojector = stripmetalstates|>crystalprojector
+    stripmetalcorrelations = idmap(stripmetalprojector|>getoutspace) - stripmetalprojector
+end
 stripmetalstates|>linespectrum|>visualize
 
-stripmetalprojector = stripmetalstates|>crystalprojector
-stripmetalcorrelations = idmap(stripmetalprojector|>getoutspace) - stripmetalprojector
-
-function getregionfock(crystalfock::CrystalFock, region::Region)
-    crystalspace::RealSpace = crystalfock|>getcrystal|>getspace
-    crystalregion::Region = Subset(crystalspace * r for r in region)
-    
-    homemodes::Dict{Offset, Mode} = Dict(getattr(mode, :b)=>mode for mode in crystalfock|>unitcellfock)
-    basispoints = (r|>basispoint for r in crystalregion)
-    crystalpositions = ((r - b, b) for (r, b) in zip(crystalregion, basispoints))
-    return FockSpace(homemodes[b]|>setattr(:r=>r) for (r, b) in crystalpositions)|>RegionFock
+function Base.:+(regionfock::RegionFock, offset::Offset)::RegionFock
+    positiontomodes = ((getpos(mode) + offset)=>mode for mode in regionfock)
+    return RegionFock(mode|>setattr(:r=>(pos - basispoint(pos)), :b=>basispoint(pos)) for (pos, mode) in positiontomodes)
 end
 
-function Zipper.RegionFock(input)
-    function preprocess(mode::Mode)::Mode
-        if hasattr(mode, :k)
-            error("The mode has a momentum space position attribute!")
-        end
-        if !hasattr(mode, :r)
-            return mode|>setattr(:r=>mode|>getattr(:b)|>getspace|>getorigin)
-        end
-        return mode
-    end
+Base.:-(regionfock::RegionFock, offset::Offset)::RegionFock = regionfock + (-offset)
 
-    processedinput = (m|>preprocess for m in input)
-    region::Region = Subset(m|>getpos for m in processedinput)
-    return FockSpace(processedinput, reflected=region)
-end
-
+mirror135 = pointgrouptransform([0 -1; -1 0], localspace=square)
 wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector * 0.875, radius=0.5, minbottomheight=0.15)
-wannierregion|>visualize
-basistohomemodes = ((mode|>getattr(:b))=>mode for mode in stripmetalcorrelations|>getoutspace|>unitcellfock)
-selectedhomemodes = (mode for (b, mode) in basistohomemodes if b∈wannierregion)
-wannierregionfock = selectedhomemodes|>RegionFock
-wannierregionfock = FockSpace(mode|>setattr(:r=>-normalvector*0.5) for mode in wannierregionfock)|>RegionFock
-wannierregionfock|>getregion|>visualize
-wannierregionrestriction = fourier(stripmetalcorrelations|>getoutspace, wannierregionfock)
-wannierregionrestriction|>visualize
-wannierlocalcorrelations = wannierregionrestriction' * stripmetalcorrelations * wannierregionrestriction / 24
-wannierlocalcorrelations|>eigspech|>visualize
+wannierregionfock = RegionFock(mode for mode in truncationregionfock if mode|>getpos in wannierregion)    
+
+function findlocalstate(; localcorrelations::FockMap, symmetry::AffineTransform, bandgroupingthreshold::Real = 1e-3, bandpredicate::Function)
+    localseedingspectrum::EigenSpectrum = eigspech(localcorrelations, groupingthreshold=bandgroupingthreshold)
+    groupeigenvalues::Base.Generator = (
+        subset => (localseedingspectrum|>geteigenvalues)[subset|>first]
+        for subset in localseedingspectrum|>geteigenvectors|>getinspace|>sparsegrouping(:eigenindex)|>rep)
+    selectedgroups = Iterators.filter(p -> p.second|>bandpredicate, groupeigenvalues)
+    selectedgroup = selectedgroups|>first
+    selectedfock = selectedgroup|>first|>FockSpace
+    selectedlocalstate = (localseedingspectrum|>geteigenvectors)[:, selectedfock]
+
+    localstateregion = selectedlocalstate|>getoutspace|>getregion
+    localsymmetry = symmetry|>recenter(localstateregion|>getcenter)
+    transform = selectedlocalstate * localsymmetry
+    symmetriclocalstate = selectedlocalstate * transform
+
+    return symmetriclocalstate * spatialmap(symmetriclocalstate)'
+end
+
+@info("Searching for Wannier seeds in strip metallic states at r=0...")
+
+function Base.:*(fockmap::FockMap, symmetry::AffineTransform)::FockMap
+    outspacerep::FockMap = *(symmetry, fockmap |> getoutspace)
+    hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
+    inspacerep::FockMap = fockmap' * outspacerep * fockmap
+
+    phasespectrum::EigenSpectrum = inspacerep |> eigspec
+    inspace::FockSpace = FockSpace(
+        m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
+        # TODO: What if there are more attributes exists in the home modes? Such as :flavor, :orbital, etc.
+        #   |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
+        for m in phasespectrum |> geteigenvectors |> getinspace)
+    return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
+end
+
+    wannierregionfockR00 = wannierregionfock - normalvector*0.5
+    wannierregionfockR00|>getregion|>visualize
+    regionrestrictor = fourier(stripmetalcorrelations|>getoutspace, wannierregionfockR00, homemappings) / sqrt(stripmetalcorrelations|>getoutspace|>getcrystal|>vol)
+    localseedingcorrelations = regionrestrictor' * stripmetalcorrelations * regionrestrictor
+    localseedingspectrum::EigenSpectrum = eigspech(localseedingcorrelations, groupingthreshold=1e-3)
+    localseedingspectrum|>visualize
+    groupeigenvalues::Base.Generator = (
+        subset => (localseedingspectrum|>geteigenvalues)[subset|>first]
+        for subset in localseedingspectrum|>geteigenvectors|>getinspace|>sparsegrouping(:eigenindex)|>rep)
+    selectedgroups = Iterators.filter(p -> p.second|>(v -> v < 1e-2), groupeigenvalues)
+    selectedgroup = selectedgroups|>first
+    selectedfock = selectedgroup|>first|>FockSpace
+    selectedlocalstateR00 = (localseedingspectrum|>geteigenvectors)[:, selectedfock]
+
+    localstateregion = selectedlocalstateR00|>getoutspace|>getregion
+    mirror135 = mirror135|>recenter(localstateregion|>getcenter)
+    transform = selectedlocalstateR00 * mirror135
+    symmetriclocalstateR00 = selectedlocalstateR00 * transform
+
+localseedingspectrum|>visualize
+
+visualize(RegionState(symmetriclocalstateR00), markersizemultiplier=20, markersizescaling=0.1)
+visualize(RegionState(symmetriclocalstateR05), markersizemultiplier=20, markersizescaling=0.1)
+
+symmetriclocalstateR00 * spatialmap(symmetriclocalstateR00)' |>getinspace|>modeattrs
+
+@info("Searching for Wannier seeds in strip metallic states at r=0.5...")
+@time begin
+    regionrestrictor = fourier(stripmetalcorrelations|>getoutspace, wannierregionfock, homemappings) / sqrt(stripmetalcorrelations|>getoutspace|>getcrystal|>vol)
+    localseedingcorrelations = regionrestrictor' * stripmetalcorrelations * regionrestrictor
+    localseedingspectrum::EigenSpectrum = eigspech(localseedingcorrelations, groupingthreshold=6e-6)
+    groupeigenvalues::Base.Generator = (
+        subset => (localseedingspectrum|>geteigenvalues)[subset|>first]
+        for subset in localseedingspectrum|>geteigenvectors|>getinspace|>sparsegrouping(:eigenindex)|>rep)
+    selectedgroups = Iterators.filter(p -> p.second|>(v -> v < 1e-2), groupeigenvalues)
+    selectedgroup = selectedgroups|>first
+    selectedfock = selectedgroup|>first|>FockSpace
+    selectedlocalstateR05 = (localseedingspectrum|>geteigenvectors)[:, selectedfock]
+
+    localstateregion = selectedlocalstateR05|>getoutspace|>getregion
+    mirror135 = mirror135|>recenter(localstateregion|>getcenter)
+    transform = selectedlocalstateR05 * mirror135
+    symmetriclocalstateR05 = selectedlocalstateR05 * transform
+end
+localseedingspectrum|>visualize
+
+visualize(selectedlocalstateR00|>getoutspace|>getregion, selectedlocalstateR05|>getoutspace|>getregion)
+
+mirror135 = pointgrouptransform([-1 0; 0 -1], localspace=square)
+localstateregion = selectedlocalstate|>getoutspace|>getregion
+mirror135 = mirror135|>recenter(localstateregion|>getcenter)
+selectedlocalstate * mirror135 |>getinspace|>modeattrs
 
 visualize(getsphericalregion(crystal=blockedcrystal, radius=5, metricspace=blockedcrystal|>getspace), crosssection, crosssection + normalvector)
 
 crosssectionfock = quantize(crosssection, 1)
 crosssectionfourier = fourier(blockedcorrelations|>getoutspace, crosssectionfock)
 
-function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)
-    snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector|>vec|>transpose, crystal|>size|>diagm)) 
-    _, S, Vd = snfinput|>dosnf
-    return Scale((S|>diag|>diagm) * Vd |>transpose, crystal|>getspace)
-end
-
 extendedscale = extendedcrystalscale(crystal=blockedcrystal, generatingvector=normalvector)
-extendedscale|>rep
 
 scaledcrystal = extendedscale * blockedcrystal
-scaledcrystal|>getspace|>rep
-visualize(scaledcrystal|>sitepoints, scaledcrystal|>getunitcell)
 
 scaledspace = scaledcrystal|>getspace
 
 embeddedfock = FockSpace(m|>setattr(:R=>(scaledspace * getpos(m)))|>removeattr(:r, :b) for m in crosssectionfock)
-embeddedfock|>modeattrs
 
 scaledkspace = convert(MomentumSpace, scaledspace)
 

@@ -1,3 +1,10 @@
+function extendedcrystalscale(; crystal::Crystal, generatingvector::Offset)::Scale
+    snfinput::Matrix{Integer} = map(Integer, vcat(generatingvector|>vec|>transpose, crystal|>size|>diagm)) 
+    _, S, Vd = snfinput|>dosnf
+    return Scale((S|>diag|>diagm) * Vd |>transpose, crystal|>getspace)
+end
+export extendedcrystalscale
+
 struct ExtendedRestrict <: Transformation{Matrix{Float64}}
     scale::Scale
     normalvector::Offset

@@ -730,6 +730,33 @@ function Base.:getindex(fockmap::FockMap, outmode::Mode, inmode::Mode)::Complex
     return (fockmap |> rep)[CartesianIndex(outspaceorder, inspaceorder)]
 end
 
+"""
+    extractindices(fockmap::FockMap, indices)
+
+This function extracts a subset of indices from a `FockMap` object and returns a new `FockMap` object that only includes these indices. 
+
+### Input
+- `fockmap::FockMap`: The input `FockMap` object.
+- `indices`: The indices to be extracted.
+
+### Output
+- A new `FockMap` object that only includes the specified indices.
+"""
+function extractindices(fockmap::FockMap, indices)
+    function getindex(index)::Tuple{Integer, Integer}
+        frommode, tomode = index
+        return fockorder(fockmap|>getoutspace, tomode), fockorder(fockmap|>getinspace, frommode)
+    end
+
+    extracted::SparseMatrixCSC = spzeros(Complex, fockmap|>getoutspace|>dimension, fockmap|>getinspace|>dimension)
+    for index in indices
+        fromindex, toindex = getindex(index)
+        extracted[fromindex, toindex] = (fockmap|>rep)[fromindex, toindex]
+    end
+    return FockMap(fockmap|>getoutspace, fockmap|>getinspace, extracted)
+end
+export extractindices
+
 LinearAlgebra.:tr(fockmap::FockMap) = fockmap|>rep|>tr
 
 LinearAlgebra.:det(fockmap::FockMap) = fockmap|>rep|>det

@@ -367,7 +367,7 @@ function Zipper.RegionFock(input)
             error("The mode has a momentum space position attribute!")
         end
         if !hasattr(mode, :r)
-            return mode|>setattr(:r=>mode|>getattr(:b)|>getspace|>origin)
+            return mode|>setattr(:r=>mode|>getattr(:b)|>getspace|>getorigin)
         end
         return mode
     end
@@ -729,6 +729,33 @@ function Base.:getindex(fockmap::FockMap, outmode::Mode, inmode::Mode)::Complex
     outspaceorder::Integer = fockorder(fockmap|>getoutspace, outmode)
     return (fockmap |> rep)[CartesianIndex(outspaceorder, inspaceorder)]
 end
+
+"""
+    extractindices(fockmap::FockMap, indices)
+
+This function extracts a subset of indices from a `FockMap` object and returns a new `FockMap` object that only includes these indices. 
+
+### Input
+- `fockmap::FockMap`: The input `FockMap` object.
+- `indices`: The indices to be extracted.
+
+### Output
+- A new `FockMap` object that only includes the specified indices.
+"""
+function extractindices(fockmap::FockMap, indices)
+    function getindex(index)::Tuple{Integer, Integer}
+        frommode, tomode = index
+        return fockorder(fockmap|>getoutspace, tomode), fockorder(fockmap|>getinspace, frommode)
+    end
+
+    extracted::SparseMatrixCSC = spzeros(Complex, fockmap|>getoutspace|>dimension, fockmap|>getinspace|>dimension)
+    for index in indices
+        fromindex, toindex = getindex(index)
+        extracted[fromindex, toindex] = (fockmap|>rep)[fromindex, toindex]
+    end
+    return FockMap(fockmap|>getoutspace, fockmap|>getinspace, extracted)
+end
+export extractindices
 
 LinearAlgebra.:tr(fockmap::FockMap) = fockmap|>rep|>tr
 
@@ -1407,6 +1434,12 @@ function regionalrestriction(crystalstate::FockMap, regionfock::RegionFock)::Reg
     return Dict(mode => mode |> extractregionstate for mode in eigenmodes) |> RegionState{crystalstate |> getoutspace |> getcrystal |> dimension}
 end
 export regionalrestriction
+
+""" Convert a state like `FockMap` with outspace type of `RegionFock` to a `RegionState`. """
+function Zipper.RegionState(localstate::FockMap{RegionFock, <:FockSpace})
+    dim::Integer = localstate|>getoutspace|>getregion|>getspace|>dimension
+    return Dict(mode=>localstate[:, mode] for mode in localstate|>getinspace)|>RegionState{dim}
+end
 
 Zipper.:getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
 Zipper.:getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace

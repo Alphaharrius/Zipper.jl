@@ -137,14 +137,22 @@ function orthodirections(vector::Point)
 end
 export orthodirections
 
-function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace)
-    height::Real = (normalvector|>norm) / (crystal|>getspace|>linearscale)
-    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2), metricspace=metricspace)
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace, minbottomheight::Real = 0)
+    height::Real = (*(metricspace, normalvector)|>norm)
+    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2)*2, metricspace=metricspace)
 
-    normaldirection::Offset = normalvector|>normalize
-    getorthodirection(point::Point) = normalize(point - dot(point, normaldirection) * normaldirection)
-    crosssectionfilter(point::Point) = 0 < dot(point, getspace(point) * normaldirection) < height && (dot(point, point|>getorthodirection)|>abs) < radius
+    normaldirection::Offset = *(metricspace, normalvector)|>normalize
+    function crosssectionfilter(point::Point)::Bool
+        metricpoint::Point = metricspace * point
+        iswithinheight::Bool = minbottomheight <= dot(metricpoint, normaldirection) <= height
+        orthoreminder::Point = metricpoint - dot(metricpoint, normaldirection) * normaldirection
+        iswithinradius::Bool = norm(orthoreminder) < radius
+        return iswithinheight && iswithinradius
+    end
 
-    return sphericalregion|>filter(crosssectionfilter)
+    rawregion::Region = sphericalregion|>filter(crosssectionfilter)
+    proximityregion::Region = rawregion - normalvector
+
+    return rawregion - intersect(rawregion, proximityregion)
 end
 export getcrosssection

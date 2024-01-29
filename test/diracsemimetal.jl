@@ -134,7 +134,7 @@ frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
 
 globaldistiller = globaldistillerhamiltonian(
     correlations=blockresult[:correlations],
-    restrictspace=frozenseedingfock,
+    regionfock=frozenseedingfock,
     localisometryselectionstrategy=frozenselectionbycount(3),
     symmetry=c6)
 
@@ -154,7 +154,7 @@ c3 = c6^2 |> recenter(courierseedingcenter)
 blockedcourierprojector = distillresult[:courier] |> crystalprojector
 blockedcouriercorrelation = idmap(blockedcourierprojector.outspace, blockedcourierprojector.outspace) - blockedcourierprojector
 
-localcourierseed = findlocalspstates(statecorrelations=blockedcouriercorrelation, regionfock=courierseedingfock, symmetry=identitytransform(2))
+localcourierseed = [regionalwannierseeding(blockedcouriercorrelation, courierseedingfock, symmetry=c3)...][1]
 fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
 
 crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)

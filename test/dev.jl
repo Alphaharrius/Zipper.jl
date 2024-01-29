@@ -3,9 +3,9 @@ include("../src/geometries.jl")
 include("../src/transformations.jl")
 include("../src/quantum.jl")
 include("../src/physical.jl")
-include("../src/plotting.jl")
 include("../src/quantumtransformations.jl")
 include("../src/renormalization.jl")
+include("../src/plotting.jl")
 
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
 using ..Spaces, ..Geometries, ..Quantum, ..Transformations, ..Plotting, ..QuantumTransformations, ..Physical, ..Renormalization
@@ -20,8 +20,10 @@ spatialsnappingcalibration((pa, pb, pc))
 
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
+c6 * findeigenfunction(c6, eigenvalue=-1)
+
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [32, 32])
+crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(:b, unitcell, 1)

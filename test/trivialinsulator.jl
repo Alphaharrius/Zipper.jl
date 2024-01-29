@@ -88,11 +88,13 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [48, 48])
+crystal = Crystal(unitcell, [32, 32])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(:b, unitcell, 1)
 m0, m1 = members(modes)
+
+modes[1:2]
 
 t_a = ComplexF64(-0.3)
 t_b = ComplexF64(-0.7)
@@ -494,12 +496,21 @@ globaldistillerspectrum |> visualize
 distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
 
 filledseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
-courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
-courierseedingregion::Subset{Offset} = Subset(m |> pos for m in courierseedingmodes)
-visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))
-courierseedingfock::FockSpace = FockSpace(courierseedingregion)
+filledseedingmodes::Subset{Mode} = circularregionmodes(filledseedingcenter, physicalmodes, 1.8)
+filledseedingregion::Subset{Offset} = Subset(m |> pos for m in filledseedingmodes)
+visualize(filledseedingregion, filledseedingcenter |> Subset, title="Filled Seeding Region", visualspace=euclidean(RealSpace, 2))
+filledseedingfock::FockSpace = FockSpace(filledseedingmodes)
 
-c3 = c6^2 |> recenter(courierseedingcenter)
+c3 = c6^2 |> recenter(filledseedingcenter)
+
+blockedfilledprojector = distillresult[:filled] |> crystalprojector
+blockedfilledcorrelations = idmap(blockedfilledprojector.outspace, blockedfilledprojector.outspace) - blockedfilledprojector
+
+localseedA = [regionalwannierseeding(blockedfilledcorrelations, filledseedingfock, symmetry=c3)...][1]
+localseedA |> Quantum.columnspec |> visualize
+
+crystalseedA = crystalisometries(localisometry=localseedA, crystalfock=blockedcorrelations.outspace, addinspacemomentuminfo=true)
+wannierfilledAisometry = wann
 
 blockedcourierprojector = distillresult[:courier] |> crystalprojector
 blockedcouriercorrelation = idmap(blockedcourierprojector.outspace, blockedcourierprojector.outspace) - blockedcourierprojector

@@ -1,0 +1,111 @@
+"""
+Refers to an object with `dimension` spanned by some other objects like `Vector`.
+"""
+abstract type AbstractSpace{T} <: Element{T} end
+export AbstractSpace
+
+"""
+This is a less general subtype of `AbstractSpace` that is spanned by `Vector` in a continuous manner.
+"""
+abstract type AffineSpace <: AbstractSpace{Matrix{Float64}} end
+export AffineSpace
+
+"""
+    RealSpace(rep::Matrix{Float64})
+
+A real space concrete type of `AffineSpace`, this is present in tandem with `MomentumSpace` to distinguish between real space and momentum space.
+
+### Input
+- `rep` The representation of the space which is the basis vectors.
+"""
+struct RealSpace <: AffineSpace
+    rep::Matrix{Float64}
+end
+export RealSpace
+
+"""
+    MomentumSpace(rep::Matrix{Float64})
+
+A momentum space concrete type of `AffineSpace`, this is present in tandem with `RealSpace` to distinguish between real space and momentum space.
+
+### Input
+- `rep` The representation of the space which is the basis vectors.
+"""
+struct MomentumSpace <: AffineSpace
+    rep::Matrix{Float64}
+end
+export MomentumSpace
+
+"""
+Subset of element type `T <: AbstractSubset` defined within a full set.
+"""
+# TODO: Is this type still needed?
+abstract type AbstractSubset{T} <: Element{OrderedSet{T}} end
+export AbstractSubset
+
+"""
+    Point(pos::Vector{Float64}, space::AbstractSpace)
+
+A point in an `AffineSpace`.
+
+### Input
+- `pos` The vector representation of the point in the spacial unit of the parent `AffineSpace`.
+- `space` The parent `AffineSpace`.
+"""
+struct Point{T <: AffineSpace} <: AbstractSubset{Point}
+    pos::Vector{Float64}
+    space::T
+
+    Point(pos, space::T) where {T <: AffineSpace} = new{space |> typeof}([pos...], space)
+end
+export Point
+
+""" Alias of a real space point. """
+Offset = Point{RealSpace}
+""" Alias of a momentum space point. """
+Momentum = Point{MomentumSpace}
+export Offset, Momentum
+
+"""
+    Subset(elements::OrderedSet{T})
+    Subset(elements::Vector{T})
+
+A concrete type of `AbstractSubset` act as a container of elements of type `<: AbstractSubset` in ordered manner, as a subset of a larger set, this set is assumed
+to reside within a given `AbstractSpace`, which all of the elements also belongs to the `AbstractSpace`. To 
+
+### Input
+- `elements` The set of elements to be stored, can be type of `OrderedSet{T}` or `Vector{T}` depends on use case, normally `OrderedSet{T}` is suggested if possible
+             if it is created before the constructor of this type.
+"""
+struct Subset{T} <: AbstractSubset{T}
+    rep::OrderedSet{T}
+
+    Subset(elements::OrderedSet) = new{elements |> first |> typeof}(elements)
+
+    Subset(generator::Base.Generator) = Subset(OrderedSet{generator |> first |> typeof}(generator))
+    Subset(input::Base.Iterators.Flatten) = Subset(OrderedSet{input |> first |> typeof}(input))
+    Subset(subset::Subset) = Subset(OrderedSet([subset]))
+    Subset(input::Base.Iterators.Filter) = Subset(OrderedSet{input |> first |> typeof}(input))
+
+    Subset(elements) = Subset(OrderedSet(elements))
+
+    # Allows the creation of a empty subset.
+    Subset{T}() where {T} = new{T}(OrderedSet())
+end
+export Subset
+
+""" Interface to get the dimension of an `Element`. """
+dimension(::Element)::Integer = notimplemented()
+export dimension
+
+""" Interface to check if two `Element` objects have the same span. """
+hassamespan(::Element, ::Element)::Bool = notimplemented()
+export hassamespan
+
+""" Interface to retrieve the space of an `Element`. """
+getspace(::Element)::AffineSpace = notimplemented()
+export getspace
+
+""" Interface to retrieve the position of an `Element`. """
+getpos(::Element) = notimplemented()
+export getpos

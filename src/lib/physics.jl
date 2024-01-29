@@ -1,9 +1,3 @@
-module Physical
-
-using OrderedCollections
-using ..Spaces, ..Quantum, ..Geometries
-
-
 """
     bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
 
@@ -25,11 +19,11 @@ The `FockMap` object that contains the bonding information.
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
     (modeA, modeB) => tₙ,
-    (modeA, modeB |> setattr(:offset => triangularspace & [-1, 0])) => tₙ,
-    (modeA, modeB |> setattr(:offset => triangularspace & [0, 1])) => tₙ])
+    (modeA, modeB |> setattr(:r => [-1, 0] ∈ triangularspace)) => tₙ,
+    (modeA, modeB |> setattr(:r => [0, 1] ∈ triangularspace)) => tₙ])
 ```
 """
-function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, ComplexF64}})::FockMap
+function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, T}})::FockMap where {T <: Complex}
     fockspace::FockSpace = FockSpace(Subset(mode for bond in bonds for mode in bond.first))
     half::FockMap = FockMap(fockspace, fockspace, Dict(bonds))
     diag::FockMap = FockMap(fockspace, fockspace, Dict(filter(p -> p.first |> first == p.first |> last, bonds)))
@@ -43,9 +37,10 @@ export bondmap
 Compute the momentum space energy spectrum within a `Crystal` brillouin zone for a given `bonds` generated from `bondmap`.
 """
 function computeenergyspectrum(bonds::FockMap; crystal::Crystal)::CrystalSpectrum
-    bz::Subset{Momentum} = crystal |> brillouinzone
-    bondmodes::Subset{Mode} = bonds.outspace |> orderedmodes
-    fouriers::Base.Generator = (k => fourier(k |> Subset, bondmodes |> FockSpace) for k in bz)
+    bondmodes::Subset{Mode} = bonds|>getoutspace|>orderedmodes
+    basismodes::Subset{Mode} = bonds|>getoutspace|>RegionFock|>unitcellfock|>orderedmodes
+    transform::FockMap = fourier(getcrystalfock(basismodes, crystal), bondmodes|>RegionFock)
+    fouriers::Base.Generator = (k => transform[subspace, :] for (k, subspace) in transform|>getoutspace|>crystalsubspaces)
     momentumhamiltonians::Base.Generator = (k => fourier * bonds * fourier' for (k, fourier) in fouriers)
     return crystalspectrum(momentumhamiltonians, crystal=crystal)
 end
@@ -79,9 +74,9 @@ function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfilling
     groupcollectcount::Integer = findfirst(v -> v >= totalfillings, cumfillings)
     contributions = Iterators.take(groupedeigenvalues, groupcollectcount)
     groundstatemodesets::Base.Generator = (modeset for (_, modeset) in contributions)
-    groundstatemodes::Subset{Mode} = reduce(+, groundstatemodesets)
+    groundstatemodes::Subset{Mode} = groundstatemodesets |> subsetunion
 
-    decoratedmodes::Base.Generator = ((m |> getattr(:offset)) => m for m in groundstatemodes)
+    decoratedmodes::Base.Generator = ((m |> getattr(:k)) => m for m in groundstatemodes)
     momentummodes::Dict = foldl(decoratedmodes; init=Dict()) do d, (k, v)
         mergewith!(append!, d, LittleDict(k => [v]))
     end
@@ -115,4 +110,33 @@ function roundingpurification(correlationspectrum::CrystalSpectrum)::CrystalSpec
 end
 export roundingpurification
 
+function entanglemententropy(correlationspectrum::CrystalSpectrum)
+    sumresult = 0
+    for (_, v) in correlationspectrum |> geteigenvalues
+        if isapprox(v, 0, atol=1e-7) || isapprox(v, 1, atol=1e-7)
+            continue
+        end
+        
+        sumresult += v * log(v) + (1 - v) * log(1 - v)
+    end
+    return -sumresult
 end
+export entanglemententropy
+
+function momentumoccupations(correlations::FockMap)::FockMap
+    kcorrelations::Base.Generator = correlations |> crystalsubmaps
+    crystal::Crystal = correlations |> getoutspace |> getcrystal
+    center::Offset = crystal |> getspace |> getorigin
+    tracecrystal::Crystal = Crystal(center |> Subset, crystal |> size)
+    mode::Mode = Mode(:b => center)
+
+    function tracing(k::Momentum, corr::FockMap)::FockMap
+        space::FockSpace = mode |> setattr(:k => k) |> FockSpace
+        return FockMap(space, space, [corr |> tr][:, :] |> SparseMatrixCSC) / dimension(corr |> getoutspace)
+    end
+
+    occupations::FockMap = directsum(tracing(k, corr) for (k, corr) in kcorrelations)
+    fockspace::FockSpace = FockSpace(occupations |> getoutspace, reflected=tracecrystal)
+    return FockMap(occupations, inspace=fockspace, outspace=fockspace)
+end
+export momentumoccupations

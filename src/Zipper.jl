@@ -1,22 +1,24 @@
 module Zipper
 
-using LinearAlgebra, SparseArrays, OrderedCollections, Base.Iterators, SmithNormalForm, Combinatorics, Statistics
+using OrderedCollections, Base.Iterators, SparseArrays
+using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
-include("spaces.jl")
-using .Spaces
-export Element, AbstractSpace, AffineSpace, RealSpace, MomentumSpace, AbstractSubset, Point, Offset, Momentum, Subset
-export rep, euclidean, basis, dimension, getspace, rpos, pos, lineartransform, fourier_coef, distance, flatten, members, subsetunion
+include("core.jl")
 
-include("geometries.jl")
-include("transformations.jl")
-include("quantum.jl")
-include("physical.jl")
+include("interfaces/core.jl")
+include("interfaces/spaces.jl")
+include("interfaces/transformations.jl")
+include("interfaces/geometries.jl")
 
-include("quantumtransformations.jl")
-include("renormalization.jl")
+include("lib/spaces.jl")
+include("lib/geometries.jl")
+include("lib/transformations.jl")
+include("lib/quantum.jl")
+include("lib/quantumtransformations.jl")
+include("lib/physics.jl")
+include("lib/renormalization.jl")
 
 using Plotly, ColorTypes, Compat
-
-include("plotting.jl")
+include("lib/plotting.jl")
 
 end

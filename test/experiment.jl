@@ -16,15 +16,15 @@ kspace = convert(MomentumSpace, triangular)
 
 unitcell = Subset([triangular & [1/3, 2/3], triangular & [2/3, 1/3]])
 crystal = Crystal(unitcell, [64, 64])
-modes::Subset{Mode} = quantize(:pos, unitcell, 1)
+modes::Subset{Mode} = quantize(:b, unitcell, 1)
 
 tₙ = ComplexF64(-1.)
 m0, m1 = members(modes)
 
 bonds::FockMap = bondmap([
     (m0, m1) => tₙ,
-    (m0, setattr(m1, :offset => Point([-1, 0], triangular))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 1], triangular))) => tₙ])
+    (m0, setattr(m1, :r => Point([-1, 0], triangular))) => tₙ,
+    (m0, setattr(m1, :r => Point([0, 1], triangular))) => tₙ])
 
 𝐻::FockMap = hamiltonian(crystal, bonds)
 𝐶::FockMap = groundstatecorrelations(𝐻)
@@ -41,7 +41,7 @@ visualize(blockedcorrelations, title="Correlation", rowrange=1:64, colrange=1:64
 newcrystal = blocked[:crystal]
 
 crystalpoints::Subset{Offset} = latticepoints(newcrystal)
-newmodes::Subset{Mode} = quantize(:pos, newcrystal.unitcell, 1)
+newmodes::Subset{Mode} = quantize(:b, newcrystal.unitcell, 1)
 physicalmodes::Subset{Mode} = spanoffset(newmodes, crystalpoints)
 restrictedregion::Subset{Mode} = filter(circularfilter(origin(euclidean(RealSpace, 2)), 2.0), physicalmodes)
 restrictedfock::FockSpace = FockSpace(restrictedregion)

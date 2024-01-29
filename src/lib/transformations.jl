@@ -1,18 +1,3 @@
-module Transformations
-
-using LinearAlgebra, SmithNormalForm, OrderedCollections, Combinatorics, Statistics, Base.Iterators
-using ..Spaces, ..Geometries
-
-abstract type Transformation{T} <: Element{T} end
-export Transformation
-
-struct BasisFunction <: Element{Vector{Complex}}
-    rep::Vector{Complex}
-    dimension::Integer
-    rank::Integer
-end
-export BasisFunction
-
 Base.:(==)(a::BasisFunction, b::BasisFunction) = a.rank == b.rank && (a |> dimension) == (b |> dimension) && isapprox(a |> rep, b |> rep)
 
 Base.:hash(basisfunction::BasisFunction)::UInt = (map(hashablecomplex, basisfunction |> rep), basisfunction |> dimension, basisfunction.rank) |> hash
@@ -21,11 +6,20 @@ Base.:isequal(a::BasisFunction, b::BasisFunction)::Bool = a == b
 swave::BasisFunction = BasisFunction([1], 0, 0)
 export swave
 
-LinearAlgebra.normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
+swaveminus::BasisFunction = BasisFunction([-1], 0, 0)
+export swaveminus
+
+ppluswave::BasisFunction = BasisFunction([0.5+0.5*sqrt(3)im], 0, 0)
+export ppluswave
+
+pminuswave::BasisFunction = BasisFunction([0.5-0.5*sqrt(3)im], 0, 0)
+export ppluswave
+
+LinearAlgebra.:normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
 
 Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
 
-Spaces.dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
+Zipper.:dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
 
 NAMEINDEXTABLE::Dict{String, Integer} = Dict("x" => 1, "y" => 2, "z" => 3) # The mappings for axis (x y z) in basis functions to tensor indicies.
 
@@ -75,7 +69,8 @@ function Base.:show(io::IO, basisfunction::BasisFunction)
     function generatesymbol(info::Tuple)::String
         if isapprox(info |> last |> abs, 0, atol=1e-10) return "" end
         coords::Vector = invindexmap[info |> first]
-        return "($(info |> last))*" * reduce(*, Iterators.map(c -> indexnametable[c], coords))
+        printnumber::Number = round(info |> last, digits=4)
+        return "($printnumber)*" * reduce(*, Iterators.map(c -> indexnametable[c], coords))
     end
     expression::String = join(filter(v -> v != "", map(generatesymbol, basisfunction |> rep |> enumerate)), " + ")
     print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(expression))"))
@@ -88,8 +83,7 @@ function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Intege
         error("Function with mixed order elements is not a valid basis function!")
     end
 
-
-    indexmap::Dict{Vector, Integer} = Dict(n => v for (n, v) in tmatfullindexmappings(dimension, maxrank) |> enumerate)
+    indexmap::Dict{Vector, Integer} = Dict(v => n for (n, v) in tmatfullindexmappings(dimension, maxrank) |> enumerate)
     data::Vector{Complex} = zeros(ComplexF64, indexmap |> length)
 
     for (symbol, value) in expressions
@@ -109,16 +103,6 @@ end
 
 Base.:iszero(basis::BasisFunction)::Bool = basis |> normalize |> rep |> iszero
 
-struct AffineTransform <: Transformation{Matrix{Float64}}
-    localspace::AffineSpace
-    shiftvector::Vector{Float64}
-    transformmatrix::Matrix{Float64}
-    eigenfunctions::Dict{Tuple, BasisFunction}
-    eigenvaluehashdenominator::Integer
-    antiunitary::Bool
-end
-export AffineTransform
-
 fullpointgrouprepresentation(irrep::Matrix; rank::Integer = 1)::Matrix = reduce(kron, repeat([irrep], rank))
 export fullpointgrouprepresentation
 
@@ -136,12 +120,8 @@ function computeeigenfunctions(pointgroupmatrix::Matrix; functionorderrange::Uni
         return Iterators.filter(p -> !(p.second |> iszero), basisfunctions)
     end
 
-    return (p for functionorder in functionorderrange for p in functionorder |> computeeigenfunctionsatorder)
+    return (p for functionorder in functionorderrange |> reverse for p in functionorder |> computeeigenfunctionsatorder)
 end
-
-functionsignature(basis::BasisFunction, eigenvalue::Complex; denominator::Integer = 128)::Tuple = functionsignature(
-    basis.rank, basis |> dimension, eigenvalue; denominator=denominator)
-functionsignature(rank::Integer, dimension::Integer, eigenvalue::Complex; denominator::Integer = 128)::Tuple = (dimension, rank, hashablecomplex(eigenvalue, denominator))
 
 function AffineTransform(
     transformmatrix::Matrix, shiftvector::Vector = zeros(Float64, transformmatrix |> size |> first);
@@ -150,20 +130,27 @@ function AffineTransform(
 
     eigenfunctions = transformmatrix |> computeeigenfunctions
     eigenvaluehashdenominator::Integer = findcomplexdenominator(v for (v, _) in eigenfunctions; denominatorrange=64:128).denominator
-    eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(functionsignature(f, v |> Complex, denominator=eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
-    eigenfunctiontable[functionsignature(swave, 1 + 0im, denominator=eigenvaluehashdenominator)] = swave
+    eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(hashablecomplex(v |> Complex, eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
+    eigenfunctiontable[hashablecomplex(1 + 0im, eigenvaluehashdenominator)] = swave
+    eigenfunctiontable[hashablecomplex(-1 + 0im, eigenvaluehashdenominator)] = swaveminus
+    eigenfunctiontable[hashablecomplex(0.5+0.5sqrt(3)im, eigenvaluehashdenominator)] = ppluswave
+    eigenfunctiontable[hashablecomplex(0.5-0.5sqrt(3)im, eigenvaluehashdenominator)] = pminuswave
     return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
 end
 
-# function AffineTransform(transformmatrix::Matrix, shiftvector::Vector; basisfunctions::Dict{})::AffineTransform
-#     return AffineTransform(transformmatrix, shiftvector; antiunitary=false)
-# end
+function addeigenfunction!(transform::AffineTransform; eigenvalue::Number, eigenfunction::BasisFunction)
+    eigenvaluekey::Tuple = hashablecomplex(eigenvalue |> Complex, transform.eigenvaluehashdenominator)
+    trialphase::Complex = relativephase(transform * eigenfunction, eigenfunction)
+    hashablecomplex(trialphase |> Complex, transform.eigenvaluehashdenominator) == eigenvaluekey || error("The eigenvalue is not associated with the eigenfunction!")
+    transform.eigenfunctions[eigenvaluekey] = eigenfunction
+end
+export addeigenfunction!
 
 pointgrouptransform(
     pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,
     localspace::RealSpace = euclidean(RealSpace, dimension),
-    referencepoint::Offset = localspace |> origin,
+    referencepoint::Offset = localspace |> getorigin,
     antiunitary::Bool = false)::AffineTransform = AffineTransform(pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
     localspace=localspace, antiunitary=antiunitary)
 export pointgrouptransform
@@ -183,6 +170,9 @@ translation(
     Matrix{Float64}(I, dimension, dimension), shiftvector; localspace=localspace, antiunitary=antiunitary)
 export translation
 
+identitytransform(dimension::Integer) = AffineTransform(Matrix{Float64}(I, dimension, dimension))
+export identitytransform
+
 function affinematrix(transformation::AffineTransform)::Matrix{Float64}
     shiftrow::Vector = vcat(transformation.shiftvector, [1])
     leftcolumns::Matrix = vcat(
@@ -193,10 +183,10 @@ export affinematrix
 
 function transformationshift(transformmatrix::Matrix, localspace::AffineSpace, reference::Point)::Vector
     localreference::Point = lineartransform(localspace, reference)
-    return (localreference |> pos) - (transformmatrix * (localreference |> pos))
+    return (localreference |> vec) - (transformmatrix * (localreference |> vec))
 end
 
-Spaces.:getspace(transformation::AffineTransform)::AffineSpace = transformation.localspace
+Zipper.:getspace(transformation::AffineTransform)::AffineSpace = transformation.localspace
 
 Base.:convert(::Type{Matrix{Float64}}, source::AffineTransform) = source |> affinematrix
 
@@ -209,9 +199,9 @@ function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTrans
     if space |> dimension != transformation |> dimension
         error("Dimension mismatch!")
     end
-    relativebasis::Matrix = (space |> basis |> inv) * (transformation |> getspace |> basis)
+    relativebasis::Matrix = (space |> getbasis |> inv) * (transformation |> getspace |> getbasis)
     transformmatrix::Matrix = relativebasis * (transformation.transformmatrix) * (relativebasis |> inv)
-    shiftvector::Vector = lineartransform(space, transformation.localspace & transformation.shiftvector) |> pos
+    shiftvector::Vector = lineartransform(space, transformation.shiftvector ∈ (transformation |> getspace)) |> vec
     return AffineTransform(
         transformmatrix, shiftvector;
         localspace=space, antiunitary=transformation.antiunitary)
@@ -254,7 +244,7 @@ end
 function Base.:*(transformation::AffineTransform, region::Subset{Offset})::Subset{Offset}
     nativetransformation::AffineTransform = (region |> getspace) * transformation
     transformed::Base.Generator = (
-        Point(((nativetransformation |> rep) * vcat(point |> pos, [1]))[1:end - 1], point |> getspace)
+        Point(((nativetransformation |> rep) * vcat(point |> vec, [1]))[1:end - 1], point |> getspace)
         for point in region)
     return Subset(transformed)
 end
@@ -264,29 +254,21 @@ function Base.:*(transformation::AffineTransform, zone::Subset{Momentum})::Subse
     realspace::RealSpace = convert(RealSpace, kspace)
     nativetransformation::AffineTransform = realspace * transformation
     kspacerep::Matrix = Matrix(nativetransformation.transformmatrix |> transpose |> inv)
-    return Subset(Point(kspacerep * (k |> pos), kspace) for k in zone)
+    return Subset(Point(kspacerep * (k |> vec), kspace) for k in zone)
 end
 
 Base.:*(transformation::AffineTransform, point::Point) = (transformation * Subset(point)) |> first
 
-Spaces.dimension(transformation::AffineTransform)::Integer = transformation.transformmatrix |> size |> first
+Zipper.:dimension(transformation::AffineTransform)::Integer = transformation.transformmatrix |> size |> first
 
 pointgrouprepresentation(transformation::AffineTransform; rank::Integer = 1)::Matrix = pointgrouprepresentation(transformation.transformmatrix; rank=rank)
 
-function findeigenfunction(transformation::AffineTransform;
-    rankrange::UnitRange = 0:3, dimensionrange::UnitRange = 0:3, eigenvalue::Number = 1)::BasisFunction
-
-    lookupsignatures::Base.Generator = (
-        functionsignature(rank, dimension, eigenvalue |> Complex; denominator=transformation.eigenvaluehashdenominator)
-        for (rank, dimension) in Iterators.product(rankrange, dimensionrange))
-
-    for signature in lookupsignatures
-        if haskey(transformation.eigenfunctions, signature)
-            return transformation.eigenfunctions[signature]
-        end
+function findeigenfunction(transformation::AffineTransform; eigenvalue::Number = 1)::BasisFunction
+    eigenvaluekey::Tuple = hashablecomplex(eigenvalue |> Complex, transformation.eigenvaluehashdenominator)
+    if !haskey(transformation.eigenfunctions, eigenvaluekey)
+        error("No eigenfunction is found for eigenvalue $(eigenvalue)!")
     end
-
-    error("No eigenfunction is found for the provided constraints!")
+    return transformation.eigenfunctions[eigenvaluekey]
 end
 export findeigenfunction
 
@@ -325,8 +307,8 @@ pointgrouporder(pointgroup::AffineTransform; maxorder=128)::Integer = pointgroup
 export pointgrouporder
 
 function relativephase(target::BasisFunction, ref::BasisFunction)::Complex
-    normalizedref::Vector = ref |> rep
-    normalizedtarget::Vector = target |> rep
+    normalizedref::Vector = ref |> normalize |> rep
+    normalizedtarget::Vector = target |> normalize |> rep
     trialphase::Number = dot(normalizedref, normalizedtarget)
     if !isapprox(dot(normalizedtarget ./ trialphase, normalizedref), 1)
         error("Target function is not a gauged version of the reference function.")
@@ -337,33 +319,43 @@ export relativephase
 
 relativephase(ref::BasisFunction) = target::BasisFunction -> relativephase(target, ref)
 
-struct Scale <: Transformation{Matrix{Float64}}
-    rep::Matrix{Float64}
-end
-export Scale
+Zipper.:dimension(scale::Scale)::Integer = scale |> rep |> size |> first
+Zipper.:getspace(scale::Scale)::RealSpace = scale.localspace
 
 Base.:convert(::Type{Matrix{Float64}}, source::Scale) = source.rep
 
-Base.:inv(scale::Scale)::Scale = scale |> rep |> inv |> Scale
-Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * (b |> rep))
-Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace((scale |> rep) * (space |> rep))
-Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace((scale |> inv |> rep) * (space |> rep))
-Base.:*(scale::Scale, point::Point)::Point = lineartransform(scale * (point |> getspace), point)
+Base.:inv(scale::Scale)::Scale = Scale(scale |> rep |> inv, scale |> getspace)
+
+Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * ((a |> getspace) * b |> rep), a |> getspace)
+
+function Base.:*(space::RealSpace, scale::Scale)::Scale
+    space |> dimension == scale |> dimension || error("Dimension mismatch!")
+    relativebasis::Matrix = (space |> getbasis |> inv) * (scale |> getspace |> getbasis)
+    scalematrix::Matrix = relativebasis * (scale |> rep) * (relativebasis |> inv)
+    return Scale(scalematrix, space)
+end
+
+Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space |> rep, space * scale |> rep))
+
+Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(*(space |> rep, convert(RealSpace, space) * scale |> inv |> rep))
+Base.:*(scale::Scale, point::Point)::Point = *(scale, point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
 function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    oldspace::RealSpace = crystal |> getspace
-    snf = vcat(scale |> rep, crystal.sizes |> diagm) |> smith
-    boundarysnf = snf.S[end - dimension(oldspace) + 1:end, 1:dimension(oldspace)] |> smith
-    Δ::Matrix{Float64} = snf |> diagm
-    newbasiscoords::Matrix{Float64} = boundarysnf.T * (Δ |> diag |> diagm) * snf.T
-    blockingpoints::Base.Generator = (Point(collect(coord), oldspace) for coord in Iterators.product((0:size - 1 for size in diag(Δ))...))
-    relativescale::Scale = Scale(newbasiscoords)
-    scaledunitcell::Subset{Offset} = Subset(relativescale * (a + b) for (a, b) in Iterators.product(blockingpoints, crystal.unitcell))
-    return Crystal(scaledunitcell, diag(diagm(boundarysnf)))
-end
+    realspace::RealSpace = crystal|>getspace
+    snfinput::Matrix{Integer} = map(Integer, vcat(scale|>rep|>transpose, crystal|>size|>diagm))
+    U, S, Vd = snfinput|>dosnf
+    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
+    _, bS, bVd = snfinput|>dosnf
+    newsizes = bS|>diag
+    newrelativebasis = bVd * (S|>diag|>diagm) * Vd |>transpose
 
-uniformscale(scalefactor::Real; dimension::Integer)::Scale = Scale(scalefactor * Matrix{Float64}(I, dimension, dimension))
-export uniformscale
+    if reduce(+, newrelativebasis) < 0
+        newrelativebasis = -newrelativebasis
+    end
 
+    subunitcell = Subset((transpose(Vd) * (r|>collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S|>diag)...))
+    newscale = Scale(newrelativebasis, realspace)
+    newunitcell = Subset(newscale * (a + b)|>basispoint for (a, b) in Iterators.product(subunitcell, crystal|>getunitcell))
+    return Crystal(newunitcell, newsizes)
 end

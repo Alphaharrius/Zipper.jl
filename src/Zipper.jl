@@ -18,6 +18,7 @@ include("lib/quantumtransformations.jl")
 include("lib/physics.jl")
 include("lib/renormalization.jl")
 include("lib/extendedrestrictions.jl")
+include("lib/gmerarenormalization.jl")
 
 using Plotly, ColorTypes, Compat
 include("lib/plotting.jl")

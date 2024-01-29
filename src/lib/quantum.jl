@@ -377,6 +377,14 @@ function Zipper.RegionFock(input)
     return FockSpace(processedinput, reflected=region)
 end
 
+""" Translate a `RegionFock` by a `Offset` and recompute the corresponding `:r` and `:b` attributes."""
+function Base.:+(regionfock::RegionFock, offset::Offset)::RegionFock
+    positiontomodes = ((getpos(mode) + offset)=>mode for mode in regionfock)
+    return RegionFock(mode|>setattr(:r=>(pos - basispoint(pos)), :b=>basispoint(pos)) for (pos, mode) in positiontomodes)
+end
+
+Base.:-(regionfock::RegionFock, offset::Offset)::RegionFock = regionfock + (-offset)
+
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
 Base.:show(io::IO, ::Type{FockSpace{Region}}) = print(io, string("RegionFock"))

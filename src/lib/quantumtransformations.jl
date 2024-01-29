@@ -131,9 +131,21 @@ function Base.:*(fockmap::FockMap, symmetry::AffineTransform)::FockMap
     inspacerep::FockMap = fockmap' * outspacerep * fockmap
 
     phasespectrum::EigenSpectrum = inspacerep |> eigspec
-    inspace::FockSpace = FockSpace(
-        m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
-          |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
-        for m in phasespectrum |> geteigenvectors |> getinspace)
+
+    # This is used to correct the :flavor attribute when there are multiple mode with the same orbital is found.
+    processedmodes::Dict{Mode, Integer} = Dict()
+    function getinspacemode(mode::Mode)::Mode
+        eigenvalue::Complex = (phasespectrum|>geteigenvalues)[mode]
+        basisfunction::BasisFunction = findeigenfunction(symmetry, eigenvalue=eigenvalue)
+        newmode::Mode = mode|>setattr(:orbital=>basisfunction)|>removeattr(:eigenindex, :flavor)
+        if !haskey(processedmodes, newmode)
+            processedmodes[newmode] = 1
+        else
+            processedmodes[newmode] += 1
+        end
+        return newmode|>setattr(:flavor=>processedmodes[newmode])
+    end
+
+    inspace::FockSpace = FockSpace(m|>getinspacemode for m in phasespectrum|>geteigenvectors|>getinspace)
     return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end

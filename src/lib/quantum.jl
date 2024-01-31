@@ -1421,6 +1421,27 @@ function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     return [outmode => mat[fockorder(fockmap|>getoutspace, outmode), 1] for outmode in orderedmodes(fockmap|>getoutspace)]
 end
 
+"""
+    spatialremapper(regionfock::RegionFock; offsets::Region, unitcell::Region)
+
+This function remaps the positions of modes in a `RegionFock` object based on provided offsets and a unit cell. This function is used when 
+the unit-cell defined in the original `regionfock` does not match with what you desire, most of the case the `unitcell` is not defined in 
+the positive parallelogram spanned by the lattice basis vectors.
+
+### Input
+- `regionfock`  The `RegionFock` object to be remapped.
+
+### Output
+It creates a new `RegionFock` object with the remapped modes and returns an identity map between the new and original `RegionFock` objects.
+"""
+function spatialremapper(regionfock::RegionFock; offsets::Region, unitcell::Region)
+    positions::Dict{Offset, Tuple} = Dict((r + b)=>(r, b) for (r, b) in Iterators.product(offsets, unitcell))
+    remappingdata::Base.Generator = ((positions[mode|>getpos], mode) for mode in regionfock)
+    remappedfock::RegionFock = RegionFock(mode|>setattr(:r=>r, :b=>b) for ((r, b), mode) in remappingdata)
+    return idmap(remappedfock, regionfock)
+end
+export spatialremapper
+
 struct RegionState{Dim} <: Element{FockMap}
     spstates::Dict{Mode, FockMap}
 end

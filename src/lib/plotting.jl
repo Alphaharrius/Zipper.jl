@@ -29,7 +29,7 @@ function visualizevectorpositions(positions::Array{Vector})
     return trace
 end
 
-function Zipper.visualize(state::RegionState{2}; title::String = "", markersizemultiplier::Real = 120, markersizescaling::Real = 1)
+function Zipper.visualize(state::RegionState{2}; title::String = "", markersizemultiplier::Real = 120, markersizescaling::Real = 1, titleattr::Symbol = :orbital)
     function generatestateplot(spstate::FockMap)
         spmode::Mode = spstate |> getinspace |> first
         columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
@@ -47,7 +47,7 @@ function Zipper.visualize(state::RegionState{2}; title::String = "", markersizem
     end
 
     scatters::Vector = [spstate |> generatestateplot for (_, spstate) in state]
-    subplotnames::Base.Generator = (mode |> string for mode in state |> getinspace |> orderedmodes |> indexmodes)
+    subplotnames::Base.Generator = (mode|>getattr(titleattr)|>string for mode in state|>getinspace)
     fig = make_subplots(rows=1, cols=scatters |> length, subplot_titles=hcat(subplotnames...))
     for (n, scatter) in enumerate(scatters)
         add_trace!(fig, scatter, row=1, col=n)

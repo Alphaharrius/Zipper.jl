@@ -125,16 +125,20 @@ function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
     return FockMap(phasespectrum |> geteigenvectors, inspace=outspace, performpermute=false)'
 end
 
-function Base.:*(fockmap::FockMap, symmetry::AffineTransform)::FockMap
+function Base.:*(fockmap::FockMap, symmetry::AffineTransform)
     outspacerep::FockMap = *(symmetry, fockmap |> getoutspace)
     hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
     inspacerep::FockMap = fockmap' * outspacerep * fockmap
-
     phasespectrum::EigenSpectrum = inspacerep |> eigspec
-
     # This is used to correct the :flavor attribute when there are multiple mode with the same orbital is found.
     processedmodes::Dict{Mode, Integer} = Dict()
-    function getinspacemode(mode::Mode)::Mode
+    newmodes::Vector{Mode} = []
+    # Previously this is using a function to generate the new mode, but it is not working with the FockSpace constructor 
+    # when creating the inspace since it will call the constructor of Subset(::Base.Generator), which it uses Base.first 
+    # to determine the type of the generator elements, which will invoke the function and cause the first mode to be processed 
+    # once before the main iteration. This will cause one of the orbital group start with index 2 instead of 1 since it 
+    # has been processed once and loaded into the dictionary processedmodes.
+    for mode in phasespectrum|>geteigenvectors|>getinspace
         eigenvalue::Complex = (phasespectrum|>geteigenvalues)[mode]
         basisfunction::BasisFunction = findeigenfunction(symmetry, eigenvalue=eigenvalue)
         newmode::Mode = mode|>setattr(:orbital=>basisfunction)|>removeattr(:eigenindex, :flavor)
@@ -143,9 +147,9 @@ function Base.:*(fockmap::FockMap, symmetry::AffineTransform)::FockMap
         else
             processedmodes[newmode] += 1
         end
-        return newmode|>setattr(:flavor=>processedmodes[newmode])
+        push!(newmodes, newmode|>setattr(:flavor=>processedmodes[newmode]))
     end
 
-    inspace::FockSpace = FockSpace(m|>getinspacemode for m in phasespectrum|>geteigenvectors|>getinspace)
+    inspace::FockSpace = FockSpace(newmodes)
     return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end

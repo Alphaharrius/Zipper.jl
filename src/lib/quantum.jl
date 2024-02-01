@@ -1532,18 +1532,29 @@ function regionalrestriction(crystalstate::FockMap, regionfock::RegionFock)::Reg
 end
 export regionalrestriction
 
-""" Convert a state like `FockMap` with outspace type of `RegionFock` to a `RegionState`. """
-function Zipper.RegionState(localstate::FockMap{RegionFock, <:FockSpace})
-    dim::Integer = localstate|>getoutspace|>getregion|>getspace|>dimension
-    return Dict(mode=>localstate[:, mode] for mode in localstate|>getinspace)|>RegionState{dim}
+"""" Convert a state like `FockMap` with outspace type of `RegionFock` to a `RegionState`. """
+function RegionState(localstates::SparseFockMap{RegionFock, <:FockSpace})
+    decorated::FockMap = localstates * spatialmap(localstates)
+    dim::Integer = decorated|>getoutspace|>getregion|>getspace|>dimension
+    return Dict(mode=>decorated[:, mode] for mode in decorated|>getinspace)|>RegionState{dim}
 end
 
-Zipper.:getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
-Zipper.:getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace
+FockMap(regionstate::RegionState) = reduce(+, state for (_, state) in regionstate.spstates)
+
+getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
+getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace
 
 Base.:iterate(state::RegionState, i...) = iterate(state.spstates, i...)
 Base.:length(state::RegionState) = state.spstates |> length
 
+function Base.:+(a::RegionState, b::RegionState)
+    combinedstates::Vector = [a.spstates..., b.spstates...]
+    combinedinmodes::Base.Generator = (mode for (mode, _) in combinedstates)
+    # This step ensures that any duplicated modes from a and b will be mapped to different :flavor.
+    mergedmodes::Subset{Mode} = combinedinmodes|>mapmodes(m -> m)
+    mappedstates = (mode=>FockMap(state, inspace=mode|>FockSpace, performpermute=false) for (mode, (_, state)) in zip(mergedmodes, combinedstates))
+    return RegionState(mappedstates)
+end
 """
     CrystalFockMap(outcrystal::Crystal, incrystal::Crystal, blocks::Dict{Tuple{Momentum, Momentum}, FockMap})
 

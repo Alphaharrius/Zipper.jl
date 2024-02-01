@@ -87,30 +87,6 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal), performpermute=false)
 end
 
-"""
-    spatialmap(fockmap::FockMap)::FockMap
-
-Given `fockmap` with a `outspace` of `FockMap{Region}`, determine the center position of the column function and generate a identity map that transforms
-the `inspace` of `fockmap` to include the actual physical attribute of `:r` and `:b`.
-
-### Output
-The transformer `FockMap` with `inspace` of `fockmap` and the spatially decorated version as the `outspace`.
-"""
-function spatialmap(fockmap::FockMap)::FockMap
-    function spatialinmode(colmap::FockMap)
-        inmode::Mode = colmap |> getinspace |> first
-        absmap::FockMap = colmap |> abs
-        weights::FockMap = absmap / (absmap |> rep |> collect |> real |> sum)
-        modecenter::Offset = reduce(+, (outmode |> getpos) * (weights[outmode, inmode] |> real) for outmode in weights |> getoutspace)
-        basis::Offset = modecenter |> basispoint
-        offset::Offset = modecenter - basis
-        return inmode |> setattr(:r => offset) |> setattr(:b => basis)
-    end
-
-    spatialinspace::FockSpace{Region} = FockSpace{Region}(fockmap[:, m] |> spatialinmode for m in fockmap |> getinspace)
-    return idmap(spatialinspace, fockmap |> getinspace)
-end
-export spatialmap
 
 function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
     inspacerep::FockMap = *(symmetry, fockmap |> getinspace)

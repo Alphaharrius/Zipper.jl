@@ -113,24 +113,6 @@ wannierregionfock = quantize(Subset(scaledspace * r for r in wannierregion), 1)
 remapper = spatialremapper(wannierregionfock, offsets=Subset(-(scaledspace * normalvector), scaledspace|>getorigin, scaledspace * normalvector), unitcell=scaledunitcell)
 wannierregionfock = remapper|>getoutspace
 
-function findlocalstate(; localcorrelations::FockMap, symmetry::AffineTransform, bandgroupingthreshold::Real = 1e-3, bandpredicate::Function)
-    localseedingspectrum::EigenSpectrum = eigspech(localcorrelations, groupingthreshold=bandgroupingthreshold)
-    groupeigenvalues::Base.Generator = (
-        subset => (localseedingspectrum|>geteigenvalues)[subset|>first]
-        for subset in localseedingspectrum|>geteigenvectors|>getinspace|>sparsegrouping(:eigenindex)|>rep)
-    selectedgroups = Iterators.filter(p -> p.second|>bandpredicate, groupeigenvalues)
-    selectedgroup = selectedgroups|>first
-    selectedfock = selectedgroup|>first|>FockSpace
-    selectedlocalstate = (localseedingspectrum|>geteigenvectors)[:, selectedfock]
-
-    localstateregion = selectedlocalstate|>getoutspace|>getregion
-    localsymmetry = symmetry|>recenter(localstateregion|>getcenter)
-    transform = selectedlocalstate * localsymmetry
-    symmetriclocalstate = selectedlocalstate * transform
-
-    return symmetriclocalstate * spatialmap(symmetriclocalstate)'
-end
-
 function getregionstates(; localcorrelations::FockMap{RegionFock, <:FockSpace}, grouping::Vector{<:Integer})
     localspectrum::EigenSpectrum = localcorrelations|>eigspech
     sortedmodes = [mode for (mode, _) in sort(localspectrum|>geteigenvalues|>collect, by=last)]
@@ -152,18 +134,9 @@ regionrestrictor|>visualize
 localcorrelations = regionrestrictor' * quasistripmetalcorrelations * regionrestrictor
 localcorrelations|>eigspech|>visualize
 
-function Base.:*(symmetry::AffineTransform, regionstate::RegionState)
-    states::FockMap = reduce(+, state for (_, state) in regionstate.spstates)
-    region::Region = states|>getoutspace|>getregion
-    regioncenter::Offset = region|>getcenter
-    regionsymmetry::AffineTransform = recenter(symmetry, regioncenter)
-    transform::FockMap = states * regionsymmetry
-    return RegionState(states * transform)
-end
-
-Zipper.FockMap(regionstate::RegionState) = reduce(+, state for (_, state) in regionstate.spstates)
-
 r00state = getregionstates(localcorrelations=localcorrelations, grouping=[8])|>collect|>first
+r00state|>getinspace|>modeattrs
+
 visualize(c2 * r00state, markersizemultiplier=20, markersizescaling=0.1)
 FockSpace(m for (m, _) in r00states[1])|>modeattrs
 c2 * r00state|>FockMap|>getinspace|>modeattrs

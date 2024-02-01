@@ -87,6 +87,28 @@ function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal
     return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal), performpermute=false)
 end
 
+function Base.:*(symmetry::AffineTransform, state::RegionState)
+    statemap::FockMap = state|>FockMap
+    stateregionfock::RegionFock = statemap|>getoutspace
+    localsymmetry::AffineTransform = symmetry|>recenter(stateregionfock|>getregion|>getcenter)
+    outspacerep::FockMap = localsymmetry * stateregionfock
+    hassamespan(outspacerep|>getoutspace, stateregionfock) || error("The symmetry action on the state region fockspace in not closed!")
+    inspacerep::FockMap = statemap' * outspacerep * statemap
+    phasespectrum::EigenSpectrum = inspacerep|>eigspec
+
+    function mapper(mode::Mode)::Mode
+        eigenvalue::Complex = (phasespectrum|>geteigenvalues)[mode]
+        basisfunction::BasisFunction = findeigenfunction(localsymmetry, eigenvalue=eigenvalue)
+        # The existing :flavor attribute is not needed since we will use mapmodes to determine the new one;
+        # the :eigenindex is not needed since it does not represent any physical attributes.
+        return mode|>setattr(:orbital=>basisfunction)|>removeattr(:eigenindex, :flavor)
+    end
+
+    symmetricfock::FockSpace = phasespectrum|>geteigenvectors|>getinspace|>mapmodes(mapper)|>FockSpace
+    symmetrizer::FockMap = FockMap(phasespectrum|>geteigenvectors, inspace=symmetricfock, performpermute=false)
+
+    return RegionState(statemap * symmetrizer)
+end
 
 function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
     inspacerep::FockMap = *(symmetry, fockmap |> getinspace)

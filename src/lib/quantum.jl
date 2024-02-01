@@ -1473,6 +1473,42 @@ export mapmodes
 """ A shorthand for `mapmodes`. """
 mapmodes(mapper::Function)::Function = input -> mapmodes(mapper, input)
 
+"""
+    weightedspatialmap(localisometry::FockMap)::FockMap{RegionFock, RegionFock}
+
+Given `localisometry` with an `outspace` of `FockMap{Region}`, determine the center position of the column 
+function by the weights of the eigenfunction and generate a identity map that transforms the `inspace` of 
+`localisometry` to include the actual physical attribute of `:r` and `:b`.
+
+### Output
+The transformer `FockMap` with `inspace` of `localisometry` and the spatially decorated version as the `outspace`.
+"""
+function weightedspatialmap(localisometry::FockMap)::FockMap{RegionFock, RegionFock}
+    function mapper(mode::Mode)::Mode
+        modeisometry::FockMap = localisometry[:, mode]
+        absmap::FockMap = modeisometry|>abs
+        weights::FockMap = absmap / (absmap|>rep|>collect|>real|>sum)
+        pos::Offset = reduce(+, (outmode|>getpos) * (weights[outmode, mode]|>real) for outmode in weights|>getoutspace)
+        b::Offset = pos|>basispoint
+        r::Offset = pos - b
+        # removeattr(:eigenindex) is added since localisometry is coming from a EigenSpectrum.
+        return mode|>setattr(:r=>r, :b=>b)|>removeattr(:eigenindex)
+    end
+    return idmap(localisometry|>getinspace, localisometry|>getinspace|>mapmodes(mapper)|>RegionFock)
+end
+export weightedspatialmap
+
+function spatialmap(localisometry::FockMap)::FockMap
+    function mapper(mode::Mode)::Mode
+        pos::Offset = localisometry|>getoutspace|>getregion|>getcenter
+        b::Offset = pos|>basispoint
+        r::Offset = pos - b
+        # removeattr(:eigenindex) is added since localisometry is coming from a EigenSpectrum.
+        return mode|>setattr(:r=>r, :b=>b)|>removeattr(:eigenindex)
+    end
+    return idmap(localisometry|>getinspace, localisometry|>getinspace|>mapmodes(mapper)|>RegionFock)
+end
+export spatialmap
 
 struct RegionState{Dim} <: Element{FockMap}
     spstates::Dict{Mode, FockMap}

@@ -1551,13 +1551,15 @@ Base.:iterate(state::RegionState, i...) = iterate(state.spstates, i...)
 Base.:length(state::RegionState) = state.spstates |> length
 
 function Base.:+(a::RegionState, b::RegionState)
+    dim::Integer = a|>getoutspace|>getregion|>getspace|>dimension
     combinedstates::Vector = [a.spstates..., b.spstates...]
     combinedinmodes::Base.Generator = (mode for (mode, _) in combinedstates)
     # This step ensures that any duplicated modes from a and b will be mapped to different :flavor.
     mergedmodes::Subset{Mode} = combinedinmodes|>mapmodes(m -> m)
     mappedstates = (mode=>FockMap(state, inspace=mode|>FockSpace, performpermute=false) for (mode, (_, state)) in zip(mergedmodes, combinedstates))
-    return RegionState(mappedstates)
+    return RegionState{dim}(mappedstates|>Dict)
 end
+
 """
     CrystalFockMap(outcrystal::Crystal, incrystal::Crystal, blocks::Dict{Tuple{Momentum, Momentum}, FockMap})
 

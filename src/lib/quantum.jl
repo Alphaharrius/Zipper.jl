@@ -1539,7 +1539,10 @@ function RegionState(localstates::SparseFockMap{RegionFock, <:FockSpace})
     return Dict(mode=>decorated[:, mode] for mode in decorated|>getinspace)|>RegionState{dim}
 end
 
-FockMap(regionstate::RegionState) = reduce(+, state for (_, state) in regionstate.spstates)
+function FockMap(regionstate::RegionState)
+    statemap::FockMap = reduce(+, state for (_, state) in regionstate.spstates)
+    return FockMap(statemap, outspace=statemap|>getoutspace|>RegionFock, inspace=statemap|>getinspace|>RegionFock)
+end
 
 getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
 getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace

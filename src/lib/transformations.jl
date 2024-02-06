@@ -132,9 +132,6 @@ function AffineTransform(
     eigenvaluehashdenominator::Integer = findcomplexdenominator(v for (v, _) in eigenfunctions; denominatorrange=64:128).denominator
     eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(hashablecomplex(v |> Complex, eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
     eigenfunctiontable[hashablecomplex(1 + 0im, eigenvaluehashdenominator)] = swave
-    eigenfunctiontable[hashablecomplex(-1 + 0im, eigenvaluehashdenominator)] = swaveminus
-    eigenfunctiontable[hashablecomplex(0.5+0.5sqrt(3)im, eigenvaluehashdenominator)] = ppluswave
-    eigenfunctiontable[hashablecomplex(0.5-0.5sqrt(3)im, eigenvaluehashdenominator)] = pminuswave
     return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
 end
 

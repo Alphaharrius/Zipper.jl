@@ -1421,6 +1421,95 @@ function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     return [outmode => mat[fockorder(fockmap|>getoutspace, outmode), 1] for outmode in orderedmodes(fockmap|>getoutspace)]
 end
 
+"""
+    spatialremapper(regionfock::RegionFock; offsets::Region, unitcell::Region)
+
+This function remaps the positions of modes in a `RegionFock` object based on provided offsets and a unit cell. This function is used when 
+the unit-cell defined in the original `regionfock` does not match with what you desire, most of the case the `unitcell` is not defined in 
+the positive parallelogram spanned by the lattice basis vectors.
+
+### Input
+- `regionfock`  The `RegionFock` object to be remapped.
+
+### Output
+It creates a new `RegionFock` object with the remapped modes and returns an identity map between the new and original `RegionFock` objects.
+"""
+function spatialremapper(regionfock::RegionFock; offsets::Region, unitcell::Region)
+    positions::Dict{Offset, Tuple} = Dict((r + b)=>(r, b) for (r, b) in Iterators.product(offsets, unitcell))
+    remappingdata::Base.Generator = ((positions[mode|>getpos], mode) for mode in regionfock)
+    remappedfock::RegionFock = RegionFock(mode|>setattr(:r=>r, :b=>b) for ((r, b), mode) in remappingdata)
+    return idmap(remappedfock, regionfock)
+end
+export spatialremapper
+
+"""
+    mapmodes(mapper::Function, modes)::Subset{Mode}
+
+A standard way to apply a mapping function onto an iterator of `Mode` that might ends up with mode duplication.
+All duplications will be mapped with incremental `:flavor` indices starting from `1`. It is adviced that all code 
+that looks like `Subset(mode|>mapper for mode in modes)` to be replaced with this function.
+
+### Input
+- `mapper`  The mapping function to be applied to each `Mode` object, it should only be taking one `Mode` as argument.
+- `modes`   The iterator of `Mode` objects to be mapped.
+"""
+function mapmodes(mapper::Function, modes)::Subset{Mode}
+    # :flavor is removed to ensure there is not overlooked degeneracy lifted.
+    mapped::Base.Generator = (mode|>mapper|>removeattr(:flavor) for mode in modes)
+    degenerates::Dict = Dict()
+    flavoredmodes::Vector{Mode} = []
+    for mode in mapped
+        if !haskey(degenerates, mode)
+            degenerates[mode] = 1
+        else
+            degenerates[mode] += 1
+        end
+        push!(flavoredmodes, mode|>setattr(:flavor=>degenerates[mode]))
+    end
+    return Subset(flavoredmodes)
+end
+export mapmodes
+
+""" A shorthand for `mapmodes`. """
+mapmodes(mapper::Function)::Function = input -> mapmodes(mapper, input)
+
+"""
+    weightedspatialmap(localisometry::FockMap)::FockMap{RegionFock, RegionFock}
+
+Given `localisometry` with an `outspace` of `FockMap{Region}`, determine the center position of the column 
+function by the weights of the eigenfunction and generate a identity map that transforms the `inspace` of 
+`localisometry` to include the actual physical attribute of `:r` and `:b`.
+
+### Output
+The transformer `FockMap` with `inspace` of `localisometry` and the spatially decorated version as the `outspace`.
+"""
+function weightedspatialmap(localisometry::FockMap)::FockMap{RegionFock, RegionFock}
+    function mapper(mode::Mode)::Mode
+        modeisometry::FockMap = localisometry[:, mode]
+        absmap::FockMap = modeisometry|>abs
+        weights::FockMap = absmap / (absmap|>rep|>collect|>real|>sum)
+        pos::Offset = reduce(+, (outmode|>getpos) * (weights[outmode, mode]|>real) for outmode in weights|>getoutspace)
+        b::Offset = pos|>basispoint
+        r::Offset = pos - b
+        # removeattr(:eigenindex) is added since localisometry is coming from a EigenSpectrum.
+        return mode|>setattr(:r=>r, :b=>b)|>removeattr(:eigenindex)
+    end
+    return idmap(localisometry|>getinspace, localisometry|>getinspace|>mapmodes(mapper)|>RegionFock)
+end
+export weightedspatialmap
+
+function spatialmap(localisometry::FockMap)::FockMap
+    function mapper(mode::Mode)::Mode
+        pos::Offset = localisometry|>getoutspace|>getregion|>getcenter
+        b::Offset = pos|>basispoint
+        r::Offset = pos - b
+        # removeattr(:eigenindex) is added since localisometry is coming from a EigenSpectrum.
+        return mode|>setattr(:r=>r, :b=>b)|>removeattr(:eigenindex)
+    end
+    return idmap(localisometry|>getinspace, localisometry|>getinspace|>mapmodes(mapper)|>RegionFock)
+end
+export spatialmap
+
 struct RegionState{Dim} <: Element{FockMap}
     spstates::Dict{Mode, FockMap}
 end
@@ -1443,17 +1532,33 @@ function regionalrestriction(crystalstate::FockMap, regionfock::RegionFock)::Reg
 end
 export regionalrestriction
 
-""" Convert a state like `FockMap` with outspace type of `RegionFock` to a `RegionState`. """
-function Zipper.RegionState(localstate::FockMap{RegionFock, <:FockSpace})
-    dim::Integer = localstate|>getoutspace|>getregion|>getspace|>dimension
-    return Dict(mode=>localstate[:, mode] for mode in localstate|>getinspace)|>RegionState{dim}
+"""" Convert a state like `FockMap` with outspace type of `RegionFock` to a `RegionState`. """
+function RegionState(localstates::SparseFockMap{RegionFock, <:FockSpace})
+    decorated::FockMap = localstates * spatialmap(localstates)
+    dim::Integer = decorated|>getoutspace|>getregion|>getspace|>dimension
+    return Dict(mode=>decorated[:, mode] for mode in decorated|>getinspace)|>RegionState{dim}
 end
 
-Zipper.:getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
-Zipper.:getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace
+function FockMap(regionstate::RegionState)
+    statemap::FockMap = reduce(+, state for (_, state) in regionstate.spstates)
+    return FockMap(statemap, outspace=statemap|>getoutspace|>RegionFock, inspace=statemap|>getinspace|>RegionFock)
+end
+
+getinspace(state::RegionState) = FockSpace(m for (m, _) in state.spstates)
+getoutspace(state::RegionState) = state.spstates |> first |> last |> getoutspace
 
 Base.:iterate(state::RegionState, i...) = iterate(state.spstates, i...)
 Base.:length(state::RegionState) = state.spstates |> length
+
+function Base.:+(a::RegionState, b::RegionState)
+    dim::Integer = a|>getoutspace|>getregion|>getspace|>dimension
+    combinedstates::Vector = [a.spstates..., b.spstates...]
+    combinedinmodes::Base.Generator = (mode for (mode, _) in combinedstates)
+    # This step ensures that any duplicated modes from a and b will be mapped to different :flavor.
+    mergedmodes::Subset{Mode} = combinedinmodes|>mapmodes(m -> m)
+    mappedstates = (mode=>FockMap(state, inspace=mode|>FockSpace, performpermute=false) for (mode, (_, state)) in zip(mergedmodes, combinedstates))
+    return RegionState{dim}(mappedstates|>Dict)
+end
 
 """
     CrystalFockMap(outcrystal::Crystal, incrystal::Crystal, blocks::Dict{Tuple{Momentum, Momentum}, FockMap})

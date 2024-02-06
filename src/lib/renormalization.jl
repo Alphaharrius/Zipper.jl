@@ -234,7 +234,7 @@ function findlocalspstates(;
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)
     orthogonalspstates = Iterators.filter(lineardependencefilter, selectedisometries)
     symmetricspstates = (state * *(state, symmetry) for state in orthogonalspstates)
-    spstates = (state * spatialmap(state)' for state in symmetricspstates)
+    spstates = (state * spatialmap(state) for state in symmetricspstates)
 
     return Dict(state |> getinspace |> dimension => state for state in spstates)
 end

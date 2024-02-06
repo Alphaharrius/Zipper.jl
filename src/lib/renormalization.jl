@@ -165,7 +165,7 @@ function globaldistillerhamiltonian(;
     crystalfock::CrystalFock = correlations|>getinspace
     @info("globaldistillerhamiltonian: Computing crystalprojectors...")
     showtaskmeter(false)
-    threads = map(localisometries) do (name, isometry)
+    threads = map((name, isometry) for (name, isometry) in localisometries) do (name, isometry)
         Threads.@spawn name=>crystalprojector(localisometry=isometry, crystalfock=crystalfock)
     end
     showtaskmeter(true)

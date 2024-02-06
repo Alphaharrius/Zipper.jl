@@ -1777,23 +1777,48 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
     kspace::MomentumSpace = convert(MomentumSpace, realspace)
     Γ::Momentum = kspace|>getorigin
     singularcrystal::Crystal = Crystal(realspace|>getorigin|>Subset, realspace|>dimension|>ones)
-    blocks::Dict = Dict((Γ, k)=>fouriertransform[:, fock] for (k, fock) in fouriertransform|>getinspace|>crystalsubspaces)
+
+    batchsize::Integer = ((crystal|>vol) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
+        tasks=(()->((Γ, k)=>fouriertransform[:, fock]) for (k, fock) in fouriertransform|>getinspace|>crystalsubspaces),
+        batchsize=batchsize)|>parallel|>Dict
     crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, crystal, blocks)
 
     transformed::CrystalFockMap = crystaltransform * fockmap
     outspace::RegionFock = fouriertransform|>getoutspace
     inspace::CrystalFock = fouriertransform|>getinspace
-    data::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
-    for (_, block) in transformed.blocks
-        blockinspace::FockSpace = block|>getinspace
-        inorder::UnitRange = fockorder(inspace, blockinspace|>first):fockorder(inspace, blockinspace|>last)
-        data[:, inorder] += block|>rep
+
+    function compute(blocks)
+        data::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
+        for block in blocks
+            blockinspace::FockSpace = block|>getinspace
+            inorder::UnitRange = inspace[blockinspace|>first]:inspace[blockinspace|>last]
+            data[:, inorder] += block|>rep
+        end
+        return data
     end
 
-    return FockMap(outspace, inspace, data)
+    batchsize = (length(transformed.blocks) / Threads.nthreads())|>ceil
+    summingpartitions = Iterators.partition((block for (_, block) in transformed.blocks), batchsize)
+    reps = paralleltasks(
+        name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
+        tasks=(()->compute(partition) for partition in summingpartitions),
+        batchsize=batchsize)|>parallel
+    
+    spdata::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
+    for rep in reps
+        spdata[:, :] += rep
+    end
+
+    return FockMap(outspace, inspace, spdata)
 end
 
 function idmap(fockspace::CrystalFock)
-    blocks::Dict = Dict((k, k)=>idmap(fock) for (k, fock) in fockspace|>crystalsubspaces)
+    batchsize::Integer = ((fockspace|>getcrystal|>vol) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="idmap",
+        tasks=(()->((k, k)=>idmap(subspace)) for (k, subspace) in fockspace|>crystalsubspaces),
+        batchsize=batchsize)|>parallel|>Dict
     return CrystalFockMap(fockspace|>getcrystal, fockspace|>getcrystal, blocks)
 end

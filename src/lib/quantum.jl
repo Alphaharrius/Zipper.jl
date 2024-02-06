@@ -1709,17 +1709,32 @@ function Base.:*(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
     return CrystalFockMap(a.outcrystal, b.incrystal, finalblocks)
 end
 
-Base.:*(fockmap::CrystalFockMap, num::Number) = CrystalFockMap(
-    fockmap.outcrystal, fockmap.incrystal, Dict(pair=>(num * block) for (pair, block) in fockmap.blocks))
+function Base.:*(fockmap::CrystalFockMap, num::Number)
+    batchsize::Integer = (length(fockmap.blocks) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="CrystalFockMap * Number",
+        tasks=(()->(pair=>(num * block)) for (pair, block) in fockmap.blocks),
+        batchsize=batchsize)|>parallel|>Dict
+    return CrystalFockMap(fockmap.outcrystal, fockmap.incrystal, blocks)
+end
+
 Base.:*(num::Number, fockmap::CrystalFockMap) = fockmap * num
 
-function Base.:adjoint(fockmap::CrystalFockMap)::CrystalFockMap
-    blocks::Dict{Tuple{Momentum, Momentum}, FockMap} = Dict((ink, outk)=>block' for ((outk, ink), block) in fockmap.blocks)
+function Base.:adjoint(fockmap::CrystalFockMap)
+    batchsize::Integer = (length(fockmap.blocks) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="adjoint",
+        tasks=(()->((ink, outk)=>block') for ((outk, ink), block) in fockmap.blocks),
+        batchsize=batchsize)|>parallel|>Dict
     return CrystalFockMap(fockmap.incrystal, fockmap.outcrystal, blocks)
 end
 
 function Base.:transpose(fockmap::CrystalFockMap)::CrystalFockMap
-    blocks::Dict{Tuple{Momentum, Momentum}, FockMap} = Dict((ink, outk)=>transpose(block) for ((outk, ink), block) in fockmap.blocks)
+    batchsize::Integer = (length(fockmap.blocks) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="transpose",
+        tasks=(()->((ink, outk)=>transpose(block)) for ((outk, ink), block) in fockmap.blocks),
+        batchsize=batchsize)|>parallel|>Dict
     return CrystalFockMap(fockmap.incrystal, fockmap.outcrystal, blocks)
 end
 

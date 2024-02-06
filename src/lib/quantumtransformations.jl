@@ -1,18 +1,24 @@
 function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
+    meter = Progress(4, desc="Scale * CrystalFock initialization")
+
     crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
     unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
     bz::Subset{Momentum} = crystal |> brillouinzone
     basismodes::Subset{Mode} = crystalfock|>unitcellfock|>orderedmodes
+    next!(meter)
 
     momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
+    next!(meter)
 
     unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
     unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
+    next!(meter)
 
     volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
 
     crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
+    finish!(meter)
     restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
     blocks::Dict = Dict()
 

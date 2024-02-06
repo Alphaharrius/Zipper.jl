@@ -1,9 +1,5 @@
-using Distributed
-procs = addprocs(5)
-@info("Using $(nworkers()) threads...")
-
-@everywhere using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-@everywhere using Zipper
+using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+using Zipper
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
@@ -16,7 +12,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [96, 96])
+crystal = Crystal(unitcell, [384, 384])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -46,12 +42,10 @@ energyspectrum|>visualize
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstates|>visualize
 
-groundstateprojector = groundstates |> crystalprojector
+groundstateprojector = groundstates|>crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 
-Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
-
-@everywhere function zer(correlations)
+function zer(correlations)
     @info("Starting RG...")
     crystalfock = correlations|>getoutspace
 
@@ -154,9 +148,10 @@ Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
         return emptycorrelations, wannieremptyisometry
     end
 
-    courierrenormalization = @spawnat :any renormalizecourier()
-    filledrenormalization = @spawnat :any renormalizefilled()
-    emptyrenormalization = @spawnat :any renormalizeempty()
+    showtaskmeter(false)
+    courierrenormalization = Threads.@spawn renormalizecourier()
+    filledrenormalization = Threads.@spawn renormalizefilled()
+    emptyrenormalization = Threads.@spawn renormalizeempty()
 
     @info ("Renormalizing courier...")
     couriercorrelations, wanniercourierisometry, nonpurifiedcorrelationspectrum = @time fetch(courierrenormalization)
@@ -164,6 +159,7 @@ Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
     filledcorrelations, wannierfilledisometry = @time fetch(filledrenormalization)
     @info ("Renormalizing empty...")
     emptycorrelations, wannieremptyisometry = @time fetch(emptyrenormalization)
+    showtaskmeter(true)
 
     return Dict(
         :blocker => blocker,
@@ -188,8 +184,7 @@ rg4 = zer(rg3[:correlations])
 
 rg5 = zer(rg4[:correlations])
 
-# Remove all the distributed workers.
-rmprocs(procs...)
+rg3[:globaldistiller]|>crystalspectrum|>visualize
 
 entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
 entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)

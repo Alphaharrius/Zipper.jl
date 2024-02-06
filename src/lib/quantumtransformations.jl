@@ -14,17 +14,19 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
 
     crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
     restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
-    blocks::Dict = Dict()
 
-    scaledksubspaces::Dict{Momentum, FockSpace} = Dict()
-    for (scaledk, k) in momentummappings
+    function compute(scaledk, k)
         kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
-        if !haskey(scaledksubspaces, scaledk)
-            scaledksubspaces[scaledk] = FockSpace(
-                setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
-        end
-        blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
+        scaledksubspace::FockSpace =  FockSpace(
+            setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
+        return (scaledk, k)=>FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
     end
+
+    batchsize::Integer = (length(momentummappings) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="Scale * CrystalFock",
+        tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
+        batchsize=batchsize)|>parallel|>Dict
 
     return CrystalFockMap(scaledcrystal, crystal, blocks)
 end

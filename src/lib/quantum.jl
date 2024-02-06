@@ -1799,6 +1799,7 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
         return data
     end
 
+    # Without doing the followings this step is unbearablelly slow for large system size.
     batchsize = (length(transformed.blocks) / Threads.nthreads())|>ceil
     summingpartitions = Iterators.partition((block for (_, block) in transformed.blocks), batchsize)
     reps = paralleltasks(

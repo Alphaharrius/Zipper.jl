@@ -95,9 +95,8 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
     addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
 
     crystal::Crystal = getcrystal(crystalfock)
-    fouriermap::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
-    momentumfouriers::Base.Generator = rowsubmaps(fouriermap)
-    bz::Subset{Momentum} = brillouinzone(crystal)
+    transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
+    momentumfouriers::Base.Generator = (k=>transform[subspace, :] for (k, subspace) in transform|>getoutspace|>crystalsubspaces)
 
     function preprocesslocalisometry(k::Momentum)::FockMap
         if !addinspacemomentuminfo
@@ -107,7 +106,13 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
         return FockMap(localisometry, inspace=inspace, performpermute=false)
     end
 
-    return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
+    batchsize::Integer = ceil(vol(crystal) / Threads.nthreads())|>Integer
+    isometries = paralleltasks(
+        name="crystalisometries",
+        tasks=(()->(k=>kfourier*preprocesslocalisometry(k)) for (k, kfourier) in momentumfouriers),
+        batchsize=batchsize)|>parallel
+
+    return Dict(isometries)
 end
 export crystalisometries
 
@@ -132,15 +137,23 @@ export crystalisometry
 function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
     momentumisometries::Dict{Point, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)
-    bz::Subset{Momentum} = brillouinzone(crystal)
 
-    projectors::Dict = Dict((k, k) => momentumisometries[k] * momentumisometries[k]' for k in bz)
+    batchsize::Integer = ceil(vol(crystal) / Threads.nthreads())|>Integer
+    projectors::Dict = paralleltasks(
+        name="crystalprojector",
+        tasks=(()->((k, k)=>isometry * isometry') for (k, isometry) in momentumisometries),
+        batchsize=batchsize)|>parallel|>Dict
+
     return CrystalFockMap(crystal, crystal, projectors)
 end
 export crystalprojector
 
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
-    blocks::Dict = Dict((k, k)=>(u * u') for (k, u) in spectrum|>geteigenvectors)
+    batchsize::Integer = ceil(vol(spectrum|>getcrystal) / Threads.nthreads())|>Integer
+    blocks::Dict = paralleltasks(
+        name="crystalprojector",
+        tasks=(()->((k, k)=>u*u') for (k, u) in spectrum|>geteigenvectors),
+        batchsize=batchsize)|>parallel|>Dict
     return CrystalFockMap(spectrum|>getcrystal, spectrum|>getcrystal, blocks)
 end
 
@@ -259,7 +272,13 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
     end
-    blocks::Dict = Dict((k, k)=>approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
+
+    batchsize::Integer = (length(crystalisometries) / Threads.nthreads())|>ceil
+    blocks = paralleltasks(
+        name="wannierprojection",
+        tasks=(()->((k, k)=>approximateisometry(k, isometry, overlap)) for (k, isometry, overlap) in overlaps),
+        batchsize=batchsize)|>parallel|>Dict
+    
     return CrystalFockMap(crystal, wanniercrystal, blocks)
 end
 export wannierprojection

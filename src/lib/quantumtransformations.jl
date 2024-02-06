@@ -74,17 +74,29 @@ function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})
     return FockMap(outmodes |> FockSpace{Region}, regionfock, connections)
 end
 
-function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap
-    homefock::FockSpace = crystalfock |> unitcellfock
+function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::FockMap
+    homefock::FockSpace = crystalfock|>unitcellfock
     homefocktransform::FockMap = transformation * RegionFock(homefock)
     ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces |> Dict
     fouriertransform::FockMap = fourier(crystalfock, homefock|>RegionFock)
     transformedfourier::FockMap = fourier(crystalfock, homefocktransform|>getoutspace|>RegionFock)
-    transform::FockMap = directsum(
-        rows(transformedfourier, ksubspaces[transformation * k |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
-        for (k, fockspace) in ksubspaces)
-    crystal::Crystal = crystalfock |> getcrystal
-    return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal), performpermute=false)
+
+    function compute(data)
+        k, subspace = data
+        left = transformedfourier[ksubspaces[transformation*k|>basispoint], :]
+        right = fouriertransform[subspace, :]
+        return (k, k)=>(left * homefocktransform * right')
+    end
+
+    crystal::Crystal = crystalfock|>getcrystal
+
+    batchsize::Integer = (vol(crystal) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="AffineTransform * CrystalFock",
+        tasks=(()->compute(data) for data in ksubspaces),
+        batchsize=batchsize)|>parallel|>Dict
+
+    return CrystalFockMap(crystal, crystal, blocks)
 end
 
 function Base.:*(symmetry::AffineTransform, state::RegionState)

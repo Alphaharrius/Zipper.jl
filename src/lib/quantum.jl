@@ -975,11 +975,20 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
     momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystalfock|>getcrystal|>brillouinzone)...)
     momentumhomefock = crystalfock|>unitcellfock
     values::Array = zeros(Complex, momentumhomefock|>length, size(momentummatrix, 2), regionfock|>dimension)
-    for (n, homemode) in momentumhomefock|>enumerate, (m, inmode) in regionfock|>enumerate
-        if !haskey(unitcellfockmapping, homemode) || unitcellfockmapping[homemode] != inmode|>removeattr(:r) continue end
+    
+    function fillvalues(n, homemode, m, inmode)
+        if !haskey(unitcellfockmapping, homemode) || unitcellfockmapping[homemode] != inmode|>removeattr(:r) return end
         offsetvector::Vector = inmode|>getattr(:r)|>euclidean|>vec
         values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
     end
+
+    batchsize::Integer = ceil(dimension(momentumhomefock) * dimension(regionfock) / Threads.nthreads())
+    # Since each (n, m) only corresponds to one entry, thus this is thread-safe.
+    paralleltasks(
+        name="fourier",
+        tasks=(()->fillvalues(n, homemode, m, inmode) for (n, homemode) in momentumhomefock|>enumerate for (m, inmode) in regionfock|>enumerate),
+        batchsize=batchsize)|>parallel
+
     data::SparseMatrixCSC = reshape(values, (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
     return FockMap(crystalfock, regionfock, data)
 end
@@ -1166,17 +1175,20 @@ Given a collection of Hermitian `FockMap` objects each associated with a specifi
 `CrystalSpectrum` object.
 """
 function crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
-    crystaleigenmodes::Dict{Momentum, Subset{Mode}} = Dict()
-    crystaleigenvalues::Dict{Mode, Number} = Dict()
-    crystaleigenvectors::Dict{Momentum, FockMap} = Dict()
-    for (k, fockmap) in momentumfockmaps
+    function compute(k, fockmap)
         eigenspectrum::EigenSpectrum = eigspech(fockmap, :k => k)
-        crystaleigenmodes[k] = Subset(m for (m, _) in eigenspectrum |> geteigenvalues)
-        crystaleigenvectors[k] = eigenspectrum |> geteigenvectors
-        for (m, v) in eigenspectrum |> geteigenvalues
-            crystaleigenvalues[m] = v
-        end
+        eigenmodes = Subset(m for (m, _) in eigenspectrum |> geteigenvalues)
+        eigenvectors = eigenspectrum|>geteigenvectors
+        eigenvalues = (mode=>v for (mode, v) in eigenspectrum|>geteigenvalues)
+        return k=>(eigenmodes, eigenvectors, eigenvalues)
     end
+    batchsize::Integer = ceil(vol(crystal) / Threads.nthreads())
+    tasks = (()->compute(k, fockmap) for (k, fockmap) in momentumfockmaps)
+    eigendatas = paralleltasks(name="crystalspectrum", tasks=tasks, batchsize=batchsize)|>parallel
+
+    crystaleigenmodes::Dict{Momentum, Subset{Mode}} = Dict(k=>kmodes for (k, (kmodes, _, _)) in eigendatas)
+    crystaleigenvalues::Dict{Mode, Number} = Dict(m=>v for (k, (_, _, pairs)) in eigendatas for (m, v) in pairs)
+    crystaleigenvectors::Dict{Momentum, FockMap} = Dict(k=>kvecs for (k, (_, kvecs, _)) in eigendatas)
     return CrystalSpectrum(crystal, crystaleigenmodes, crystaleigenvalues, crystaleigenvectors)
 end
 export crystalspectrum
@@ -1580,6 +1592,17 @@ struct CrystalFockMap <: FockMap{CrystalFock, CrystalFock}
 end
 export CrystalFockMap
 
+function Base.:show(io::IO, fockmap::CrystalFockMap)
+    example::FockMap = fockmap.blocks|>first|>last
+    incrystalvol::Integer = vol(fockmap.incrystal)
+    inspacedim::Integer = incrystalvol * dimension(example|>getinspace)
+    inspacestring::String = "CrystalFock(sub=$(incrystalvol), dim=$(inspacedim))"
+    outcrystalvol::Integer = vol(fockmap.outcrystal)
+    outspacedim::Integer = outcrystalvol * dimension(example|>getoutspace)
+    outspacestring::String = "CrystalFock(sub=$(outcrystalvol), dim=$(outspacedim))"
+    print(io, string("$(inspacestring) => $(outspacestring)"))
+end
+
 """ Generates the input `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
 Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock = getcrystalfock(fockmap.blocks|>first|>last|>getinspace|>orderedmodes, fockmap.incrystal)
 
@@ -1604,10 +1627,20 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
 end
 
 function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
-    addblocks::Dict = Dict(pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block) for (pair, block) in a.blocks)
+    function compute(data)
+        pair, block = data
+        return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
+    end
+
+    batchsize::Integer = (length(a.blocks) / Threads.nthreads())|>ceil
+    addblocks::Dict = paralleltasks(
+        name="CrystalFockMap + CrystalFockMap",
+        tasks=(()->compute(data) for data in a.blocks),
+        batchsize=batchsize)|>parallel|>Dict
+
     remainblocks::Dict = Dict(pair=>block for (pair, block) in b.blocks if !haskey(addblocks, pair))
 
-    return CrystalFockMap(a.outcrystal, a.incrystal, Dict(addblocks..., remainblocks...))
+    return CrystalFockMap(a.outcrystal, a.incrystal, Dict(el for dict in (addblocks, remainblocks) for el in dict))
 end
 
 function Base.:-(target::CrystalFockMap)::CrystalFockMap
@@ -1621,19 +1654,49 @@ function Base.:*(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
     @assert(a.incrystal == b.outcrystal) # Given one layer of guard for improper use.
 
     rightblocks::Dict{Momentum, Tuple} = Dict(outk=>(ink, block) for ((outk, ink), block) in b.blocks)
-    rawblocks::Base.Generator = (
-        (outk, rightblocks[ink][1])=>(leftblock * rightblocks[ink][2]) for ((outk, ink), leftblock) in a.blocks if haskey(rightblocks, ink))
+    rawdatas::Base.Generator = (
+        (outk, rightblocks[ink][1], leftblock, ink) for ((outk, ink), leftblock) in a.blocks if haskey(rightblocks, ink))
 
-    blocks::Dict = Dict()
-    for (kpair, block) in rawblocks
-        if haskey(blocks, kpair)
-            blocks[kpair] += block
+    function compute(rawdata)
+        outk, rink, leftblock, ink = rawdata
+        kindices = (outk, rink)
+        return kindices=>leftblock*rightblocks[ink][2]
+    end
+
+    batchsize::Integer = (length(a.blocks) / Threads.nthreads())|>ceil
+    rawblocks = paralleltasks(
+        name="CrystalFockMap * CrystalFockMap",
+        tasks=(()->compute(rawdata) for rawdata in rawdatas),
+        batchsize=batchsize)|>parallel
+    
+    function sumgroup(group)
+        blocks::Dict = Dict()
+        for (kindices, block) in group
+            if haskey(blocks, kindices)
+                blocks[kindices] += block
+            else
+                blocks[kindices] = block
+            end
+        end
+        return blocks
+    end
+
+    summationgroups = Iterators.partition(rawblocks, batchsize)
+    blockslist = paralleltasks(
+        name="CrystalFockMap * CrystalFockMap",
+        tasks=(()->sumgroup(group) for group in summationgroups),
+        batchsize=1)|>parallel
+
+    finalblocks::Dict = Dict()
+    for blocks in blockslist, (kindices, block) in blocks
+        if haskey(finalblocks, kindices)
+            finalblocks[kindices] += block
         else
-            blocks[kpair] = block
+            finalblocks[kindices] = block
         end
     end
 
-    return CrystalFockMap(a.outcrystal, b.incrystal, blocks)
+    return CrystalFockMap(a.outcrystal, b.incrystal, finalblocks)
 end
 
 Base.:*(fockmap::CrystalFockMap, num::Number) = CrystalFockMap(
@@ -1655,13 +1718,19 @@ Zipper.:crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator = (outk=>block f
 Zipper.:crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
 
 function CrystalFockMap(crystalspectrum::CrystalSpectrum)::CrystalFockMap
-    function momentumfockmap(k::Momentum)
+    function compute(k::Momentum)
         modes::Subset{Mode} = crystalspectrum.eigenmodes[k]
         eigenfock::FockSpace = modes |> FockSpace
         diagonal::FockMap = FockMap(eigenfock, eigenfock, Dict((m, m) => crystalspectrum.eigenvalues[m] |> ComplexF64 for m in modes))
-        return crystalspectrum.eigenvectors[k] * diagonal * crystalspectrum.eigenvectors[k]'
+        return (k, k)=>(crystalspectrum.eigenvectors[k] * diagonal * crystalspectrum.eigenvectors[k]')
     end
-    blocks::Dict = Dict((k, k)=>(k|>momentumfockmap) for (k, _) in crystalspectrum.eigenmodes)
+
+    batchsize::Integer = ((crystalspectrum|>getcrystal|>vol) / Threads.nthreads())|>ceil
+    blocks::Dict = paralleltasks(
+        name="CrystalFockMap from CrystalSpectrum",
+        tasks=(()->compute(k) for (k, _) in crystalspectrum.eigenmodes),
+        batchsize=batchsize)|>parallel|>Dict
+
     return CrystalFockMap(crystalspectrum|>getcrystal, crystalspectrum|>getcrystal, blocks)
 end
 

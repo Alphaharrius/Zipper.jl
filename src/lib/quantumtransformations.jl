@@ -1,4 +1,4 @@
-function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
+function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
     crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
     unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
@@ -29,7 +29,7 @@ function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
     return CrystalFockMap(scaledcrystal, crystal, blocks)
 end
 
-function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})::FockMap
+function Base.:*(transformation::AffineTransform, regionfock::RegionFock)::FockMap
     # This is used to correct the :b attribute, since the :b as a Point will be symmetrized,
     # which the basis point set might not include the symmetrized :b. Thus we would like to set
     # the :b to its corresponding basis point, and offload the difference to :r.
@@ -71,7 +71,7 @@ function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})
 
     outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in regionfock)
     
-    return FockMap(outmodes |> FockSpace{Region}, regionfock, connections)
+    return FockMap(outmodes |> RegionFock, regionfock, connections)
 end
 
 function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::FockMap

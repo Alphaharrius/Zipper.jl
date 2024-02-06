@@ -184,7 +184,7 @@ rg4 = zer(rg3[:correlations])
 
 rg5 = zer(rg4[:correlations])
 
-rg3[:globaldistiller]|>crystalspectrum|>visualize
+rg4[:globaldistiller]|>crystalspectrum|>visualize
 
 entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
 entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
@@ -229,7 +229,7 @@ end
 
 
 # frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 8)
-# frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
+# frozenseedingfock::FockSpace = RegionFock(frozenseedingmodes)
 
 
 # regionalrestriction(rg1[:filledisometry], frozenseedingfock) |> visualize

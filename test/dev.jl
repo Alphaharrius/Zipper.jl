@@ -122,7 +122,7 @@ c6rep = c6 * courierseed.outspace
 
 symmetrizedseed = reduce(+, (t * fullcourierseed.outspace) * fullcourierseed for t in c6 |> pointgroupelements)
 
-function Renormalization.crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
+function Renormalization.crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
     isometries::Dict{Momentum, FockMap} = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
     isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)

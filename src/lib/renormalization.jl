@@ -81,17 +81,17 @@ function blocking(parameters::Dict{Symbol})::Dict{Symbol}
 end
 
 """
-    crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal}, addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
+    crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock, addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
 
-Given a `localisometry` that is defined within a `FockSpace{Region}`, perform fourier transform to obtain the k-space representation of the isometry
+Given a `localisometry` that is defined within a `RegionFock`, perform fourier transform to obtain the k-space representation of the isometry
 and store as a dictionary of bloch isometries keyed by the momentum of the `crystalfock`.
 
 ### Input
-- `localisometry::FockMap`: The local isometry defined within a `FockSpace{Region}`.
-- `crystalfock::FockSpace{Crystal}`: The crystal `FockSpace`.
+- `localisometry::FockMap`: The local isometry defined within a `RegionFock`.
+- `crystalfock::CrystalFock`: The crystal `FockSpace`.
 - `addinspacemomentuminfo::Bool`: Whether to add the momentum information into the `inspace` as attribute `:k` of the returned `FockMap`.
 """
-function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal},
+function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
     addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
 
     crystal::Crystal = getcrystal(crystalfock)
@@ -117,13 +117,13 @@ end
 export crystalisometries
 
 """
-    crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
+    crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
 
-Given a `localisometry` that is defined within a `FockSpace{Region}`, perform fourier transform to obtain the k-space representation of the isometry.
+Given a `localisometry` that is defined within a `RegionFock`, perform fourier transform to obtain the k-space representation of the isometry.
 The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `inspace` of the input `localisometry` as the unitcell fockspace and
 the brillouin zone of the `crystalfock`.
 """
-function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
+function crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
     isometries::Dict{Momentum, FockMap} = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
     isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
@@ -134,7 +134,7 @@ function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crysta
 end
 export crystalisometry
 
-function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
+function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
     momentumisometries::Dict{Point, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)
 

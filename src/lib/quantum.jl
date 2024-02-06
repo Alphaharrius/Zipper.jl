@@ -263,11 +263,13 @@ Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
 # ==================================================
 
+abstract type FockSpace <: AbstractSpace{Subset{Subset{Mode}}} end
+
 """
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)
-    FockSpace(subset::Subset{Mode}; reflected=Nothing)
-    FockSpace(fockspace::FockSpace; reflected=Nothing)
-    FockSpace(mode::Mode) = FockSpace(Subset(mode); reflected=Nothing)
+    SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)
+    SparseFock(subset::Subset{Mode}; reflected=Nothing)
+    SparseFock(fockspace::SparseFock; reflected=Nothing)
+    SparseFock(mode::Mode) = SparseFock(Subset(mode); reflected=Nothing)
 
 A collection of `Modes` or `Mode` partitions in the case of sparse fockspace, implicit ordering of underlying modes is assumed.
 
@@ -278,34 +280,58 @@ represented by `Subset{Mode}`.
 The `reflected` attribute is used to store the object this fockspace is reflected to, such as `Crystal` for a crystal fockspace, by default it will be `Nothing`.
 
 ### Examples
-- `FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)` is used when all the components of the `FockSpace`
+- `SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)` is used when all the components of the `FockSpace`
   is already constructed prior instantiation.
-- `FockSpace(subset::Subset{Mode}; reflected=Nothing)` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
-- `FockSpace(fockspace::FockSpace; reflected=Nothing)` is used to set the `reflected` attribute.
-- `FockSpace(mode::Mode; reflected=Nothing)` is used to create a fockspace with a single mode.
+- `SparseFock(subset::Subset{Mode}; reflected=Nothing)` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
+- `SparseFock(fockspace::SparseFock; reflected=Nothing)` is used to set the `reflected` attribute.
+- `SparseFock(mode::Mode; reflected=Nothing)` is used to create a fockspace with a single mode.
 """
-struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
+struct SparseFock{T} <: FockSpace
     reflected::T
     rep::Subset{Subset{Mode}}
     ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = new{typeof(reflected)}(reflected, subsets, ordering)
-    FockSpace(subset::Subset{Mode}; reflected=Nothing) = FockSpace(
+    SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = new{typeof(reflected)}(reflected, subsets, ordering)
+    SparseFock(subset::Subset{Mode}; reflected=Nothing) = SparseFock(
         Subset(subset),
         Dict(mode => order for (order, mode) in enumerate(subset)),
         reflected=reflected)
-    FockSpace(fockspace::FockSpace; reflected=Nothing) = FockSpace(rep(fockspace), fockspace.ordering, reflected=reflected)
-    FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
+    SparseFock(fockspace::SparseFock; reflected=Nothing) = SparseFock(rep(fockspace), fockspace.ordering, reflected=reflected)
+    SparseFock(mode::Mode; reflected=Nothing) = SparseFock(Subset(mode), reflected=reflected)
     
-    FockSpace(input::Vector{Mode}; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
-    FockSpace(input::Base.Generator; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
-    FockSpace(input::Base.Iterators.Flatten; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
+    SparseFock(input::Vector{Mode}; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
+    SparseFock(input::Base.Generator; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
+    SparseFock(input::Base.Iterators.Flatten; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
 end
-export FockSpace
+export SparseFock
 
-""" To retrieve the reflected property this `FockSpace` is reflected to. """
-getreflected(fockspace::FockSpace) = fockspace.reflected
+# SparseFock is the default implementation of FockSpace
+FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = SparseFock(subsets, ordering, reflected=reflected)
+FockSpace(subset::Subset{Mode}; reflected=Nothing) = SparseFock(subset, reflected=reflected)
+FockSpace(fockspace::SparseFock; reflected=Nothing) = SparseFock(fockspace, reflected=reflected)
+FockSpace(mode::Mode; reflected=Nothing) = SparseFock(mode, reflected=reflected)
+FockSpace(input::Vector{Mode}; reflected=Nothing) = SparseFock(input, reflected=reflected)
+FockSpace(input::Base.Generator; reflected=Nothing) = SparseFock(input, reflected=reflected)
+FockSpace(input::Base.Iterators.Flatten; reflected=Nothing) = SparseFock(input, reflected=reflected)
+
+""" To retrieve the reflected property this `SparseFock` is reflected to. """
+getreflected(fockspace::SparseFock) = fockspace.reflected
 export getreflected
+
+CrystalFock = SparseFock{Crystal}
+export CrystalFock
+
+""" Shorthand alias for `SparseFock{Region}`. """
+RegionFock = SparseFock{Region}
+export RegionFock
+
+""" Shorthand alias for `SparseFock{Momentum}`. """
+MomentumFock = SparseFock{Momentum}
+export MomentumFock
+
+""" Shorthand alias for `SparseFock{Offset}`. """
+SiteFock = SparseFock{Offset}
+export SiteFock
 
 """
     getsparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
@@ -334,23 +360,7 @@ getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSp
 export getcrystalfock
 
 """ Get the reflected region of the regional `FockSpace`. """
-Zipper.:getregion(regionfock::FockSpace{Region})::Region = regionfock |> getreflected
-
-""" Shorthand alias for `FockSpace{Crystal}`. """
-CrystalFock = FockSpace{Crystal}
-export CrystalFock
-
-""" Shorthand alias for `FockSpace{Region}`. """
-RegionFock = FockSpace{Region}
-export RegionFock
-
-""" Shorthand alias for `FockSpace{Momentum}`. """
-MomentumFock = FockSpace{Momentum}
-export MomentumFock
-
-""" Shorthand alias for `FockSpace{Offset}`. """
-SiteFock = FockSpace{Offset}
-export SiteFock
+Zipper.:getregion(regionfock::RegionFock)::Region = regionfock |> getreflected
 
 """
     RegionFock(input)
@@ -387,7 +397,7 @@ Base.:-(regionfock::RegionFock, offset::Offset)::RegionFock = regionfock + (-off
 
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
-Base.:show(io::IO, ::Type{FockSpace{Region}}) = print(io, string("RegionFock"))
+Base.:show(io::IO, ::Type{RegionFock}) = print(io, string("RegionFock"))
 Base.:show(io::IO, ::Type{CrystalFock}) = print(io, string("CrystalFock"))
 
 """ Check whether a `Mode` is in the `FockSpace`. """
@@ -444,19 +454,19 @@ Shorthand for retrieving the `Crystal` of a `CrystalFock`.
 Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock |> getreflected
 
 """
-    crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}}
+    crystalsubsets(crystalfock::CrystalFock)::Dict{Momentum, Subset{Mode}}
 
     Retrieve mappings from the crystal momentums to the corresponding `Subset{Mode}`.
 """
-crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :k) => subspace for subspace in crystalfock |> rep)
+crystalsubsets(crystalfock::CrystalFock)::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :k) => subspace for subspace in crystalfock |> rep)
 export crystalsubsets
 
 """
-    crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
+    crystalsubspaces(crystalfock::CrystalFock)::Base.Generator
 
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
-function crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
+function crystalsubspaces(crystalfock::CrystalFock)::Base.Generator
     function subsettofockspace(subset::Subset{Mode})::Pair{Momentum, FockSpace}
         k::Momentum = commonattr(subset, :k)
         return k => FockSpace(subset, reflected=k)
@@ -466,11 +476,11 @@ end
 export crystalsubspaces
 
 """
-    getmomentum(subspace::FockSpace{Momentum})::Momentum
+    getmomentum(subspace::MomentumFock)::Momentum
 
-Shorthand for retrieving the `Momentum` of a `FockSpace{Momentum}`.
+Shorthand for retrieving the `Momentum` of a `MomentumFock`.
 """
-getmomentum(subspace::FockSpace{Momentum})::Momentum = subspace.reflected
+getmomentum(subspace::MomentumFock)::Momentum = subspace.reflected
 export getmomentum
 
 """
@@ -690,10 +700,10 @@ struct SparseFockMap{A <: FockSpace, B <: FockSpace} <: FockMap{A, B}
     inspace::B
     rep::SparseMatrixCSC{ComplexF64, Int64}
 
-    SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, rep)
-    SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
+    SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, rep)
+    SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
 
-    function SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, T})::SparseFockMap where {T <: Complex}
+    function SparseFockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, T})::SparseFockMap where {T <: Complex}
         rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
             rep[outspace.ordering[out_mode], inspace.ordering[in_mode]] = value
@@ -701,7 +711,7 @@ struct SparseFockMap{A <: FockSpace, B <: FockSpace} <: FockMap{A, B}
         return SparseFockMap(outspace, inspace, rep)
     end
 
-    SparseFockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap|>getoutspace, inspace::FockSpace{<: Any} = fockmap|>getinspace, performpermute::Bool = true) = (
+    SparseFockMap(fockmap::FockMap; outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, performpermute::Bool = true) = (
         SparseFockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
 end
 export SparseFockMap
@@ -710,10 +720,10 @@ export SparseFockMap
 Using `FockMap` as the entry point of instantiating a default `SparseFockMap` object.
 """
 # Using SparseFockMap as the default implementation of FockMap
-FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = SparseFockMap(outspace, inspace, rep)
-FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = SparseFockMap(outspace, inspace, rep)
-FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}})::SparseFockMap= SparseFockMap(outspace, inspace, mapping)
-FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap|>getoutspace, inspace::FockSpace{<: Any} = fockmap|>getinspace, performpermute::Bool = true) = SparseFockMap(fockmap, outspace=outspace, inspace=inspace, performpermute=performpermute)
+FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = SparseFockMap(outspace, inspace, rep)
+FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number}) = SparseFockMap(outspace, inspace, rep)
+FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}})::SparseFockMap= SparseFockMap(outspace, inspace, mapping)
+FockMap(fockmap::FockMap; outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, performpermute::Bool = true) = SparseFockMap(fockmap, outspace=outspace, inspace=inspace, performpermute=performpermute)
 
 getoutspace(fockmap::SparseFockMap)::FockSpace = fockmap.outspace
 export getoutspace

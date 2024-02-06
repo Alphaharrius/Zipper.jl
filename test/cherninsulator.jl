@@ -12,7 +12,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [384, 384])
+crystal = Crystal(unitcell, [192, 192])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -184,7 +184,11 @@ rg4 = zer(rg3[:correlations])
 
 rg5 = zer(rg4[:correlations])
 
-rg4[:globaldistiller]|>crystalspectrum|>visualize
+rg6 = zer(rg5[:correlations])
+
+rg7 = zer(rg6[:correlations])
+
+rg1[:globaldistiller]|>crystalspectrum|>visualize
 
 entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
 entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)

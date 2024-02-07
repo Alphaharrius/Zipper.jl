@@ -161,13 +161,9 @@ function globaldistillerhamiltonian(;
     localisometries::Dict{Symbol} = localfrozenisometries(correlations, restrictspace, selectionstrategy=localisometryselectionstrategy)
     crystalfock::CrystalFock = correlations|>getinspace
     @info("globaldistillerhamiltonian: Computing crystalprojectors...")
-    showtaskmeter(false)
-    threads = map((name, isometry) for (name, isometry) in localisometries) do (name, isometry)
-        Threads.@spawn name=>crystalprojector(localisometry=isometry, crystalfock=crystalfock)
-    end
-    showtaskmeter(true)
-    @info("globaldistillerhamiltonian: Finalizing...")
-    crystalprojectors::Dict{Symbol, FockMap} = fetch.(threads)|>Dict
+    crystalprojectors = Dict(
+        name=>crystalprojector(localisometry=isometry, crystalfock=crystalfock) for (name, isometry) in localisometries)
+        @info("globaldistillerhamiltonian: finalizing...")
     return reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
 end
 export globaldistillerhamiltonian

@@ -759,13 +759,6 @@ Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(fockmap|>getinspace) 
 
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::SparseFockMap) = source.rep
 
-""" Allows the retrieval of mapping data via `fockmap[outmode, inmode]`. """
-function Base.:getindex(fockmap::FockMap, outmode::Mode, inmode::Mode)::Complex
-    inspaceorder::Integer = (fockmap|>getinspace)[inmode]
-    outspaceorder::Integer = (fockmap|>getoutspace)[outmode]
-    return (fockmap |> rep)[CartesianIndex(outspaceorder, inspaceorder)]
-end
-
 """
     extractindices(fockmap::FockMap, indices)
 

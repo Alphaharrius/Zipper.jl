@@ -1666,14 +1666,20 @@ function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
         return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
     end
 
-    addblocks::Dict = paralleltasks(
+    blocks::Dict = paralleltasks(
         name="CrystalFockMap + CrystalFockMap",
         tasks=(()->compute(data) for data in a.blocks),
         count=length(a.blocks))|>parallel|>Dict
 
-    remainblocks::Dict = Dict(pair=>block for (pair, block) in b.blocks if !haskey(addblocks, pair))
+    finalizeprogress = ProgressUnknown("CrystalFockMap + CrystalFockMap", spinner=true)
+    for (pair, block) in b.blocks
+        ProgressMeter.update!(finalizeprogress)
+        if haskey(blocks, pair) continue end
+        blocks[pair] = block
+    end
+    finish!(finalizeprogress)
 
-    return CrystalFockMap(a.outcrystal, a.incrystal, Dict(el for dict in (addblocks, remainblocks) for el in dict))
+    return CrystalFockMap(a.outcrystal, a.incrystal, blocks)
 end
 
 function Base.:-(target::CrystalFockMap)::CrystalFockMap

@@ -1,4 +1,4 @@
-# JuliaZipper
+# Zipper.jl
 Implementation of Zipper Entanglement Renormalization on Julia platform.
 
 ## Using multithreading to enhance performance

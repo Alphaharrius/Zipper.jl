@@ -320,3 +320,4 @@ function gmera(correlations::FockMap, step::Int)
 end
 
 rg1 = gmera(correlations,1)
+rg2 = gmera(rg1[:gmera3rdcorrelations],2)

@@ -1,6 +1,8 @@
 using Revise, LinearAlgebra, AbstractAlgebra, SmithNormalForm
 using Zipper
 
+setmaxthreads(Threads.nthreads())
+
 square = euclidean(RealSpace, 2)
 point = [1/2, 1/2] ∈ square
 spatialsnappingcalibration([point])
@@ -107,7 +109,6 @@ m135 = pointgrouptransform([0 -1; -1 0], localspace=square)
 m45 = pointgrouptransform([0 1; 1 0], localspace=square)
 
 wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15)
-wannierregion|>visualize
 wannierregionfock = quantize(wannierregion, 1)
 scaledcrystal = quasistripmetalstate|>getcrystal
 scaledspace = scaledcrystal|>getspace
@@ -116,9 +117,13 @@ wannierregionfock = remapper|>getoutspace
 wannierrestrict = fourier(quasistripmetalcorrelations|>getoutspace, wannierregionfock) / (scaledcrystal|>vol|>sqrt)
 localcorrelations = wannierrestrict' * quasistripmetalcorrelations * wannierrestrict
 localcorrelations|>eigspech|>visualize
-localstatesR00 = getregionstates(localcorrelations=localcorrelations, grouping=[3, 4])|>collect
-visualize(localstatesR00[1], markersizemultiplier=20, markersizescaling=0.1)
+localstatesR00 = getregionstates(localcorrelations=localcorrelations, grouping=[3, 5])|>collect
+visualize(m135 * localstatesR00[1], markersizemultiplier=20, markersizescaling=0.1)
 visualize(localstatesR00[2], markersizemultiplier=20, markersizescaling=0.1)
+
+wannierregionfock|>modeattrs
+m135 * localstatesR00[1] |>getinspace|>modeattrs
+localstatesR00[2]|>FockMap|>getinspace|>modeattrs
 
 wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15) - normalvector*0.5
 wannierregionfock = quantize(wannierregion, 1)
@@ -129,11 +134,12 @@ wannierrestrict = fourier(quasistripmetalcorrelations|>getoutspace, wannierregio
 localcorrelations = wannierrestrict' * quasistripmetalcorrelations * wannierrestrict
 localcorrelations|>eigspech|>visualize
 localstatesR05 = getregionstates(localcorrelations=localcorrelations, grouping=[2, 5])|>collect
-visualize(localstatesR05[1], markersizemultiplier=20, markersizescaling=0.1)
-visualize(localstatesR05[2], markersizemultiplier=20, markersizescaling=0.1)
+visualize(m135 * localstatesR05[1], markersizemultiplier=30, markersizescaling=0.3)
+visualize(localstatesR05[4], markersizemultiplier=30, markersizescaling=0.1)
 
 wannierseedstate = localstatesR00[1] + localstatesR05[2]
 wannierseeds = wannierseedstate|>FockMap
+
 seedstransform = fourier(quasistripmetalcorrelations|>getoutspace, wannierseeds|>getoutspace) / (scaledcrystal|>vol|>sqrt)
 crystalseeds = seedstransform * wannierseeds
 pseudoidentities = (crystalseeds[subspace, :]' * crystalseeds[subspace, :] for (_, subspace) in crystalseeds|>getoutspace|>crystalsubspaces)
@@ -144,16 +150,32 @@ wanniermetalisometries = wannierprojection(crystalisometries=quasistripmetalstat
 wanniermetalisometries' * stripcorrelations * wanniermetalisometries |>crystalspectrum|>linespectrum|>visualize
 
 leftrestrict = fourier(wanniermetalisometries|>getoutspace, wannierseeds|>getoutspace) / (scaledcrystal|>vol|>sqrt)
-rightrestrict = fourier(wanniermetalisometries|>getinspace, wanniermetalisometries|>getinspace|>unitcellfock|>RegionFock)
+wanniercrystal = wanniermetalisometries|>getinspace|>getcrystal
+rightrestrict = fourier(wanniermetalisometries|>getinspace, wanniermetalisometries|>getinspace|>unitcellfock|>RegionFock) / (wanniercrystal|>vol|>sqrt)
 wannierlocalisometries = leftrestrict' * FockMap(wanniermetalisometries) * rightrestrict
 visualize(wannierlocalisometries|>RegionState, markersizemultiplier=20, markersizescaling=0.1)
+
+wannierlocalisometries' * wannierlocalisometries |>visualize
 
 remapper = spatialremapper(wannierlocalisometries|>getoutspace, getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace))
 wannierlocalisometries = remapper * wannierlocalisometries
 wanniermetalprojector = crystalprojector(localisometry=wannierlocalisometries, crystalfock=blockedcrystalfock)
 wanniermetalprojector|>crystalspectrum|>visualize
 
-c4transform = c4 * blockedcrystalfock
+c4T = c4 * blockedcrystalfock
+c4wanniermetalprojector = c4T * wanniermetalprojector * c4T'
+
+wanniermetalprojector + c4wanniermetalprojector |>crystalspectrum|>visualize
+
+for n in 1:10 if n > 5
+    print(n)
+end end
+
+FockMap(wanniermetalprojector) + FockMap(c4wanniermetalprojector) |>crystalspectrum|>visualize
+FockMap(wanniermetalprojector) + FockMap(c4T * wanniermetalprojector * c4T') |>crystalspectrum|>visualize
+
+# TODO: This multiplication is wrong using CrystalFockMap
+c4transform = c4 * blockedcrystalfock |>FockMap
 fullwanniermetalprojector = FockMap(wanniermetalprojector) + c4transform * FockMap(wanniermetalprojector) * c4transform'
 fullwanniermetalprojector|>crystalspectrum|>visualize
 
@@ -174,7 +196,7 @@ remapper = spatialremapper(wannierregionfock, offsets=Subset(-(scaledspace * nor
 wannierregionfock = remapper|>getoutspace
 
 using Base.Iterators
-function getregionstates(; localcorrelations::FockMap{RegionFock, <:FockSpace}, grouping::Vector{<:Integer})
+function getregionstates(; localcorrelations::FockMap{RegionFock, <:Zipper.FockSpace}, grouping::Vector{<:Integer})
     localspectrum::EigenSpectrum = localcorrelations|>eigspech
     current = 1
     states = []
@@ -231,7 +253,7 @@ crystalseeds = Dict(k=>crystalseeds[subspace, :] for (k, subspace) in crystalsee
 quasistripmetalstate|>geteigenvectors
 quasistripmetalstate|>getcrystal
 
-function Zipper.wannierprojection(; crystalisometries::Dict{Momentum, <:FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:FockMap}, svdorthothreshold::Number = 1e-1)
+function Zipper.wannierprojection(; crystalisometries::Dict{Momentum, <:Zipper.FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:Zipper.FockMap}, svdorthothreshold::Number = 1e-1)
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
     overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
@@ -245,7 +267,7 @@ function Zipper.wannierprojection(; crystalisometries::Dict{Momentum, <:FockMap}
         unitary::FockMap = U * Vt
         approximated::FockMap = isometry * unitary
 
-        inspace=FockSpace(approximated|>getinspace|>setattr(:k=>k)|>removeattr(:r)|>mapmodes(m->m))
+        inspace=Zipper.FockSpace(approximated|>getinspace|>setattr(:k=>k)|>removeattr(:r)|>mapmodes(m->m))
         return FockMap(approximated, inspace=inspace, performpermute=false)
     end
     if (precarioussvdvalues |> length) > 0

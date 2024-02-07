@@ -793,8 +793,11 @@ LinearAlgebra.:det(fockmap::FockMap) = fockmap|>rep|>det
 # ===================================================================================================================================================
 # Added to support getindex of FockMap objects.
 Base.:getindex(fockmap::FockMap, row, col) = restrict(fockmap, (fockmap |> getoutspace)[row] |> FockSpace, (fockmap |> getinspace)[col] |> FockSpace)
+Base.:getindex(fockmap::FockMap, row::Mode, col::Mode) = restrict(fockmap, row |> FockSpace, col |> FockSpace)
 Base.:getindex(fockmap::FockMap, ::Colon, col) = restrict(fockmap, fockmap |> getoutspace, (fockmap |> getinspace)[col] |> FockSpace)
+Base.:getindex(fockmap::FockMap, ::Colon, col::Mode) = restrict(fockmap, fockmap |> getoutspace, col |> FockSpace)
 Base.:getindex(fockmap::FockMap, row, ::Colon) = restrict(fockmap, (fockmap |> getoutspace)[row] |> FockSpace, fockmap |> getinspace)
+Base.:getindex(fockmap::FockMap, row::Mode, ::Colon) = restrict(fockmap, row |> FockSpace, fockmap |> getinspace)
 Base.:getindex(fockmap::FockMap, ::Colon, ::Colon) = fockmap
 Base.:getindex(fockmap::FockMap, rowspace::FockSpace, colspace::FockSpace) = restrict(fockmap, rowspace, colspace)
 Base.:getindex(fockmap::FockMap, ::Colon, colspace::FockSpace) = columns(fockmap, colspace)

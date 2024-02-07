@@ -92,7 +92,10 @@ function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::Foc
         k, subspace = data
         left = transformedfourier[ksubspaces[transformation*k|>basispoint], :]
         right = fouriertransform[subspace, :]
-        return (k, k)=>(left * homefocktransform * right')
+        ktransform = left * homefocktransform * right'
+        outk = commonattr(ktransform|>getoutspace, :k)
+        ink = commonattr(ktransform|>getinspace, :k)
+        return (outk, ink)=>ktransform
     end
 
     crystal::Crystal = crystalfock|>getcrystal

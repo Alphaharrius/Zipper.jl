@@ -1,14 +1,12 @@
 mutable struct ParallelSettings
     showmeter::Bool
-    # TODO: Implement!
     maxthreads::Integer
     taskmeterlock::ReentrantLock
 end
 
-global parallelsettings = ParallelSettings(true, Threads.nthreads(), ReentrantLock())
+global parallelsettings = ParallelSettings(true, 1, ReentrantLock())
 
 mutable struct ParallelTasks
-    name::String
     tasks
     meter
 end
@@ -19,9 +17,20 @@ function showtaskmeter(bool::Bool)
 end
 export showtaskmeter
 
-function paralleltasks(; name::String, tasks, batchsize::Integer)
+function setmaxthreads(count::Integer)
+    @warn("Max thread count is set to $count")
+    parallelsettings.maxthreads = count
+end
+export setmaxthreads
+
+getmaxthreads() = parallelsettings.maxthreads
+export getmaxthreads
+
+function paralleltasks(; name::String, tasks, count::Integer)
+    actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
+    batchsize::Integer = (count / actualcorecount)|>ceil
     taskpartitions = Iterators.partition(tasks, batchsize)
-    paralleltasks = ParallelTasks(name, undef, undef)
+    paralleltasks = ParallelTasks(undef, Progress(count, desc="#threads($actualcorecount) $name"))
 
     function runnable(tasks)::Vector
         rets = []
@@ -38,14 +47,11 @@ function paralleltasks(; name::String, tasks, batchsize::Integer)
         return rets
     end
 
-    count::Integer = 0
     partitioned::Vector = []
     for partition in taskpartitions
-        count += length(partition)
         push!(partitioned, (runnable, partition))
     end
     paralleltasks.tasks = partitioned
-    paralleltasks.meter = Progress(count, desc=name)
     return paralleltasks
 end
 

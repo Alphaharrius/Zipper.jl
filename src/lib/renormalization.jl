@@ -106,11 +106,10 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
         return FockMap(localisometry, inspace=inspace, performpermute=false)
     end
 
-    batchsize::Integer = ceil(vol(crystal) / Threads.nthreads())|>Integer
     isometries = paralleltasks(
         name="crystalisometries",
         tasks=(()->(k=>kfourier*preprocesslocalisometry(k)) for (k, kfourier) in momentumfouriers),
-        batchsize=batchsize)|>parallel
+        count=crystal|>vol)|>parallel
 
     return Dict(isometries)
 end
@@ -138,22 +137,20 @@ function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::F
     momentumisometries::Dict{Point, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)
 
-    batchsize::Integer = ceil(vol(crystal) / Threads.nthreads())|>Integer
     projectors::Dict = paralleltasks(
         name="crystalprojector",
         tasks=(()->((k, k)=>isometry * isometry') for (k, isometry) in momentumisometries),
-        batchsize=batchsize)|>parallel|>Dict
+        count=crystal|>vol)|>parallel|>Dict
 
     return CrystalFockMap(crystal, crystal, projectors)
 end
 export crystalprojector
 
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
-    batchsize::Integer = ceil(vol(spectrum|>getcrystal) / Threads.nthreads())|>Integer
     blocks::Dict = paralleltasks(
         name="crystalprojector",
         tasks=(()->((k, k)=>u*u') for (k, u) in spectrum|>geteigenvectors),
-        batchsize=batchsize)|>parallel|>Dict
+        count=spectrum|>getcrystal|>vol)|>parallel|>Dict
     return CrystalFockMap(spectrum|>getcrystal, spectrum|>getcrystal, blocks)
 end
 
@@ -279,11 +276,10 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
     end
 
-    batchsize::Integer = (length(crystalisometries) / Threads.nthreads())|>ceil
     blocks = paralleltasks(
         name="wannierprojection",
         tasks=(()->((k, k)=>approximateisometry(k, isometry, overlap)) for (k, isometry, overlap) in overlaps),
-        batchsize=batchsize)|>parallel|>Dict
+        count=crystalisometries|>length)|>parallel|>Dict
     
     return CrystalFockMap(crystal, wanniercrystal, blocks)
 end

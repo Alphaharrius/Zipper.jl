@@ -28,11 +28,10 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
         return (scaledk, k)=>FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
     end
 
-    batchsize::Integer = (length(momentummappings) / Threads.nthreads())|>ceil
     blocks::Dict = paralleltasks(
         name="Scale * CrystalFock",
         tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
-        batchsize=batchsize)|>parallel|>Dict
+        count=length(momentummappings))|>parallel|>Dict
 
     return CrystalFockMap(scaledcrystal, crystal, blocks)
 end
@@ -98,11 +97,10 @@ function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::Foc
 
     crystal::Crystal = crystalfock|>getcrystal
 
-    batchsize::Integer = (vol(crystal) / Threads.nthreads())|>ceil
     blocks::Dict = paralleltasks(
         name="AffineTransform * CrystalFock",
         tasks=(()->compute(data) for data in ksubspaces),
-        batchsize=batchsize)|>parallel|>Dict
+        count=crystal|>vol)|>parallel|>Dict
 
     return CrystalFockMap(crystal, crystal, blocks)
 end

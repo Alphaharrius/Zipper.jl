@@ -996,7 +996,13 @@ end
 export rulemapunitcellfock
 
 function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
-    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystalfock|>getcrystal|>brillouinzone)...)
+    momentummatrix::Matrix = zeros(crystalfock|>getcrystal|>dimension, crystalfock|>getcrystal|>vol)
+    fillmomentummatrix(n, momentums) = (momentummatrix[:, n] = momentums|>euclidean|>vec)
+    paralleltasks(
+        name="fourier",
+        tasks=(()->fillmomentummatrix(n, k) for (n, k) in crystalfock|>getcrystal|>brillouinzone|>enumerate),
+        count=crystalfock|>getcrystal|>vol)|>parallel
+
     momentumhomefock = crystalfock|>unitcellfock
     values::Array = zeros(Complex, momentumhomefock|>length, size(momentummatrix, 2), regionfock|>dimension)
     

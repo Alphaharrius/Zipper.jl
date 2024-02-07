@@ -1671,7 +1671,7 @@ function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
         tasks=(()->compute(data) for data in a.blocks),
         count=length(a.blocks))|>parallel|>Dict
 
-    finalizeprogress = ProgressUnknown("CrystalFockMap + CrystalFockMap", spinner=true)
+    finalizeprogress = ProgressUnknown(desc="CrystalFockMap + CrystalFockMap", spinner=true)
     for (pair, block) in b.blocks
         ProgressMeter.update!(finalizeprogress)
         if haskey(blocks, pair) continue end

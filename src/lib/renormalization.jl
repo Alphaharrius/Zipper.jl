@@ -92,7 +92,7 @@ and store as a dictionary of bloch isometries keyed by the momentum of the `crys
 - `addinspacemomentuminfo::Bool`: Whether to add the momentum information into the `inspace` as attribute `:k` of the returned `FockMap`.
 """
 function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
-    addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
+    addinspacemomentuminfo::Bool = false)
 
     crystal::Crystal = getcrystal(crystalfock)
     transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
@@ -111,7 +111,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
         tasks=(()->(k=>kfourier*preprocesslocalisometry(k)) for (k, kfourier) in momentumfouriers),
         count=crystal|>vol)|>parallel
 
-    return Dict(isometries)
+    return isometries
 end
 export crystalisometries
 
@@ -123,7 +123,7 @@ The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `
 the brillouin zone of the `crystalfock`.
 """
 function crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-    isometries::Dict{Momentum, FockMap} = crystalisometries(
+    isometries = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
     isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
     isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
@@ -134,7 +134,7 @@ end
 export crystalisometry
 
 function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-    momentumisometries::Dict{Point, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
+    momentumisometries = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)
 
     projectors::Dict = paralleltasks(
@@ -229,7 +229,7 @@ function findlocalspstates(;
     statecrystalfock::CrystalFock = statecorrelations|>getoutspace)::Dict{Integer, FockMap}
 
     function lineardependencefilter(spstate::FockMap)::Bool
-        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecrystalfock)
+        crystalspstates = crystalisometries(localisometry=spstate, crystalfock=statecrystalfock)
         crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
         pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
         mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)

@@ -81,23 +81,22 @@ function blocking(parameters::Dict{Symbol})::Dict{Symbol}
 end
 
 """
-    crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal}, addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
+    crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock, addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
 
-Given a `localisometry` that is defined within a `FockSpace{Region}`, perform fourier transform to obtain the k-space representation of the isometry
+Given a `localisometry` that is defined within a `RegionFock`, perform fourier transform to obtain the k-space representation of the isometry
 and store as a dictionary of bloch isometries keyed by the momentum of the `crystalfock`.
 
 ### Input
-- `localisometry::FockMap`: The local isometry defined within a `FockSpace{Region}`.
-- `crystalfock::FockSpace{Crystal}`: The crystal `FockSpace`.
+- `localisometry::FockMap`: The local isometry defined within a `RegionFock`.
+- `crystalfock::CrystalFock`: The crystal `FockSpace`.
 - `addinspacemomentuminfo::Bool`: Whether to add the momentum information into the `inspace` as attribute `:k` of the returned `FockMap`.
 """
-function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal},
-    addinspacemomentuminfo::Bool = false)::Dict{Momentum, FockMap}
+function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
+    addinspacemomentuminfo::Bool = false)
 
     crystal::Crystal = getcrystal(crystalfock)
-    fouriermap::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
-    momentumfouriers::Base.Generator = rowsubmaps(fouriermap)
-    bz::Subset{Momentum} = brillouinzone(crystal)
+    transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
+    momentumfouriers::Base.Generator = (k=>transform[subspace, :] for (k, subspace) in transform|>getoutspace|>crystalsubspaces)
 
     function preprocesslocalisometry(k::Momentum)::FockMap
         if !addinspacemomentuminfo
@@ -107,19 +106,24 @@ function crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
         return FockMap(localisometry, inspace=inspace, performpermute=false)
     end
 
-    return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
+    isometries = paralleltasks(
+        name="crystalisometries",
+        tasks=(()->(k=>kfourier*preprocesslocalisometry(k)) for (k, kfourier) in momentumfouriers),
+        count=crystal|>vol)|>parallel
+
+    return isometries
 end
 export crystalisometries
 
 """
-    crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
+    crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
 
-Given a `localisometry` that is defined within a `FockSpace{Region}`, perform fourier transform to obtain the k-space representation of the isometry.
+Given a `localisometry` that is defined within a `RegionFock`, perform fourier transform to obtain the k-space representation of the isometry.
 The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `inspace` of the input `localisometry` as the unitcell fockspace and
 the brillouin zone of the `crystalfock`.
 """
-function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
-    isometries::Dict{Momentum, FockMap} = crystalisometries(
+function crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
+    isometries = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
     isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
     isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
@@ -129,29 +133,37 @@ function crystalisometry(; localisometry::FockMap, crystalfock::FockSpace{Crysta
 end
 export crystalisometry
 
-function crystalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::FockMap
-    momentumisometries::Dict{Point, FockMap} = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
+function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
+    momentumisometries = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)
-    bz::Subset{Momentum} = brillouinzone(crystal)
 
-    projectors::Dict = Dict((k, k) => momentumisometries[k] * momentumisometries[k]' for k in bz)
+    projectors::Dict = paralleltasks(
+        name="crystalprojector",
+        tasks=(()->((k, k)=>isometry * isometry') for (k, isometry) in momentumisometries),
+        count=crystal|>vol)|>parallel|>Dict
+
     return CrystalFockMap(crystal, crystal, projectors)
 end
 export crystalprojector
 
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
-    blocks::Dict = Dict((k, k)=>(u * u') for (k, u) in spectrum|>geteigenvectors)
+    blocks::Dict = paralleltasks(
+        name="crystalprojector",
+        tasks=(()->((k, k)=>u*u') for (k, u) in spectrum|>geteigenvectors),
+        count=spectrum|>getcrystal|>vol)|>parallel|>Dict
     return CrystalFockMap(spectrum|>getcrystal, spectrum|>getcrystal, blocks)
 end
 
 function globaldistillerhamiltonian(;
     correlations::FockMap, restrictspace::FockSpace,
     localisometryselectionstrategy::Function, manualeigenenergies::Dict{Symbol, <:Number} = Dict(:filled => -1, :empty => 1))::FockMap
-
+    @info("globaldistillerhamiltonian: Computing localisometries...")
     localisometries::Dict{Symbol} = localfrozenisometries(correlations, restrictspace, selectionstrategy=localisometryselectionstrategy)
-    crystalprojectors::Dict{Symbol, FockMap} = Dict(
-        name => crystalprojector(localisometry=localisometries[name], crystalfock=correlations|>getinspace)
-        for (name, isometry) in localisometries)
+    crystalfock::CrystalFock = correlations|>getinspace
+    @info("globaldistillerhamiltonian: Computing crystalprojectors...")
+    crystalprojectors = Dict(
+        name=>crystalprojector(localisometry=isometry, crystalfock=crystalfock) for (name, isometry) in localisometries)
+        @info("globaldistillerhamiltonian: finalizing...")
     return reduce(+, manualeigenenergies[name] * crystalprojector for (name, crystalprojector) in crystalprojectors)
 end
 export globaldistillerhamiltonian
@@ -172,14 +184,22 @@ end
 function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol, CrystalSpectrum}
     groupingfunction::Function = bandpredicates |> generategroupingfunction
     labeled::Base.Generator = ((mode |> getattr(:k), v |> groupingfunction) => mode for (mode, v) in spectrum |> geteigenvalues)
-    momentumgroups::Dict{Tuple, Vector{Mode}} = foldl(labeled; init=Dict{Tuple, Vector{Mode}}()) do d,(k, v)
-        mergewith!(append!, d, LittleDict(k => [v]))
+    momentumgroups::Dict{Tuple, Vector{Mode}} = Dict()
+    
+    watchprogress(desc="distillation: labelling")
+    for (key, mode) in labeled
+        !haskey(momentumgroups, key) && (momentumgroups[key] = [])
+        push!(momentumgroups[key], mode)
+        updateprogress()
     end
+    unwatchprogress()
 
     bands::Dict{Symbol, Dict{Momentum, FockMap}} = Dict()
+    watchprogress(desc="distillation: band grouping")
     for ((k, band), modes) in momentumgroups
         !haskey(bands, band) && (bands[band] = Dict())
         bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> FockSpace)
+        updateprogress()
     end
 
     function repacktospectrum(isometries::Dict{Momentum, FockMap})::CrystalSpectrum
@@ -188,7 +208,14 @@ function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol
         return CrystalSpectrum(spectrum.crystal, eigenmodes, eigenvalues, isometries)
     end
 
-    return Dict(band => isometries |> repacktospectrum for (band, isometries) in bands)
+    watchprogress(desc="distillation: finalizing")
+    result = Dict()
+    for (band, isometries) in bands
+        result[band] = isometries|>repacktospectrum
+        updateprogress()
+    end
+    unwatchprogress()
+    return result
 end
 export distillation
 
@@ -217,7 +244,7 @@ function findlocalspstates(;
     statecrystalfock::CrystalFock = statecorrelations|>getoutspace)::Dict{Integer, FockMap}
 
     function lineardependencefilter(spstate::FockMap)::Bool
-        crystalspstates::Dict{Momentum, FockMap} = crystalisometries(localisometry=spstate, crystalfock=statecrystalfock)
+        crystalspstates = crystalisometries(localisometry=spstate, crystalfock=statecrystalfock)
         crystalspstate::FockMap = directsum(v for (_, v) in crystalspstates)
         pseudoidentity::FockMap = (crystalspstate' * crystalspstate)
         mineigenvalue = minimum(v for (_, v) in pseudoidentity |> eigvalsh)
@@ -240,7 +267,7 @@ function findlocalspstates(;
 end
 export findlocalspstates
 
-function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, FockMap}, svdorthothreshold::Number = 1e-1)
+function wannierprojection(; crystalisometries::Dict{Momentum, <:FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:FockMap}, svdorthothreshold::Number = 1e-1)
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
     overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
@@ -259,7 +286,12 @@ function wannierprojection(; crystalisometries::Dict{Momentum, FockMap}, crystal
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
     end
-    blocks::Dict = Dict((k, k)=>approximateisometry(k, isometry, overlap) for (k, isometry, overlap) in overlaps)
+
+    blocks = paralleltasks(
+        name="wannierprojection",
+        tasks=(()->((k, k)=>approximateisometry(k, isometry, overlap)) for (k, isometry, overlap) in overlaps),
+        count=crystalisometries|>length)|>parallel|>Dict
+    
     return CrystalFockMap(crystal, wanniercrystal, blocks)
 end
 export wannierprojection

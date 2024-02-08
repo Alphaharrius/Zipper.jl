@@ -130,7 +130,7 @@ physicalmodes::Subset{Mode} = spanoffset(blockedmodes, crystalpoints)
 frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 2.0)
 frozenseedingregion::Subset{Offset} = Subset(m |> getpos for m in frozenseedingmodes)
 visualize(frozenseedingregion, title="Frozen Seeding Region", visualspace=euclidean(RealSpace, 2))
-frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
+frozenseedingfock::FockSpace = RegionFock(frozenseedingmodes)
 
 globaldistiller = globaldistillerhamiltonian(
     correlations=blockresult[:correlations],
@@ -147,7 +147,7 @@ courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)
 courierseedingregion::Subset{Offset} = Subset(m |> getpos for m in courierseedingmodes)
 visualize(courierseedingregion, courierseedingcenter |> Subset, title="Courier Seeding Region", visualspace=euclidean(RealSpace, 2))
-courierseedingfock::FockSpace{Region} = FockSpace{Region}(courierseedingmodes)
+courierseedingfock::RegionFock = RegionFock(courierseedingmodes)
 
 c3 = c6^2 |> recenter(courierseedingcenter)
 

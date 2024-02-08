@@ -105,7 +105,7 @@ end
 function localregioninspection(center::Offset, physicalmodes::Subset{Mode}, radius::Number, crystal:: Crystal)::Tuple{Subset{Offset},FockSpace}
     seedingmodes::Subset{Mode} = circularregionmodes(center, physicalmodes, radius, crystal)
     seedingregion::Subset{Offset} = Subset(m |> getpos for m in seedingmodes)
-    seedingfock::FockSpace = FockSpace{Region}(seedingmodes)
+    seedingfock::FockSpace = RegionFock(seedingmodes)
     return seedingregion,seedingfock
 end
 
@@ -133,7 +133,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         return inmode |> setattr(:r => offset) |> setattr(:b => basis) |> setattr(:ind => ind)
     end
 
-    spatialinspace::FockSpace{Region} = FockSpace{Region}( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
+    spatialinspace::RegionFock = RegionFock( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
     return idmap(spatialinspace, fockmap |> getinspace)
 end
 
@@ -246,7 +246,7 @@ function locaclRG(center_pt)::Tuple{FockMap,FockMap}
     courierseedingcenterA::Offset = Point(center_pt+[2/3, 1/3] ,  (blockedmodes |> getspace))
     courierseedingregionA,courierseedingfockA = localregioninspection(courierseedingcenterA, physicalmodes, 0.1, blockedcrystal)
     visualize(courierseedingregionA, title="Courier Seeding Region A", visualspace=euclidean(RealSpace, 2))
-    courierseedingfockB = FockSpace{Region}(m for m in c6recenter*courierseedingfockA |> getoutspace)
+    courierseedingfockB = RegionFock(m for m in c6recenter*courierseedingfockA |> getoutspace)
 
 
     regioncorrelations(blockedcorrelations,courierseedingfockB) |> eigspech |>visualize
@@ -271,8 +271,8 @@ function locaclRG(center_pt)::Tuple{FockMap,FockMap}
     courierseedingregionA2,courierseedingfockA2 = localregioninspection(courierseedingcenterA2, physicalmodes, 0.1, blockedcrystal)
     visualize(courierseedingregionA2, title="Courier Seeding Region A1", visualspace=euclidean(RealSpace, 2))
 
-    courierseedingfockB1 = FockSpace{Region}(m for m in c6recenter*courierseedingfockA1 |> getoutspace)
-    courierseedingfockB2 = FockSpace{Region}(m for m in c6recenter*courierseedingfockA2 |> getoutspace)
+    courierseedingfockB1 = RegionFock(m for m in c6recenter*courierseedingfockA1 |> getoutspace)
+    courierseedingfockB2 = RegionFock(m for m in c6recenter*courierseedingfockA2 |> getoutspace)
 
     # for A1
     courierseedA1 =  findlocalspstates(statecorrelations = blockedcorrelations, regionfock = courierseedingfockA1, 

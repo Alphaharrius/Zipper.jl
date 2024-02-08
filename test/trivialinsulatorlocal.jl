@@ -105,7 +105,7 @@ end
 function localregioninspection(center::Offset, physicalmodes::Subset{Mode}, radius::Number, crystal:: Crystal)::Tuple{Subset{Offset},FockSpace}
     seedingmodes::Subset{Mode} = circularregionmodes(center, physicalmodes, radius, crystal)
     seedingregion::Subset{Offset} = Subset(m |> getpos for m in seedingmodes)
-    seedingfock::FockSpace = FockSpace{Region}(seedingmodes)
+    seedingfock::FockSpace = RegionFock(seedingmodes)
     return seedingregion,seedingfock
 end
 
@@ -133,7 +133,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         return inmode |> setattr(:r => offset) |> setattr(:b => basis) |> setattr(:ind => ind)
     end
 
-    spatialinspace::FockSpace{Region} = FockSpace{Region}( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
+    spatialinspace::RegionFock = RegionFock( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
     return idmap(spatialinspace, fockmap |> getinspace)
 end
 
@@ -231,7 +231,7 @@ function locaclRG(center)::Tuple{FockMap,FockMap}
     frozenseedingcenterA::Offset = (blockedmodes |> getspace) & (center+[2/3, 1/3])
     frozenseedingregionA,frozenseedingfockA = localregioninspection(frozenseedingcenterA, physicalmodes, 0.8)
     visualize(frozenseedingregionA, title="Frozen Seeding Region A", visualspace=euclidean(RealSpace, 2))
-    frozenseedingfockB = FockSpace{Region}(m for m in c6recenter*frozenseedingfockA |> getoutspace)
+    frozenseedingfockB = RegionFock(m for m in c6recenter*frozenseedingfockA |> getoutspace)
 
     regioncorrelations(blockedcorrelations,frozenseedingfockA) |> eigspech |>visualize
 
@@ -267,7 +267,7 @@ function locaclRG(center)::Tuple{FockMap,FockMap}
     courierseedingregionA,courierseedingfockA = localregioninspection(courierseedingcenterA, physicalmodes, 0.8)
     visualize(courierseedingregionA, title="Frozen Seeding Region A", visualspace=euclidean(RealSpace, 2))
     
-    courierseedingfockB = FockSpace{Region}(m for m in c6recenter*courierseedingfockA |> getoutspace)
+    courierseedingfockB = RegionFock(m for m in c6recenter*courierseedingfockA |> getoutspace)
 
     #regioncorrelations(blockedcorrelations,frozenseedingfockA) |> eigspech |>visualize
     courierseedA = findlocalspstates(statecorrelations = blockedcorrelations, regionfock = courierseedingfockA, 

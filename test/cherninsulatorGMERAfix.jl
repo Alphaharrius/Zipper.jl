@@ -5,7 +5,7 @@ procs = addprocs(5)
 @everywhere using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics, DataFrames
 @everywhere using Zipper
 
-# function _crystalisometries(; localisometry::FockMap,crystalfock::FockSpace{Crystal},localregionfock::RegionFock, 
+# function _crystalisometries(; localisometry::FockMap,crystalfock::CrystalFock,localregionfock::RegionFock, 
 #     homemappings::Dict{Mode, Mode} = mapunitcellfock(crystalfock, localregionfock), addinspacemomentuminfo::Bool = false)
 
 #     crystal::Crystal = getcrystal(crystalfock)
@@ -25,7 +25,7 @@ procs = addprocs(5)
 #     return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers)),fouriermap
 # end
 
-function _crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal},
+function _crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
     addinspacemomentuminfo::Bool = false)
 
     crystal::Crystal = getcrystal(crystalfock)
@@ -44,7 +44,7 @@ function _crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Cry
     return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
 end
 
-# function _crystalisometriesprime(; localisometry::FockMap, crystalfock::FockSpace{Crystal},
+# function _crystalisometriesprime(; localisometry::FockMap, crystalfock::CrystalFock,
 #     addinspacemomentuminfo::Bool = false)
 
 #     crystal::Crystal = getcrystal(crystalfock)
@@ -127,7 +127,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         return inmode |> setattr(:r => offset) |> setattr(:b => basis) 
     end
 
-    spatialinspace::FockSpace{Region} = FockSpace{Region}( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
+    spatialinspace::RegionFock = RegionFock( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
     return idmap(spatialinspace, fockmap |> getinspace)
 end
 

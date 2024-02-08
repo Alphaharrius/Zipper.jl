@@ -263,11 +263,13 @@ Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
 # ==================================================
 
+abstract type FockSpace <: AbstractSpace{Subset{Subset{Mode}}} end
+
 """
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)
-    FockSpace(subset::Subset{Mode}; reflected=Nothing)
-    FockSpace(fockspace::FockSpace; reflected=Nothing)
-    FockSpace(mode::Mode) = FockSpace(Subset(mode); reflected=Nothing)
+    SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)
+    SparseFock(subset::Subset{Mode}; reflected=Nothing)
+    SparseFock(fockspace::SparseFock; reflected=Nothing)
+    SparseFock(mode::Mode) = SparseFock(Subset(mode); reflected=Nothing)
 
 A collection of `Modes` or `Mode` partitions in the case of sparse fockspace, implicit ordering of underlying modes is assumed.
 
@@ -278,34 +280,61 @@ represented by `Subset{Mode}`.
 The `reflected` attribute is used to store the object this fockspace is reflected to, such as `Crystal` for a crystal fockspace, by default it will be `Nothing`.
 
 ### Examples
-- `FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)` is used when all the components of the `FockSpace`
+- `SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)` is used when all the components of the `FockSpace`
   is already constructed prior instantiation.
-- `FockSpace(subset::Subset{Mode}; reflected=Nothing)` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
-- `FockSpace(fockspace::FockSpace; reflected=Nothing)` is used to set the `reflected` attribute.
-- `FockSpace(mode::Mode; reflected=Nothing)` is used to create a fockspace with a single mode.
+- `SparseFock(subset::Subset{Mode}; reflected=Nothing)` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
+- `SparseFock(fockspace::SparseFock; reflected=Nothing)` is used to set the `reflected` attribute.
+- `SparseFock(mode::Mode; reflected=Nothing)` is used to create a fockspace with a single mode.
 """
-struct FockSpace{T} <: AbstractSpace{Subset{Subset{Mode}}}
+struct SparseFock{T} <: FockSpace
     reflected::T
     rep::Subset{Subset{Mode}}
     ordering::Dict{Mode, Integer}
 
-    FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = new{typeof(reflected)}(reflected, subsets, ordering)
-    FockSpace(subset::Subset{Mode}; reflected=Nothing) = FockSpace(
+    SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = new{typeof(reflected)}(reflected, subsets, ordering)
+    SparseFock(subset::Subset{Mode}; reflected=Nothing) = SparseFock(
         Subset(subset),
         Dict(mode => order for (order, mode) in enumerate(subset)),
         reflected=reflected)
-    FockSpace(fockspace::FockSpace; reflected=Nothing) = FockSpace(rep(fockspace), fockspace.ordering, reflected=reflected)
-    FockSpace(mode::Mode; reflected=Nothing) = FockSpace(Subset(mode), reflected=reflected)
+    SparseFock(fockspace::SparseFock; reflected=Nothing) = SparseFock(rep(fockspace), fockspace.ordering, reflected=reflected)
+    SparseFock(mode::Mode; reflected=Nothing) = SparseFock(Subset(mode), reflected=reflected)
     
-    FockSpace(input::Vector{Mode}; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
-    FockSpace(input::Base.Generator; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
-    FockSpace(input::Base.Iterators.Flatten; reflected=Nothing) = FockSpace(Subset(input), reflected=reflected)
+    SparseFock(input::Vector{Mode}; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
+    SparseFock(input::Base.Generator; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
+    SparseFock(input::Base.Iterators.Flatten; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
 end
-export FockSpace
+export SparseFock
 
-""" To retrieve the reflected property this `FockSpace` is reflected to. """
-getreflected(fockspace::FockSpace) = fockspace.reflected
+# SparseFock is the default implementation of FockSpace
+FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = SparseFock(subsets, ordering, reflected=reflected)
+FockSpace(subset::Subset{Mode}; reflected=Nothing) = SparseFock(subset, reflected=reflected)
+FockSpace(fockspace::SparseFock; reflected=Nothing) = SparseFock(fockspace, reflected=reflected)
+FockSpace(mode::Mode; reflected=Nothing) = SparseFock(mode, reflected=reflected)
+FockSpace(input::Vector{Mode}; reflected=Nothing) = SparseFock(input, reflected=reflected)
+FockSpace(input::Base.Generator; reflected=Nothing) = SparseFock(input, reflected=reflected)
+FockSpace(input::Base.Iterators.Flatten; reflected=Nothing) = SparseFock(input, reflected=reflected)
+
+""" To retrieve the reflected property this `SparseFock` is reflected to. """
+getreflected(fockspace::SparseFock) = fockspace.reflected
 export getreflected
+
+struct CrystalFock <: FockSpace
+    crystal::Crystal
+    korderings::Dict{Momentum, Integer}
+    homefock::SparseFock
+end
+
+""" Shorthand alias for `SparseFock{Region}`. """
+RegionFock = SparseFock{Region}
+export RegionFock
+
+""" Shorthand alias for `SparseFock{Momentum}`. """
+MomentumFock = SparseFock{Momentum}
+export MomentumFock
+
+""" Shorthand alias for `SparseFock{Offset}`. """
+SiteFock = SparseFock{Offset}
+export SiteFock
 
 """
     getsparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
@@ -330,27 +359,15 @@ export getsparsefock
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::CrystalFock = FockSpace(getsparsefock(basismodes, brillouinzone(crystal)), reflected=crystal)
+function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
+    homefock::SparseFock = basismodes|>FockSpace
+    korderings::Dict{Momentum, Integer} = Dict(k=>n for (n, k) in crystal|>brillouinzone|>enumerate)
+    return CrystalFock(crystal, korderings, homefock)
+end
 export getcrystalfock
 
 """ Get the reflected region of the regional `FockSpace`. """
-Zipper.:getregion(regionfock::FockSpace{Region})::Region = regionfock |> getreflected
-
-""" Shorthand alias for `FockSpace{Crystal}`. """
-CrystalFock = FockSpace{Crystal}
-export CrystalFock
-
-""" Shorthand alias for `FockSpace{Region}`. """
-RegionFock = FockSpace{Region}
-export RegionFock
-
-""" Shorthand alias for `FockSpace{Momentum}`. """
-MomentumFock = FockSpace{Momentum}
-export MomentumFock
-
-""" Shorthand alias for `FockSpace{Offset}`. """
-SiteFock = FockSpace{Offset}
-export SiteFock
+Zipper.:getregion(regionfock::RegionFock)::Region = regionfock |> getreflected
 
 """
     RegionFock(input)
@@ -387,16 +404,17 @@ Base.:-(regionfock::RegionFock, offset::Offset)::RegionFock = regionfock + (-off
 
 """ Displays the fock type, subspace count and dimension information of a `FockSpace`. """
 Base.:show(io::IO, fockspace::FockSpace) = print(io, string("$(typeof(fockspace))(sub=$(fockspace |> subspacecount), dim=$(fockspace |> dimension))"))
-Base.:show(io::IO, ::Type{FockSpace{Region}}) = print(io, string("RegionFock"))
+Base.:show(io::IO, ::Type{RegionFock}) = print(io, string("RegionFock"))
 Base.:show(io::IO, ::Type{CrystalFock}) = print(io, string("CrystalFock"))
 
 """ Check whether a `Mode` is in the `FockSpace`. """
 Base.:in(mode::Mode, fockspace::FockSpace)::Bool = haskey(fockspace.ordering, mode)
+Base.:in(mode::Mode, crystalfock::CrystalFock)::Bool = haskey(mode|>getattr(:k), crystalfock.korderings) && mode|>removeattr(:k) in crystalfock|>unitcellfock
 
+# TODO: Implement for CrystalFock
 """ Allow the retrieval of `Mode` at a given `order` index with syntax `fockspace[order]`. """
 Base.:getindex(fockspace::FockSpace, order::Integer)::Mode = (fockspace |> orderedmodes)[order]
-Base.:getindex(fockspace::FockSpace, range::UnitRange)::FockSpace = (fockspace |> orderedmodes)[range] |> FockSpace
-Base.:getindex(fockspace::FockSpace, mode::Mode)::Mode = mode ∈ fockspace ? mode : error("The mode is not in the fockspace!")
+Base.:getindex(fockspace::FockSpace, range::UnitRange)::FockSpace = collect(fockspace|>orderedmodes)[range]|>FockSpace
 
 """
     fockspaceunion(fockspaces)::FockSpace
@@ -434,43 +452,38 @@ Base.:lastindex(fockspace::FockSpace) = fockspace|>dimension
 
 Returns the number of unique member modes within the `fockspace`, each of those represents a vector from the Hilbert space.
 """
-Zipper.:dimension(fockspace::FockSpace) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
+Zipper.:dimension(fockspace::SparseFock) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
+Zipper.:dimension(crystalfock::CrystalFock) = vol(crystalfock.crystal) * dimension(crystalfock.homefock)
 
 """
     getcrystal(crystalfock::CrystalFock)::Crystal
 
 Shorthand for retrieving the `Crystal` of a `CrystalFock`.
 """
-Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock |> getreflected
+Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock.crystal
 
 """
-    crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}}
+    crystalsubsets(crystalfock::CrystalFock)::Dict{Momentum, Subset{Mode}}
 
     Retrieve mappings from the crystal momentums to the corresponding `Subset{Mode}`.
 """
-crystalsubsets(crystalfock::FockSpace{Crystal})::Dict{Momentum, Subset{Mode}} = Dict(commonattr(subspace, :k) => subspace for subspace in crystalfock |> rep)
+crystalsubsets(crystalfock::CrystalFock)::Dict{Momentum, Subset{Mode}} = Dict(k=>crystalfock.homefock|>setattr(:k=>k) for (k, _) in crystalfock.korderings)
 export crystalsubsets
 
 """
-    crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
+    crystalsubspaces(crystalfock::CrystalFock)::Base.Generator
 
 Retrieve mappings from the crystal momentums to the corresponding fockspaces.
 """
-function crystalsubspaces(crystalfock::FockSpace{Crystal})::Base.Generator
-    function subsettofockspace(subset::Subset{Mode})::Pair{Momentum, FockSpace}
-        k::Momentum = commonattr(subset, :k)
-        return k => FockSpace(subset, reflected=k)
-    end
-    return (subspace |> subsettofockspace for subspace in crystalfock |> rep)
-end
+crystalsubspaces(crystalfock::CrystalFock)::Base.Generator = (k=>FockSpace(crystalfock.homefock|>setattr(:k=>k), reflected=k) for (k, _) in crystalfock.korderings)
 export crystalsubspaces
 
 """
-    getmomentum(subspace::FockSpace{Momentum})::Momentum
+    getmomentum(subspace::MomentumFock)::Momentum
 
-Shorthand for retrieving the `Momentum` of a `FockSpace{Momentum}`.
+Shorthand for retrieving the `Momentum` of a `MomentumFock`.
 """
-getmomentum(subspace::FockSpace{Momentum})::Momentum = subspace.reflected
+getmomentum(subspace::MomentumFock)::Momentum = subspace.reflected
 export getmomentum
 
 """
@@ -497,10 +510,7 @@ export modeattrs
 
 Retrieve the unit cell fockspace of the system from a `CrystalFock`, positioned at the origin of the parent `AffineSpace`.
 """
-function unitcellfock(crystalfock::CrystalFock)
-    firstpartition::Subset{Mode} = crystalfock|>rep|>first
-    return FockSpace(firstpartition|>removeattr(:k))
-end
+unitcellfock(crystalfock::CrystalFock) = crystalfock.homefock
 export unitcellfock
 
 unitcellfock(regionfock::RegionFock) = regionfock|>removeattr(:r)|>FockSpace
@@ -518,7 +528,8 @@ export subspaces
 
 Get the number of sub-fockspaces of this `fockspace`.
 """
-subspacecount(fockspace::FockSpace)::Integer = fockspace |> rep |> length
+subspacecount(fockspace::SparseFock)::Integer = fockspace |> rep |> length
+subspacecount(crystalfock::CrystalFock)::Integer = vol(crystalfock.crystal)
 export subspacecount
 
 """
@@ -530,12 +541,16 @@ flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mo
 export flattensubspaces
 
 """
-    fockorder(fockspace::FockSpace, mode::Mode)::Int64
-
 Since the fockspace have implicit ordering, this function returns the order index of the `mode` in the `fockspace`.
 """
-fockorder(fockspace::FockSpace, mode::Mode)::Int64 = fockspace.ordering[mode]
-export fockorder
+Base.:getindex(fockspace::SparseFock, mode::Mode) = fockspace.ordering[mode]
+
+function Base.:getindex(crystalfock::CrystalFock, mode::Mode)
+    k = mode|>getattr(:k)
+    kordering = crystalfock.korderings[k]
+    homefock = crystalfock|>unitcellfock
+    return (kordering - 1) * dimension(homefock) + (crystalfock|>unitcellfock)[mode|>removeattr(:k)]
+end
 
 """
     getmodes(fockspace::FockSpace)::Set{Mode}
@@ -546,13 +561,22 @@ more than one partitions.
 getmodes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
 export getmodes
 
+getmodes(crystalfock::CrystalFock) = Set(crystalfock|>orderedmodes)
+
 """
     orderedmodes(fockspace::FockSpace)::Subset{Mode}
 
 Returns an ordered `Subset` of modes of `fockspace`.
 """
 orderedmodes(fockspace::FockSpace)::Subset{Mode} = flatten(rep(fockspace))
+# TODO: Implement for CrystalFock
 export orderedmodes
+
+function orderedmodes(crystalfock::CrystalFock)::Base.Iterators.Flatten
+    korderings = crystalfock.korderings|>collect
+    sort!(korderings, by=last)
+    return (mode|>setattr(:k=>k) for (k, _) in korderings for mode in crystalfock|>unitcellfock)
+end
 
 """
     orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
@@ -569,7 +593,7 @@ the mode ordering of the permuted list of modes will matches the ordering of `to
 """
 function orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
     @assert(hassamespan(fromspace, tospace))
-    return [fromspace.ordering[mode] for mode in orderedmodes(tospace)]
+    return [fromspace[mode] for mode in orderedmodes(tospace)]
 end
 export orderingrule
 
@@ -579,6 +603,10 @@ export orderingrule
 Check if fockspaces of `a` and `b` shares the same set of underlying modes regardless of partitions.
 """
 Zipper.:hassamespan(a::FockSpace, b::FockSpace)::Bool = getmodes(a) == getmodes(b)
+
+function Zipper.:hassamespan(a::CrystalFock, b::CrystalFock)::Bool
+    return getcrystal(a) == getcrystal(b) && hassamespan(a|>unitcellfock, b|>unitcellfock)
+end
 
 """
     issparse(fockspace::FockSpace)::Bool
@@ -690,18 +718,18 @@ struct SparseFockMap{A <: FockSpace, B <: FockSpace} <: FockMap{A, B}
     inspace::B
     rep::SparseMatrixCSC{ComplexF64, Int64}
 
-    SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, rep)
-    SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
+    SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, rep)
+    SparseFockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number}) = new{outspace |> typeof, inspace |> typeof}(outspace, inspace, SparseMatrixCSC{ComplexF64, Int64}(rep))
 
-    function SparseFockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}, T})::SparseFockMap where {T <: Complex}
+    function SparseFockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}, T})::SparseFockMap where {T <: Complex}
         rep::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
         for ((out_mode::Mode, in_mode::Mode), value::ComplexF64) in mapping
-            rep[outspace.ordering[out_mode], inspace.ordering[in_mode]] = value
+            rep[outspace[out_mode], inspace[in_mode]] = value
         end
         return SparseFockMap(outspace, inspace, rep)
     end
 
-    SparseFockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap|>getoutspace, inspace::FockSpace{<: Any} = fockmap|>getinspace, performpermute::Bool = true) = (
+    SparseFockMap(fockmap::FockMap; outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, performpermute::Bool = true) = (
         SparseFockMap(outspace, inspace, performpermute ? permute(fockmap, outspace=outspace, inspace=inspace) |> rep : fockmap |> rep))
 end
 export SparseFockMap
@@ -710,10 +738,10 @@ export SparseFockMap
 Using `FockMap` as the entry point of instantiating a default `SparseFockMap` object.
 """
 # Using SparseFockMap as the default implementation of FockMap
-FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::SparseMatrixCSC{ComplexF64, Int64}) = SparseFockMap(outspace, inspace, rep)
-FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, rep::AbstractArray{<:Number}) = SparseFockMap(outspace, inspace, rep)
-FockMap(outspace::FockSpace{<: Any}, inspace::FockSpace{<: Any}, mapping::Dict{Tuple{Mode, Mode}})::SparseFockMap= SparseFockMap(outspace, inspace, mapping)
-FockMap(fockmap::FockMap; outspace::FockSpace{<: Any} = fockmap|>getoutspace, inspace::FockSpace{<: Any} = fockmap|>getinspace, performpermute::Bool = true) = SparseFockMap(fockmap, outspace=outspace, inspace=inspace, performpermute=performpermute)
+FockMap(outspace::FockSpace, inspace::FockSpace, rep::SparseMatrixCSC{ComplexF64, Int64}) = SparseFockMap(outspace, inspace, rep)
+FockMap(outspace::FockSpace, inspace::FockSpace, rep::AbstractArray{<:Number}) = SparseFockMap(outspace, inspace, rep)
+FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}})::SparseFockMap= SparseFockMap(outspace, inspace, mapping)
+FockMap(fockmap::FockMap; outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, performpermute::Bool = true) = SparseFockMap(fockmap, outspace=outspace, inspace=inspace, performpermute=performpermute)
 
 getoutspace(fockmap::SparseFockMap)::FockSpace = fockmap.outspace
 export getoutspace
@@ -731,13 +759,6 @@ Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(fockmap|>getinspace) 
 
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, source::SparseFockMap) = source.rep
 
-""" Allows the retrieval of mapping data via `fockmap[outmode, inmode]`. """
-function Base.:getindex(fockmap::FockMap, outmode::Mode, inmode::Mode)::Complex
-    inspaceorder::Integer = fockorder(fockmap|>getinspace, inmode)
-    outspaceorder::Integer = fockorder(fockmap|>getoutspace, outmode)
-    return (fockmap |> rep)[CartesianIndex(outspaceorder, inspaceorder)]
-end
-
 """
     extractindices(fockmap::FockMap, indices)
 
@@ -753,7 +774,7 @@ This function extracts a subset of indices from a `FockMap` object and returns a
 function extractindices(fockmap::FockMap, indices)
     function getindex(index)::Tuple{Integer, Integer}
         frommode, tomode = index
-        return fockorder(fockmap|>getoutspace, tomode), fockorder(fockmap|>getinspace, frommode)
+        return (fockmap|>getoutspace)[tomode], (fockmap|>getinspace)[frommode]
     end
 
     extracted::SparseMatrixCSC = spzeros(Complex, fockmap|>getoutspace|>dimension, fockmap|>getinspace|>dimension)
@@ -772,8 +793,11 @@ LinearAlgebra.:det(fockmap::FockMap) = fockmap|>rep|>det
 # ===================================================================================================================================================
 # Added to support getindex of FockMap objects.
 Base.:getindex(fockmap::FockMap, row, col) = restrict(fockmap, (fockmap |> getoutspace)[row] |> FockSpace, (fockmap |> getinspace)[col] |> FockSpace)
+Base.:getindex(fockmap::FockMap, row::Mode, col::Mode) = restrict(fockmap, row |> FockSpace, col |> FockSpace)
 Base.:getindex(fockmap::FockMap, ::Colon, col) = restrict(fockmap, fockmap |> getoutspace, (fockmap |> getinspace)[col] |> FockSpace)
+Base.:getindex(fockmap::FockMap, ::Colon, col::Mode) = restrict(fockmap, fockmap |> getoutspace, col |> FockSpace)
 Base.:getindex(fockmap::FockMap, row, ::Colon) = restrict(fockmap, (fockmap |> getoutspace)[row] |> FockSpace, fockmap |> getinspace)
+Base.:getindex(fockmap::FockMap, row::Mode, ::Colon) = restrict(fockmap, row |> FockSpace, fockmap |> getinspace)
 Base.:getindex(fockmap::FockMap, ::Colon, ::Colon) = fockmap
 Base.:getindex(fockmap::FockMap, rowspace::FockSpace, colspace::FockSpace) = restrict(fockmap, rowspace, colspace)
 Base.:getindex(fockmap::FockMap, ::Colon, colspace::FockSpace) = columns(fockmap, colspace)
@@ -839,7 +863,7 @@ export colmap
 Restrict the `inspace` of the `fockmap` by a sub-fockspace `restrictspace`.
 """
 function columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    restrictindices::Vector{Integer} = [fockorder(fockmap|>getinspace, mode) for mode in orderedmodes(restrictspace)]
+    restrictindices::Vector{Integer} = [(fockmap|>getinspace)[mode] for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), :, restrictindices))
     return FockMap(fockmap|>getoutspace, restrictspace, spmat)
 end
@@ -851,7 +875,7 @@ export columns
 Restrict the `outspace` of the `fockmap` by a sub-fockspace `restrictspace`.
 """
 function rows(fockmap::FockMap, restrictspace::FockSpace)::FockMap
-    restrictindices::Vector{Integer} = [fockorder(fockmap|>getoutspace, mode) for mode in orderedmodes(restrictspace)]
+    restrictindices::Vector{Integer} = [(fockmap|>getoutspace)[mode] for mode in orderedmodes(restrictspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), restrictindices, :))
     return FockMap(restrictspace, fockmap|>getinspace, spmat)
 end
@@ -879,8 +903,8 @@ export colsubmaps
 Restrict the `outspace` & `inspace` of the `fockmap` by a sub-fockspaces `outspace` & `inspace` respectively.
 """
 function restrict(fockmap::FockMap, outspace::FockSpace, inspace::FockSpace)::FockMap
-    outindices::Vector{Integer} = [fockorder(fockmap|>getoutspace, mode) for mode in orderedmodes(outspace)]
-    inindices::Vector{Integer} = [fockorder(fockmap|>getinspace, mode) for mode in orderedmodes(inspace)]
+    outindices::Vector{Integer} = [(fockmap|>getoutspace)[mode] for mode in orderedmodes(outspace)]
+    inindices::Vector{Integer} = [(fockmap|>getinspace)[mode] for mode in orderedmodes(inspace)]
     spmat::SparseMatrixCSC{ComplexF64, Int64} = sparse(view(rep(fockmap), outindices, inindices))
     return FockMap(outspace, inspace, spmat)
 end
@@ -972,14 +996,43 @@ end
 export rulemapunitcellfock
 
 function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
-    momentummatrix::Matrix = hcat((k|>euclidean|>vec for k in crystalfock|>getcrystal|>brillouinzone)...)
+    function computekmatrix(batch)
+        matrix::SparseMatrixCSC = spzeros(crystalfock|>getcrystal|>dimension, crystalfock|>getcrystal|>vol)
+        for (n, k) in batch
+            matrix[:, n] = k|>euclidean|>vec
+        end
+        return matrix
+    end
+
+    batches = Iterators.partition((el for el in crystalfock|>getcrystal|>brillouinzone|>enumerate), getmaxthreads())
+    matrixparts = paralleltasks(
+        name="fourier",
+        tasks=(()->computekmatrix(batch) for batch in batches),
+        count=crystalfock|>getcrystal|>vol)|>parallel
+
+    momentummatrix::SparseMatrixCSC = spzeros(crystalfock|>getcrystal|>dimension, crystalfock|>getcrystal|>vol)
+    watchprogress(desc="fourier")
+    for part in matrixparts
+        momentummatrix[:, :] += part
+        updateprogress()
+    end
+    unwatchprogress()
+
     momentumhomefock = crystalfock|>unitcellfock
     values::Array = zeros(Complex, momentumhomefock|>length, size(momentummatrix, 2), regionfock|>dimension)
-    for (n, homemode) in momentumhomefock|>enumerate, (m, inmode) in regionfock|>enumerate
-        if !haskey(unitcellfockmapping, homemode) || unitcellfockmapping[homemode] != inmode|>removeattr(:r) continue end
+    
+    function fillvalues(n, homemode, m, inmode)
+        if !haskey(unitcellfockmapping, homemode) || unitcellfockmapping[homemode] != inmode|>removeattr(:r) return end
         offsetvector::Vector = inmode|>getattr(:r)|>euclidean|>vec
         values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
     end
+
+    # Since each (n, m) only corresponds to one entry, thus this is thread-safe.
+    paralleltasks(
+        name="fourier",
+        tasks=(()->fillvalues(n, homemode, m, inmode) for (n, homemode) in momentumhomefock|>enumerate for (m, inmode) in regionfock|>enumerate),
+        count=dimension(momentumhomefock)*dimension(regionfock))|>parallel
+
     data::SparseMatrixCSC = reshape(values, (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
     return FockMap(crystalfock, regionfock, data)
 end
@@ -1041,7 +1094,7 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
         inmodes::Subset{Mode} = is |> orderedmodes
 
         restricted::FockMap = restrict(source, os, is)
-        data[fockorder(outspace, outmodes |> first):fockorder(outspace, outmodes |> last), fockorder(inspace, inmodes |> first):fockorder(inspace, inmodes |> last)] += (restricted |> rep)
+        data[outspace[outmodes|>first]:outspace[outmodes|>last], inspace[inmodes|>first]:inspace[inmodes|>last]] += (restricted|>rep)
     end
 
     internaladdition(a, outspace1, inspace1)
@@ -1102,9 +1155,9 @@ function directsum(fockmaps)::FockMap
     function filldata(fockmap::FockMap)
         # The procedure beneath assumes that the fockspace elements are concatenated in order during union operations.
         outmodes::Subset{Mode} = fockmap|>getoutspace |> orderedmodes
-        outrange::UnitRange = fockorder(outspace, outmodes |> first):fockorder(outspace, outmodes |> last)
+        outrange::UnitRange = outspace[outmodes|>first]:outspace[outmodes|>last]
         inmodes::Subset{Mode} = fockmap|>getinspace |> orderedmodes
-        inrange::UnitRange = fockorder(inspace, inmodes |> first):fockorder(inspace, inmodes |> last)
+        inrange::UnitRange = inspace[inmodes|>first]:inspace[inmodes|>last]
         data[outrange, inrange] += fockmap |> rep
     end
     foreach(filldata, fockmaps)
@@ -1166,17 +1219,19 @@ Given a collection of Hermitian `FockMap` objects each associated with a specifi
 `CrystalSpectrum` object.
 """
 function crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
-    crystaleigenmodes::Dict{Momentum, Subset{Mode}} = Dict()
-    crystaleigenvalues::Dict{Mode, Number} = Dict()
-    crystaleigenvectors::Dict{Momentum, FockMap} = Dict()
-    for (k, fockmap) in momentumfockmaps
+    function compute(k, fockmap)
         eigenspectrum::EigenSpectrum = eigspech(fockmap, :k => k)
-        crystaleigenmodes[k] = Subset(m for (m, _) in eigenspectrum |> geteigenvalues)
-        crystaleigenvectors[k] = eigenspectrum |> geteigenvectors
-        for (m, v) in eigenspectrum |> geteigenvalues
-            crystaleigenvalues[m] = v
-        end
+        eigenmodes = Subset(m for (m, _) in eigenspectrum |> geteigenvalues)
+        eigenvectors = eigenspectrum|>geteigenvectors
+        eigenvalues = (mode=>v for (mode, v) in eigenspectrum|>geteigenvalues)
+        return k=>(eigenmodes, eigenvectors, eigenvalues)
     end
+    tasks = (()->compute(k, fockmap) for (k, fockmap) in momentumfockmaps)
+    eigendatas = paralleltasks(name="crystalspectrum", tasks=tasks, count=crystal|>vol)|>parallel
+
+    crystaleigenmodes::Dict{Momentum, Subset{Mode}} = Dict(k=>kmodes for (k, (kmodes, _, _)) in eigendatas)
+    crystaleigenvalues::Dict{Mode, Number} = Dict(m=>v for (k, (_, _, pairs)) in eigendatas for (m, v) in pairs)
+    crystaleigenvectors::Dict{Momentum, FockMap} = Dict(k=>kvecs for (k, (_, kvecs, _)) in eigendatas)
     return CrystalSpectrum(crystal, crystaleigenmodes, crystaleigenvalues, crystaleigenvectors)
 end
 export crystalspectrum
@@ -1418,7 +1473,7 @@ Extract the column values as a `Mode` to `ComplexF64` pair from a `N×1` `FockMa
 function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     @assert(dimension(fockmap|>getinspace) == 1)
     mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
-    return [outmode => mat[fockorder(fockmap|>getoutspace, outmode), 1] for outmode in orderedmodes(fockmap|>getoutspace)]
+    return [outmode => mat[(fockmap|>getoutspace)[outmode], 1] for outmode in orderedmodes(fockmap|>getoutspace)]
 end
 
 """
@@ -1580,11 +1635,28 @@ struct CrystalFockMap <: FockMap{CrystalFock, CrystalFock}
 end
 export CrystalFockMap
 
+function Base.:show(io::IO, fockmap::CrystalFockMap)
+    example::FockMap = fockmap.blocks|>first|>last
+    incrystalvol::Integer = vol(fockmap.incrystal)
+    inspacedim::Integer = incrystalvol * dimension(example|>getinspace)
+    inspacestring::String = "CrystalFock(sub=$(incrystalvol), dim=$(inspacedim))"
+    outcrystalvol::Integer = vol(fockmap.outcrystal)
+    outspacedim::Integer = outcrystalvol * dimension(example|>getoutspace)
+    outspacestring::String = "CrystalFock(sub=$(outcrystalvol), dim=$(outspacedim))"
+    print(io, string("$(inspacestring) => $(outspacestring)"))
+end
+
 """ Generates the input `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
-Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock = getcrystalfock(fockmap.blocks|>first|>last|>getinspace|>orderedmodes, fockmap.incrystal)
+function Zipper.:getinspace(fockmap::CrystalFockMap)::CrystalFock
+    basismodes::Subset{Mode} = fockmap.blocks|>first|>last|>getinspace|>removeattr(:k)
+    return getcrystalfock(basismodes, fockmap.incrystal)
+end
 
 """ Generates the output `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
-Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock = getcrystalfock(fockmap.blocks|>first|>last|>getoutspace|>orderedmodes, fockmap.outcrystal)
+function Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock
+    basismodes::Subset{Mode} = fockmap.blocks|>first|>last|>getoutspace|>removeattr(:k)
+    getcrystalfock(basismodes, fockmap.outcrystal)
+end
 
 """ Convert a `CrystalFockMap` into a `SparseFockMap`. """
 function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, CrystalFock}
@@ -1592,22 +1664,40 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
     inspace::CrystalFock = fockmap|>getinspace
     data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace|>dimension, inspace|>dimension)
 
+    watchprogress(desc="FockMap(::CrystalFockMap)")
     for (_, block) in fockmap.blocks
         blockoutspace::FockSpace = block|>getoutspace
-        outorder::UnitRange = fockorder(outspace, blockoutspace|>first):fockorder(outspace, blockoutspace|>last)
+        outorder::UnitRange = outspace[blockoutspace|>first]:outspace[blockoutspace|>last]
         blockinspace::FockSpace = block|>getinspace
-        inorder::UnitRange = fockorder(inspace, blockinspace|>first):fockorder(inspace, blockinspace|>last)
+        inorder::UnitRange = inspace[blockinspace|>first]:inspace[blockinspace|>last]
         data[outorder, inorder] += block|>rep
+        updateprogress()
     end
+    unwatchprogress()
 
     return FockMap(outspace, inspace, data)
 end
 
 function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
-    addblocks::Dict = Dict(pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block) for (pair, block) in a.blocks)
-    remainblocks::Dict = Dict(pair=>block for (pair, block) in b.blocks if !haskey(addblocks, pair))
+    function compute(data)
+        pair, block = data
+        return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
+    end
 
-    return CrystalFockMap(a.outcrystal, a.incrystal, Dict(addblocks..., remainblocks...))
+    blocks::Dict = paralleltasks(
+        name="CrystalFockMap + CrystalFockMap",
+        tasks=(()->compute(data) for data in a.blocks),
+        count=length(a.blocks))|>parallel|>Dict
+
+    watchprogress(desc="CrystalFockMap + CrystalFockMap")
+    for (pair, block) in b.blocks
+        updateprogress()
+        if haskey(blocks, pair) continue end
+        blocks[pair] = block
+    end
+    unwatchprogress()
+
+    return CrystalFockMap(a.outcrystal, a.incrystal, blocks)
 end
 
 function Base.:-(target::CrystalFockMap)::CrystalFockMap
@@ -1621,32 +1711,77 @@ function Base.:*(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
     @assert(a.incrystal == b.outcrystal) # Given one layer of guard for improper use.
 
     rightblocks::Dict{Momentum, Tuple} = Dict(outk=>(ink, block) for ((outk, ink), block) in b.blocks)
-    rawblocks::Base.Generator = (
-        (outk, rightblocks[ink][1])=>(leftblock * rightblocks[ink][2]) for ((outk, ink), leftblock) in a.blocks if haskey(rightblocks, ink))
+    rawdatas::Base.Generator = (
+        (outk, rightblocks[ink][1], leftblock, ink) for ((outk, ink), leftblock) in a.blocks if haskey(rightblocks, ink))
 
-    blocks::Dict = Dict()
-    for (kpair, block) in rawblocks
-        if haskey(blocks, kpair)
-            blocks[kpair] += block
-        else
-            blocks[kpair] = block
-        end
+    function compute(rawdata)
+        outk, rink, leftblock, ink = rawdata
+        kindices = (outk, rink)
+        return kindices=>leftblock*rightblocks[ink][2]
     end
 
-    return CrystalFockMap(a.outcrystal, b.incrystal, blocks)
+    rawblocks = paralleltasks(
+        name="CrystalFockMap * CrystalFockMap",
+        tasks=(()->compute(rawdata) for rawdata in rawdatas),
+        count=length(a.blocks))|>parallel
+    
+    function sumgroup(group)
+        blocks::Dict = Dict()
+        for (kindices, block) in group
+            if haskey(blocks, kindices)
+                blocks[kindices] += block
+            else
+                blocks[kindices] = block
+            end
+        end
+        return blocks
+    end
+
+    batchsize::Integer = (length(a.blocks) / getmaxthreads())|>ceil
+    summationgroups = Iterators.partition(rawblocks, batchsize)|>collect
+    blockslist = paralleltasks(
+        name="CrystalFockMap * CrystalFockMap",
+        tasks=(()->sumgroup(group) for group in summationgroups),
+        count=summationgroups|>length)|>parallel
+
+    watchprogress(desc="CrystalFockMap * CrystalFockMap")
+    finalblocks::Dict = Dict()
+    for blocks in blockslist, (kindices, block) in blocks
+        if haskey(finalblocks, kindices)
+            finalblocks[kindices] += block
+        else
+            finalblocks[kindices] = block
+        end
+        updateprogress()
+    end
+    unwatchprogress()
+
+    return CrystalFockMap(a.outcrystal, b.incrystal, finalblocks)
 end
 
-Base.:*(fockmap::CrystalFockMap, num::Number) = CrystalFockMap(
-    fockmap.outcrystal, fockmap.incrystal, Dict(pair=>(num * block) for (pair, block) in fockmap.blocks))
+function Base.:*(fockmap::CrystalFockMap, num::Number)
+    blocks::Dict = paralleltasks(
+        name="CrystalFockMap * Number",
+        tasks=(()->(pair=>(num * block)) for (pair, block) in fockmap.blocks),
+        count=length(fockmap.blocks))|>parallel|>Dict
+    return CrystalFockMap(fockmap.outcrystal, fockmap.incrystal, blocks)
+end
+
 Base.:*(num::Number, fockmap::CrystalFockMap) = fockmap * num
 
-function Base.:adjoint(fockmap::CrystalFockMap)::CrystalFockMap
-    blocks::Dict{Tuple{Momentum, Momentum}, FockMap} = Dict((ink, outk)=>block' for ((outk, ink), block) in fockmap.blocks)
+function Base.:adjoint(fockmap::CrystalFockMap)
+    blocks::Dict = paralleltasks(
+        name="adjoint",
+        tasks=(()->((ink, outk)=>block') for ((outk, ink), block) in fockmap.blocks),
+        count=length(fockmap.blocks))|>parallel|>Dict
     return CrystalFockMap(fockmap.incrystal, fockmap.outcrystal, blocks)
 end
 
 function Base.:transpose(fockmap::CrystalFockMap)::CrystalFockMap
-    blocks::Dict{Tuple{Momentum, Momentum}, FockMap} = Dict((ink, outk)=>transpose(block) for ((outk, ink), block) in fockmap.blocks)
+    blocks::Dict = paralleltasks(
+        name="transpose",
+        tasks=(()->((ink, outk)=>transpose(block)) for ((outk, ink), block) in fockmap.blocks),
+        count=length(fockmap.blocks))|>parallel|>Dict
     return CrystalFockMap(fockmap.incrystal, fockmap.outcrystal, blocks)
 end
 
@@ -1655,13 +1790,18 @@ Zipper.:crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator = (outk=>block f
 Zipper.:crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
 
 function CrystalFockMap(crystalspectrum::CrystalSpectrum)::CrystalFockMap
-    function momentumfockmap(k::Momentum)
+    function compute(k::Momentum)
         modes::Subset{Mode} = crystalspectrum.eigenmodes[k]
         eigenfock::FockSpace = modes |> FockSpace
         diagonal::FockMap = FockMap(eigenfock, eigenfock, Dict((m, m) => crystalspectrum.eigenvalues[m] |> ComplexF64 for m in modes))
-        return crystalspectrum.eigenvectors[k] * diagonal * crystalspectrum.eigenvectors[k]'
+        return (k, k)=>(crystalspectrum.eigenvectors[k] * diagonal * crystalspectrum.eigenvectors[k]')
     end
-    blocks::Dict = Dict((k, k)=>(k|>momentumfockmap) for (k, _) in crystalspectrum.eigenmodes)
+
+    blocks::Dict = paralleltasks(
+        name="CrystalFockMap from CrystalSpectrum",
+        tasks=(()->compute(k) for (k, _) in crystalspectrum.eigenmodes),
+        count=crystalspectrum|>getcrystal|>vol)|>parallel|>Dict
+
     return CrystalFockMap(crystalspectrum|>getcrystal, crystalspectrum|>getcrystal, blocks)
 end
 
@@ -1683,23 +1823,50 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
     kspace::MomentumSpace = convert(MomentumSpace, realspace)
     Γ::Momentum = kspace|>getorigin
     singularcrystal::Crystal = Crystal(realspace|>getorigin|>Subset, realspace|>dimension|>ones)
-    blocks::Dict = Dict((Γ, k)=>fouriertransform[:, fock] for (k, fock) in fouriertransform|>getinspace|>crystalsubspaces)
+
+    blocks::Dict = paralleltasks(
+        name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
+        tasks=(()->((Γ, k)=>fouriertransform[:, fock]) for (k, fock) in fouriertransform|>getinspace|>crystalsubspaces),
+        count=crystal|>vol)|>parallel|>Dict
     crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, crystal, blocks)
 
     transformed::CrystalFockMap = crystaltransform * fockmap
     outspace::RegionFock = fouriertransform|>getoutspace
     inspace::CrystalFock = fouriertransform|>getinspace
-    data::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
-    for (_, block) in transformed.blocks
-        blockinspace::FockSpace = block|>getinspace
-        inorder::UnitRange = fockorder(inspace, blockinspace|>first):fockorder(inspace, blockinspace|>last)
-        data[:, inorder] += block|>rep
+
+    function compute(blocks)
+        data::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
+        for block in blocks
+            blockinspace::FockSpace = block|>getinspace
+            inorder::UnitRange = inspace[blockinspace|>first]:inspace[blockinspace|>last]
+            data[:, inorder] += block|>rep
+        end
+        return data
     end
 
-    return FockMap(outspace, inspace, data)
+    # Without doing the followings this step is unbearablelly slow for large system size.
+    batchsize::Integer = (length(transformed.blocks) / getmaxthreads())|>ceil
+    summingbatches = Iterators.partition((block for (_, block) in transformed.blocks), batchsize)
+    reps = paralleltasks(
+        name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
+        tasks=(()->compute(partition) for partition in summingbatches),
+        count=getmaxthreads())|>parallel
+    
+    watchprogress(desc="FockMap{RegionFock, CrystalFock} * CrystalFockMap")
+    spdata::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
+    for rep in reps
+        spdata[:, :] += rep
+        updateprogress()
+    end
+    unwatchprogress()
+
+    return FockMap(outspace, inspace, spdata)
 end
 
 function idmap(fockspace::CrystalFock)
-    blocks::Dict = Dict((k, k)=>idmap(fock) for (k, fock) in fockspace|>crystalsubspaces)
+    blocks::Dict = paralleltasks(
+        name="idmap",
+        tasks=(()->((k, k)=>idmap(subspace)) for (k, subspace) in fockspace|>crystalsubspaces),
+        count=fockspace|>getcrystal|>vol)|>parallel|>Dict
     return CrystalFockMap(fockspace|>getcrystal, fockspace|>getcrystal, blocks)
 end

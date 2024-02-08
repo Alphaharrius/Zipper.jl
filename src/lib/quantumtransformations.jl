@@ -1,35 +1,39 @@
-function Base.:*(scale::Scale, crystalfock::FockSpace{Crystal})::FockMap
+function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
+    watchprogress(desc="Scale * CrystalFock")
     crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
     unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
     bz::Subset{Momentum} = crystal |> brillouinzone
     basismodes::Subset{Mode} = crystalfock|>unitcellfock|>orderedmodes
-
     momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
-
     unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
     unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
-
     volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
-
-    crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
-    restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
-    blocks::Dict = Dict()
-
-    scaledksubspaces::Dict{Momentum, FockSpace} = Dict()
-    for (scaledk, k) in momentummappings
-        kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
-        if !haskey(scaledksubspaces, scaledk)
-            scaledksubspaces[scaledk] = FockSpace(
-                setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
-        end
-        blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
+    crystalfocksubspaces::Dict{Momentum, FockSpace} = Dict()
+    for (k, subspace) in crystalfock|>crystalsubspaces
+        crystalfocksubspaces[k] = subspace
+        updateprogress()
     end
+    unwatchprogress()
+
+    restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
+
+    function compute(scaledk, k)
+        kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
+        scaledksubspace::FockSpace =  FockSpace(
+            setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
+        return (scaledk, k)=>FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
+    end
+
+    blocks::Dict = paralleltasks(
+        name="Scale * CrystalFock",
+        tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
+        count=length(momentummappings))|>parallel|>Dict
 
     return CrystalFockMap(scaledcrystal, crystal, blocks)
 end
 
-function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})::FockMap
+function Base.:*(transformation::AffineTransform, regionfock::RegionFock)::FockMap
     # This is used to correct the :b attribute, since the :b as a Point will be symmetrized,
     # which the basis point set might not include the symmetrized :b. Thus we would like to set
     # the :b to its corresponding basis point, and offload the difference to :r.
@@ -71,20 +75,34 @@ function Base.:*(transformation::AffineTransform, regionfock::FockSpace{Region})
 
     outmodes::Subset{Mode} = Subset(mode |> modesymmetrize |> rebaseorbital for mode in regionfock)
     
-    return FockMap(outmodes |> FockSpace{Region}, regionfock, connections)
+    return FockMap(outmodes |> RegionFock, regionfock, connections)
 end
 
-function Base.:*(transformation::AffineTransform, crystalfock::FockSpace{Crystal})::FockMap
-    homefock::FockSpace = crystalfock |> unitcellfock
+function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::FockMap
+    homefock::FockSpace = crystalfock|>unitcellfock
     homefocktransform::FockMap = transformation * RegionFock(homefock)
     ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces |> Dict
     fouriertransform::FockMap = fourier(crystalfock, homefock|>RegionFock)
     transformedfourier::FockMap = fourier(crystalfock, homefocktransform|>getoutspace|>RegionFock)
-    transform::FockMap = directsum(
-        rows(transformedfourier, ksubspaces[transformation * k |> basispoint]) * homefocktransform * rows(fouriertransform, fockspace)'
-        for (k, fockspace) in ksubspaces)
-    crystal::Crystal = crystalfock |> getcrystal
-    return FockMap(transform, outspace=FockSpace(transform.outspace, reflected=crystal), inspace=FockSpace(transform.inspace, reflected=crystal), performpermute=false)
+
+    function compute(data)
+        k, subspace = data
+        left = transformedfourier[ksubspaces[transformation*k|>basispoint], :]
+        right = fouriertransform[subspace, :]
+        ktransform = left * homefocktransform * right'
+        outk = commonattr(ktransform|>getoutspace, :k)
+        ink = commonattr(ktransform|>getinspace, :k)
+        return (outk, ink)=>ktransform
+    end
+
+    crystal::Crystal = crystalfock|>getcrystal
+
+    blocks::Dict = paralleltasks(
+        name="AffineTransform * CrystalFock",
+        tasks=(()->compute(data) for data in ksubspaces),
+        count=crystal|>vol)|>parallel|>Dict
+
+    return CrystalFockMap(crystal, crystal, blocks)
 end
 
 function Base.:*(symmetry::AffineTransform, state::RegionState)

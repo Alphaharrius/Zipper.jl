@@ -48,7 +48,7 @@ restrictedfock::FockSpace = FockSpace(restrictedregion)
 
 isometries = localfrozenisometries(blocked[:correlations], restrictedfock, selectionstrategy=frozenselectionbycount(3))
 
-function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal})::Dict{Point, FockMap}
+function fourierisometries(; localisometry::FockMap, crystalfock::CrystalFock)::Dict{Point, FockMap}
     crystal::Crystal = getcrystal(crystalfock)
     fouriermap::FockMap = fourier(crystalfock, localisometry.outspace) / (crystal |> vol |> sqrt)
     momentumfouriers::Vector{FockMap} = rowsubmaps(fouriermap)
@@ -56,7 +56,7 @@ function fourierisometries(; localisometry::FockMap, crystalfock::FockSpace{Crys
     return Dict(k => fourier_k * localisometry for (k, fourier_k) in zip(bz, momentumfouriers))
 end
 
-function isometryglobalprojector(; localisometry::FockMap, crystalfock::FockSpace{Crystal})
+function isometryglobalprojector(; localisometry::FockMap, crystalfock::CrystalFock)
     momentumisometries::Dict{Point, FockMap} = fourierisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)
     bz::Subset{Momentum} = brillouinzone(crystal)
@@ -117,7 +117,7 @@ plot([surface(z=spec3d[n, :, :]) for n in 1:size(spec3d, 1)])
 specmat = hcat([v for (k, v) in spectrum]...)
 plot([scatter(y=specmat[n, :]) for n in 1:size(specmat, 1)])
 
-function Base.:*(symmetry::Symmetry, crystalfock::FockSpace{Crystal})::Vector{FockMap}
+function Base.:*(symmetry::Symmetry, crystalfock::CrystalFock)::Vector{FockMap}
     homefock::FockSpace = unitcellfock(crystalfock)
     homemaps::Vector{FockMap} = symmetry * homefock
     momentumsubspaces::Dict{Point, FockSpace} = crystalsubspaces(crystalfock)

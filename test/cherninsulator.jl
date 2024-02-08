@@ -14,7 +14,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [192, 192])
+crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -177,33 +177,91 @@ end
 
 rg1 = @time zer(correlations)
 
-rg2 = zer(rg1[:correlations])
+rg2 = @time zer(rg1[:correlations])
 
-rg3 = zer(rg2[:correlations])
+rg3 = @time zer(rg2[:correlations])
 
-rg4 = zer(rg3[:correlations])
+rg4 = @time zer(rg3[:correlations])
 
-rg5 = zer(rg4[:correlations])
+rg5 = @time zer(rg4[:correlations])
 
-rg6 = zer(rg5[:correlations])
+rg6 = @time zer(rg5[:correlations])
 
 rg7 = zer(rg6[:correlations])
 
-rg5[:globaldistiller]|>crystalspectrum|>visualize
+c6g = c6 * getoutspace(rg4[:globaldistiller])
+rg4[:globaldistiller] + c6g'rg4[:globaldistiller]*c6g|>crystalspectrum|>visualize
 
 H = CrystalFockMap(energyspectrum)
-rg1courierzipper = rg1[:blocker]' * rg1[:courierisometry]
-rg1H = rg1courierzipper' * H * rg1courierzipper
-rg1crystal = rg1H|>getoutspace|>getcrystal
-restrictregion = getsphericalregion(crystal=rg1crystal, radius=10, metricspace=euclidean(RealSpace, 2))
-restrictregion|>visualize
-restrictfock = quantize(restrictregion, 1)
 
-rg1H|>crystalspectrum|>visualize
-Ft = fourier(rg1H|>getoutspace, restrictfock) / (rg1H|>getoutspace|>getcrystal|>vol|>sqrt)
-rg1Hrs = Ft' * rg1H * Ft
-rg1Hrs|>FockMap|>visualize
-rg1Hrs|>eigspech|>visualize
+function getphysspreaddata(H)
+    restrictregion = getsphericalregion(crystal=crystal, radius=6, metricspace=euclidean(RealSpace, 2))
+    refpos = [2/3, 1/3] ∈ getspace(crystal)
+    centerregion = Subset(r for r in restrictregion if ((refpos-r)|>euclidean|>norm) <= 3.5)
+    restrictfock = quantize(centerregion, 1)
+    Ft = fourier(H|>getoutspace, restrictfock) / (H|>getoutspace|>getcrystal|>vol|>sqrt)
+    rgHrs = Ft' * H * Ft
+    visualmode = quantize(refpos|>Subset, 1)|>first
+    visualH = rgHrs[:, visualmode]
+    data = [((getpos(visualmode)-getpos(m)|>euclidean|>norm), (visualH[m, :]|>rep)[1, 1]|>abs) for m in visualH|>getoutspace]
+    return sort(data, by=first)
+end
+
+function getspreaddata(rgdata, H)
+    courierzipper = rgdata[:blocker]' * rgdata[:courierisometry]
+    rgH = courierzipper' * H * courierzipper
+    rgcrystal = rgH|>getoutspace|>getcrystal
+    ospace = H|>getoutspace|>getcrystal|>getspace|>orthospace
+    restrictregion = getsphericalregion(crystal=rgcrystal, radius=12, metricspace=ospace)
+    refpos = [2/3, 1/3] ∈ getspace(rgcrystal)
+    centerregion = Subset(r for r in restrictregion if (ospace*(refpos-r)|>norm) < 7)
+    restrictfock = quantize(centerregion, 1)
+    Ft = fourier(rgH|>getoutspace, restrictfock) / (rgH|>getoutspace|>getcrystal|>vol|>sqrt)
+    rgHrs = Ft' * rgH * Ft
+    visualmode = quantize(refpos|>Subset, 1)|>first
+    rgvisualH = rgHrs[:, visualmode]
+    data = [((getpos(visualmode)-getpos(m)|>euclidean|>norm), (rgvisualH[m, :]|>rep)[1, 1]|>abs) for m in rgvisualH|>getoutspace]
+    return sort(data, by=first), rgH
+end
+
+data0 = getphysspreaddata(H)
+data1, rg1H = getspreaddata(rg1, H)
+data2, rg2H = getspreaddata(rg2, rg1H)
+data3, rg3H = getspreaddata(rg3, rg2H)
+data4, rg4H = getspreaddata(rg4, rg3H)
+data5, rg5H = getspreaddata(rg5, rg4H)
+data6, rg6H = getspreaddata(rg6, rg5H)
+
+pdata0 = data0[2:end]
+pdata1 = data1[2:end]
+pdata2 = data2[2:end]
+pdata3 = data3[2:end]
+pdata4 = data4[2:end]
+pdata5 = data5[2:end]
+pdata6 = data6[2:end]
+
+marker = attr(symbol="circle-open", size=12, line_width=2, color="MediumPurple")
+
+plot([
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata0], mode="markers", opacity=0.1, marker=marker, name="Physical"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata1], mode="markers", opacity=0.2, marker=marker, name="RG1"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata2], mode="markers", opacity=0.3, marker=marker, name="RG2"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata3], mode="markers", opacity=0.4, marker=marker, name="RG3"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata4], mode="markers", opacity=0.6, marker=marker, name="RG4"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata5], mode="markers", opacity=0.8, marker=marker, name="RG5")])
+
+plot([
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata0], mode="markers", opacity=0.3, marker=marker, name="Physical"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata1], mode="markers", opacity=0.35, marker=marker, name="RG1"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata2], mode="markers", opacity=0.45, marker=marker, name="RG2"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata3], mode="markers", opacity=0.6, marker=marker, name="RG3"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata4], mode="markers", opacity=0.75, marker=marker, name="RG4"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata5], mode="markers", opacity=0.9, marker=marker, name="RG5")],
+    Layout(yaxis_range=[-10, 1]))
+
+plot(scatter(y=[d[2] for d in data1]))
+
+visualize(rg3Hrs[:, 135]|>RegionState, markersizemultiplier=20, markersizescaling=0.1)
 
 lineregionfock = RegionFock(m for m in restrictfock if Integer((m|>getattr(:r)|>vec)[2]|>round) == 1)
 lineregionfock|>getregion|>visualize

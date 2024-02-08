@@ -1846,10 +1846,10 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
 
     # Without doing the followings this step is unbearablelly slow for large system size.
     batchsize::Integer = (length(transformed.blocks) / getmaxthreads())|>ceil
-    summingpartitions = Iterators.partition((block for (_, block) in transformed.blocks), batchsize)
+    summingbatches = Iterators.partition((block for (_, block) in transformed.blocks), batchsize)
     reps = paralleltasks(
         name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
-        tasks=(()->compute(partition) for partition in summingpartitions),
+        tasks=(()->compute(partition) for partition in summingbatches),
         count=getmaxthreads())|>parallel
     
     watchprogress(desc="FockMap{RegionFock, CrystalFock} * CrystalFockMap")

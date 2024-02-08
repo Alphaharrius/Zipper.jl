@@ -38,6 +38,11 @@ function paralleltasks(; name::String, tasks, count::Integer)
     batchsize::Integer = (count / actualcorecount)|>ceil
     taskpartitions = Iterators.partition(tasks, batchsize)
     paralleltasks = ParallelTasks(undef, Progress(count, desc="#threads($actualcorecount) $name"))
+    @debug begin
+        "paralleltasks: $name"
+        "actualcorecount: $actualcorecount"
+        "batchsize: $batchsize"
+    end
 
     function runnable(tasks)::Vector
         rets = []

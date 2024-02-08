@@ -5,7 +5,7 @@ procs = addprocs(5)
 @everywhere using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics, DataFrames
 @everywhere using Zipper
 
-function _crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
+function _crystalisometries(; localisometry::FockMap, crystalfock::FockSpace{Crystal},
     addinspacemomentuminfo::Bool = false)
 
     crystal::Crystal = getcrystal(crystalfock)
@@ -52,7 +52,7 @@ end
 function getsphericalregionwifcenter(;center, crystal::Crystal, radius::Real, metricspace::RealSpace)
     generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
     generatinglength::Integer = generatingradius * 2
-    generatingcrystal::Crystal = Crystal(crystal|>getunitcell, crystal|>size)
+    generatingcrystal::Crystal = Crystal(crystal|>getunitcell, 4*(crystal|>size))
     crystalregion::Region = generatingcrystal|>sitepoints
     centeredregion::Region = crystalregion - (crystalregion|>getcenter) 
     return Subset(point for point in centeredregion if norm(metricspace * (point-center)) <= radius)
@@ -68,7 +68,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         return inmode |> setattr(:r => offset) |> setattr(:b => basis) 
     end
 
-    spatialinspace::RegionFock = RegionFock( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
+    spatialinspace::FockSpace{Region} = FockSpace{Region}( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
     return idmap(spatialinspace, fockmap |> getinspace)
 end
 
@@ -110,7 +110,7 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [96, 96])
+crystal = Crystal(unitcell, [48, 48])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -147,12 +147,6 @@ blockedcrystalfock = blockedcorrelations|>getoutspace
 blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
 blockedspace::RealSpace = blockedcrystal|>getspace
 
-localcenter1input = [1/3, 0] ∈ blockedspace 
-localcenter2input = [0, 1/3] ∈ blockedspace 
-localcenter3input = [1/3, 1] ∈ blockedspace 
-localcenter4input = [2/3, 2/3] ∈ blockedspace 
-localcenter5input = [1, 1/3] ∈ blockedspace 
-
 function firststepgmera(correlations::FockMap,localcenter1,localcenter2,localcenter3,localcenter4,localcenter5)
     crystal::Crystal = getcrystal(correlations|>getinspace)
     space::RealSpace = crystal|>getspace
@@ -167,8 +161,8 @@ function firststepgmera(correlations::FockMap,localcenter1,localcenter2,localcen
         frozenseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode[2] for mode in modebydist[3])] 
         emptyseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in emptyseedslist)] 
         filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in filledseedslist)] 
-
         courierseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode[2] for mode in modebydist[1])+FockSpace(mode[2] for mode in modebydist[2])]
+        
         wannierfrozens = _localwannierization(localiso[:filled]+localiso[:empty], frozenseeds)
         wannieremptys = _localwannierization(localiso[:empty], emptyseeds)
         wannierfilleds = _localwannierization(localiso[:filled], filledseeds)
@@ -324,12 +318,10 @@ function thirdstepgmera(correlations::FockMap,localcenter1,localcenter2,localcen
     emptycorrelations = wannieremptyisometry' * correlations * wannieremptyisometry
     emptycorrelationspectrum = emptycorrelations |> crystalspectrum
     purifiedcorrelationspectrum = emptycorrelationspectrum |> roundingpurification
-    purifiedemptycorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
     filledcorrelations = wannierfilledisometry' * correlations * wannierfilledisometry
     filledcorrelationspectrum = filledcorrelations |> crystalspectrum
     purifiedcorrelationspectrum = filledcorrelationspectrum |> roundingpurification
-    purifiedfilledcorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
     return Dict(
         :frozenisometry => wannierfrozenisometry,
@@ -341,27 +333,17 @@ function thirdstepgmera(correlations::FockMap,localcenter1,localcenter2,localcen
         :filledcorrelations => filledcorrelations,
         :couriercorrelations => couriercorrelations,
         :purifiedfrozencorrelations => purifiedfrozencorrelations,
-        :purifiedfilledcorrelations => purifiedfilledcorrelations,
-        :purifiedemptycorrelations => purifiedemptycorrelations,
-        :purifiedcouriercorrelations => purifiedcouriercorrelations)
+        :correlations => purifiedcouriercorrelations)
 end
 
+
+
+localcenter1input = [1/3, 0] ∈ blockedspace 
+localcenter2input = [0, 1/3] ∈ blockedspace 
+localcenter3input = [1/3, 1] ∈ blockedspace 
+localcenter4input = [2/3, 2/3] ∈ blockedspace 
+localcenter5input = [1, 1/3] ∈ blockedspace 
 firstgmera = firststepgmera(blockedcorrelations,localcenter1input,localcenter2input,localcenter3input,localcenter4input,localcenter5input)
-
-testregion = getsphericalregionwifcenter(center=localcenter3input,crystal=blockedcrystal, radius=1/3, metricspace=blockedspace|>orthospace)
-localseedingfock::RegionFock = quantize(testregion,1)
-
-refcorrelations = firstgmera[:purifiedcouriercorrelations]
-visualize(refcorrelations|>crystalspectrum)
-visualize((refcorrelations|>getinspace |> getcrystal).unitcell)
-trialcrystal::Crystal = refcorrelations|> getoutspace|>getcrystal
-trialspace::RealSpace = trialcrystal|>getspace
-
-origin = [1, 2/3] ∈ blockedspace 
-triallocalregion::Region = getsphericalregionwifcenter(center = origin,crystal=trialcrystal, radius=1/3, metricspace=trialspace|>orthospace) 
-visualize(triallocalregion)
-triallocalseedingfock::RegionFock = quantize(triallocalregion, 1)
-visualize(regioncorrelations(refcorrelations, triallocalseedingfock)|>eigspech)
 
 rg1couriercorrelations = firstgmera[:purifiedcouriercorrelations]
 rg2localcenter1input = [2/3, 0] ∈ blockedspace 
@@ -371,18 +353,6 @@ rg2localcenter4input = [1, 2/3] ∈ blockedspace
 rg2localcenter5input = [2/3, 1] ∈ blockedspace 
 secondgmera = firststepgmera(rg1couriercorrelations,rg2localcenter1input,rg2localcenter2input,rg2localcenter3input,rg2localcenter4input,rg2localcenter5input)
 
-refcorrelations = secondgmera[:purifiedcouriercorrelations]
-visualize(refcorrelations|>crystalspectrum)
-visualize((refcorrelations|>getinspace |> getcrystal).unitcell)
-trialcrystal::Crystal = refcorrelations|> getoutspace|>getcrystal
-trialspace::RealSpace = trialcrystal|>getspace
-
-origin = [2/3, 1/3] ∈ blockedspace 
-triallocalregion::Region = getsphericalregionwifcenter(center = origin,crystal=trialcrystal, radius=1/3, metricspace=trialspace|>orthospace) 
-visualize(triallocalregion)
-triallocalseedingfock::RegionFock = quantize(triallocalregion, 1)
-visualize(regioncorrelations(refcorrelations, triallocalseedingfock)|>eigspech)
-
 rg2couriercorrelations = secondgmera[:purifiedcouriercorrelations]
 rg3localcenter1input = [0, 0] ∈ blockedspace 
 rg3localcenter2input = [0, 1] ∈ blockedspace 
@@ -391,30 +361,6 @@ rg3localcenter4input = [1/3, 2/3] ∈ blockedspace
 rg3localcenter5input = [2/3, 1/3] ∈ blockedspace 
 rg3localcenter6input = [1, 1] ∈ blockedspace 
 thirdgmera = thirdstepgmera(rg2couriercorrelations,rg3localcenter1input,rg3localcenter2input,rg3localcenter3input,rg3localcenter4input,rg3localcenter5input,rg3localcenter6input)
-
-refcorrelations = thirdgmera[:purifiedcouriercorrelations]
-visualize(refcorrelations|>crystalspectrum)
-visualize((refcorrelations|>getinspace |> getcrystal).unitcell)
-trialcrystal::Crystal = refcorrelations|> getoutspace|>getcrystal
-trialspace::RealSpace = trialcrystal|>getspace
-
-origin = [2/3, 1/3] ∈ blockedspace 
-triallocalregion::Region = getsphericalregionwifcenter(center = origin,crystal=trialcrystal, radius=1/3, metricspace=trialspace|>orthospace) 
-visualize(triallocalregion)
-triallocalseedingfock::RegionFock = quantize(triallocalregion, 1)
-visualize(regioncorrelations(refcorrelations, triallocalseedingfock)|>eigspech)
-
-
-blockingmap = FockMap(blocker)
-blockedH = blockingmap*H*blockingmap'
-rg1courierisometry = FockMap(firstgmera[:courierisometry])
-rg2courierisometry = FockMap(secondgmera[:courierisometry])
-rg3courierisometry = FockMap(thirdgmera[:courierisometry])
-rg1H = rg1courierisometry'*blockedH*rg1courierisometry
-rg2H = rg2courierisometry'*rg1H*rg2courierisometry
-rg3H = rg3courierisometry'*rg2H*rg3courierisometry
-
-visualize(rg3H|>crystalspectrum)
 
 proceedcorrelations = thirdgmera[:purifiedcouriercorrelations]
 gmera1crystalfock = proceedcorrelations|>getoutspace
@@ -453,80 +399,170 @@ gmera1rg3localcenter5input = [2/3, 1/3] ∈ proceedblockedspace
 gmera1rg3localcenter6input = [1, 1] ∈ proceedblockedspace
 thirdgmeraprime = thirdstepgmera(gmerarg3couriercorrelations,gmera1rg3localcenter1input,gmera1rg3localcenter2input,gmera1rg3localcenter3input,gmera1rg3localcenter4input,gmera1rg3localcenter5input,gmera1rg3localcenter6input)
 
-
-finalcorrelations = thirdgmeraprime[:purifiedcouriercorrelations]
-gmera2crystalfock = finalcorrelations|>getoutspace
+proceedcorrelationsprime = thirdgmeraprime[:purifiedcouriercorrelations]
+gmera2crystalfock = proceedcorrelationsprime|>getoutspace
 scaleprimeprime = Scale([2 0; 0 2], gmera2crystalfock|>getcrystal|>getspace)
 
 @info("Performing blocking...")
 @info("Generating blocking transformation...")
 blockerprimeprime = @time scaleprimeprime * gmera2crystalfock
 @info("Performing blocking on correlations...")
-finalblockedcorrelations = @time blockerprimeprime * finalcorrelations * blockerprimeprime'
-finalblockedcrystalfock = finalblockedcorrelations|>getoutspace
-finalblockedcrystal::Crystal = finalblockedcrystalfock|>getcrystal
-finalblockedspace::RealSpace = finalblockedcrystal|>getspace
+proceedblockedcorrelationsprime = @time blockerprimeprime * proceedcorrelationsprime * blockerprimeprime'
+proceedblockedcrystalfockprime = proceedblockedcorrelationsprime|>getoutspace
+proceedblockedcrystalprime::Crystal = proceedblockedcrystalfockprime|>getcrystal
+proceedblockedspaceprime::RealSpace = proceedblockedcrystalprime|>getspace
 
-gmera2localcenter1input = [1/3, 0] ∈ finalblockedspace
-gmera2localcenter2input = [0, 1/3] ∈ finalblockedspace
-gmera2localcenter3input = [1/3, 1] ∈ finalblockedspace
-gmera2localcenter4input = [2/3, 2/3] ∈ finalblockedspace
-gmera2localcenter5input = [1, 1/3] ∈ finalblockedspace
-firstgmeraprimeprime = firststepgmera(finalblockedcorrelations,gmera2localcenter1input,gmera2localcenter2input,gmera2localcenter3input,gmera2localcenter4input,gmera2localcenter5input)
+visualize((proceedcorrelationsprime|>getinspace|>getcrystal).unitcell)
+visualize((proceedblockedcorrelationsprime|>getinspace|>getcrystal).unitcell)
 
-gmerarg2couriercorrelations = firstgmeraprimeprime[:purifiedcouriercorrelations]
-gmera2rg2localcenter1input = [2/3, 0] ∈ finalblockedspace
-gmera2rg2localcenter2input = [0, 2/3] ∈ finalblockedspace
-gmera2rg2localcenter3input = [1/3, 1/3] ∈ finalblockedspace
-gmera2rg2localcenter4input = [1, 2/3] ∈ finalblockedspace
-gmera2rg2localcenter5input = [2/3, 1] ∈ finalblockedspace
-secondgmeraprimeprime = firststepgmera(gmerarg2couriercorrelations,gmera2rg2localcenter1input,gmera2rg2localcenter2input,gmera2rg2localcenter3input,gmera2rg2localcenter4input,gmera2rg2localcenter5input)
+gmera2localcenter1input = [1/3, 0] ∈ proceedblockedspaceprime
+gmera2localcenter2input = [0, 1/3] ∈ proceedblockedspaceprime
+gmera2localcenter3input = [1/3, 1] ∈ proceedblockedspaceprime
+gmera2localcenter4input = [2/3, 2/3] ∈ proceedblockedspaceprime
+gmera2localcenter5input = [1, 1/3] ∈ proceedblockedspaceprime
+firstgmeraprimeprime = firststepgmera(proceedblockedcorrelationsprime,gmera2localcenter1input,gmera2localcenter2input,gmera2localcenter3input,gmera2localcenter4input,gmera2localcenter5input)
 
-gmerarg3couriercorrelations = secondgmeraprimeprime[:purifiedcouriercorrelations]
-gmera2rg3localcenter1input = [0, 0] ∈ finalblockedspace
-gmera2rg3localcenter2input = [0, 1] ∈ finalblockedspace
-gmera2rg3localcenter3input = [1, 0] ∈ finalblockedspace
-gmera2rg3localcenter4input = [1/3, 2/3] ∈ finalblockedspace
-gmera2rg3localcenter5input = [2/3, 1/3] ∈ finalblockedspace
-gmera2rg3localcenter6input = [1, 1] ∈ finalblockedspace
-thirdgmeraprimeprime = thirdstepgmera(gmerarg3couriercorrelations,gmera2rg3localcenter1input,gmera2rg3localcenter2input,gmera2rg3localcenter3input,gmera2rg3localcenter4input,gmera2rg3localcenter5input,gmera2rg3localcenter6input)
+proceedblockedcorrelationsprime
+gmerarg2couriercorrelationsprime = firstgmeraprimeprime[:purifiedcouriercorrelations]
+gmera2rg2localcenter1input = [2/3, 0] ∈ proceedblockedspaceprime
+gmera2rg2localcenter2input = [0, 2/3] ∈ proceedblockedspaceprime
+gmera2rg2localcenter3input = [1/3, 1/3] ∈ proceedblockedspaceprime
+gmera2rg2localcenter4input = [1, 2/3] ∈ proceedblockedspaceprime
+gmera2rg2localcenter5input = [2/3, 1] ∈ proceedblockedspaceprime
+secondgmeraprimeprime = firststepgmera(gmerarg2couriercorrelationsprime,gmera2rg2localcenter1input,gmera2rg2localcenter2input,gmera2rg2localcenter3input,gmera2rg2localcenter4input,gmera2rg2localcenter5input)
 
-rg1firstgmerafillediso = firstgmera[:filledisometry]
-rg1firstgmeracourieriso = firstgmera[:courierisometry]
-rg1secondgmerafillediso = secondgmera[:filledisometry]
-rg1secondgmeracourieriso = secondgmera[:courierisometry]
-rg1thirdgmerafillediso = thirdgmera[:filledisometry]
-rg1thirdgmeracourieriso = thirdgmera[:courierisometry]
+gmerarg3couriercorrelationsprime = secondgmeraprimeprime[:purifiedcouriercorrelations]
+gmera2rg3localcenter1input = [0, 0] ∈ proceedblockedspaceprime
+gmera2rg3localcenter2input = [0, 1] ∈ proceedblockedspaceprime
+gmera2rg3localcenter3input = [1, 0] ∈ proceedblockedspaceprime
+gmera2rg3localcenter4input = [1/3, 2/3] ∈ proceedblockedspaceprime
+gmera2rg3localcenter5input = [2/3, 1/3] ∈ proceedblockedspaceprime
+gmera2rg3localcenter6input = [1, 1] ∈ proceedblockedspaceprime
+thirdgmeraprimeprime = thirdstepgmera(gmerarg3couriercorrelationsprime,gmera2rg3localcenter1input,gmera2rg3localcenter2input,gmera2rg3localcenter3input,gmera2rg3localcenter4input,gmera2rg3localcenter5input,gmera2rg3localcenter6input)
 
-rg2firstgmerafillediso = firstgmeraprime[:filledisometry]
-rg2firstgmeracourieriso = firstgmeraprime[:courierisometry]
-rg2secondgmerafillediso = secondgmeraprime[:filledisometry]
-rg2secondgmeracourieriso = secondgmeraprime[:courierisometry]
-rg2thirdgmerafillediso = thirdgmeraprime[:filledisometry]
-rg2thirdgmeracourieriso = thirdgmeraprime[:courierisometry]
+proceedcorrelationsprimeprime = thirdgmeraprimeprime[:purifiedcouriercorrelations]
+gmera3crystalfock = proceedcorrelationsprimeprime|>getoutspace
+scaleprimeprimeprime = Scale([2 0; 0 2], gmera3crystalfock|>getcrystal|>getspace)
 
-rg3firstgmerafillediso = firstgmeraprimeprime[:filledisometry]
-rg3firstgmeracourieriso = firstgmeraprimeprime[:courierisometry]
-rg3secondgmerafillediso = secondgmeraprimeprime[:filledisometry]
-rg3secondgmeracourieriso = secondgmeraprimeprime[:courierisometry]
-rg3thirdgmerafillediso = thirdgmeraprimeprime[:filledisometry]
-rg3thirdgmeracourieriso = thirdgmeraprimeprime[:courierisometry]
+@info("Performing blocking...")
+@info("Generating blocking transformation...")
+blockerprimeprimeprime = @time scaleprimeprimeprime * gmera3crystalfock
+@info("Performing blocking on correlations...")
+proceedblockedcorrelationsprimeprime = @time blockerprimeprimeprime * proceedcorrelationsprimeprime * blockerprimeprimeprime'
+proceedblockedcrystalfockprimeprime = proceedblockedcorrelationsprimeprime|>getoutspace
+proceedblockedcrystalprimeprime::Crystal = proceedblockedcrystalfockprimeprime|>getcrystal
+proceedblockedspaceprimeprime::RealSpace = proceedblockedcrystalprimeprime|>getspace
 
-rg1firstgmeraphysicalfillediso = blocker'*rg1firstgmerafillediso
-rg1secondgmeraphysicalfillediso = blocker'*rg1firstgmeracourieriso*rg1secondgmerafillediso
-rg1thirdgmeraphysicalfillediso = blocker'*rg1firstgmeracourieriso*rg1secondgmeracourieriso*rg1thirdgmerafillediso
+gmera3localcenter1input = [1/3, 0] ∈ proceedblockedspaceprimeprime
+gmera3localcenter2input = [0, 1/3] ∈ proceedblockedspaceprimeprime
+gmera3localcenter3input = [1/3, 1] ∈ proceedblockedspaceprimeprime
+gmera3localcenter4input = [2/3, 2/3] ∈ proceedblockedspaceprimeprime
+gmera3localcenter5input = [1, 1/3] ∈ proceedblockedspaceprimeprime
+firstgmeraprimeprimeprime = firststepgmera(proceedblockedcorrelationsprimeprime,gmera3localcenter1input,gmera3localcenter2input,gmera3localcenter3input,gmera3localcenter4input,gmera3localcenter5input)
 
-rg1firstgmeraphysicalfilledcorr = rg1firstgmeraphysicalfillediso*rg1firstgmeraphysicalfillediso'
-rg1secondgmeraphysicalfilledcorr = rg1secondgmeraphysicalfillediso*rg1secondgmeraphysicalfillediso'
-rg1thirdgmeraphysicalfilledcorr = rg1thirdgmeraphysicalfillediso*rg1thirdgmeraphysicalfillediso'
+gmerarg2couriercorrelationsprimeprime = firstgmeraprimeprimeprime[:purifiedcouriercorrelations]
+gmera3rg2localcenter1input = [2/3, 0] ∈ proceedblockedspaceprimeprime
+gmera3rg2localcenter2input = [0, 2/3] ∈ proceedblockedspaceprimeprime
+gmera3rg2localcenter3input = [1/3, 1/3] ∈ proceedblockedspaceprimeprime
+gmera3rg2localcenter4input = [1, 2/3] ∈ proceedblockedspaceprimeprime
+gmera3rg2localcenter5input = [2/3, 1] ∈ proceedblockedspaceprimeprime
+secondgmeraprimeprimeprime = firststepgmera(gmerarg2couriercorrelationsprimeprime,gmera3rg2localcenter1input,gmera3rg2localcenter2input,gmera3rg2localcenter3input,gmera3rg2localcenter4input,gmera3rg2localcenter5input)
 
-rg2firstgmeraphysicalfillediso = blocker'*rg1firstgmeracourieriso*rg1secondgmeracourieriso*rg1thirdgmeracourieriso*rg2firstgmerafillediso
-rg2secondgmeraphysicalfillediso = blocker'*rg1firstgmeracourieriso*rg1secondgmeracourieriso*rg1thirdgmeracourieriso*rg2firstgmeracourieriso*rg2secondgmerafillediso
-rg2thirdgmeraphysicalfillediso = blocker'*rg1firstgmeracourieriso*rg1secondgmeracourieriso*rg1thirdgmeracourieriso*rg2firstgmeracourieriso*rg2secondgmeracourieriso*rg2thirdgmerafillediso
+gmerarg3couriercorrelationsprimeprime = secondgmeraprimeprimeprime[:purifiedcouriercorrelations]
+gmera3rg3localcenter1input = [0, 0] ∈ proceedblockedspaceprimeprime
+gmera3rg3localcenter2input = [0, 1] ∈ proceedblockedspaceprimeprime
+gmera3rg3localcenter3input = [1, 0] ∈ proceedblockedspaceprimeprime
+gmera3rg3localcenter4input = [1/3, 2/3] ∈ proceedblockedspaceprimeprime
+gmera3rg3localcenter5input = [2/3, 1/3] ∈ proceedblockedspaceprimeprime
+gmera3rg3localcenter6input = [1, 1] ∈ proceedblockedspaceprimeprime
+thirdgmeraprimeprimeprime = thirdstepgmera(gmerarg3couriercorrelationsprimeprime,gmera3rg3localcenter1input,gmera3rg3localcenter2input,gmera3rg3localcenter3input,gmera3rg3localcenter4input,gmera3rg3localcenter5input,gmera3rg3localcenter6input)
 
-ref = blocker'*rg1firstgmeracourieriso*rg1secondgmeracourieriso*rg1thirdgmeracourieriso*rg2firstgmeracourieriso*rg2secondgmeracourieriso*rg2thirdgmeracourieriso
-rg3firstgmeraphysicalfillediso = ref*rg3firstgmerafillediso
-rg3secondgmeraphysicalfillediso = ref*rg3firstgmeracourieriso*rg3secondgmerafillediso
-rg3thirdgmeraphysicalfillediso = ref*rg3firstgmeracourieriso*rg3secondgmeracourieriso*rg3thirdgmerafillediso
+thirdgmeraprimeprimeprime[:purifiedfrozencorrelations]
+visualize(thirdgmeraprimeprime[:filledcorrelations]|>crystalspectrum)
 
-visualize(((idmap(groundstateprojector|>getoutspace)-correlations)-rg1firstgmeraphysicalfilledcorr-rg1secondgmeraphysicalfilledcorr-rg1thirdgmeraphysicalfilledcorr)|>crystalspectrum)
+firstgmeraemptydiso = firstgmera[:emptyisometry]
+visualize(firstgmeraemptydiso*firstgmeraemptydiso'|>crystalspectrum)
+
+firstgmerafillediso = firstgmera[:filledisometry]
+visualize(firstgmerafillediso*firstgmerafillediso'|>crystalspectrum)
+
+firstgmerafrozendiso = firstgmera[:frozenisometry]
+visualize(firstgmerafrozendiso*firstgmerafrozendiso'|>crystalspectrum)
+
+test=firstgmerafrozendiso*firstgmerafrozendiso'-firstgmeraemptydiso*firstgmeraemptydiso'-firstgmerafillediso*firstgmerafillediso'
+visualize(test|>crystalspectrum)
+
+
+firstgmeracourierdiso = firstgmera[:frozenisometry]
+plotoutcrystal = firstgmeracourierdiso|>getoutspace|>getcrystal
+plotoutspace = plotoutcrystal|>getspace
+plottinglocalregion = getsphericalregionwifcenter(center=localcenter1input,crystal=plotoutcrystal, radius=1/3, metricspace=plotoutspace|>orthospace)
+plottinglocalregionfock = quantize(plottinglocalregion,1)
+outft = fourier(firstgmeracourierdiso|>getoutspace, plottinglocalregionfock) 
+
+plotincrystal = firstgmeracourierdiso|>getinspace|>getcrystal
+plottinglocalregioninfock = RegionFock(firstgmeracourierdiso|>getinspace|>unitcellfock)
+inft = fourier(firstgmeracourierdiso|>getinspace,plottinglocalregioninfock)
+plotcouriermodes = outft'*FockMap(firstgmeracourierdiso)*inft
+visualize(RegionState(plotcouriermodes[:,4]),markersizemultiplier = 20, markersizescaling = 0.2)
+
+secondgmeraemptyiso = secondgmera[:emptyisometry]
+secondgmeracourieriso = secondgmera[:courierisometry]
+thirdgmeraemptyiso = thirdgmera[:emptyisometry]
+thirdgmeracourieriso = thirdgmera[:courierisometry]
+
+firstgmeraemptydisoprime = firstgmeraprime[:emptyisometry]
+firstgmeracourierdisoprime = firstgmeraprime[:courierisometry]
+secondgmeraemptyisoprime = secondgmeraprime[:emptyisometry]
+secondgmeracourierisoprime = secondgmeraprime[:courierisometry]
+thirdgmeraemptyisoprime = thirdgmeraprime[:emptyisometry]
+thirdgmeracourierisoprime = thirdgmeraprime[:courierisometry]
+
+secondgmeraemptyisophys = firstgmeracourierdiso*secondgmeraemptyiso
+secondgmeracourierisophys = firstgmeracourierdiso*secondgmeracourieriso
+thirdgmeraemptyisophys = secondgmeracourierisophys*thirdgmeraemptyiso
+thirdgmeracourierisophys = secondgmeracourierisophys*thirdgmeracourieriso
+
+firstgmeraemptydisoprimephys = thirdgmeracourierisophys*blockerprime'
+
+
+firstgmeraemptydisoprimephys*firstgmeraemptydisoprimephys'|> crystalspectrum|>geteigenvalues
+
+trial=blockedcorrelations-firstgmeraemptydiso*firstgmeraemptydiso'-secondgmeraemptyisophys*secondgmeraemptyisophys'-thirdgmeraemptyisophys*thirdgmeraemptyisophys'
+visualize(trial|>crystalspectrum)
+
+
+
+# firstgmeraphysicalemptyiso = blocker'*firstgmeraemptydiso
+# visualize(firstgmeraphysicalemptyiso*firstgmeraphysicalemptyiso'|>crystalspectrum)
+
+# firstgmeraphysicalfrozeniso = blocker'*firstgmerafrozendiso
+# firstgmeraphysicalcourieriso = blocker'*firstgmeracourierdiso
+# secondgmeraphysicalemptyiso = firstgmeraphysicalcourieriso*secondgmeraemptyiso
+# secondgmeraphysicalcourieriso = firstgmeraphysicalcourieriso*secondgmeracourieriso
+# thirdgmeraphysicalemptyiso = secondgmeraphysicalcourieriso*thirdgmeraemptyiso
+# thirdgmeraphysicalcourieriso = secondgmeraphysicalcourieriso*thirdgmeracourieriso
+
+# firstgmeraphysicalemptyisoprime = thirdgmeraphysicalcourieriso*blockerprime'*firstgmeraemptydisoprime
+# firstgmeraphysicalcourierisoprime = thirdgmeraphysicalcourieriso*blockerprime'*firstgmeracourierdisoprime
+# secondgmeraphysicalemptyisoprime = firstgmeraphysicalcourierisoprime*secondgmeraemptyisoprime
+# secondgmeraphysicalcourierisoprime = firstgmeraphysicalcourierisoprime*secondgmeracourierisoprime
+# thirdgmeraphysicalemptyisoprime = secondgmeraphysicalcourierisoprime*thirdgmeraemptyisoprime
+# thirdgmeraphysicalcourierisoprime = secondgmeraphysicalcourierisoprime*thirdgmeracourierisoprime
+
+# reducedcorrelations = correlations-firstgmeraphysicalemptyiso*firstgmeraphysicalemptyiso'-secondgmeraphysicalemptyiso*secondgmeraphysicalemptyiso'-thirdgmeraphysicalemptyiso*thirdgmeraphysicalemptyiso'
+# reducedcorrelationsprime = reducedcorrelations-firstgmeraphysicalemptyisoprime*firstgmeraphysicalemptyisoprime'-secondgmeraphysicalemptyisoprime*secondgmeraphysicalemptyisoprime'-thirdgmeraphysicalemptyisoprime*thirdgmeraphysicalemptyisoprime'
+# visualize((reducedcorrelationsprime-thirdgmeraphysicalcourierisoprime*thirdgmeraprime[:purifiedcouriercorrelations]*thirdgmeraphysicalcourierisoprime')|>crystalspectrum)
+
+# correlations
+# firstgmeraemptydisoprime
+# thirdgmeraphysicalcourierisoprime*thirdgmeraprime[:purifiedcouriercorrelations]*thirdgmeraphysicalcourierisoprime'
+
+# refstate = firstgmeraphysicalemptyiso*firstgmeraphysicalemptyiso'+secondgmeraphysicalemptyiso*secondgmeraphysicalemptyiso'+thirdgmeraphysicalemptyiso*thirdgmeraphysicalemptyiso'+ firstgmeraphysicalemptyisoprime*firstgmeraphysicalemptyisoprime'+secondgmeraphysicalemptyisoprime*secondgmeraphysicalemptyisoprime'+thirdgmeraphysicalemptyisoprime*thirdgmeraphysicalemptyisoprime'+thirdgmeraphysicalcourierisoprime*thirdgmeraprime[:purifiedcouriercorrelations]*thirdgmeraphysicalcourierisoprime'
+# visualize(firstgmeraphysicalemptyiso*firstgmeraphysicalemptyiso'*correlations*firstgmeraphysicalemptyiso*firstgmeraphysicalemptyiso'|>crystalspectrum)
+# visualize(FockMap(firstgmeraphysicalemptyiso).rep)
+# visualize(FockMap(firstgmeraphysicalemptyiso*firstgmeraphysicalemptyiso'))
+
+
+# Matrix(FockMap(firstgmeraphysicalemptyiso).rep*FockMap(firstgmeraphysicalemptyiso).rep')
+# Matrix(FockMap(firstgmeraphysicalemptyiso*firstgmeraphysicalemptyiso').rep)

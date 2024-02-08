@@ -1726,6 +1726,7 @@ function Base.:*(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
         tasks=(()->sumgroup(group) for group in summationgroups),
         count=summationgroups|>length)|>parallel
 
+    watchprogress(desc="CrystalFockMap * CrystalFockMap")
     finalblocks::Dict = Dict()
     for blocks in blockslist, (kindices, block) in blocks
         if haskey(finalblocks, kindices)
@@ -1733,7 +1734,9 @@ function Base.:*(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
         else
             finalblocks[kindices] = block
         end
+        updateprogress()
     end
+    unwatchprogress()
 
     return CrystalFockMap(a.outcrystal, b.incrystal, finalblocks)
 end
@@ -1831,10 +1834,13 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
         tasks=(()->compute(partition) for partition in summingpartitions),
         count=summingpartitions|>length)|>parallel
     
+    watchprogress(desc="FockMap{RegionFock, CrystalFock} * CrystalFockMap")
     spdata::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
     for rep in reps
         spdata[:, :] += rep
+        updateprogress()
     end
+    unwatchprogress()
 
     return FockMap(outspace, inspace, spdata)
 end

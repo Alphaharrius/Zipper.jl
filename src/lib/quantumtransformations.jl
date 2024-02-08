@@ -1,4 +1,5 @@
 function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
+    watchprogress(desc="Scale * CrystalFock")
     crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
     unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
@@ -8,7 +9,12 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
     unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
     unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
     volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
-    crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
+    crystalfocksubspaces::Dict{Momentum, FockSpace} = Dict()
+    for (k, subspace) in crystalfock|>crystalsubspaces
+        crystalfocksubspaces[k] = subspace
+        updateprogress()
+    end
+    unwatchprogress()
 
     restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
 

@@ -184,14 +184,22 @@ end
 function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol, CrystalSpectrum}
     groupingfunction::Function = bandpredicates |> generategroupingfunction
     labeled::Base.Generator = ((mode |> getattr(:k), v |> groupingfunction) => mode for (mode, v) in spectrum |> geteigenvalues)
-    momentumgroups::Dict{Tuple, Vector{Mode}} = foldl(labeled; init=Dict{Tuple, Vector{Mode}}()) do d,(k, v)
-        mergewith!(append!, d, LittleDict(k => [v]))
+    momentumgroups::Dict{Tuple, Vector{Mode}} = Dict()
+    
+    watchprogress(desc="distillation: labelling")
+    for (key, mode) in labeled
+        !haskey(momentumgroups, key) && (momentumgroups[key] = [])
+        push!(momentumgroups[key], mode)
+        updateprogress()
     end
+    unwatchprogress()
 
     bands::Dict{Symbol, Dict{Momentum, FockMap}} = Dict()
+    watchprogress(desc="distillation: band grouping")
     for ((k, band), modes) in momentumgroups
         !haskey(bands, band) && (bands[band] = Dict())
         bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> FockSpace)
+        updateprogress()
     end
 
     function repacktospectrum(isometries::Dict{Momentum, FockMap})::CrystalSpectrum
@@ -200,7 +208,14 @@ function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol
         return CrystalSpectrum(spectrum.crystal, eigenmodes, eigenvalues, isometries)
     end
 
-    return Dict(band => isometries |> repacktospectrum for (band, isometries) in bands)
+    watchprogress(desc="distillation: finalizing")
+    result = Dict()
+    for (band, isometries) in bands
+        result[band] = isometries|>repacktospectrum
+        updateprogress()
+    end
+    unwatchprogress()
+    return result
 end
 export distillation
 

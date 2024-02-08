@@ -77,6 +77,9 @@ function parallel(tasks::ParallelTasks)
 end
 
 function watchprogress(; desc::String)
+    if !parallelsettings.showmeter
+        return
+    end
     progress = ProgressUnknown(desc=desc, spinner=true)
     parallelsettings.threadmeters[Threads.threadid()] = progress
     return
@@ -84,6 +87,9 @@ end
 export watchprogress
 
 function updateprogress()
+    if !parallelsettings.showmeter
+        return
+    end
     try
         tid = Threads.threadid() # Always give 1 -> N
         progress = parallelsettings.threadmeters[tid]
@@ -100,6 +106,9 @@ end
 export updateprogress
 
 function unwatchprogress()
+    if !parallelsettings.showmeter
+        return
+    end
     try
         tid = Threads.threadid() # Always give 1 -> N
         progress = parallelsettings.threadmeters[tid]

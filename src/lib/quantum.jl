@@ -1662,20 +1662,27 @@ end
 function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, CrystalFock}
     outspace::CrystalFock = fockmap|>getoutspace
     inspace::CrystalFock = fockmap|>getinspace
-    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace|>dimension, inspace|>dimension)
 
-    watchprogress(desc="FockMap(::CrystalFockMap)")
-    for (_, block) in fockmap.blocks
-        blockoutspace::FockSpace = block|>getoutspace
-        outorder::UnitRange = outspace[blockoutspace|>first]:outspace[blockoutspace|>last]
-        blockinspace::FockSpace = block|>getinspace
-        inorder::UnitRange = inspace[blockinspace|>first]:inspace[blockinspace|>last]
-        data[outorder, inorder] += block|>rep
-        updateprogress()
+    function compute(batch)
+        data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace|>dimension, inspace|>dimension)
+        for (_, block) in batch
+            blockoutspace::FockSpace = block|>getoutspace
+            outorder::UnitRange = outspace[blockoutspace|>first]:outspace[blockoutspace|>last]
+            blockinspace::FockSpace = block|>getinspace
+            inorder::UnitRange = inspace[blockinspace|>first]:inspace[blockinspace|>last]
+            data[outorder, inorder] += block|>rep
+        end
+        return data
     end
-    unwatchprogress()
 
-    return FockMap(outspace, inspace, data)
+    batchsize::Integer = (length(fockmap.blocks) / getmaxthreads())|>ceil
+    batches = Iterators.partition(fockmap.blocks, batchsize)
+    spdata = paralleltasks(
+        name="FockMap(::CrystalFockMap)",
+        tasks=(()->compute(batch) for batch in batches),
+        count=length(batches))|>parallel|>sum
+
+    return FockMap(outspace, inspace, spdata)
 end
 
 function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap

@@ -1,6 +1,7 @@
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
 using Zipper
 
+fiodir("/Users/alphaharrius/ZERData")
 setmaxthreads(Threads.nthreads())
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -14,7 +15,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [96, 96])
+crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -240,7 +241,22 @@ pdata4 = data4[2:end]
 pdata5 = data5[2:end]
 pdata6 = data6[2:end]
 
-marker = attr(symbol="circle-open", size=12, line_width=2, color="MediumPurple")
+rg2H = fioload("rg2H")
+rg2H|>crystalspectrum|>visualize
+
+pdata0 = fioload("pdata0")
+pdata1 = fioload("pdata1")
+pdata2 = fioload("pdata2")
+pdata3 = fioload("pdata3")
+pdata4 = fioload("pdata4")
+pdata5 = fioload("pdata5")
+
+marker0 = attr(symbol="circle-open", size=12, line_width=2, color="Red")
+marker1 = attr(symbol="circle-open", size=12, line_width=2, color="OrangeRed")
+marker2 = attr(symbol="circle-open", size=12, line_width=2, color="Gold")
+marker3 = attr(symbol="circle-open", size=12, line_width=2, color="LimeGreen")
+marker4 = attr(symbol="circle-open", size=12, line_width=2, color="DeepSkyBlue")
+marker5 = attr(symbol="circle-open", size=12, line_width=2, color="Blue")
 
 plot([
     scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata0], mode="markers", opacity=0.1, marker=marker, name="Physical"),
@@ -251,12 +267,12 @@ plot([
     scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata5], mode="markers", opacity=0.8, marker=marker, name="RG5")])
 
 plot([
-    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata0], mode="markers", opacity=0.3, marker=marker, name="Physical"),
-    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata1], mode="markers", opacity=0.35, marker=marker, name="RG1"),
-    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata2], mode="markers", opacity=0.45, marker=marker, name="RG2"),
-    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata3], mode="markers", opacity=0.6, marker=marker, name="RG3"),
-    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata4], mode="markers", opacity=0.75, marker=marker, name="RG4"),
-    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata5], mode="markers", opacity=0.9, marker=marker, name="RG5")],
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata0], mode="markers", marker=marker5, name="Physical"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata1], mode="markers", marker=marker4, name="RG1"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata2], mode="markers", marker=marker3, name="RG2"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata3], mode="markers", marker=marker2, name="RG3"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata4], mode="markers", marker=marker1, name="RG4"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata5], mode="markers", marker=marker0, name="RG5")],
     Layout(yaxis_range=[-10, 1]))
 
 plot(scatter(y=[d[2] for d in data1]))

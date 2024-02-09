@@ -45,6 +45,8 @@ return getbarecrystal
 
 Base.:size(crystal::Crystal) = crystal.sizes
 
+Base.:(==)(a::Crystal, b::Crystal)::Bool = a.sizes == b.sizes && a.unitcell == b.unitcell
+
 """
     pbc(crystal::Crystal, point::Point)::Point
 

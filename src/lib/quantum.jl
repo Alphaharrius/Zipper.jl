@@ -1004,11 +1004,12 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
         return matrix
     end
 
-    batches = Iterators.partition((el for el in crystalfock|>getcrystal|>brillouinzone|>enumerate), getmaxthreads())
+    batchsize::Integer = ((crystalfock|>getcrystal|>vol) / getmaxthreads())|>ceil
+    batches = Iterators.partition((el for el in crystalfock|>getcrystal|>brillouinzone|>enumerate), batchsize)
     matrixparts = paralleltasks(
         name="fourier",
         tasks=(()->computekmatrix(batch) for batch in batches),
-        count=crystalfock|>getcrystal|>vol)|>parallel
+        count=getmaxthreads())|>parallel
 
     momentummatrix::SparseMatrixCSC = spzeros(crystalfock|>getcrystal|>dimension, crystalfock|>getcrystal|>vol)
     watchprogress(desc="fourier")

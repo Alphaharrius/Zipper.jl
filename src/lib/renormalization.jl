@@ -96,7 +96,6 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
 
     crystal::Crystal = getcrystal(crystalfock)
     transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
-    momentumfouriers::Base.Generator = (k=>transform[subspace, :] for (k, subspace) in transform|>getoutspace|>crystalsubspaces)
 
     function preprocesslocalisometry(k::Momentum)::FockMap
         if !addinspacemomentuminfo
@@ -108,7 +107,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
 
     isometries = paralleltasks(
         name="crystalisometries",
-        tasks=(()->(k=>kfourier*preprocesslocalisometry(k)) for (k, kfourier) in momentumfouriers),
+        tasks=(()->(k=>transform[getsubspace(crystalfock, k), :]*preprocesslocalisometry(k)) for k in crystal|>brillouinzone),
         count=crystal|>vol)|>parallel
 
     return isometries

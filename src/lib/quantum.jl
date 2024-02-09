@@ -366,6 +366,14 @@ function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
 end
 export getcrystalfock
 
+"""
+    getsubspace(crystalfock::CrystalFock, k::Momentum)::MomentumFock
+
+Retrieve the momentum subspace of the `CrystalFock` at the given `k` momentum.
+"""
+getsubspace(crystalfock::CrystalFock, k::Momentum)::MomentumFock = FockSpace(crystalfock.homefock|>setattr(:k=>k), reflected=k)
+export getsubspace
+
 """ Get the reflected region of the regional `FockSpace`. """
 Zipper.:getregion(regionfock::RegionFock)::Region = regionfock |> getreflected
 

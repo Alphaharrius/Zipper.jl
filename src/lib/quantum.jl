@@ -1842,7 +1842,7 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
 
     blocks::Dict = paralleltasks(
         name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
-        tasks=(()->((Γ, k)=>fouriertransform[:, fock]) for (k, fock) in fouriertransform|>getinspace|>crystalsubspaces),
+        tasks=(()->((Γ, k)=>fouriertransform[:, getsubspace(fouriertransform|>getinspace, k)]) for k in crystal|>brillouinzone),
         count=crystal|>vol)|>parallel|>Dict
     crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, crystal, blocks)
 
@@ -1882,7 +1882,7 @@ end
 function idmap(fockspace::CrystalFock)
     blocks::Dict = paralleltasks(
         name="idmap",
-        tasks=(()->((k, k)=>idmap(subspace)) for (k, subspace) in fockspace|>crystalsubspaces),
+        tasks=(()->((k, k)=>idmap(getsubspace(fockspace, k))) for k in fockspace|>getcrystal|>brillouinzone),
         count=fockspace|>getcrystal|>vol)|>parallel|>Dict
     return CrystalFockMap(fockspace|>getcrystal, fockspace|>getcrystal, blocks)
 end

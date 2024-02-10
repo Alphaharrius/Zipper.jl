@@ -1754,11 +1754,10 @@ function Base.:*(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
     end
 
     batchsize::Integer = (length(a.blocks) / getmaxthreads())|>ceil
-    summationgroups = Iterators.partition(rawblocks, batchsize)|>collect
     blockslist = paralleltasks(
         name="CrystalFockMap * CrystalFockMap",
-        tasks=(()->sumgroup(group) for group in summationgroups),
-        count=summationgroups|>length)|>parallel
+        tasks=(()->sumgroup(group) for group in Iterators.partition(rawblocks, batchsize)),
+        count=getmaxthreads())|>parallel
 
     watchprogress(desc="CrystalFockMap * CrystalFockMap")
     finalblocks::Dict = Dict()

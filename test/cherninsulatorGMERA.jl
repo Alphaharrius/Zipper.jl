@@ -107,7 +107,7 @@ end
 function localregioninspection(center::Offset, physicalmodes::Subset{Mode}, radius::Number, crystal:: Crystal)::Tuple{Subset{Offset},FockSpace}
     seedingmodes::Subset{Mode} = circularregionmodes(center, physicalmodes, radius, crystal)
     seedingregion::Subset{Offset} = Subset(m |> getpos for m in seedingmodes)
-    seedingfock::FockSpace = FockSpace{Region}(seedingmodes)
+    seedingfock::FockSpace = RegionFock(seedingmodes)
     return seedingregion,seedingfock
 end
 
@@ -135,7 +135,7 @@ function _spatialmap(fockmap::FockMap)::FockMap
         return inmode |> setattr(:r => offset) |> setattr(:b => basis) |> setattr(:ind => ind)
     end
 
-    spatialinspace::FockSpace{Region} = FockSpace{Region}( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
+    spatialinspace::RegionFock = RegionFock( _spatialinmode(fockmap[:, m],i) for (i,m) in fockmap |> getinspace |> enumerate)
     return idmap(spatialinspace, fockmap |> getinspace)
 end
 

@@ -32,10 +32,10 @@ end
 function Zipper.visualize(state::RegionState{2}; title::String = "", markersizemultiplier::Real = 120, markersizescaling::Real = 1, titleattr::Symbol = :orbital)
     function generatestateplot(spstate::FockMap)
         spmode::Mode = spstate |> getinspace |> first
-        columnspectrum::Base.Generator = (m => spstate[m, spmode] for m in spstate |> getoutspace |> orderedmodes)
+        columnspectrum::Base.Generator = (m => (spstate[m, spmode]|>rep)[1, 1] for m in spstate |> getoutspace |> orderedmodes)
         positions::Vector{Offset} = [v.first |> getpos for v in columnspectrum]
         mesh::Matrix{Float64} = hcat(map(p -> p |> euclidean |> vec, positions)...)
-        markersizes::Vector{Float64} = [v.second |> abs for v in columnspectrum]
+        markersizes::Vector{Float64} = [v.second|>abs for v in columnspectrum]
         normalizedmarkersizes::Vector{Float64} = (markersizes / norm(markersizes)).^markersizescaling * markersizemultiplier
         markercolors::Vector = [convert(RGB{Float64}, HSV(angle(v.second) / 2π * 360, 1, 1)) for v in columnspectrum]
         return scatter(

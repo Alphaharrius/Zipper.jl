@@ -304,7 +304,7 @@ Flatten a higher order subset to order `1`, and preserves the element orderings 
 """
 function Iterators.flatten(subset::Subset{T})::Subset where {T}
     if T <: Subset
-        return union((flatten(element) for element in rep(subset))...)
+        return union((Iterators.flatten(element) for element in rep(subset))...)
     end
     return subset
 end

@@ -3,6 +3,9 @@ module Zipper
 using OrderedCollections, Base.Iterators, SparseArrays
 using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
+using ProgressMeter
+include("lib/parallel.jl")
+
 include("core.jl")
 
 include("interfaces/core.jl")
@@ -22,5 +25,9 @@ include("lib/gmerarenormalization.jl")
 
 using Plotly, ColorTypes, Compat
 include("lib/plotting.jl")
+
+using JSON, DataFrames, CSV, Dates
+include("lib/fio.jl")
+include("lib/fioinjection.jl")
 
 end

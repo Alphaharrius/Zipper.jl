@@ -40,8 +40,15 @@ function computeenergyspectrum(bonds::FockMap; crystal::Crystal)::CrystalSpectru
     bondmodes::Subset{Mode} = bonds|>getoutspace|>orderedmodes
     basismodes::Subset{Mode} = bonds|>getoutspace|>RegionFock|>unitcellfock|>orderedmodes
     transform::FockMap = fourier(getcrystalfock(basismodes, crystal), bondmodes|>RegionFock)
-    fouriers::Base.Generator = (k => transform[subspace, :] for (k, subspace) in transform|>getoutspace|>crystalsubspaces)
-    momentumhamiltonians::Base.Generator = (k => fourier * bonds * fourier' for (k, fourier) in fouriers)
+    function compute(k)
+        subspace = getsubspace(transform|>getoutspace, k)
+        ktransform = transform[subspace, :]
+        return k=>(ktransform*bonds*ktransform')
+    end
+    momentumhamiltonians = paralleltasks(
+        name="computeenergyspectrum",
+        tasks=(()->compute(k) for k in crystal|>brillouinzone),
+        count=crystal|>vol)|>parallel
     return crystalspectrum(momentumhamiltonians, crystal=crystal)
 end
 export computeenergyspectrum

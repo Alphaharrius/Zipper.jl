@@ -1,9 +1,8 @@
-using Distributed
-procs = addprocs(5)
-@info("Using $(nworkers()) threads...")
+using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+using Zipper
 
-@everywhere using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-@everywhere using Zipper
+fiodir("/Users/alphaharrius/ZERData")
+setmaxthreads(Threads.nthreads())
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
@@ -16,7 +15,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [48, 48])
+crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -46,12 +45,12 @@ energyspectrum|>visualize
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstates|>visualize
 
-groundstateprojector = groundstates |> crystalprojector
+groundstateprojector = groundstates|>crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 
-Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
+H = CrystalFockMap(energyspectrum)
 
-@everywhere function zer(correlations)
+function zer(correlations)
     @info("Starting RG...")
     crystalfock = correlations|>getoutspace
 
@@ -95,12 +94,13 @@ Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
             regionfock=courierseedingfock,
             symmetry=c3,
             spectrumextractpredicate=v -> v < 5e-2,
-            statecrystalfock=blockedcrystalfock)[1]
+            statecrystalfock=blockedcrystalfock,
+            linearindependencethreshold=0.0002)[1]
         fullcourierseed = localcourierseed + (c6 * localcourierseed.outspace) * localcourierseed * (c6 * localcourierseed.inspace)'
 
         crystalcourierseeds = crystalisometries(localisometry=fullcourierseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
         wanniercourierisometry = wannierprojection(
-            crystalisometries=distillresult[:courier].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds)
+            crystalisometries=distillresult[:courier].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds|>Dict)
 
         couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
         couriercorrelationspectrum = couriercorrelations |> crystalspectrum
@@ -122,11 +122,12 @@ Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
             symmetry=c6,
             spectrumextractpredicate=v -> v < 1e-2,
             degeneracythreshold=1e-3,
-            statecrystalfock=blockedcrystalfock)[3]
+            statecrystalfock=blockedcrystalfock,
+            linearindependencethreshold=0.0002)[3]
 
         crystalfilledseeds = crystalisometries(localisometry=filledseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
         wannierfilledisometry = wannierprojection(
-            crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds)
+            crystalisometries=distillresult[:filled].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalfilledseeds|>Dict)
 
         filledcorrelations = wannierfilledisometry' * blockedcorrelations * wannierfilledisometry
         return filledcorrelations, wannierfilledisometry
@@ -142,28 +143,25 @@ Base.:show(io::IO, ::CrystalFockMap) = print(io, string("CrystalFockMap"))
             symmetry=c6,
             spectrumextractpredicate=v -> v < 1e-2,
             degeneracythreshold=1e-3,
-            statecrystalfock=blockedcrystalfock)[3]
+            statecrystalfock=blockedcrystalfock,
+            linearindependencethreshold=0.0002)[3]
 
         crystalemptyseeds = crystalisometries(localisometry=emptyseed, crystalfock=blockedcrystalfock, addinspacemomentuminfo=true)
 
         wannieremptyisometry = wannierprojection(
-            crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds)
+            crystalisometries=distillresult[:empty].eigenvectors, crystal=blockedcrystal, crystalseeds=crystalemptyseeds|>Dict)
 
         emptycorrelations = wannieremptyisometry' * blockedcorrelations * wannieremptyisometry
 
         return emptycorrelations, wannieremptyisometry
     end
 
-    courierrenormalization = @spawnat :any renormalizecourier()
-    filledrenormalization = @spawnat :any renormalizefilled()
-    emptyrenormalization = @spawnat :any renormalizeempty()
-
     @info ("Renormalizing courier...")
-    couriercorrelations, wanniercourierisometry, nonpurifiedcorrelationspectrum = @time fetch(courierrenormalization)
+    couriercorrelations, wanniercourierisometry, nonpurifiedcorrelationspectrum = @time renormalizecourier()
     @info ("Renormalizing filled...")
-    filledcorrelations, wannierfilledisometry = @time fetch(filledrenormalization)
+    filledcorrelations, wannierfilledisometry = @time renormalizefilled()
     @info ("Renormalizing empty...")
-    emptycorrelations, wannieremptyisometry = @time fetch(emptyrenormalization)
+    emptycorrelations, wannieremptyisometry = @time renormalizeempty()
 
     return Dict(
         :blocker => blocker,
@@ -180,16 +178,116 @@ end
 
 rg1 = @time zer(correlations)
 
-rg2 = zer(rg1[:correlations])
+rg2 = @time zer(rg1[:correlations])
 
-rg3 = zer(rg2[:correlations])
+rg3 = @time zer(rg2[:correlations])
 
-rg4 = zer(rg3[:correlations])
+rg4 = @time zer(rg3[:correlations])
 
-rg5 = zer(rg4[:correlations])
+rg5 = @time zer(rg4[:correlations])
 
-# Remove all the distributed workers.
-rmprocs(procs...)
+rg6 = @time zer(rg5[:correlations])
+
+rg7 = zer(rg6[:correlations])
+
+c6g = c6 * getoutspace(rg4[:globaldistiller])
+rg4[:globaldistiller] + c6g'rg4[:globaldistiller]*c6g|>crystalspectrum|>visualize
+
+H = CrystalFockMap(energyspectrum)
+
+function getphysspreaddata(H)
+    restrictregion = getsphericalregion(crystal=crystal, radius=6, metricspace=euclidean(RealSpace, 2))
+    refpos = [2/3, 1/3] ∈ getspace(crystal)
+    centerregion = Subset(r for r in restrictregion if ((refpos-r)|>euclidean|>norm) <= 3.5)
+    restrictfock = quantize(centerregion, 1)
+    Ft = fourier(H|>getoutspace, restrictfock) / (H|>getoutspace|>getcrystal|>vol|>sqrt)
+    rgHrs = Ft' * H * Ft
+    visualmode = quantize(refpos|>Subset, 1)|>first
+    visualH = rgHrs[:, visualmode]
+    data = [((getpos(visualmode)-getpos(m)|>euclidean|>norm), (visualH[m, :]|>rep)[1, 1]|>abs) for m in visualH|>getoutspace]
+    return sort(data, by=first)
+end
+
+function getspreaddata(rgdata, H)
+    courierzipper = rgdata[:blocker]' * rgdata[:courierisometry]
+    rgH = courierzipper' * H * courierzipper
+    rgcrystal = rgH|>getoutspace|>getcrystal
+    ospace = H|>getoutspace|>getcrystal|>getspace|>orthospace
+    restrictregion = getsphericalregion(crystal=rgcrystal, radius=12, metricspace=ospace)
+    refpos = [2/3, 1/3] ∈ getspace(rgcrystal)
+    centerregion = Subset(r for r in restrictregion if (ospace*(refpos-r)|>norm) < 7)
+    restrictfock = quantize(centerregion, 1)
+    Ft = fourier(rgH|>getoutspace, restrictfock) / (rgH|>getoutspace|>getcrystal|>vol|>sqrt)
+    rgHrs = Ft' * rgH * Ft
+    visualmode = quantize(refpos|>Subset, 1)|>first
+    rgvisualH = rgHrs[:, visualmode]
+    data = [((getpos(visualmode)-getpos(m)|>euclidean|>norm), (rgvisualH[m, :]|>rep)[1, 1]|>abs) for m in rgvisualH|>getoutspace]
+    return sort(data, by=first), rgH
+end
+
+data0 = getphysspreaddata(H)
+data1, rg1H = getspreaddata(rg1, H)
+data2, rg2H = getspreaddata(rg2, rg1H)
+data3, rg3H = getspreaddata(rg3, rg2H)
+data4, rg4H = getspreaddata(rg4, rg3H)
+data5, rg5H = getspreaddata(rg5, rg4H)
+data6, rg6H = getspreaddata(rg6, rg5H)
+
+pdata0 = data0[2:end]
+pdata1 = data1[2:end]
+pdata2 = data2[2:end]
+pdata3 = data3[2:end]
+pdata4 = data4[2:end]
+pdata5 = data5[2:end]
+pdata6 = data6[2:end]
+
+rg2H = fioload("rg2H")
+rg2H|>crystalspectrum|>visualize
+
+pdata0 = fioload("pdata0")
+pdata1 = fioload("pdata1")
+pdata2 = fioload("pdata2")
+pdata3 = fioload("pdata3")
+pdata4 = fioload("pdata4")
+pdata5 = fioload("pdata5")
+
+marker0 = attr(symbol="circle-open", size=12, line_width=2, color="Red")
+marker1 = attr(symbol="circle-open", size=12, line_width=2, color="OrangeRed")
+marker2 = attr(symbol="circle-open", size=12, line_width=2, color="Gold")
+marker3 = attr(symbol="circle-open", size=12, line_width=2, color="LimeGreen")
+marker4 = attr(symbol="circle-open", size=12, line_width=2, color="DeepSkyBlue")
+marker5 = attr(symbol="circle-open", size=12, line_width=2, color="Blue")
+
+plot([
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata0], mode="markers", opacity=0.1, marker=marker, name="Physical"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata1], mode="markers", opacity=0.2, marker=marker, name="RG1"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata2], mode="markers", opacity=0.3, marker=marker, name="RG2"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata3], mode="markers", opacity=0.4, marker=marker, name="RG3"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata4], mode="markers", opacity=0.6, marker=marker, name="RG4"),
+    scatter(x=[d[1] for d in pdata0], y=[d[2] for d in pdata5], mode="markers", opacity=0.8, marker=marker, name="RG5")])
+
+plot([
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata0], mode="markers", marker=marker5, name="Physical"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata1], mode="markers", marker=marker4, name="RG1"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata2], mode="markers", marker=marker3, name="RG2"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata3], mode="markers", marker=marker2, name="RG3"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata4], mode="markers", marker=marker1, name="RG4"),
+    scatter(x=[d[1]|>log for d in pdata0], y=[d[2]|>log for d in pdata5], mode="markers", marker=marker0, name="RG5")],
+    Layout(yaxis_range=[-10, 1]))
+
+plot(scatter(y=[d[2] for d in data1]))
+
+visualize(rg3Hrs[:, 135]|>RegionState, markersizemultiplier=20, markersizescaling=0.1)
+
+lineregionfock = RegionFock(m for m in restrictfock if Integer((m|>getattr(:r)|>vec)[2]|>round) == 1)
+lineregionfock|>getregion|>visualize
+
+rg1Hline = rg1Hrs[lineregionfock, lineregionfock]
+anchormode = sort([m=>m|>getpos|>norm for m in lineregionfock], by=last)|>last|>first
+datasource = rg1Hline[:, anchormode]
+[(getpos(anchormode)-getpos(m)|>euclidean|>norm, (datasource[m, :]|>rep)[1, 1]|>real) for m in datasource|>getoutspace]
+rg1Hline|>visualize
+rg1Hline[anchormode, anchormode]|>rep
 
 entanglemententropy(rg1[:filledcorrelations]|>crystalspectrum) / (rg1[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
 entanglemententropy(rg2[:filledcorrelations]|>crystalspectrum) / (rg2[:filledcorrelations]|>getoutspace|>getcrystal|>vol)
@@ -234,7 +332,7 @@ end
 
 
 # frozenseedingmodes::Subset{Mode} = circularregionmodes(triangular |> getorigin, physicalmodes, 8)
-# frozenseedingfock::FockSpace = FockSpace{Region}(frozenseedingmodes)
+# frozenseedingfock::FockSpace = RegionFock(frozenseedingmodes)
 
 
 # regionalrestriction(rg1[:filledisometry], frozenseedingfock) |> visualize

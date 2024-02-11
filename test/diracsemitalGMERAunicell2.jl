@@ -1,10 +1,3 @@
-# using Distributed
-# procs = addprocs(5)
-# @info("Using $(nworkers()) threads...")
-
-# @everywhere using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics, DataFrames
-# @everywhere using Zipper
-
 using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics, DataFrames
 using Zipper
 
@@ -136,12 +129,38 @@ groundstateprojector = groundstates |> crystalprojector
 C = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 
 correlations = C
+crystalfock = correlations|>getoutspace
 
+localcenter = [1/2,0] ∈ blockedspace
+scale = Scale([4 0; 0 4], crystalfock|>getcrystal|>getspace)
+@info("Performing blocking...")
+@info("Generating blocking transformation...")
+blocker = @time scale * crystalfock
+@info("Performing blocking on correlations...")
+blockedcorrelations = @time blocker * correlations * blocker'
+blockedcrystalfock = blockedcorrelations|>getoutspace
+blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
+blockedspace::RealSpace = blockedcrystal|>getspace
+
+shift = [1/2,1/2] ∈ blockedspace
+localregion::Region =  Subset(pt+localcenter for pt in (blockedcrystal|>getunitcell))
+localseedingfock::RegionFock = quantize(localregion,1)
+modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = localcenter+shift) 
+(emptyseedslist,filledseedslist) = constructfilledandemptyseed(modebydist[6],c6|>recenter(localcenter+shift))
+localiso = localisometries(blockedcorrelations, localseedingfock, selectionstrategy=modeselectionbycount(1))
+visualize(regioncorrelations(blockedcorrelations, localseedingfock)|>eigspec)
+emptyseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(emptyseedslist[1])] 
+filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(filledseedslist[1])] 
+courierseeds = idmap(localseedingfock, localseedingfock)[:,sum([FockSpace(mode[2] for mode in modebydist[i]) for i in range(1,5)])]
+
+wannieremptys = _localwannierization(localiso[:empty], emptyseeds)
+wannierfilleds = _localwannierization(localiso[:filled], filledseeds)
+wanniercouriers = _localwannierization(localiso[:courier], courierseeds)
 
 function gmera(correlations::FockMap, step::Int)
     crystalfock = correlations|>getoutspace
     if step == 1
-        scale = Scale([6 0; 0 6], crystalfock|>getcrystal|>getspace)
+        scale = Scale([4 0; 0 4], crystalfock|>getcrystal|>getspace)
         
     else
         scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
@@ -155,20 +174,20 @@ function gmera(correlations::FockMap, step::Int)
     blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
     blockedspace::RealSpace = blockedcrystal|>getspace
 
-    function gmera1stor2ndstep(correlations::FockMap,localcenter1,localcenter2,localcenter3,localcenter4,localcenter5)
+    function gmera1ststep(correlations::FockMap,localcenter1,localcenter2)
         crystal::Crystal = getcrystal(correlations|>getinspace)
-        space::RealSpace = crystal|>getspace
-    
-        function fulllocalwannierization(correlations::FockMap,localcenter::Offset,radius::Real=1/3,selectionstragedy::Function=modeselectionbycount(3))
-            localregion::Region = getsphericalregionwifcenter(center=localcenter,crystal=crystal, radius=radius, metricspace=space|>orthospace)
+
+        function fulllocalwannierization(correlations::FockMap,localcenter::Offset,selectionstragedy::Function=modeselectionbycount(3))
+            shift = [1/2,1/2] ∈ blockedspace
+            localregion::Region =  Subset(pt+localcenter for pt in (crystal|>getunitcell))
             localseedingfock::RegionFock = quantize(localregion,1)
-            modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = localcenter) 
-            (emptyseedslist,filledseedslist) = constructfilledandemptyseed(modebydist[3],c6|>recenter(localcenter))
+            modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = localcenter+shift) 
+            (emptyseedslist,filledseedslist) = constructfilledandemptyseed(modebydist[6],c6|>recenter(localcenter+shift))
             localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstragedy)
     
             emptyseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in emptyseedslist)] 
             filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in filledseedslist)] 
-            courierseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode[2] for mode in modebydist[1])+FockSpace(mode[2] for mode in modebydist[2])]
+            courierseeds = idmap(localseedingfock, localseedingfock)[:,sum([FockSpace(mode[2] for mode in modebydist[i]) for i in range(1,5)])]
 
             wannieremptys = _localwannierization(localiso[:empty], emptyseeds)
             wannierfilleds = _localwannierization(localiso[:filled], filledseeds)
@@ -179,17 +198,14 @@ function gmera(correlations::FockMap, step::Int)
         
         wannierizedemptys1,wannierizedfilleds1, wannierizedcouriers1,emptyseeds1,filledseeds1,courierseeds1 = fulllocalwannierization(correlations, localcenter1)
         wannierizedemptys2,wannierizedfilleds2, wannierizedcouriers2,emptyseeds2,filledseeds2,courierseeds2 = fulllocalwannierization(correlations, localcenter2)
-        wannierizedemptys3,wannierizedfilleds3, wannierizedcouriers3,emptyseeds3,filledseeds3,courierseeds3 = fulllocalwannierization(correlations, localcenter3)
-        wannierizedemptys4,wannierizedfilleds4, wannierizedcouriers4,emptyseeds4,filledseeds4,courierseeds4 = fulllocalwannierization(correlations, localcenter4)
-        wannierizedemptys5,wannierizedfilleds5, wannierizedcouriers5,emptyseeds5,filledseeds5,courierseeds5 = fulllocalwannierization(correlations, localcenter5)
     
-        extendedwannierizedemptys =  wannierizedemptys1 + wannierizedemptys2 + wannierizedemptys3 + wannierizedemptys4 + wannierizedemptys5
-        extendedwannierizedfilleds =  wannierizedfilleds1 + wannierizedfilleds2 + wannierizedfilleds3 + wannierizedfilleds4 + wannierizedfilleds5
-        extendedwannierizedcouriers =  wannierizedcouriers1 + wannierizedcouriers2 + wannierizedcouriers3 + wannierizedcouriers4 + wannierizedcouriers5
+        extendedwannierizedemptys =  wannierizedemptys1 + wannierizedemptys2 
+        extendedwannierizedfilleds =  wannierizedfilleds1 + wannierizedfilleds2
+        extendedwannierizedcouriers =  wannierizedcouriers1 + wannierizedcouriers2
     
-        extendedcourierseeds = courierseeds1 + courierseeds2 + courierseeds3 + courierseeds4 + courierseeds5
-        extendedemptyseeds = emptyseeds1 + emptyseeds2 + emptyseeds3 + emptyseeds4 + emptyseeds5
-        extendedfilledseeds = filledseeds1 + filledseeds2 + filledseeds3 + filledseeds4 + filledseeds5
+        extendedcourierseeds = courierseeds1 + courierseeds2 
+        extendedemptyseeds = emptyseeds1 + emptyseeds2
+        extendedfilledseeds = filledseeds1 + filledseeds2 
         
         origin = [0, 0] ∈ blockedspace 
         resunictcellfockcourier = FockSpace(Subset(mode for mode in extendedcourierseeds |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
@@ -227,20 +243,24 @@ function gmera(correlations::FockMap, step::Int)
             :correlations => purifiedcouriercorrelations)
     end
 
-    function gmera3rdstep(correlations::FockMap,localcenter1,localcenter2,localcenter3,localcenter4,localcenter5,localcenter6)
+    function gmera2ndstep(correlations::FockMap,localcenter1,localcenter2)
         crystal::Crystal = getcrystal(correlations|>getinspace)
-        space::RealSpace = crystal|>getspace
-    
-        function fulllocalwannierization(correlations::FockMap,localcenter::Offset,radius::Real=1/3,selectionstragedy::Function=modeselectionbycount(3))
-            localregion::Region = getsphericalregionwifcenter(center=localcenter,crystal=crystal, radius=radius, metricspace=space|>orthospace)
+
+        function fulllocalwannierization(correlations::FockMap,localcenter::Offset,selectionstragedy::Function=modeselectionbycount(3))
+            shift = [1/2,1/2] ∈ blockedspace
+            shiftedunitcell::Region =  Subset(pt+localcenter*2 for pt in (crystal|>getunitcell))
+            doubleunitcell::Region = shiftedunitcell+(crystal|>getunitcell)
+            shiftedorigunitcell::Region = Subset(pt+localcenter for pt in (blockedcrystal|>getunitcell))
+            localregion = intersect(doubleunitcell,shiftedorigunitcell)
             localseedingfock::RegionFock = quantize(localregion,1)
-            modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = localcenter) 
-            (emptyseedslist,filledseedslist) = constructfilledandemptyseed(modebydist[2],c6|>recenter(localcenter))
+            modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = localcenter+shift) 
+            (emptyseedslist,filledseedslist) = constructfilledandemptyseed(modebydist[length(modebydist)],c6|>recenter(localcenter+shift))
             localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstragedy)
     
             emptyseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in emptyseedslist)] 
             filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in filledseedslist)] 
-            courierseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode[2] for mode in modebydist[1])]
+            courierseeds = idmap(localseedingfock, localseedingfock)[:,sum([FockSpace(mode[2] for mode in modebydist[i]) for i in range(1,length(modebydist)-1)])]
+
             wannieremptys = _localwannierization(localiso[:empty], emptyseeds)
             wannierfilleds = _localwannierization(localiso[:filled], filledseeds)
             wanniercouriers = _localwannierization(localiso[:courier], courierseeds)
@@ -250,18 +270,14 @@ function gmera(correlations::FockMap, step::Int)
         
         wannierizedemptys1,wannierizedfilleds1, wannierizedcouriers1,emptyseeds1,filledseeds1,courierseeds1 = fulllocalwannierization(correlations, localcenter1)
         wannierizedemptys2,wannierizedfilleds2, wannierizedcouriers2,emptyseeds2,filledseeds2,courierseeds2 = fulllocalwannierization(correlations, localcenter2)
-        wannierizedemptys3,wannierizedfilleds3, wannierizedcouriers3,emptyseeds3,filledseeds3,courierseeds3 = fulllocalwannierization(correlations, localcenter3)
-        wannierizedemptys4,wannierizedfilleds4, wannierizedcouriers4,emptyseeds4,filledseeds4,courierseeds4 = fulllocalwannierization(correlations, localcenter4)
-        wannierizedemptys5,wannierizedfilleds5, wannierizedcouriers5,emptyseeds5,filledseeds5,courierseeds5 = fulllocalwannierization(correlations, localcenter5)
-        wannierizedemptys6,wannierizedfilleds6, wannierizedcouriers6,emptyseeds6,filledseeds6,courierseeds6 = fulllocalwannierization(correlations, localcenter6)
     
-        extendedwannierizedemptys =  wannierizedemptys1 + wannierizedemptys2 + wannierizedemptys3 + wannierizedemptys4 + wannierizedemptys5 + wannierizedemptys6
-        extendedwannierizedfilleds =  wannierizedfilleds1 + wannierizedfilleds2 + wannierizedfilleds3 + wannierizedfilleds4 + wannierizedfilleds5 + wannierizedfilleds6
-        extendedwannierizedcouriers =  wannierizedcouriers1 + wannierizedcouriers2 + wannierizedcouriers3 + wannierizedcouriers4 + wannierizedcouriers5 + wannierizedcouriers6
+        extendedwannierizedemptys =  wannierizedemptys1 + wannierizedemptys2 
+        extendedwannierizedfilleds =  wannierizedfilleds1 + wannierizedfilleds2
+        extendedwannierizedcouriers =  wannierizedcouriers1 + wannierizedcouriers2
     
-        extendedcourierseeds = courierseeds1 + courierseeds2 + courierseeds3 + courierseeds4 + courierseeds5 + courierseeds6
-        extendedemptyseeds = emptyseeds1 + emptyseeds2 + emptyseeds3 + emptyseeds4 + emptyseeds5 + emptyseeds6
-        extendedfilledseeds = filledseeds1 + filledseeds2 + filledseeds3 + filledseeds4 + filledseeds5 + filledseeds6
+        extendedcourierseeds = courierseeds1 + courierseeds2 
+        extendedemptyseeds = emptyseeds1 + emptyseeds2
+        extendedfilledseeds = filledseeds1 + filledseeds2 
         
         origin = [0, 0] ∈ blockedspace 
         resunictcellfockcourier = FockSpace(Subset(mode for mode in extendedcourierseeds |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
@@ -270,6 +286,7 @@ function gmera(correlations::FockMap, step::Int)
     
         function globalwannierfunction(seeds, localisometry::FockMap)
             wanniercrystalisos = _crystalisometries(localisometry=localisometry, crystalfock=correlations|>getoutspace, addinspacemomentuminfo = true)
+    
             wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b)) for mode in seeds|>getinspace |> orderedmodes)
             wanniercrystall::Crystal = Crystal(wannierunitcell, (correlations|>getoutspace|> getcrystal).sizes)
             globalwannierizedfunction::FockMap = crystaldirectsum(outcrystal = correlations|>getoutspace|>getcrystal, incrystal=wanniercrystall,wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
@@ -298,13 +315,13 @@ function gmera(correlations::FockMap, step::Int)
             :correlations => purifiedcouriercorrelations)
     end
 
-    firstcenter1,firstcenter2,firstcenter3,firstcenter4,firstcenter5 = [1/3,0] ∈ blockedspace,[0,1/3] ∈ blockedspace,[1/3,1] ∈ blockedspace,[2/3,2/3] ∈ blockedspace,[1,1/3] ∈ blockedspace
-    secondcenter1,secondcenter2,secondcenter3,secondcenter4,secondcenter5 = [2/3,0] ∈ blockedspace,[0,2/3] ∈ blockedspace,[1/3,1/3] ∈ blockedspace,[1,2/3] ∈ blockedspace,[2/3,1] ∈ blockedspace
-    thirdcenter1,thirdcenter2,thirdcenter3,thirdcenter4,thirdcenter5,thirdcenter6 = [0,0] ∈ blockedspace,[0,1] ∈ blockedspace,[1,0] ∈ blockedspace,[1/3,2/3] ∈ blockedspace,[2/3,1/3] ∈ blockedspace,[1, 1] ∈ blockedspace
+    firstcenter1,firstcenter2 = [1/2,0] ∈ blockedspace,[-1/2,0] ∈ blockedspace
+    secondcenter1,secondcenter2 = [0,1/2] ∈ blockedspace,[0,-1/2] ∈ blockedspace
+    thirdcenter1,thirdcenter2 = [1/2,1/2] ∈ blockedspace,[-1/2,-1/2] ∈ blockedspace
     
-    gmera1st = gmera1stor2ndstep(blockedcorrelations,firstcenter1,firstcenter2,firstcenter3,firstcenter4,firstcenter5)
-    gmera2nd = gmera1stor2ndstep(gmera1st[:correlations],secondcenter1,secondcenter2,secondcenter3,secondcenter4,secondcenter5)
-    gmera3rd = gmera3rdstep(gmera2nd[:correlations],thirdcenter1,thirdcenter2,thirdcenter3,thirdcenter4,thirdcenter5,thirdcenter6)
+    gmera1st = gmera1ststep(blockedcorrelations,firstcenter1,firstcenter2)
+    gmera2nd = gmera2ndstep(gmera1st[:correlations],secondcenter1,secondcenter2)
+    gmera3rd = gmera2ndstep(gmera2nd[:correlations],thirdcenter1,thirdcenter2)
 
     return Dict(
             :gmera1stemptyisometry => gmera1st[:emptyisometry],
@@ -322,4 +339,64 @@ function gmera(correlations::FockMap, step::Int)
 end
 
 rg1 = gmera(correlations,1)
-rg2 = gmera(rg1[:gmera3rdcorrelations],2)
+
+crystalfock = correlations|>getoutspace
+scale = Scale([4 0; 0 4], crystalfock|>getcrystal|>getspace)
+blocker = @time scale * crystalfock
+blockedcorrelations = @time blocker * correlations * blocker'
+blockedcrystalfock = blockedcorrelations|>getoutspace
+blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
+blockedspace::RealSpace = blockedcrystal|>getspace
+
+gmeracorrelations = rg1[:gmera2ndcorrelations]
+gmeracrystalfock = gmeracorrelations|>getoutspace
+gmeracrystal::Crystal = gmeracrystalfock|>getcrystal
+gmeraspace::RealSpace = gmeracrystal|>getspace
+thirdcenter1,thirdcenter2 = [1/2,1/2] ∈ blockedspace,[-1/2,-1/2] ∈ blockedspace
+shift = [1/2,1/2] ∈ blockedspace
+
+right = [1,0] ∈ blockedspace
+up = [0,1] ∈ blockedspace
+shifteddigunitcell::Region =  Subset(pt+thirdcenter1*2 for pt in (gmeracrystal|>getunitcell))
+shiftedrightunitcell::Region =  Subset(pt+right for pt in (gmeracrystal|>getunitcell))
+shiftedupunitcell::Region =  Subset(pt+up for pt in (gmeracrystal|>getunitcell))
+qudrpleunitcell::Region = shifteddigunitcell+shiftedrightunitcell+shiftedupunitcell+(gmeracrystal|>getunitcell)
+shiftedorigunitcell::Region = Subset(pt+thirdcenter1 for pt in (blockedcrystal|>getunitcell))
+localregion = intersect(qudrpleunitcell,shiftedorigunitcell)
+
+localseedingfock::RegionFock = quantize(localregion,1)
+modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = thirdcenter1+shift)
+(emptyseedslist,filledseedslist) = constructfilledandemptyseed(modebydist[length(modebydist)],c6|>recenter(thirdcenter1+shift))
+localiso = localisometries(gmeracorrelations, localseedingfock, selectionstrategy=modeselectionbycount(3))
+emptyseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in emptyseedslist)] 
+filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in filledseedslist)] 
+courierseeds = idmap(localseedingfock, localseedingfock)[:,sum([FockSpace(mode[2] for mode in modebydist[i]) for i in range(1,length(modebydist)-1)])]
+
+wannieremptys = _localwannierization(localiso[:empty], emptyseeds)
+wannierfilleds = _localwannierization(localiso[:filled], filledseeds)
+wanniercouriers = _localwannierization(localiso[:courier], courierseeds)
+
+shiftblockedunitcell = Subset(pt+shift  for pt in (blockedcrystal|>getunitcell))
+refdoubleunitcell = shiftblockedunitcell+(blockedcrystal|>getunitcell)
+refdoubleunitcell
+interest = intersect(refdoubleunitcell,(blockedcrystal|>getunitcell))
+shitfedblockedunitcellfock = quantize(shiftblockedunitcell,1)
+visualize(regioncorrelations(blockedcorrelations,shitfedblockedunitcellfock)|>eigspech)
+
+
+
+
+
+blockedunitcellfock = RegionFock(blockedcrystalfock|>unitcellfock)
+# visualize(regioncorrelations(blockedcorrelations,blockedunitcellfock)|>eigspech)
+localcenter = [1/2,1/2] ∈ blockedspace
+localiso = localisometries(blockedcorrelations, blockedunitcellfock, selectionstrategy=modeselectionbycount(3))
+modebydist = groupmodesbydist(region = blockedcrystal|>getunitcell,regionfock = blockedunitcellfock,center = localcenter) 
+(emptyseedslist,filledseedslist) = constructfilledandemptyseed(modebydist[6],c6|>recenter(localcenter))
+emptyseeds = idmap(blockedunitcellfock, blockedunitcellfock)[:,FockSpace(mode for mode in emptyseedslist)] 
+filledseeds = idmap(blockedunitcellfock, blockedunitcellfock)[:,FockSpace(mode for mode in filledseedslist)] 
+courierseeds = idmap(blockedunitcellfock, blockedunitcellfock)[:,sum([FockSpace(mode[2] for mode in modebydist[i]) for i in range(1,5)])]
+wannieremptys = _localwannierization(localiso[:empty], emptyseeds)
+wannierfilleds = _localwannierization(localiso[:filled], filledseeds)
+wanniercouriers = _localwannierization(localiso[:courier], courierseeds)
+

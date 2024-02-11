@@ -22,7 +22,7 @@ To allow Julia REPL in Visual Studio Code to use multiple threads, head to Julia
 `Zipper.jl` supports saving/loading data objects from JSON files, so that data that requires long period of computation time can be loaded with ease. This API also support defining custom 
 serialization rules for special data types. Noted that *normal* Julia types are also supported by `fioload` and `fiosave`. 
 
-## Fio APIs
+### Fio APIs
 - `fiodir` Set the current project directory of the session, this is the directory which all saving/loading data will be performed on.
 - `fiolower` Define a special lower function for the serialization of the object attributes, the lower function will 
 be applied to the object before `JSON` serializes the object into a JSON string.

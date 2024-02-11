@@ -100,7 +100,7 @@ function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::Foc
     blocks::Dict = paralleltasks(
         name="AffineTransform * CrystalFock",
         tasks=(()->compute(data) for data in ksubspaces),
-        count=crystal|>vol)|>parallel|>Dict
+        count=ksubspaces|>length)|>parallel|>Dict
 
     return CrystalFockMap(crystal, crystal, blocks)
 end

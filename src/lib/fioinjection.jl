@@ -4,11 +4,13 @@ function writesparse(sparse::SparseMatrixCSC; filename::String)
     Vr = [real(v) for v in V]
     Vi = [imag(v) for v in V]
     dataframe = DataFrame(I=I, J=J, Vr=Vr, Vi=Vi)
+    @info "Sparse data is written to $filepath"
     return CSV.write(filepath, dataframe)
 end
 
 function readsparse(filename::String)
     filepath = joinpath(fiodir(), filename)
+    !isfile(filepath) && error("The required sparse datafile $filepath does not exist!")
     dataframe = CSV.read(filepath, DataFrame)
     I = dataframe.I|>Vector
     J = dataframe.J|>Vector
@@ -33,10 +35,7 @@ fiolower((CrystalFock, :korderings), d -> [[k, i] for (k, i) in d])
 # Storing matrix data in JSON format is not efficient, so we have to store it separately 
 # in a CSV file and store the filename in the JSON file.
 fiolower((SparseFockMap, :rep), function (sparse::SparseMatrixCSC)
-    timestring = Dates.format(now(), "yyyymmddHHMMSSsss")
-    randomhash = string(rand(Int, 1)|>hash, base=16)
-    pseudounique = "$randomhash-$timestring"
-    filename = "sparsedata-$pseudounique.csv"
+    filename = "$(fiotargetname()).csv"
     filepath = writesparse(sparse, filename=filename)
     @debug "sparse -> $filepath"
     return Dict(:filename=>filename)

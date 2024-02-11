@@ -15,16 +15,15 @@ an error message will be logged.
 - `path::String`: The path to the directory to be set as the resource directory.
 """
 function fiodir(path::String)
-    if isdir(path)
-        RES_SETTINGS[:projectdirpath] = path
-        @info "Resource directory is set to $path"
-        return
+    if !isdir(path)
+        try
+            mkdir(path)
+        catch _
+            @error "Could not create resource directory at $path"
+        end
     end
-    try
-        mkdir(path)
-    catch _
-        @error "Could not create resource directory at $path"
-    end
+    RES_SETTINGS[:projectdirpath] = path
+    @info "Resource directory is set to $path"
     return
 end
 export fiodir

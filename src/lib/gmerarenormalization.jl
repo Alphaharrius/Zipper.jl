@@ -47,8 +47,21 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
     addinspacemomentuminfo::Bool = false)
 
     crystal::Crystal = getcrystal(crystalfock)
-    transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock)
+    transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
+    # fouriermap::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) 
+    # # momentumfouriers::Base.Generator = rowsubmaps(fouriermap)
+    # bz::Subset{Momentum} = brillouinzone(crystal)
 
+    # function preprocesslocalisometry(k::Momentum)::FockMap
+    #     if !addinspacemomentuminfo
+    #         return localisometry
+    #     end
+    #     inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:k => k) |> removeattr(:r) |> FockSpace
+    #     return FockMap(localisometry, inspace=inspace, performpermute=false)
+    # end
+
+    # # return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
+    # return Dict(k => fouriermap[getsubspace(crystalfock, k), :] * preprocesslocalisometry(k) for k in bz)
     function preprocesslocalisometry(k::Momentum)::FockMap
         if !addinspacemomentuminfo
             return localisometry
@@ -64,7 +77,7 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
 
     return isometries
 end
-export crystalisometries
+export gmeracrystalisometries
 
 function gmeraspatialmap(fockmap::FockMap)::FockMap
     function spatialinmode(colmap::FockMap, ind::Integer)
@@ -81,7 +94,7 @@ function gmeraspatialmap(fockmap::FockMap)::FockMap
 end
 
 # Need further improvement
-function groupmodesbydist(;
+function groupmodesbydistwifb(;
     region::Subset{Point{RealSpace}},
     regionfock::FockSpace,
     center::Point,
@@ -93,29 +106,66 @@ function groupmodesbydist(;
     df = DataFrame()
     df.distance = [round(dist; digits=samedistancethreshold) for (dist,_) in distancewithmode]
     df.mode = [mode for (_,mode) in distancewithmode]
+    df.b = [mode |> getattr(:b) for (_,mode) in distancewithmode]
     grouped_df = groupby(df, :distance)
     store = Dict()
     for (ind,group) in enumerate(grouped_df)
         store[ind] = []
-        for (distance,mode) in zip(group.distance,group.mode)
-            push!(store[ind],(distance,mode))
+        for (distance,mode,b) in zip(group.distance,group.mode,group.b)
+            push!(store[ind],(distance,mode,b))
         end
     end
     return store
 end
-export groupmodesbydist
+export groupmodesbydistwifb
 
-function localwannierseedslists(modebydist,localiso::Dict{Symbol,FockMap})
-    modeorderedbydist = [modewifdist[2] for r in range(1,length(modebydist)) for modewifdist in modebydist[length(modebydist)-r+1]]
+# function groupptbydist(;
+#     region::Subset{Point{RealSpace}},
+#     center::Point,
+#     samedistancethreshold::Int = 3)
+#     visualspace = region |> getspace |> euclidean
+#     physicalnorm = pt -> lineartransform(visualspace, pt) |> norm
+#     distancewithpt = sort([(physicalnorm(pt-center),pt) for pt in region], by = first, rev = true)
+#     df = DataFrame()
+#     df.distance = [round(dist; digits=samedistancethreshold) for (dist,_) in distancewithpt]
+#     df.pt = [pt for (_,pt) in distancewithpt]
+#     grouped_df = groupby(df, :distance)
+#     store = Dict()
+#     for (ind,group) in enumerate(grouped_df)
+#         store[ind] = []
+#         for (distance,pt) in zip(group.distance,group.pt)
+#             push!(store[ind],(distance,pt))
+#         end
+#     end
+#     return store
+# end
+# export groupptbydist
+
+
+function localwannierseedslists(modebydistwifb,localiso::Dict{Symbol,FockMap})
+    modeorderedbydist = [modewifdistandb[2] for r in range(1,length(modebydistwifb)) for modewifdistandb in modebydistwifb[length(modebydistwifb)-r+1]]
+    borderedbydist = [modewifdistandb[3] for r in range(1,length(modebydistwifb)) for modewifdistandb in modebydistwifb[length(modebydistwifb)-r+1]]
     nooffilledmodes = localiso[:filled]|>getinspace|>dimension
     noofemptymodes = localiso[:empty]|>getinspace|>dimension
     emptyseedslist = modeorderedbydist[1:noofemptymodes]
     filledseedslist = modeorderedbydist[noofemptymodes+1:noofemptymodes+nooffilledmodes]
     courierseedslist = modeorderedbydist[noofemptymodes+nooffilledmodes+1:length(modeorderedbydist)]
-    return Dict(:filled => filledseedslist, :empty => emptyseedslist, :courier => courierseedslist)
+    emptybslist = borderedbydist[1:noofemptymodes]
+    filledbslist = borderedbydist[noofemptymodes+1:noofemptymodes+nooffilledmodes]
+    courierbslist = borderedbydist[noofemptymodes+nooffilledmodes+1:length(modeorderedbydist)]
+    return Dict(:filled => filledseedslist, :empty => emptyseedslist, :courier => courierseedslist,
+    :bempty=>emptybslist,:bfilled=>filledbslist,:bcourier=>courierbslist)
 end
 export localwannierseedslists
 
+function localwannierseedslistsfromref(modekeybyb,refselectionstragedydict)
+    emptyseedslist = [modekeybyb[b] for b in refselectionstragedydict[:empty]]
+    filledseedslist = [modekeybyb[b] for b in refselectionstragedydict[:filled]]
+    courierseedslist = [modekeybyb[b] for b in refselectionstragedydict[:courier]]
+
+    return Dict(:filled => filledseedslist, :empty => emptyseedslist, :courier => courierseedslist)
+end
+export localwannierseedslistsfromref
 
 function localwannierization(localbasis::FockMap, localseeds::FockMap, svdorthothreshold::Number = 1e-1)::FockMap
     U, Σ, Vt = svd(localbasis'*localseeds)
@@ -135,6 +185,21 @@ function localwannierization(localbasis::FockMap, localseeds::FockMap, svdorthot
 end
 export localwannierization
 
+function startingcombinedlocalwannierization(localiso,localwannierseedslists, localseedingfock)
+    emptyseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:empty])] 
+    filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:filled])] 
+    courierseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:courier])]
+
+    wannierempty = localwannierization(localiso[:empty], emptyseeds)
+    wannierfilled = localwannierization(localiso[:filled], filledseeds)
+    wanniercourier = localwannierization(localiso[:courier], courierseeds)
+
+    return Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
+    :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
+    :bempty=>localwannierseedslists[:bempty],:bfilled=>localwannierseedslists[:bfilled],:bcourier=>localwannierseedslists[:bcourier])
+end
+export startingcombinedlocalwannierization
+
 function combinedlocalwannierization(localiso,localwannierseedslists, localseedingfock)
     emptyseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:empty])] 
     filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:filled])] 
@@ -149,62 +214,81 @@ function combinedlocalwannierization(localiso,localwannierseedslists, localseedi
 end
 export combinedlocalwannierization
 
-# function gmerastep1(correlations::CrystalFockMap,localcenterlist)
-#     crystal::Crystal = getcrystal(correlations|>getinspace)
-#     space::RealSpace = crystal|>getspace
-#     function fulllocalwannierization(correlations::CrystalFockMap,localcenter::Offset,selectionstragedy::Function=modeselectionbycount(3))
-#         shift = [1/2,1/2] ∈ space
-#         localregion::Region =  Subset(pt+localcenter for pt in (crystal|>getunitcell))
-#         localseedingfock::RegionFock = quantize(localregion,1)
-#         modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = localcenter+shift) 
-#         localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstragedy)
-#         localwannierlist = localwannierseedslists(modebydist,localiso)
-#         return combinedlocalwannierization(localiso,localwannierlist,localseedingfock)
-#     end
-#     wannierinfos =  Dict(localcenter=>fulllocalwannierization(correlations,localcenter) for localcenter in localcenterlist)
+function gmerastep1(correlations::CrystalFockMap,localcenterlist)
+    crystal::Crystal = getcrystal(correlations|>getinspace)
+    space::RealSpace = crystal|>getspace
+    function startingfulllocalwannierization(correlations::CrystalFockMap,localcenter::Offset,selectionstrategy::Function=modeselectionbycount(3))
+        shift = [1/2,1/2] ∈ space
+        localregion::Region =  Subset(pt+localcenter for pt in (crystal|>getunitcell))
+        localseedingfock::RegionFock = quantize(localregion,1)
+        modebydistwifb = groupmodesbydistwifb(region = localregion,regionfock = localseedingfock,center = localcenter+shift) 
+        localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstrategy)
+        localwannierlist = localwannierseedslists(modebydistwifb,localiso)
+        return startingcombinedlocalwannierization(localiso,localwannierlist,localseedingfock)
+    end
+
+    function fulllocalwannierization(correlations::CrystalFockMap,localcenter::Offset,selectionstrategy::Function,refselectionstrategydict)
+        localregion::Region =  Subset(pt+localcenter for pt in (crystal|>getunitcell))
+        localseedingfock::RegionFock = quantize(localregion,1)
+        modekeybyb = Dict(m|>getattr(:b)=>m for m in localseedingfock)
+        localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstrategy)
+        localwannierlist = localwannierseedslistsfromref(modekeybyb,refselectionstrategydict)
+        return combinedlocalwannierization(localiso,localwannierlist,localseedingfock)
+    end
+    wannierinfos =  Dict(localcenterlist[1]=>startingfulllocalwannierization(correlations,localcenterlist[1]))
+    refselectionstragedydict = Dict(:empty=>(wannierinfos[localcenterlist[1]][:bempty]),:filled=>(wannierinfos[localcenterlist[1]][:bfilled]),:courier=>(wannierinfos[localcenterlist[1]][:bcourier]))
+    for localcenter in localcenterlist[2:length(localcenterlist)]
+        wannierinfos[localcenter] = fulllocalwannierization(correlations,localcenter,modeselectionbycount(3),refselectionstragedydict)
+    end
+    extendedwannierizedempty =  sum(wannierinfos[center][:wannierempty] for center in localcenterlist)
+    extendedwannierizedfilled =  sum(wannierinfos[center][:wannierfilled] for center in localcenterlist)
+    extendedwannierizedcourier =  sum(wannierinfos[center][:wanniercourier] for center in localcenterlist)
+
+    # extendedemptyseeds = sum(wannierinfos[center][:emptyseeds] for center in localcenterlist)
+    # extendedfilledseeds = sum(wannierinfos[center][:filledseeds] for center in localcenterlist)
+    # extendedcourierseeds = sum(wannierinfos[center][:courierseeds] for center in localcenterlist)
     
-#     extendedwannierizedempty =  sum(wannierinfos[center][:wannierempty] for center in localcenterlist)
-#     extendedwannierizedfilled =  sum(wannierinfos[center][:wannierfilled] for center in localcenterlist)
-#     extendedwannierizedcourier =  sum(wannierinfos[center][:wanniercourier] for center in localcenterlist)
+    origin = [0, 0] ∈ space
+    refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
 
-#     # extendedemptyseeds = sum(wannierinfos[center][:emptyseeds] for center in localcenterlist)
-#     # extendedfilledseeds = sum(wannierinfos[center][:filledseeds] for center in localcenterlist)
-#     # extendedcourierseeds = sum(wannierinfos[center][:courierseeds] for center in localcenterlist)
-    
-#     origin = [0, 0] ∈ space
-#     refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-#     refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-#     refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    # return wannierinfos
 
-#     # return wannierinfos
+    function globalwannierfunction(localisometry::FockMap)
+        wanniercrystalisos = gmeracrystalisometries(localisometry=localisometry, crystalfock=correlations|>getoutspace,addinspacemomentuminfo=true)
 
-#     function globalwannierfunction(localisometry::FockMap)
-#         wanniercrystalisos = gmeracrystalisometries(localisometry=localisometry, crystalfock=correlations|>getoutspace,addinspacemomentuminfo=true)
+        wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b)) for mode in localisometry|>getinspace |> orderedmodes)
+        wanniercrystall::Crystal = Crystal(wannierunitcell, (correlations|>getoutspace|> getcrystal).sizes)
+        globalwannierizedfunction::FockMap = crystaldirectsum(outcrystal = correlations|>getoutspace|>getcrystal, incrystal=wanniercrystall,wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
 
-#         wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b)) for mode in localisometry|>getinspace |> orderedmodes)
-#         wanniercrystall::Crystal = Crystal(wannierunitcell, (correlations|>getoutspace|> getcrystal).sizes)
-#         globalwannierizedfunction::FockMap = crystaldirectsum(outcrystal = correlations|>getoutspace|>getcrystal, incrystal=wanniercrystall,wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
+        return globalwannierizedfunction
+    end
 
-#         return globalwannierizedfunction
-#     end
+    wannieremptyisometry = globalwannierfunction(extendedwannierizedempty[:,refunictcellfockempty])
+    wannierfilledisometry = globalwannierfunction(extendedwannierizedfilled[:,refunictcellfockfilled])
+    wanniercourierisometry = globalwannierfunction(extendedwannierizedcourier[:,refunictcellfockcourier])
 
-#     wannieremptyisometry = globalwannierfunction(extendedwannierizedempty[:,refunictcellfockempty])
-#     wannierfilledisometry = globalwannierfunction(extendedwannierizedfilled[:,refunictcellfockfilled])
-#     wanniercourierisometry = globalwannierfunction(extendedwannierizedcourier[:,refunictcellfockcourier])
+    couriercorrelations = wanniercourierisometry' * correlations * wanniercourierisometry
+    couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+    purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+    purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
-#     couriercorrelations = wanniercourierisometry' * correlations * wanniercourierisometry
-#     couriercorrelationspectrum = couriercorrelations |> crystalspectrum
-#     purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
-#     purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
-
-#     return Dict(
-#         :emptyisometry => wannieremptyisometry,
-#         :filledisometry => wannierfilledisometry,
-#         :courierisometry => wanniercourierisometry,
-#         :couriercorrelations => couriercorrelations,
-#         :correlations => purifiedcouriercorrelations)
-# end
-# export gmerastep1
+    return Dict(
+        :wannierinfos => wannierinfos,
+        :emptyisometry => wannieremptyisometry,
+        :filledisometry => wannierfilledisometry,
+        :courierisometry => wanniercourierisometry,
+        :couriercorrelations => couriercorrelations,
+        :correlations => purifiedcouriercorrelations,
+        :localemptyisometry => extendedwannierizedempty,
+        :localfilledisometry => extendedwannierizedfilled,
+        :localcourierisometry => extendedwannierizedcourier,
+        :refunictcellfockempty => refunictcellfockempty,
+        :refunictcellfockfilled => refunictcellfockfilled,
+        :refunictcellfockcourier => refunictcellfockcourier)
+end
+export gmerastep1
 
 # function gmerastep2(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFockMap,localcenterlist)
 #     origcrystal::Crystal = getcrystal(rgblockedcorrelations|>getinspace)
@@ -267,7 +351,7 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
     origcrystal::Crystal = getcrystal(rgblockedcorrelations|>getinspace)
     crystal::Crystal = getcrystal(correlations|>getinspace)
     space::RealSpace = crystal|>getspace
-    function fulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstragedy::Function=modeselectionbythreshold(3))
+    function startingfulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstragedy::Function=modeselectionbycount(3))
         shift = [1/2,1/2] ∈ space
         shiftedorigunitcell::Region = Subset(pt+offset for pt in (origcrystal|>getunitcell))
         if offset == ([1/2,0] ∈ space) || offset == ([-1/2,0] ∈ space) || offset == ([0,1/2] ∈ space) || offset == ([0,-1/2] ∈ space)
@@ -300,13 +384,57 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
             localregion = crystal|>getunitcell
         end
         localseedingfock::RegionFock = quantize(localregion,1)
-        modebydist = groupmodesbydist(region = localregion,regionfock = localseedingfock,center = offset+shift) 
+        modebydistwifb = groupmodesbydistwifb(region = localregion,regionfock = localseedingfock,center = offset+shift) 
         localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstragedy)
-        localwannierlist = localwannierseedslists(modebydist,localiso)
+        localwannierlist = localwannierseedslists(modebydistwifb,localiso)
+        return startingcombinedlocalwannierization(localiso,localwannierlist,localseedingfock)
+    end
+
+    function fulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstrategy::Function,refselectionstrategydict)
+        shiftedorigunitcell::Region = Subset(pt+offset for pt in (origcrystal|>getunitcell))
+        if offset == ([1/2,0] ∈ space) || offset == ([-1/2,0] ∈ space) || offset == ([0,1/2] ∈ space) || offset == ([0,-1/2] ∈ space)
+            @info ("gmera step for vertical or horizontal offset...")
+            shiftedunitcell::Region =  Subset(pt+offset*2 for pt in (crystal|>getunitcell))
+            doubleunitcell::Region = shiftedunitcell+(crystal|>getunitcell)
+            localregion = intersect(doubleunitcell,shiftedorigunitcell)
+        elseif offset == ([1/2,1/2] ∈ space) || offset == ([-1/2,-1/2] ∈ space) || offset == ([1/2,-1/2] ∈ space) || offset == ([-1/2,1/2] ∈ space)
+            @info ("gmera step for diagonal offset...")
+            if offset == ([1/2,1/2] ∈ space)
+                horizontal = [1,0] ∈ space
+                vertical = [0,1] ∈ space
+            elseif offset == ([-1/2,-1/2] ∈ space)
+                horizontal = [-1,0] ∈ space
+                vertical = [0,-1] ∈ space
+            elseif offset == ([-1/2,1/2] ∈ space)
+                horizontal = [-1,0] ∈ space
+                vertical = [0,1] ∈ space
+            elseif offset == ([1/2,-1/2] ∈ space)
+                horizontal = [1,0] ∈ space
+                vertical = [0,-1] ∈ space
+            end
+            shiftedhorizontalunitcell::Region =  Subset(pt+horizontal for pt in (crystal|>getunitcell))
+            shiftedverticalunitcell::Region =  Subset(pt+vertical for pt in (crystal|>getunitcell))
+            shifteddiagunitcell::Region =  Subset(pt+offset*2 for pt in (crystal|>getunitcell))
+            allunitcell::Region = shiftedhorizontalunitcell+shiftedverticalunitcell+shifteddiagunitcell+(crystal|>getunitcell)
+            localregion = intersect(allunitcell,shiftedorigunitcell)
+        else
+            @info ("gmera step without offset...")
+            localregion = crystal|>getunitcell
+        end
+        localseedingfock::RegionFock = quantize(localregion,1)
+        modekeybyb = Dict(m|>getattr(:b)=>m for m in localseedingfock)
+        localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstrategy)
+        localwannierlist = localwannierseedslistsfromref(modekeybyb,refselectionstrategydict)
         return combinedlocalwannierization(localiso,localwannierlist,localseedingfock)
     end
-    wannierinfos =  Dict(offset=>fulllocalwannierization(correlations,offset) for offset in offsetlist)
+
+    wannierinfos =  Dict(offsetlist[1]=>startingfulllocalwannierization(correlations,offsetlist[1]))
+    refselectionstragedydict = Dict(:empty=>(wannierinfos[offsetlist[1]][:bempty]),:filled=>(wannierinfos[offsetlist[1]][:bfilled]),:courier=>(wannierinfos[offsetlist[1]][:bcourier]))
     
+    for offset in offsetlist[2:length(offsetlist)]
+        wannierinfos[offset] = fulllocalwannierization(correlations,offset,modeselectionbycount(3),refselectionstragedydict)
+    end
+
     extendedwannierizedempty =  sum(wannierinfos[offset][:wannierempty] for offset in offsetlist)
     extendedwannierizedfilled =  sum(wannierinfos[offset][:wannierfilled] for offset in offsetlist)
     extendedwannierizedcourier =  sum(wannierinfos[offset][:wanniercourier] for offset in offsetlist)

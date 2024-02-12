@@ -67,7 +67,7 @@ function gmera(correlations,reftransistionmap)
     @info("Starting RG...")
     crystalfock = correlations|>getoutspace
 
-    rgscale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
+    rgscale = Scale([3 0; 0 3], crystalfock|>getcrystal|>getspace)
     @info("Performing rgblocking...")
     @info("Generating rgblocking transformation...")
     rgblocker = @time rgscale * crystalfock
@@ -85,6 +85,7 @@ function gmera(correlations,reftransistionmap)
     finalcenterlist = [[0,0] ∈ rgblockedspace]
     @info ("1st gmera step...")
     gmera1 = @time gmerastep(rgblockedcorrelations,rgblockedcorrelations,firstcenterlist)
+    # gmera1 = @time gmerastep1(rgblockedcorrelations,firstcenterlist)
     @info ("1st gmera approximation to correlations...")
     gmera1approx = transistionmap*gmera1[:emptyisometry]*gmera1[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera1[:courierisometry]
@@ -107,6 +108,7 @@ function gmera(correlations,reftransistionmap)
     gmera4approx = transistionmap*gmera4[:emptyisometry]*gmera4[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera4[:courierisometry]
     
+    # return gmera1
     return Dict(
         :rgblockedmap => rgblocker,
         :gmera1stemptyisometry => gmera1[:emptyisometry],
@@ -129,22 +131,16 @@ function gmera(correlations,reftransistionmap)
         :gmera4thcourierisometry => gmera4[:courierisometry],
         :gmera4thapprox => gmera4approx,
         :correlations => gmera4[:correlations],
-        :transisitionmap => transistionmap)
+        :transistionmap => transistionmap)
 end
 
 rg1 = gmera(blockedcorrelations,idmap(blockedcorrelations|>getinspace))
-rg2 = gmera(rg1[:correlations],rg1[:transisitionmap])
+rg2 = gmera(rg1[:correlations],rg1[:transistionmap])
 
-rg1approx = rg1[:gmera1stapprox]+rg1[:gmera2ndapprox]+rg1[:gmera3rdapprox]+rg1[:gmera4thapprox]
-rg2approx = rg2[:gmera1stapprox]+rg2[:gmera2ndapprox]+rg2[:gmera3rdapprox]+rg2[:gmera4thapprox]
+rg2[:correlations]
 
-blockedcorrelations
-rg1approx = rg1[:gmera1stapprox]+rg1[:gmera2ndapprox]+rg1[:gmera3rdapprox]+rg1[:gmera4thapprox]
-rg1approx
-testcorrelations = rg1[:rgblockedmap]*blockedcorrelations*rg1[:rgblockedmap]'
-visualize((rg1[:gmera1stemptyisometry]'*testcorrelations*rg1[:gmera1stemptyisometry])|>crystalspectrum)
+rg1blockedcorrelations = rg1[:rgblockedmap]*blockedcorrelations*rg1[:rgblockedmap]'
+rg2blockedcorrelations = rg2[:rgblockedmap]*rg1[:correlations]*rg2[:rgblockedmap]'
 
-rg1[:gmera1stfilledisometry]'*rg1[:gmera1stfilledisometry]
-visualize((rg1[:gmera1stfilledisometry]'*rg1[:gmera1stfilledisometry])|>crystalspectrum)
-
-rg1[:gmera1stemptyisometry]*rg1[:gmera1stemptyisometry]'
+rg1approx = rg1[:gmera1stapprox] + rg1[:gmera2ndapprox] + rg1[:gmera3rdapprox] + rg1[:gmera4thapprox]
+rg1blockedcorrelations-rg1approx

@@ -13,6 +13,8 @@ include("interfaces/spaces.jl")
 include("interfaces/transformations.jl")
 include("interfaces/geometries.jl")
 
+include("lib/memorization.jl")
+
 include("lib/spaces.jl")
 include("lib/geometries.jl")
 include("lib/transformations.jl")

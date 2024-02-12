@@ -582,7 +582,7 @@ export orderedmodes
 
 orderedmodes(crystalfock::CrystalFock) = (
     # brillouinzone is the default ordering of the momentums since korderings is generated from it too.
-    mode|>setattr(:k=>k) for k in crystal|>getcrystal|>brillouinzone for mode in crystalfock|>unitcellfock)
+    mode|>setattr(:k=>k) for k in crystalfock|>getcrystal|>brillouinzone for mode in crystalfock|>unitcellfock)
 
 """
     orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}

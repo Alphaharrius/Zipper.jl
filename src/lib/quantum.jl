@@ -580,11 +580,9 @@ orderedmodes(fockspace::FockSpace)::Subset{Mode} = Iterators.flatten(rep(fockspa
 # TODO: Implement for CrystalFock
 export orderedmodes
 
-function orderedmodes(crystalfock::CrystalFock)::Base.Iterators.Flatten
-    korderings = crystalfock.korderings|>collect
-    sort!(korderings, by=last)
-    return (mode|>setattr(:k=>k) for (k, _) in korderings for mode in crystalfock|>unitcellfock)
-end
+orderedmodes(crystalfock::CrystalFock) = (
+    # brillouinzone is the default ordering of the momentums since korderings is generated from it too.
+    mode|>setattr(:k=>k) for k in crystal|>getcrystal|>brillouinzone for mode in crystalfock|>unitcellfock)
 
 """
     orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}

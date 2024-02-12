@@ -280,7 +280,7 @@ function Zipper.:getspace(subset::Subset)
 end
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the OrderedSet representation and leave to the Base.isequal for identification.
-Base.:hash(subset::Subset)::UInt = hash(rep(subset))
+Base.:hash(subset::Subset)::UInt = hash([v for v in rep(subset)])
 Base.:isequal(a::Subset, b::Subset)::Bool = a == b
 
 # Overloads for iterators.

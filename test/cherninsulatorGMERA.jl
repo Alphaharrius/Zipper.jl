@@ -137,4 +137,14 @@ rg2 = gmera(rg1[:correlations],rg1[:transisitionmap])
 
 rg1approx = rg1[:gmera1stapprox]+rg1[:gmera2ndapprox]+rg1[:gmera3rdapprox]+rg1[:gmera4thapprox]
 rg2approx = rg2[:gmera1stapprox]+rg2[:gmera2ndapprox]+rg2[:gmera3rdapprox]+rg2[:gmera4thapprox]
-visualize((blockedcorrelations)|>crystalspectrum)
+
+blockedcorrelations
+rg1approx = rg1[:gmera1stapprox]+rg1[:gmera2ndapprox]+rg1[:gmera3rdapprox]+rg1[:gmera4thapprox]
+rg1approx
+testcorrelations = rg1[:rgblockedmap]*blockedcorrelations*rg1[:rgblockedmap]'
+visualize((rg1[:gmera1stemptyisometry]'*testcorrelations*rg1[:gmera1stemptyisometry])|>crystalspectrum)
+
+rg1[:gmera1stfilledisometry]'*rg1[:gmera1stfilledisometry]
+visualize((rg1[:gmera1stfilledisometry]'*rg1[:gmera1stfilledisometry])|>crystalspectrum)
+
+rg1[:gmera1stemptyisometry]*rg1[:gmera1stemptyisometry]'

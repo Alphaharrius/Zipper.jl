@@ -267,7 +267,7 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
     origcrystal::Crystal = getcrystal(rgblockedcorrelations|>getinspace)
     crystal::Crystal = getcrystal(correlations|>getinspace)
     space::RealSpace = crystal|>getspace
-    function fulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstragedy::Function=modeselectionbycount(3))
+    function fulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstragedy::Function=modeselectionbythreshold(3))
         shift = [1/2,1/2] ∈ space
         shiftedorigunitcell::Region = Subset(pt+offset for pt in (origcrystal|>getunitcell))
         if offset == ([1/2,0] ∈ space) || offset == ([-1/2,0] ∈ space) || offset == ([0,1/2] ∈ space) || offset == ([0,-1/2] ∈ space)

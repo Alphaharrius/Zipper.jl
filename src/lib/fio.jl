@@ -1,8 +1,17 @@
-# A Dict that stores the neccessart information for the 
-# serialization and deserialization of the objects.
-global RES_SETTINGS::Dict = Dict()
-# The default directiory is the current working directory.
-RES_SETTINGS[:projectdirpath] = pwd()
+"""
+### Attributes
+- `projectpath` The path to the project directory which all object save/load will be performed.
+- `threadtargetname` The name of the current FIO target of each thread in the Julia environment, 
+                     this have took advantage of each thread can only save one object at a time.
+"""
+mutable struct FioState
+    projectpath::String
+    threadtargetname::Vector{String}
+end
+
+global FIO_STATE = FioState(
+    pwd(), # The default directiory is the current working directory.
+    ["" for i in 1:Threads.nthreads()]) # Defaults to an empty string.
 
 """
     fiodir(path::String)
@@ -22,7 +31,7 @@ function fiodir(path::String)
             @error "Could not create resource directory at $path"
         end
     end
-    RES_SETTINGS[:projectdirpath] = path
+    FIO_STATE.projectpath = path
     @info "Resource directory is set to $path"
     return
 end
@@ -33,7 +42,7 @@ export fiodir
 
 Return the current project directory path.
 """
-fiodir() = RES_SETTINGS[:projectdirpath]
+fiodir() = FIO_STATE.projectpath
 
 # The JSON key of the type of the object.
 const JL_TYPE::String = ":t"
@@ -175,6 +184,14 @@ end
 export fiostoragetype
 
 """
+    fiotargetname()
+
+Return the name of the current FIO target of the current thread in the Julia environment, 
+if the current thread has no target the return value will be `""`.
+"""
+fiotargetname() = FIO_STATE.threadtargetname[Threads.threadid()]
+
+"""
     fiosave(object; name::String)
 
 Save the given `object` to a file with the given `name` in the current project directory defined in `fiodir()`, 
@@ -191,7 +208,11 @@ function fiosave(object; name::String)
         storageobject = convert(STORAGE_TYPES[type], object)
     end
     filepath = joinpath(fiodir(), "$name.json")
+    # Set the target name for the current thread.
+    FIO_STATE.threadtargetname[Threads.threadid()] = name
     jsonstring = JSON.json(storageobject)
+    # Reset the target name for the current thread.
+    FIO_STATE.threadtargetname[Threads.threadid()] = ""
     open(filepath, "w") do io
         write(io, jsonstring)
         @info "Saved $type object to $filepath"

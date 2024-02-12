@@ -1,9 +1,5 @@
-using Distributed
-procs = addprocs(5)
-@info("Using $(nworkers()) threads...")
-
-@everywhere using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics, DataFrames
-@everywhere using Zipper
+using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+using Zipper
 
 function _crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
     addinspacemomentuminfo::Bool = false)

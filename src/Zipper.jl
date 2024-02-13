@@ -4,7 +4,7 @@ using OrderedCollections, Base.Iterators, SparseArrays
 using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
 using ExprTools
-include("lib/memorization.jl")
+include("lib/memoization.jl")
 
 using ProgressMeter
 include("lib/parallel.jl")

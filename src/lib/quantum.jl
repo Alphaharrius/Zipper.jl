@@ -359,7 +359,7 @@ export getsparsefock
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-@memorize function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
+@memoize function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
     homefock::SparseFock = basismodes|>FockSpace
     korderings::Dict{Momentum, Integer} = Dict(k=>n for (n, k) in crystal|>brillouinzone|>enumerate)
     return CrystalFock(crystal, korderings, homefock)

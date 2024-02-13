@@ -90,18 +90,18 @@ mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 export vol
 
-@memorize function latticepoints(crystal::Crystal)::Subset{Offset}
+@memoize function latticepoints(crystal::Crystal)::Subset{Offset}
     realspace::RealSpace = getspace(crystal.unitcell)
     crystalmesh::Matrix{Int64} = mesh(crystal.sizes)
     return Subset(Point(pos, realspace) for pos in eachcol(crystalmesh))
 end
 export latticepoints
 
-@memorize sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
+@memoize sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
     latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
 export sitepoints
 
-@memorize function brillouinzone(crystal::Crystal)::Subset{Momentum}
+@memoize function brillouinzone(crystal::Crystal)::Subset{Momentum}
     momentum_space::MomentumSpace = convert(MomentumSpace, getspace(crystal.unitcell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)

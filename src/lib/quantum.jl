@@ -1662,7 +1662,7 @@ end
 """ Generates the output `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
 function Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock
     basismodes::Subset{Mode} = fockmap.blocks|>first|>last|>getoutspace|>removeattr(:k)
-    getcrystalfock(basismodes, fockmap.outcrystal)
+    return getcrystalfock(basismodes, fockmap.outcrystal)
 end
 
 """ Convert a `CrystalFockMap` into a `SparseFockMap`. """

@@ -37,6 +37,27 @@ function modeselectionbycount(count::Integer)
 end
 export modeselectionbycount
 
+function modeselection1stbycountthenbythreshold(count::Integer,threshold::Float64)::Function
+    function modefockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
+        spectrum::EigenSpectrum = 𝐶ᵣ |> eigspech
+        evals = spectrum |> geteigenvalues
+        sortedmodeandevalpairs = sort!(collect(evals), by = x->x.second)
+        filledmodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[1:count])
+        reffilledeval = sortedmodeandevalpairs[count][2]
+        emptymodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[(end - count + 1):end])
+        refemptyeval = sortedmodeandevalpairs[end - count + 1][2]
+        filledmodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> p.second-reffilledeval < threshold, spectrum |> geteigenvalues))
+        emptymodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> 1-threshold < p.second+1-refemptyeval, spectrum |> geteigenvalues))
+        filledmodes = filledmodesbycount + filledmodesbythreshold
+        emptymodes = emptymodesbycount + emptymodesbythreshold
+        couriermodes::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> threshold + reffilledeval <= p.second <= refemptyeval - threshold, spectrum |> geteigenvalues))
+        return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),
+        :courier => columns(spectrum |> geteigenvectors, FockSpace(couriermodes)))
+    end
+    return modefockmaps
+end
+export modeselection1stbycountthenbythreshold
+
 localisometries(
     correlations::FockMap, regionfock::FockSpace;
     selectionstrategy::Function = modeselectionbythreshold(1e-3))::Dict{Symbol, FockMap} = (
@@ -47,21 +68,10 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
     addinspacemomentuminfo::Bool = false)
 
     crystal::Crystal = getcrystal(crystalfock)
-    transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) / (crystal |> vol |> sqrt)
-    # fouriermap::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) 
-    # # momentumfouriers::Base.Generator = rowsubmaps(fouriermap)
-    # bz::Subset{Momentum} = brillouinzone(crystal)
+    fouriermap::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) 
+    # momentumfouriers::Base.Generator = rowsubmaps(fouriermap)
+    bz::Subset{Momentum} = brillouinzone(crystal)
 
-    # function preprocesslocalisometry(k::Momentum)::FockMap
-    #     if !addinspacemomentuminfo
-    #         return localisometry
-    #     end
-    #     inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:k => k) |> removeattr(:r) |> FockSpace
-    #     return FockMap(localisometry, inspace=inspace, performpermute=false)
-    # end
-
-    # # return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
-    # return Dict(k => fouriermap[getsubspace(crystalfock, k), :] * preprocesslocalisometry(k) for k in bz)
     function preprocesslocalisometry(k::Momentum)::FockMap
         if !addinspacemomentuminfo
             return localisometry
@@ -70,12 +80,8 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
         return FockMap(localisometry, inspace=inspace, performpermute=false)
     end
 
-    isometries = paralleltasks(
-        name="crystalisometries",
-        tasks=(()->(k=>transform[getsubspace(crystalfock, k), :]*preprocesslocalisometry(k)) for k in crystal|>brillouinzone),
-        count=crystal|>vol)|>parallel
-
-    return isometries
+    # return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
+    return Dict(k => fouriermap[getsubspace(crystalfock, k), :] * preprocesslocalisometry(k) for k in bz)
 end
 export gmeracrystalisometries
 
@@ -118,28 +124,6 @@ function groupmodesbydistwifb(;
     return store
 end
 export groupmodesbydistwifb
-
-# function groupptbydist(;
-#     region::Subset{Point{RealSpace}},
-#     center::Point,
-#     samedistancethreshold::Int = 3)
-#     visualspace = region |> getspace |> euclidean
-#     physicalnorm = pt -> lineartransform(visualspace, pt) |> norm
-#     distancewithpt = sort([(physicalnorm(pt-center),pt) for pt in region], by = first, rev = true)
-#     df = DataFrame()
-#     df.distance = [round(dist; digits=samedistancethreshold) for (dist,_) in distancewithpt]
-#     df.pt = [pt for (_,pt) in distancewithpt]
-#     grouped_df = groupby(df, :distance)
-#     store = Dict()
-#     for (ind,group) in enumerate(grouped_df)
-#         store[ind] = []
-#         for (distance,pt) in zip(group.distance,group.pt)
-#             push!(store[ind],(distance,pt))
-#         end
-#     end
-#     return store
-# end
-# export groupptbydist
 
 
 function localwannierseedslists(modebydistwifb,localiso::Dict{Symbol,FockMap})
@@ -347,11 +331,12 @@ export gmerastep1
 # end
 # export gmerastep2
 
-function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFockMap,offsetlist)
+function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFockMap,offsetlist,selectionstragedy)
     origcrystal::Crystal = getcrystal(rgblockedcorrelations|>getinspace)
     crystal::Crystal = getcrystal(correlations|>getinspace)
     space::RealSpace = crystal|>getspace
-    function startingfulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstragedy::Function=modeselectionbycount(3))
+    function startingfulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstragedy::Function=modeselectionbycount(6))
+        @info ("starting step for one layer of gmera...")
         shift = [1/2,1/2] ∈ space
         shiftedorigunitcell::Region = Subset(pt+offset for pt in (origcrystal|>getunitcell))
         if offset == ([1/2,0] ∈ space) || offset == ([-1/2,0] ∈ space) || offset == ([0,1/2] ∈ space) || offset == ([0,-1/2] ∈ space)
@@ -391,6 +376,7 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
     end
 
     function fulllocalwannierization(correlations::CrystalFockMap,offset::Offset,selectionstrategy::Function,refselectionstrategydict)
+        @info ("other steps for one layer of gmera...")
         shiftedorigunitcell::Region = Subset(pt+offset for pt in (origcrystal|>getunitcell))
         if offset == ([1/2,0] ∈ space) || offset == ([-1/2,0] ∈ space) || offset == ([0,1/2] ∈ space) || offset == ([0,-1/2] ∈ space)
             @info ("gmera step for vertical or horizontal offset...")
@@ -428,11 +414,11 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
         return combinedlocalwannierization(localiso,localwannierlist,localseedingfock)
     end
 
-    wannierinfos =  Dict(offsetlist[1]=>startingfulllocalwannierization(correlations,offsetlist[1]))
+    wannierinfos =  Dict(offsetlist[1]=>startingfulllocalwannierization(correlations,offsetlist[1],selectionstragedy))
     refselectionstragedydict = Dict(:empty=>(wannierinfos[offsetlist[1]][:bempty]),:filled=>(wannierinfos[offsetlist[1]][:bfilled]),:courier=>(wannierinfos[offsetlist[1]][:bcourier]))
     
     for offset in offsetlist[2:length(offsetlist)]
-        wannierinfos[offset] = fulllocalwannierization(correlations,offset,modeselectionbycount(3),refselectionstragedydict)
+        wannierinfos[offset] = fulllocalwannierization(correlations,offset,selectionstragedy,refselectionstragedydict)
     end
 
     extendedwannierizedempty =  sum(wannierinfos[offset][:wannierempty] for offset in offsetlist)

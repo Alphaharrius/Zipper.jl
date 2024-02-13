@@ -15,7 +15,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [24, 24])
+crystal = Crystal(unitcell, [48, 48])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -53,7 +53,7 @@ H = CrystalFockMap(energyspectrum)
 @info("Starting RG...")
 crystalfock = correlations|>getoutspace
 
-scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
+scale = Scale([3 0; 0 3], crystalfock|>getcrystal|>getspace)
 @info("Performing unitcellblocking...")
 @info("Generating unitcellblocking transformation...")
 blocker = @time scale * crystalfock
@@ -67,7 +67,7 @@ function gmera(correlations,reftransistionmap)
     @info("Starting RG...")
     crystalfock = correlations|>getoutspace
 
-    rgscale = Scale([3 0; 0 3], crystalfock|>getcrystal|>getspace)
+    rgscale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
     @info("Performing rgblocking...")
     @info("Generating rgblocking transformation...")
     rgblocker = @time rgscale * crystalfock
@@ -84,26 +84,26 @@ function gmera(correlations,reftransistionmap)
     thirdcenterlist = [[1/2,1/2] ∈ rgblockedspace,[-1/2,-1/2] ∈ rgblockedspace, [-1/2,1/2] ∈ rgblockedspace,[1/2,-1/2] ∈ rgblockedspace]
     finalcenterlist = [[0,0] ∈ rgblockedspace]
     @info ("1st gmera step...")
-    gmera1 = @time gmerastep(rgblockedcorrelations,rgblockedcorrelations,firstcenterlist)
+    gmera1 = @time gmerastep(rgblockedcorrelations,rgblockedcorrelations,firstcenterlist, modeselectionbycount(6))
     # gmera1 = @time gmerastep1(rgblockedcorrelations,firstcenterlist)
     @info ("1st gmera approximation to correlations...")
     gmera1approx = transistionmap*gmera1[:emptyisometry]*gmera1[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera1[:courierisometry]
 
     @info ("2nd gmera step...")
-    gmera2 = @time gmerastep(rgblockedcorrelations,gmera1[:correlations],secondcenterlist)
+    gmera2 = @time gmerastep(rgblockedcorrelations,gmera1[:correlations],secondcenterlist, modeselectionbycount(6))
     @info ("2nd gmera approximation to correlations...")
     gmera2approx = transistionmap*gmera2[:emptyisometry]*gmera2[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera2[:courierisometry]
 
     @info ("3rd gmera step...")
-    gmera3 = @time gmerastep(rgblockedcorrelations,gmera2[:correlations],thirdcenterlist)
+    gmera3 = @time gmerastep(rgblockedcorrelations,gmera2[:correlations],thirdcenterlist, modeselectionbycount(6))
     @info ("3rd gmera approximation to correlations...")
     gmera3approx = transistionmap*gmera3[:emptyisometry]*gmera3[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera3[:courierisometry]
 
     @info ("final gmera step...")
-    gmera4 = @time gmerastep(rgblockedcorrelations,gmera3[:correlations],finalcenterlist)
+    gmera4 = @time gmerastep(rgblockedcorrelations,gmera3[:correlations],finalcenterlist, modeselectionbycount(6))
     @info ("4th gmera approximation to correlations...")
     gmera4approx = transistionmap*gmera4[:emptyisometry]*gmera4[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera4[:courierisometry]
@@ -136,10 +136,22 @@ end
 
 rg1 = gmera(blockedcorrelations,idmap(blockedcorrelations|>getinspace))
 rg2 = gmera(rg1[:correlations],rg1[:transistionmap])
-
-rg2[:correlations]
+visualize(rg1[:correlations]|>getinspace|>getcrystal|>getunitcell)
 
 rg1blockedcorrelations = rg1[:rgblockedmap]*blockedcorrelations*rg1[:rgblockedmap]'
+rg1blockedunitcell = rg1blockedcorrelations|>getinspace|>unitcellfock|>RegionFock
+visualize(regioncorrelations(rg1blockedcorrelations,rg1blockedunitcell)|>eigspech)
+modeselectionbycount(3)
+localisometries(rg1blockedcorrelations,rg1blockedunitcell,selectionstrategy=modeselection1stbycountthenbythreshold(3,0.001))
+# refspec = regioncorrelations(rg1blockedcorrelations,rg1blockedunitcell)|>eigspech
+# refevals = refspec|> geteigenvalues
+# sortres = sort!(collect(refevals), by = x->x.second)
+# [pair[2] for pair in sortres]
+
+
+# rg2[:correlations]
+
+
 rg2blockedcorrelations = rg2[:rgblockedmap]*rg1[:correlations]*rg2[:rgblockedmap]'
 
 rg1approx = rg1[:gmera1stapprox] + rg1[:gmera2ndapprox] + rg1[:gmera3rdapprox] + rg1[:gmera4thapprox]

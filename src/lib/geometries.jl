@@ -90,14 +90,14 @@ mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 export vol
 
-function latticepoints(crystal::Crystal)::Subset{Offset}
+@memorize function latticepoints(crystal::Crystal)::Subset{Offset}
     realspace::RealSpace = getspace(crystal.unitcell)
     crystalmesh::Matrix{Int64} = mesh(crystal.sizes)
     return Subset(Point(pos, realspace) for pos in eachcol(crystalmesh))
 end
 export latticepoints
 
-sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
+@memorize sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
     latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
 export sitepoints
 

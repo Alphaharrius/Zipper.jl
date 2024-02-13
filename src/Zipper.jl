@@ -3,6 +3,9 @@ module Zipper
 using OrderedCollections, Base.Iterators, SparseArrays
 using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
+using ExprTools
+include("lib/memorization.jl")
+
 using ProgressMeter
 include("lib/parallel.jl")
 
@@ -12,8 +15,6 @@ include("interfaces/core.jl")
 include("interfaces/spaces.jl")
 include("interfaces/transformations.jl")
 include("interfaces/geometries.jl")
-
-include("lib/memorization.jl")
 
 include("lib/spaces.jl")
 include("lib/geometries.jl")

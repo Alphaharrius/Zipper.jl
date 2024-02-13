@@ -1698,7 +1698,7 @@ function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
         return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
     end
 
-    blocks::Dict = paralleltasks(
+    blocks::Dict{Any, Any} = paralleltasks(
         name="CrystalFockMap + CrystalFockMap",
         tasks=(()->compute(data) for data in a.blocks),
         count=length(a.blocks))|>parallel|>Dict

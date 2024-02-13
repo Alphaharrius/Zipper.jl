@@ -1,16 +1,16 @@
-MEMORIZED::Dict{Symbol, Dict} = Dict()
+MEMOIZED::Dict{Symbol, Dict} = Dict()
 
 function memoization(f::Function)
     fsymbol = Symbol(f)
-    haskey(MEMORIZED, fsymbol) || (MEMORIZED[fsymbol] = Dict())
+    haskey(MEMOIZED, fsymbol) || (MEMOIZED[fsymbol] = Dict())
     return function (arguments...; kwarguments...)
         key = Dict(:arguments=>arguments, kwarguments...)
-        if haskey(MEMORIZED[fsymbol], key)
+        if haskey(MEMOIZED[fsymbol], key)
             @debug "Using memoized value for $(f) with arguments $(arguments)"
-            return MEMORIZED[fsymbol][key]
+            return MEMOIZED[fsymbol][key]
         else
             result = f(arguments...; kwarguments...)
-            MEMORIZED[fsymbol][key] = result
+            MEMOIZED[fsymbol][key] = result
             return result
         end
     end
@@ -31,4 +31,3 @@ macro memoize(innerdef)
     )
     return esc(ExprTools.combinedef(outerdef))
 end
-export @memoize

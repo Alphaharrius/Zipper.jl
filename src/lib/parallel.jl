@@ -59,7 +59,7 @@ function paralleltasks(; name::String, tasks, count::Integer)
         return rets
     end
 
-    watchprogress(desc="paralleltasks")
+    watchprogress(desc="paralleltasks ($name)")
     partitioned::Vector = []
     for partition in taskpartitions
         push!(partitioned, (runnable, partition))

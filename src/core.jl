@@ -13,14 +13,7 @@ Base.:convert(::Type{T}, source::T) where {T <: Element} = source
 Base.:convert(::Type{OrderedSet{T}}, source::T) where {T <: Element} = OrderedSet{T}([source])
 
 # The default hashing function for all Element subtypes
-function Base.:hash(o::Element)
-    hashvalue = 0
-    for field in typeof(o)|>fieldnames
-        # Hash all attribute values of the type.
-        hashvalue += hash(getfield(o, field))
-    end
-    return hashvalue
-end
+Base.:hash(o::Element)::UInt = reduce(⊻, getfield(o, fieldname)|>hash for fieldname in typeof(o)|>fieldnames)
 
 # Overload the hashing function for vector of points to yield the same value with the same data content.
 Base.:hash(elements::Vector{T}) where {T <: Element} = hash([element|>hash for element in elements])

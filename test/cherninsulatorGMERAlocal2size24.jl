@@ -88,24 +88,28 @@ function gmera(correlations,reftransistionmap)
     # gmera1 = @time gmerastep1(rgblockedcorrelations,firstcenterlist)
     @info ("1st gmera approximation to correlations...")
     gmera1approx = transistionmap*gmera1[:emptyisometry]*gmera1[:emptyisometry]'*transistionmap'
+    # gmera1approx = transistionmap*gmera1[:emptyisometry]
     transistionmap = transistionmap*gmera1[:courierisometry]
 
     @info ("2nd gmera step...")
     gmera2 = @time gmerastep(rgblockedcorrelations,gmera1[:correlations],secondcenterlist, modeselectionbycount(3))
     @info ("2nd gmera approximation to correlations...")
     gmera2approx = transistionmap*gmera2[:emptyisometry]*gmera2[:emptyisometry]'*transistionmap'
+    # gmera2approx = transistionmap*gmera2[:emptyisometry]
     transistionmap = transistionmap*gmera2[:courierisometry]
 
     @info ("3rd gmera step...")
     gmera3 = @time gmerastep(rgblockedcorrelations,gmera2[:correlations],thirdcenterlist, modeselectionbycount(3))
     @info ("3rd gmera approximation to correlations...")
     gmera3approx = transistionmap*gmera3[:emptyisometry]*gmera3[:emptyisometry]'*transistionmap'
+    # gmera3approx = transistionmap*gmera3[:emptyisometry]
     transistionmap = transistionmap*gmera3[:courierisometry]
 
     @info ("final gmera step...")
     gmera4 = @time gmerastep(rgblockedcorrelations,gmera3[:correlations],finalcenterlist, modeselectionbycount(3))
     @info ("4th gmera approximation to correlations...")
     gmera4approx = transistionmap*gmera4[:emptyisometry]*gmera4[:emptyisometry]'*transistionmap'
+    # gmera4approx = transistionmap*gmera4[:emptyisometry]
     transistionmap = transistionmap*gmera4[:courierisometry]
     
     # return gmera1
@@ -139,15 +143,20 @@ rg2size24 = gmera(rg1size24[:correlations],rg1size24[:transistionmap])
 
 core24 = @time distillation(rg2size24[:correlations]|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
 coreemptyprojector24 = core24[:empty]|>crystalprojector
-rg2size24[:transistionmap]*coreemptyprojector24*rg2size24[:transistionmap]'
+
+fullfouriermap = fullftmap(blockedcorrelations24)
 
 rg1size24approx = rg1size24[:gmera1stapprox]+rg1size24[:gmera2ndapprox]+rg1size24[:gmera3rdapprox]+rg1size24[:gmera4thapprox]
 rg2size24approx = rg2size24[:gmera1stapprox]+rg2size24[:gmera2ndapprox]+rg2size24[:gmera3rdapprox]+rg2size24[:gmera4thapprox]
 
+errormatink = blockedcorrelations24-rg1size24approx-rg2size24approx-rg2size24[:transistionmap]*coreemptyprojector24*rg2size24[:transistionmap]'
+errormat = fullfouriermap'*errormatink*fullfouriermap
+sum(abs(FockMap(errormatink))|>rep)/1152
+sum(abs(FockMap(errormat))|>rep)/1152
 
-sum(FockMap(abs(blockedcorrelations24-rg1size24approx-rg2size24approx-rg2size24[:transistionmap]*coreemptyprojector24*rg2size24[:transistionmap]'))|>rep)/1152
+# visualize(errormat)
 
-visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx-rg3size24approx))
+# visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx-rg3size24approx))
 
-visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx))
-visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx-rg3size24approx))
+# visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx))
+# visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx-rg3size24approx))

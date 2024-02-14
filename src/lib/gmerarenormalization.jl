@@ -44,8 +44,10 @@ function modeselection1stbycountthenbythreshold(count::Integer,threshold::Float6
         sortedmodeandevalpairs = sort!(collect(evals), by = x->x.second)
         filledmodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[1:count])
         reffilledeval = sortedmodeandevalpairs[count][2]
+        println("ref filled eigenvalue ", reffilledeval)
         emptymodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[(end - count + 1):end])
         refemptyeval = sortedmodeandevalpairs[end - count + 1][2]
+        println("ref empty eigenvalue ", refemptyeval)
         filledmodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> p.second-reffilledeval < threshold, spectrum |> geteigenvalues))
         emptymodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> 1-threshold < p.second+1-refemptyeval, spectrum |> geteigenvalues))
         filledmodes = filledmodesbycount + filledmodesbythreshold
@@ -63,6 +65,16 @@ localisometries(
     selectionstrategy::Function = modeselectionbythreshold(1e-3))::Dict{Symbol, FockMap} = (
     regioncorrelations(correlations, regionfock) |> selectionstrategy)
 export localisometries
+
+function fullftmap(correlations::FockMap)
+    crystal = correlations|>getinspace|>getcrystal
+    crystalpoints::Subset{Offset} = latticepoints(crystal)
+    crystalfock::CrystalFock = correlations|>getinspace
+    realspacemodes::RegionFock = RegionFock(spanoffset(correlations|>getinspace|>unitcellfock|>orderedmodes, crystalpoints))
+    fouriermap::FockMap = fourier(crystalfock, realspacemodes)/ (crystalfock|>subspacecount|>sqrt)
+    return fouriermap
+end
+export fullftmap
 
 function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
     addinspacemomentuminfo::Bool = false)

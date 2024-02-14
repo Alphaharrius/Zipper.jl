@@ -359,7 +359,7 @@ export getsparsefock
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
-function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
+@memoize function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
     homefock::SparseFock = basismodes|>FockSpace
     korderings::Dict{Momentum, Integer} = Dict(k=>n for (n, k) in crystal|>brillouinzone|>enumerate)
     return CrystalFock(crystal, korderings, homefock)
@@ -580,11 +580,9 @@ orderedmodes(fockspace::FockSpace)::Subset{Mode} = Iterators.flatten(rep(fockspa
 # TODO: Implement for CrystalFock
 export orderedmodes
 
-function orderedmodes(crystalfock::CrystalFock)::Base.Iterators.Flatten
-    korderings = crystalfock.korderings|>collect
-    sort!(korderings, by=last)
-    return (mode|>setattr(:k=>k) for (k, _) in korderings for mode in crystalfock|>unitcellfock)
-end
+orderedmodes(crystalfock::CrystalFock) = (
+    # brillouinzone is the default ordering of the momentums since korderings is generated from it too.
+    mode|>setattr(:k=>k) for k in crystalfock|>getcrystal|>brillouinzone for mode in crystalfock|>unitcellfock)
 
 """
     orderingrule(fromspace::FockSpace, tospace::FockSpace)::Vector{Int64}
@@ -1664,7 +1662,7 @@ end
 """ Generates the output `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, it is recommended to store the result. """
 function Zipper.:getoutspace(fockmap::CrystalFockMap)::CrystalFock
     basismodes::Subset{Mode} = fockmap.blocks|>first|>last|>getoutspace|>removeattr(:k)
-    getcrystalfock(basismodes, fockmap.outcrystal)
+    return getcrystalfock(basismodes, fockmap.outcrystal)
 end
 
 """ Convert a `CrystalFockMap` into a `SparseFockMap`. """
@@ -1689,7 +1687,7 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
     spdata = paralleltasks(
         name="FockMap(::CrystalFockMap)",
         tasks=(()->compute(batch) for batch in batches),
-        count=length(batches))|>parallel|>sum
+        count=getmaxthreads())|>parallel|>sum
 
     return FockMap(outspace, inspace, spdata)
 end
@@ -1700,7 +1698,7 @@ function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
         return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
     end
 
-    blocks::Dict = paralleltasks(
+    blocks::Dict{Any, Any} = paralleltasks(
         name="CrystalFockMap + CrystalFockMap",
         tasks=(()->compute(data) for data in a.blocks),
         count=length(a.blocks))|>parallel|>Dict

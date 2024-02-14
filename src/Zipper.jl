@@ -3,6 +3,9 @@ module Zipper
 using OrderedCollections, Base.Iterators, SparseArrays
 using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
+using ExprTools, ConcurrentCollections
+include("lib/memoization.jl")
+
 using ProgressMeter
 include("lib/parallel.jl")
 

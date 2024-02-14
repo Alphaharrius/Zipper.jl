@@ -1,7 +1,3 @@
-# Overload the hashing function for vector of points to yield the same value with the same data content.
-Base.:hash(elements::Vector{T}) where {T <: Element} = hash([element|>hash for element in elements])
-Base.:hash(elements::Tuple{Vararg{Element, N}}) where {N} = hash([element|>hash for element in elements])
-
 """
     dimension(space::T)::Integer where {T <: AbstractSpace}
 
@@ -183,10 +179,9 @@ Get the dimension of the `Point`, which is the dimension of its vector represent
 Zipper.:dimension(point::Point)::Integer = point |> vec |> length
 
 # rpos is used to to equate the points to round off slight differences.
-function Base.:(==)(a::Point, b::Point)::Bool
-    @assert(typeof(a |> getspace) == typeof(b |> getspace))
-    return rpos(a) == rpos(b)
-end
+Base.:(==)(a::Offset, b::Offset)::Bool = rpos(a) == rpos(b)
+# Reciprocal space points are equivalent only if they reside in the same space.
+Base.:(==)(a::Momentum, b::Momentum)::Bool = getspace(a) == getspace(b) && rpos(a) == rpos(b)
 
 LinearAlgebra.:norm(point::Point) = point |> vec |> norm
 LinearAlgebra.:normalize(point::Point) = Point(point |> vec |> normalize, point |> getspace)
@@ -284,7 +279,7 @@ function Zipper.:getspace(subset::Subset)
 end
 
 # Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the OrderedSet representation and leave to the Base.isequal for identification.
-Base.:hash(subset::Subset)::UInt = hash(rep(subset))
+Base.:hash(subset::Subset)::UInt = hash([v for v in rep(subset)])
 Base.:isequal(a::Subset, b::Subset)::Bool = a == b
 
 # Overloads for iterators.

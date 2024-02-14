@@ -1,6 +1,6 @@
 name = "Zipper"
 uuid = "b58802ec-5e99-4d09-92f2-6abd5f310117"
-authors = ["Sam <samwongapple@gmail.com>"]
+authors = ["Alphaharrius <alphaharrius@gmail.com>", "Sam <samwongapple@gmail.com>"]
 version = "0.1.0"
 
 [deps]

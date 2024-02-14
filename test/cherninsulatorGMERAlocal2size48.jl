@@ -138,11 +138,14 @@ rg1size48 = gmera(blockedcorrelations48,idmap(blockedcorrelations48|>getinspace)
 rg2size48 = gmera(rg1size48[:correlations],rg1size48[:transistionmap])
 rg3size48 = gmera(rg2size48[:correlations],rg2size48[:transistionmap])
 
+core48 = @time distillation(rg3size48[:correlations]|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
+coreemptyprojector48 = core48[:empty]|>crystalprojector
+rg3size48[:transistionmap]*coreemptyprojector48*rg3size48[:transistionmap]'
+
+
 rg1size48approx = rg1size48[:gmera1stapprox]+rg1size48[:gmera2ndapprox]+rg1size48[:gmera3rdapprox]+rg1size48[:gmera4thapprox]
 rg2size48approx = rg2size48[:gmera1stapprox]+rg2size48[:gmera2ndapprox]+rg2size48[:gmera3rdapprox]+rg2size48[:gmera4thapprox]
 rg3size48approx = rg3size48[:gmera1stapprox]+rg3size48[:gmera2ndapprox]+rg3size48[:gmera3rdapprox]+rg3size48[:gmera4thapprox]
 
-sum(abs(FockMap(blockedcorrelations48-rg1size48approx-rg2size48approx-rg3size48approx))|>rep)/4608
+sum(FockMap(abs(blockedcorrelations48-rg1size48approx-rg2size48approx-rg3size48approx-rg3size48[:transistionmap]*coreemptyprojector48*rg3size48[:transistionmap]'))|>rep)/4608
 
-
-# visualize(FockMap(blockedcorrelations48-rg1size48[:gmera1stapprox]))

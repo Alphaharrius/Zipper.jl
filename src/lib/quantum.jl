@@ -1833,6 +1833,14 @@ end
 
 Base.:*(num::Number, fockmap::CrystalFockMap) = fockmap * num
 
+function Base.:abs(fockmap::CrystalFockMap)::CrystalFockMap
+    blocks::Dict = paralleltasks(
+        name="abs CrystalFockMap",
+        tasks=(()->(pair=>(abs(block))) for (pair, block) in fockmap.blocks),
+        count=length(fockmap.blocks))|>parallel|>Dict
+    return CrystalFockMap(fockmap.outcrystal, fockmap.incrystal, blocks)
+end
+
 function Base.:adjoint(fockmap::CrystalFockMap)
     blocks::Dict = paralleltasks(
         name="adjoint",

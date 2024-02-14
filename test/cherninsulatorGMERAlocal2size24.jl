@@ -15,7 +15,7 @@ spatialsnappingcalibration((pa, pb, pc))
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [12, 12])
+crystal = Crystal(unitcell, [24, 24])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -56,12 +56,12 @@ crystalfock = correlations|>getoutspace
 scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
 @info("Performing unitcellblocking...")
 @info("Generating unitcellblocking transformation...")
-blocker12 = @time scale * crystalfock
+blocker24 = @time scale * crystalfock
 @info("Performing unitcellblocking on correlations...")
-blockedcorrelations12 = @time blocker12 * correlations * blocker12'
-blockedcrystalfock12 = blockedcorrelations12|>getoutspace
-blockedcrystal12::Crystal = blockedcrystalfock12|>getcrystal
-blockedspace12::RealSpace = blockedcrystal12|>getspace
+blockedcorrelations24 = @time blocker24 * correlations * blocker24'
+blockedcrystalfock24 = blockedcorrelations24|>getoutspace
+blockedcrystal24::Crystal = blockedcrystalfock24|>getcrystal
+blockedspace24::RealSpace = blockedcrystal24|>getspace
 
 function gmera(correlations,reftransistionmap)
     @info("Starting RG...")
@@ -134,9 +134,20 @@ function gmera(correlations,reftransistionmap)
         :transistionmap => transistionmap)
 end
 
-rg1size12 = gmera(blockedcorrelations12,idmap(blockedcorrelations12|>getinspace))
+rg1size24 = gmera(blockedcorrelations24,idmap(blockedcorrelations24|>getinspace))
+rg2size24 = gmera(rg1size24[:correlations],rg1size24[:transistionmap])
 
-rg1size12approx = rg1size12[:gmera1stapprox]+rg1size12[:gmera2ndapprox]+rg1size12[:gmera3rdapprox]+rg1size12[:gmera4thapprox]
+core24 = @time distillation(rg2size24[:correlations]|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
+coreemptyprojector24 = core24[:empty]|>crystalprojector
+rg2size24[:transistionmap]*coreemptyprojector24*rg2size24[:transistionmap]'
 
-sum(abs(FockMap(blockedcorrelations12-rg1size12approx))|>rep)/288
+rg1size24approx = rg1size24[:gmera1stapprox]+rg1size24[:gmera2ndapprox]+rg1size24[:gmera3rdapprox]+rg1size24[:gmera4thapprox]
+rg2size24approx = rg2size24[:gmera1stapprox]+rg2size24[:gmera2ndapprox]+rg2size24[:gmera3rdapprox]+rg2size24[:gmera4thapprox]
 
+
+sum(FockMap(abs(blockedcorrelations24-rg1size24approx-rg2size24approx-rg2size24[:transistionmap]*coreemptyprojector24*rg2size24[:transistionmap]'))|>rep)/1152
+
+visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx-rg3size24approx))
+
+visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx))
+visualize(FockMap(blockedcorrelations24-rg1size24approx-rg2size24approx-rg3size24approx))

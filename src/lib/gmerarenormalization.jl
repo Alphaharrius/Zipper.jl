@@ -442,8 +442,17 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
         wanniercrystalisos = gmeracrystalisometries(localisometry=localisometry, crystalfock=correlations|>getoutspace,addinspacemomentuminfo=true)
 
         wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b)) for mode in localisometry|>getinspace |> orderedmodes)
-        wanniercrystall::Crystal = Crystal(wannierunitcell, (correlations|>getoutspace|> getcrystal).sizes)
-        globalwannierizedfunction::FockMap = crystaldirectsum(outcrystal = correlations|>getoutspace|>getcrystal, incrystal=wanniercrystall,wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
+        wanniercrystal::Crystal = Crystal(wannierunitcell, (correlations|>getoutspace|> getcrystal).sizes)
+
+        blocks = Dict(((k, k)=>isometry) for (k, isometry) in wanniercrystalisos|>Dict)
+        
+        # blocks = paralleltasks(
+        #     name="construct global isometry",
+        #     tasks=(()->((k, k)=>isometry) for (k, isometry) in wanniercrystalisos|>Dict),
+        #     count=wanniercrystalisos|>Dict|>length)|>parallel|>Dict
+        
+        globalwannierizedfunction::FockMap = CrystalFockMap(correlations|>getoutspace|>getcrystal, wanniercrystal, blocks)
+        # globalwannierizedfunction::FockMap = crystaldirectsum(outcrystal = correlations|>getoutspace|>getcrystal, incrystal=wanniercrystall,wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
 
         return globalwannierizedfunction
     end

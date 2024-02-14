@@ -1,8 +1,8 @@
-MEMOIZED::Dict{Symbol, Dict} = Dict()
+MEMOIZED::ConcurrentDict{Symbol, ConcurrentDict} = ConcurrentDict{Symbol, ConcurrentDict}()
 
 function memoization(f::Function)
     fsymbol = Symbol(f)
-    haskey(MEMOIZED, fsymbol) || (MEMOIZED[fsymbol] = Dict())
+    haskey(MEMOIZED, fsymbol) || (MEMOIZED[fsymbol] = ConcurrentDict{Dict, Any}())
     return function (arguments...; kwarguments...)
         key = Dict(:arguments=>arguments, kwarguments...)
         if haskey(MEMOIZED[fsymbol], key)

@@ -1687,7 +1687,7 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
     spdata = paralleltasks(
         name="FockMap(::CrystalFockMap)",
         tasks=(()->compute(batch) for batch in batches),
-        count=length(batches))|>parallel|>sum
+        count=getmaxthreads())|>parallel|>sum
 
     return FockMap(outspace, inspace, spdata)
 end

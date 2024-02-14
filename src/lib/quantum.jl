@@ -1034,10 +1034,15 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
         values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
     end
 
+    # TODO: Remove test code for isolating the issue.
+    mhfmodes = orderedmodes(momentumhomefock)
+    regionmodes = orderedmodes(regionfock)
+
     # Since each (n, m) only corresponds to one entry, thus this is thread-safe.
     paralleltasks(
         name="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)",
-        tasks=(()->fillvalues(n, homemode, m, inmode) for ((n, homemode), (m, inmode)) in Iterators.product(momentumhomefock|>enumerate, regionfock|>enumerate)),
+        # TODO: Remove test code for isolating the issue.
+        tasks=(()->fillvalues(n, homemode, m, inmode) for ((n, homemode), (m, inmode)) in Iterators.product(mhfmodes|>enumerate, regionmodes|>enumerate)),
         count=dimension(momentumhomefock)*dimension(regionfock))|>parallel
 
     data::SparseMatrixCSC = reshape(values, (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC

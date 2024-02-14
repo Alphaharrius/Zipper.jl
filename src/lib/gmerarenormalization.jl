@@ -81,7 +81,13 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
     end
 
     # return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))
-    return Dict(k => fouriermap[getsubspace(crystalfock, k), :] * preprocesslocalisometry(k) for k in bz)
+    # return Dict(k => fouriermap[getsubspace(crystalfock, k), :] * preprocesslocalisometry(k) for k in bz)
+    isometries = paralleltasks(
+        name="crystalisometries",
+        tasks=(()->(k=>fouriermap[getsubspace(crystalfock, k), :]*preprocesslocalisometry(k)) for k in crystal|>brillouinzone),
+        count=crystal|>vol)|>parallel
+
+    return isometries
 end
 export gmeracrystalisometries
 

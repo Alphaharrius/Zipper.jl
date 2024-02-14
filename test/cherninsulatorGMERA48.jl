@@ -53,15 +53,15 @@ H = CrystalFockMap(energyspectrum)
 @info("Starting RG...")
 crystalfock = correlations|>getoutspace
 
-scale = Scale([3 0; 0 3], crystalfock|>getcrystal|>getspace)
+scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
 @info("Performing unitcellblocking...")
 @info("Generating unitcellblocking transformation...")
-blocker = @time scale * crystalfock
+blocker48 = @time scale * crystalfock
 @info("Performing unitcellblocking on correlations...")
-blockedcorrelations = @time blocker * correlations * blocker'
-blockedcrystalfock = blockedcorrelations|>getoutspace
-blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
-blockedspace::RealSpace = blockedcrystal|>getspace
+blockedcorrelations48 = @time blocker48 * correlations * blocker48'
+blockedcrystalfock48 = blockedcorrelations48|>getoutspace
+blockedcrystal48::Crystal = blockedcrystalfock48|>getcrystal
+blockedspace48::RealSpace = blockedcrystal48|>getspace
 
 function gmera(correlations,reftransistionmap)
     @info("Starting RG...")
@@ -84,26 +84,26 @@ function gmera(correlations,reftransistionmap)
     thirdcenterlist = [[1/2,1/2] ∈ rgblockedspace,[-1/2,-1/2] ∈ rgblockedspace, [-1/2,1/2] ∈ rgblockedspace,[1/2,-1/2] ∈ rgblockedspace]
     finalcenterlist = [[0,0] ∈ rgblockedspace]
     @info ("1st gmera step...")
-    gmera1 = @time gmerastep(rgblockedcorrelations,rgblockedcorrelations,firstcenterlist, modeselectionbycount(6))
+    gmera1 = @time gmerastep(rgblockedcorrelations,rgblockedcorrelations,firstcenterlist, modeselectionbycount(3))
     # gmera1 = @time gmerastep1(rgblockedcorrelations,firstcenterlist)
     @info ("1st gmera approximation to correlations...")
     gmera1approx = transistionmap*gmera1[:emptyisometry]*gmera1[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera1[:courierisometry]
 
     @info ("2nd gmera step...")
-    gmera2 = @time gmerastep(rgblockedcorrelations,gmera1[:correlations],secondcenterlist, modeselectionbycount(6))
+    gmera2 = @time gmerastep(rgblockedcorrelations,gmera1[:correlations],secondcenterlist, modeselectionbycount(3))
     @info ("2nd gmera approximation to correlations...")
     gmera2approx = transistionmap*gmera2[:emptyisometry]*gmera2[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera2[:courierisometry]
 
     @info ("3rd gmera step...")
-    gmera3 = @time gmerastep(rgblockedcorrelations,gmera2[:correlations],thirdcenterlist, modeselectionbycount(6))
+    gmera3 = @time gmerastep(rgblockedcorrelations,gmera2[:correlations],thirdcenterlist, modeselectionbycount(3))
     @info ("3rd gmera approximation to correlations...")
     gmera3approx = transistionmap*gmera3[:emptyisometry]*gmera3[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera3[:courierisometry]
 
     @info ("final gmera step...")
-    gmera4 = @time gmerastep(rgblockedcorrelations,gmera3[:correlations],finalcenterlist, modeselectionbycount(6))
+    gmera4 = @time gmerastep(rgblockedcorrelations,gmera3[:correlations],finalcenterlist, modeselectionbycount(3))
     @info ("4th gmera approximation to correlations...")
     gmera4approx = transistionmap*gmera4[:emptyisometry]*gmera4[:emptyisometry]'*transistionmap'
     transistionmap = transistionmap*gmera4[:courierisometry]
@@ -134,41 +134,15 @@ function gmera(correlations,reftransistionmap)
         :transistionmap => transistionmap)
 end
 
-rg1 = gmera(blockedcorrelations,idmap(blockedcorrelations|>getinspace))
-rg2 = gmera(rg1[:correlations],rg1[:transistionmap])
+rg1size48 = gmera(blockedcorrelations48,idmap(blockedcorrelations48|>getinspace))
+rg2size48 = gmera(rg1size48[:correlations],rg1size48[:transistionmap])
+rg3size48 = gmera(rg2size48[:correlations],rg2size48[:transistionmap])
 
-@info("Starting RG...")
-    rg1crystalfock = rg1[:correlations]|>getoutspace
+rg1size48approx = rg1size48[:gmera1stapprox]+rg1size48[:gmera2ndapprox]+rg1size48[:gmera3rdapprox]+rg1size48[:gmera4thapprox]
+rg2size48approx = rg2size48[:gmera1stapprox]+rg2size48[:gmera2ndapprox]+rg2size48[:gmera3rdapprox]+rg2size48[:gmera4thapprox]
+rg3size48approx = rg3size48[:gmera1stapprox]+rg3size48[:gmera2ndapprox]+rg3size48[:gmera3rdapprox]+rg3size48[:gmera4thapprox]
 
-    rgscale = Scale([2 0; 0 2], rg1crystalfock|>getcrystal|>getspace)
-    @info("Performing rgblocking...")
-    @info("Generating rgblocking transformation...")
-    rgblocker = @time rgscale * rg1crystalfock
-    @info("Performing rgblocking on correlations...")
-    rgblockedcorrelations = @time rgblocker * rg1[:correlations] * rgblocker'
-    rgblockedcrystalfock = rgblockedcorrelations|>getoutspace
-    rgblockedcrystal = rgblockedcrystalfock|>getcrystal
-    rgblockedspace = rgblockedcrystal|>getspace
-    RegionFock(rgblockedcrystalfock|>unitcellfock)
-visualize(regioncorrelations(rgblockedcorrelations,RegionFock(rgblockedcrystalfock|>unitcellfock))|>eigspech)
-
-visualize(rg1[:correlations]|>getinspace|>getcrystal|>getunitcell)
-
-rg1blockedcorrelations = rg1[:rgblockedmap]*blockedcorrelations*rg1[:rgblockedmap]'
-rg1blockedunitcell = rg1blockedcorrelations|>getinspace|>unitcellfock|>RegionFock
-visualize(regioncorrelations(rg1blockedcorrelations,rg1blockedunitcell)|>eigspech)
-modeselectionbycount(3)
-localisometries(rg1blockedcorrelations,rg1blockedunitcell,selectionstrategy=modeselection1stbycountthenbythreshold(3,0.001))
-# refspec = regioncorrelations(rg1blockedcorrelations,rg1blockedunitcell)|>eigspech
-# refevals = refspec|> geteigenvalues
-# sortres = sort!(collect(refevals), by = x->x.second)
-# [pair[2] for pair in sortres]
+sum(abs(FockMap(blockedcorrelations48-rg1size48approx-rg2size48approx-rg3size48approx))|>rep)/4608
 
 
-# rg2[:correlations]
-
-
-rg2blockedcorrelations = rg2[:rgblockedmap]*rg1[:correlations]*rg2[:rgblockedmap]'
-
-rg1approx = rg1[:gmera1stapprox] + rg1[:gmera2ndapprox] + rg1[:gmera3rdapprox] + rg1[:gmera4thapprox]
-rg1blockedcorrelations-rg1approx
+# visualize(FockMap(blockedcorrelations48-rg1size48[:gmera1stapprox]))

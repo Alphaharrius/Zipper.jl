@@ -1013,12 +1013,12 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
     batchsize::Integer = ((crystalfock|>getcrystal|>vol) / getmaxthreads())|>ceil
     batches = Iterators.partition((el for el in crystalfock|>getcrystal|>brillouinzone|>enumerate), batchsize)
     matrixparts = paralleltasks(
-        name="fourier",
+        name="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)",
         tasks=(()->computekmatrix(batch) for batch in batches),
         count=getmaxthreads())|>parallel
 
     momentummatrix::SparseMatrixCSC = spzeros(crystalfock|>getcrystal|>dimension, crystalfock|>getcrystal|>vol)
-    watchprogress(desc="fourier")
+    watchprogress(desc="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)")
     for part in matrixparts
         momentummatrix[:, :] += part
         updateprogress()
@@ -1036,8 +1036,8 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
 
     # Since each (n, m) only corresponds to one entry, thus this is thread-safe.
     paralleltasks(
-        name="fourier",
-        tasks=(()->fillvalues(n, homemode, m, inmode) for (n, homemode) in momentumhomefock|>enumerate for (m, inmode) in regionfock|>enumerate),
+        name="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)",
+        tasks=(()->fillvalues(n, homemode, m, inmode) for ((n, homemode), (m, inmode)) in Iterators.product(momentumhomefock|>enumerate, regionfock|>enumerate)),
         count=dimension(momentumhomefock)*dimension(regionfock))|>parallel
 
     data::SparseMatrixCSC = reshape(values, (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC

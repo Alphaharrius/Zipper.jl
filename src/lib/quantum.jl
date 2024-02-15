@@ -59,9 +59,6 @@ function Zipper.:getspace(mode::Mode)
     return euclidean(RealSpace, 1)
 end
 
-""" Shorthand to create a one element `Subset{Mode}`. """
-Zipper.:Subset(modes::Mode...) = Subset(m for m in modes)
-
 """
     getpos(mode::Mode)::Point
 

@@ -94,7 +94,7 @@ function Subset(iter)
 end
 
 """ Allow using shorthand of `Subset(v0, v1, ...)`. """
-Subset(elements...) = Subset(elements)
+Subset(elements::Element...) = Subset(elements)
 
 export Subset
 

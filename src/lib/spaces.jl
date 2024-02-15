@@ -86,6 +86,8 @@ Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = Momentu
 Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(getbasis(source) / (2.0 * π)))))
 
 Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in vec(point)]) ∈ $(point |> getspace |> typeof)"))
+Base.:show(io::IO, ::Type{Offset}) = print(io, "Offset")
+Base.:show(io::IO, ::Type{Momentum}) = print(io, "Momentum")
 
 """
     getspace(point::Point)

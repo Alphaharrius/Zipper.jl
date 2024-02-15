@@ -87,6 +87,8 @@ function Subset(iter)
         haskey(orderings, v) || (orderings[v] = n)
     end
     sorted = sort(orderings|>collect, by=last)
+    # If there are repeative elements in iter, we need to reassign the orderings.
+    orderings = Dict(v=>n for (n, (v, _)) in sorted|>enumerate)
     elements::Vector{T} = [key for (key, _) in sorted]
     return Subset{T}(elements, orderings)
 end

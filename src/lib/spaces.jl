@@ -352,6 +352,11 @@ Base.:filter(f, set::Subset) = Subset(Iterators.filter(f, set|>rep))
 Iterators.:flatten(set::Subset{<:Subset}) = Subset(v for inner in set for v in inner)
 # ======================================================================================
 
+# =====================================================
+# Subset indexing
+Base.:getindex(set::Subset{T}, v::T) where T = set.orderings[v]
+# =====================================================
+
 # ========================================================================================================
 # Subset arithmetics
 Base.:+(a::Subset, b::Subset) = union(a, b)

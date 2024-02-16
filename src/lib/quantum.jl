@@ -469,7 +469,6 @@ Base.:lastindex(fockspace::FockSpace) = fockspace|>dimension
 
 Returns the number of unique member modes within the `fockspace`, each of those represents a vector from the Hilbert space.
 """
-Zipper.:dimension(fockspace::SparseFock) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
 Zipper.:dimension(crystalfock::CrystalFock) = vol(crystalfock.crystal) * dimension(crystalfock.homefock)
 
 """
@@ -545,7 +544,6 @@ export subspaces
 
 Get the number of sub-fockspaces of this `fockspace`.
 """
-subspacecount(fockspace::SparseFock)::Integer = fockspace |> rep |> length
 subspacecount(crystalfock::CrystalFock)::Integer = vol(crystalfock.crystal)
 export subspacecount
 
@@ -556,11 +554,6 @@ Merge all subspaces within the `fockspace`.
 """
 flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mode in orderedmodes(fockspace)))
 export flattensubspaces
-
-"""
-Since the fockspace have implicit ordering, this function returns the order index of the `mode` in the `fockspace`.
-"""
-Base.:getindex(fockspace::SparseFock, mode::Mode) = fockspace.ordering[mode]
 
 function Base.:getindex(crystalfock::CrystalFock, mode::Mode)
     k = mode|>getattr(:k)

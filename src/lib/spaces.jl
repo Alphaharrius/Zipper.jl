@@ -304,7 +304,7 @@ function subsetunion(iters)
     end
     sorted = sort(orderings|>collect, by=last)
     orderings = Dict(v=>n for (n, (v, _)) in enumerate(sorted))
-    return Subset{elements|>eltype}(elements, orderings)
+    return Subset{elements|>first|>typeof}(elements, orderings)
 end
 export subsetunion
 

@@ -579,7 +579,6 @@ getmodes(crystalfock::CrystalFock) = Set(crystalfock|>orderedmodes)
 Returns an ordered `Subset` of modes of `fockspace`.
 """
 orderedmodes(fockspace::FockSpace)::Subset{Mode} = Iterators.flatten(rep(fockspace))
-# TODO: Implement for CrystalFock
 export orderedmodes
 
 orderedmodes(crystalfock::CrystalFock) = (

@@ -343,18 +343,18 @@ Base.:issubset(a::Subset, b::Subset)::Bool = issubset(a.orderings|>keys, b.order
 Base.:length(set::Subset) = length(set.elements)
 Base.:iterate(set::Subset, i...) = iterate(set|>rep, i...)
 Base.:lastindex(set::Subset) = length(set)
-Base.:getindex(set::Subset, index) = rep(set)[index]
-Base.:getindex(set::Subset, range::UnitRange) = Subset(rep(set)[range])
 
 Base.:filter(f, set::Subset) = Subset(Iterators.filter(f, set|>rep))
 
 Iterators.:flatten(set::Subset{<:Subset}) = Subset(v for inner in set for v in inner)
 # ======================================================================================
 
-# =====================================================
+# =============================================================
 # Subset indexing
-Base.:getindex(set::Subset{T}, v::T) where T = set.orderings[v]
-# =====================================================
+Base.:getindex(set::Subset, index) = rep(set)[index]
+Base.:getindex(set::Subset, range::UnitRange) = Subset(rep(set)[range])
+Base.:getindex(set::Subset, v::Element) = set.orderings[v]
+# =============================================================
 
 # ========================================================================================================
 # Subset arithmetics

@@ -78,6 +78,9 @@ function Zipper.:getpos(mode::Mode)::Point
     error("The mode does not have a primary position attribute!")
 end
 
+""" Added to support shorthand of `Subset(m0, m1, ...)`. """
+Zipper.:Subset(modes::Mode...) = Subset(modes)
+
 """
     hasattr(mode::Mode, key::Symbol)::Bool
 

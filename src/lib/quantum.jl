@@ -446,12 +446,7 @@ Union of fockspaces, the resulting fockspace will have the same span as the unio
 ### Input
 - `fockspaces` An iterable of fockspaces to be unioned.
 """
-function fockspaceunion(fockspaces)::FockSpace
-    subspaces::Subset{Subset{Mode}} = subsetunion(fockspace |> rep for fockspace in fockspaces if fockspace |> dimension != 0)
-    modes::Subset{Mode} = subspaces |> Iterators.flatten
-    ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(subspaces::Subset{Subset{Mode}}, ordering)
-end
+fockspaceunion(focks)::FockSpace = subsetunion(fock|>rep for fock in focks)|>FockSpace
 export fockspaceunion
 
 issubspace(super::FockSpace, sub::FockSpace)::Bool = issubset(sub|>orderedmodes, super|>orderedmodes)

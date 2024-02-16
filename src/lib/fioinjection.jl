@@ -43,10 +43,10 @@ fiolower((CrystalFockMap, :blocks), d -> [[ok, ik, v] for ((ok, ik), v) in d])
 
 # The Dict keys from deserialization are type of String, convert them back to Symbol.
 fioconstructor(Mode, d -> Dict(Symbol(k)=>v for (k, v) in d)|>Mode)
-# SparseFock does not have a default constructor, so we have to define it manually.
-fioconstructor(SparseFock, function (reflected, rep, ordering)
+# NormalFock does not have a default constructor, so we have to define it manually.
+fioconstructor(NormalFock, function (reflected, rep)
     actualreflected = reflected isa String ? Nothing : reflected
-    return SparseFock(rep, Dict(m=>i for (m, i) in ordering), reflected=actualreflected)
+    return NormalFock(rep, reflected=actualreflected)
 end)
 
 # Merge the basis vectors back into a single matrix.

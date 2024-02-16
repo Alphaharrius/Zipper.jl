@@ -93,8 +93,8 @@ function Subset(iter)
     return Subset{T}(elements, orderings)
 end
 
-""" Allow using shorthand of `Subset(v0, v1, ...)`. """
-Subset(elements::Element...) = Subset(elements)
+""" Allow using shorthand of `Subset(p0, p1, ...)`. """
+Subset(points::Point...) = Subset(points)
 
 export Subset
 

@@ -26,6 +26,9 @@ fiolower((MomentumSpace, :rep), m -> [m[:, i] for i in axes(m, 2)])
 # JSON is parsing Complex into dictionary which is not desired, 
 # so we need to convert it as a Vector beforehand.
 fiolower((BasisFunction, :rep), v -> [[c|>real, c|>imag] for c in v])
+# Since the representation of the Subset fully describes the Subset, we can ignore 
+# the ordering which can always be generated from the representation.
+fiolower((Subset, :orderings), v -> 0)
 # The key of korderings is a Momentum, which is not json serializable, 
 # so we need to convert it into a vector of key-value pairs.
 fiolower((CrystalFock, :korderings), d -> [[k, i] for (k, i) in d])
@@ -43,6 +46,8 @@ fiolower((CrystalFockMap, :blocks), d -> [[ok, ik, v] for ((ok, ik), v) in d])
 
 # The Dict keys from deserialization are type of String, convert them back to Symbol.
 fioconstructor(Mode, d -> Dict(Symbol(k)=>v for (k, v) in d)|>Mode)
+# The orderings of the Subset is fully described by its representation.
+fioconstructor(Subset, (elements, _) -> Subset(elements))
 # NormalFock does not have a default constructor, so we have to define it manually.
 fioconstructor(NormalFock, function (reflected, rep)
     actualreflected = reflected isa String ? Nothing : reflected

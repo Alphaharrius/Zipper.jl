@@ -26,9 +26,6 @@ fiolower((MomentumSpace, :rep), m -> [m[:, i] for i in axes(m, 2)])
 # JSON is parsing Complex into dictionary which is not desired, 
 # so we need to convert it as a Vector beforehand.
 fiolower((BasisFunction, :rep), v -> [[c|>real, c|>imag] for c in v])
-# The key of ordering is a Mode, which is not json serializable, 
-# so we need to convert it into a vector of key-value pairs.
-fiolower((SparseFock, :ordering), d -> [[m, i] for (m, i) in d])
 # The key of korderings is a Momentum, which is not json serializable, 
 # so we need to convert it into a vector of key-value pairs.
 fiolower((CrystalFock, :korderings), d -> [[k, i] for (k, i) in d])
@@ -57,8 +54,6 @@ fioparser((RealSpace, :rep), v -> hcat(v...))
 fioparser((MomentumSpace, :rep), v -> hcat(v...))
 # Since we store Complex into a Vector, we have to convert it back to Complex.
 fioparser((BasisFunction, :rep), v -> [Complex(el[1], el[2]) for el in v])
-# The keys of ordering is serialized into a Dict, we have to deserialize it back into a Mode.
-fioparser((SparseFock, :ordering), v -> Dict((fioparse(m), i) for (m, i) in v))
 # The keys of ordering is serialized into a Dict, we have to deserialize it back into a Momentum.
 fioparser((CrystalFock, :korderings), v -> Dict((fioparse(k), i) for (k, i) in v))
 # The rep of SparseFockMap is stored in a CSV file, we have to read it back.

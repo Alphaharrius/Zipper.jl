@@ -153,7 +153,7 @@ function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real,
     end
 
     rawregion::Region = sphericalregion|>filter(crosssectionfilter)
-    proximityregion::Region = rawregion - normalvector
+    proximityregion::Region = rawregion .- normalvector
 
     return rawregion - intersect(rawregion, proximityregion)
 end

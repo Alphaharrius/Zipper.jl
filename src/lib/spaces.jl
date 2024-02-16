@@ -310,12 +310,9 @@ export subsetunion
 
 function Base.:intersect(set::Subset, iters...)
     orderings = copy(set.orderings)
-    others = iters|>Iterators.flatten
-    for v in others
-        if haskey(orderings, v)
-            continue
-        end
-        delete!(orderings, v)
+    others = Set(iters|>Iterators.flatten)
+    for (v, _) in set.orderings
+        v ∈ others || delete!(orderings, v)
     end
     sorted = sort(orderings|>collect, by=last)
     headelements = [v for (v, _) in sorted]

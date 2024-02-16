@@ -438,11 +438,6 @@ Base.:show(io::IO, ::Type{CrystalFock}) = print(io, string("CrystalFock"))
 Base.:in(mode::Mode, fock::NormalFock)::Bool = in(mode, fock|>rep)
 Base.:in(mode::Mode, crystalfock::CrystalFock)::Bool = haskey(mode|>getattr(:k), crystalfock.korderings) && mode|>removeattr(:k) in crystalfock|>unitcellfock
 
-# TODO: Implement for CrystalFock
-""" Allow the retrieval of `Mode` at a given `order` index with syntax `fockspace[order]`. """
-Base.:getindex(fockspace::FockSpace, order::Integer)::Mode = (fockspace |> orderedmodes)[order]
-Base.:getindex(fockspace::FockSpace, range::UnitRange)::FockSpace = collect(fockspace|>orderedmodes)[range]|>FockSpace
-
 """
     fockspaceunion(fockspaces)::FockSpace
 

@@ -435,7 +435,7 @@ Base.:show(io::IO, ::Type{RegionFock}) = print(io, string("RegionFock"))
 Base.:show(io::IO, ::Type{CrystalFock}) = print(io, string("CrystalFock"))
 
 """ Check whether a `Mode` is in the `FockSpace`. """
-Base.:in(mode::Mode, fockspace::FockSpace)::Bool = haskey(fockspace.ordering, mode)
+Base.:in(mode::Mode, fock::NormalFock)::Bool = in(mode, fock|>rep)
 Base.:in(mode::Mode, crystalfock::CrystalFock)::Bool = haskey(mode|>getattr(:k), crystalfock.korderings) && mode|>removeattr(:k) in crystalfock|>unitcellfock
 
 # TODO: Implement for CrystalFock

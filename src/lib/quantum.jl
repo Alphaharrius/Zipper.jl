@@ -568,7 +568,7 @@ end
 Returns an unordered set of modes of `fockspace`, this is a more efficient way to retrieve the underlying modes for a fockspace with
 more than one partitions.
 """
-getmodes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
+getmodes(fock::NormalFock)::Set{Mode} = Set(mode for mode in fock) # This is the most efficient way to get all distinct modes.
 export getmodes
 
 getmodes(crystalfock::CrystalFock) = Set(crystalfock|>orderedmodes)

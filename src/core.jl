@@ -32,8 +32,8 @@ end
 
 Base.:*(a::A, b::B) where {A <: Element, B <: Element} = error("Composition algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
 Base.:+(a::A, b::B) where {A <: Element, B <: Element} = error("Addition algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
-Base.:-(::A, ::B) where {A <: Element, B <: Element} = error("Subtraction algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
-Base.:/(::A, ::B) where {A <: Element, B <: Element} = error("Division algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
+Base.:-(a::A, b::B) where {A <: Element, B <: Element} = error("Subtraction algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
+Base.:/(a::A, b::B) where {A <: Element, B <: Element} = error("Division algebra not defined for `$(a |> typeof)` with `$(b |> typeof)`!")
 
 """
     rep(source::Element{R}) where {R <: Any}

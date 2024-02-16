@@ -121,7 +121,7 @@ function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealS
     generatinglength::Integer = generatingradius * 2
     generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
     crystalregion::Region = generatingcrystal|>sitepoints
-    centeredregion::Region = crystalregion - (crystalregion|>getcenter)
+    centeredregion::Region = crystalregion .- (crystalregion|>getcenter)
     return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
 end
 export getsphericalregion

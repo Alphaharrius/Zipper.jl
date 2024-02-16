@@ -180,7 +180,7 @@ Base.:convert(::Type{Matrix{Float64}}, source::AffineTransform) = source |> affi
 
 function Base.:(==)(a::AffineTransform, b::AffineTransform)::Bool
     localb::AffineTransform = (a |> getspace) * b
-    return isapprox(a |> rep, localb |> rep) && a.antiunitary == localb.antiunitary
+    return isapprox(a |> rep, localb |> rep) && a.antiunitary == localb.antiunitary && isapprox(a.shiftvector, b.shiftvector)
 end
 
 function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTransform

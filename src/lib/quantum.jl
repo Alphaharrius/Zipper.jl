@@ -652,8 +652,6 @@ Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
 # ======================================================================================
 # Overloads that makes rep(::FockSpace) works.
 Base.:convert(::Type{Subset}, source::FockSpace) = source.rep
-Base.:convert(::Type{Subset{Subset}}, source::FockSpace) = convert(Subset, source)
-Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset, source)
 # ======================================================================================
 
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source) # Added for completeness.

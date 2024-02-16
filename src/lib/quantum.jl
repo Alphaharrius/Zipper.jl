@@ -647,10 +647,9 @@ Base.kron(primary::FockSpace, secondary::FockSpace) = fockspaceunion(FockSpace(m
 """
     sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
 
-Grouping the modes within the `fockspace` by the attributes specified by `byattrs`, the resulting fockspace will have a sparse structure
-with the subspaces containing modes with the same specified attributes.
+Grouping the modes within the `fockspace` by the attributes specified by `byattrs` and return all groups as an iterator of `FockSpace` objects.
 """
-function sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
+function sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)
     getidentifier(mode)::Vector = [mode |> getattr(attr) for attr in byattrs]
 
     identifiedmodes::Base.Generator = (m |> getidentifier => m for m in fockspace)
@@ -658,7 +657,7 @@ function sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
         mergewith!(append!, d, LittleDict(k => [v]))
     end
 
-    return fockspaceunion(group |> FockSpace for group in groups |> values)
+    return (group|>FockSpace for group in groups|>values)
 end
 export sparsegrouping
 

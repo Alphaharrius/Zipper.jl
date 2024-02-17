@@ -1002,28 +1002,7 @@ end
 export rulemapunitcellfock
 
 function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
-    function computekmatrix(batch)
-        matrix::SparseMatrixCSC = spzeros(crystalfock|>getcrystal|>dimension, crystalfock|>getcrystal|>vol)
-        for (n, k) in batch
-            matrix[:, n] = k|>euclidean|>vec
-        end
-        return matrix
-    end
-
-    batchsize::Integer = ((crystalfock|>getcrystal|>vol) / getmaxthreads())|>ceil
-    batches = Iterators.partition((el for el in crystalfock|>getcrystal|>brillouinzone|>enumerate), batchsize)
-    matrixparts = paralleltasks(
-        name="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)",
-        tasks=(()->computekmatrix(batch) for batch in batches),
-        count=getmaxthreads())|>parallel
-
-    momentummatrix::SparseMatrixCSC = spzeros(crystalfock|>getcrystal|>dimension, crystalfock|>getcrystal|>vol)
-    watchprogress(desc="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)")
-    for part in matrixparts
-        momentummatrix[:, :] += part
-        updateprogress()
-    end
-    unwatchprogress()
+    momentummatrix::SparseMatrixCSC = crystalfock|>getcrystal|>computemomentummatrix
 
     momentumhomefock = crystalfock|>unitcellfock
     values::Array = zeros(Complex, momentumhomefock|>length, size(momentummatrix, 2), regionfock|>dimension)

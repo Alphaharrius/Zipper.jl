@@ -2,7 +2,7 @@ mutable struct ParallelSettings
     showmeter::Bool
     maxthreads::Integer
     taskmeterlock::ReentrantLock
-    threadmeters::Vector{ProgressUnknown}
+    mainthreadmeter::Union{UndefInitializer, ProgressUnknown}
 end
 
 global parallelsettings = ParallelSettings(
@@ -11,7 +11,7 @@ global parallelsettings = ParallelSettings(
     ReentrantLock(),
     # I have to set this value to 128 since Threads.nthreads() at initialization of Julia env 
     # seems to be 1 for some reason...
-    Vector(undef, 128)) # 128 threads should be enough for everyone.
+    undef) # 128 threads should be enough for everyone.
 
 mutable struct ParallelTasks
     tasks
@@ -82,22 +82,20 @@ function parallel(tasks::ParallelTasks)
 end
 
 function watchprogress(; desc::String)
-    if !parallelsettings.showmeter
+    if Threads.threadid() != 1 || !parallelsettings.showmeter
         return
     end
-    progress = ProgressUnknown(desc=desc, spinner=true)
-    parallelsettings.threadmeters[Threads.threadid()] = progress
+    parallelsettings.mainthreadmeter = ProgressUnknown(desc=desc, spinner=true)
     return
 end
 export watchprogress
 
 function updateprogress()
-    if !parallelsettings.showmeter
+    if Threads.threadid() != 1 || !parallelsettings.showmeter
         return
     end
     try
-        tid = Threads.threadid() # Always give 1 -> N
-        progress = parallelsettings.threadmeters[tid]
+        progress = parallelsettings.mainthreadmeter
         if typeof(progress) == UndefInitializer
             # This branch is for the case where the current thread have called watchprogress before.
             return
@@ -111,18 +109,16 @@ end
 export updateprogress
 
 function unwatchprogress()
-    if !parallelsettings.showmeter
+    if Threads.threadid() != 1 || !parallelsettings.showmeter
         return
     end
     try
-        tid = Threads.threadid() # Always give 1 -> N
-        progress = parallelsettings.threadmeters[tid]
+        progress = parallelsettings.mainthreadmeter
         if typeof(progress) == UndefInitializer
             # This branch is for the case where the current thread have called watchprogress before.
             return
         end
         ProgressMeter.finish!(progress)
-        parallelsettings.threadmeters[tid] = undef
     catch _ # UndefRefError
         # This branch is for the case where the current thread have not called watchprogress before.
     end

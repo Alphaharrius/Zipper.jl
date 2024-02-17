@@ -30,6 +30,7 @@ using Plotly, ColorTypes, Compat
 include("lib/plotting.jl")
 
 using JSON, DataFrames, CSV, Dates
+include("lib/lzw.jl")
 include("lib/fio.jl")
 include("lib/fioinjection.jl")
 

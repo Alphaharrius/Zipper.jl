@@ -142,23 +142,36 @@ end
 
 rg1size24 = gmera(blockedcorrelations24,idmap(blockedcorrelations24|>getinspace))
 rg2size24 = gmera(rg1size24[:correlations],rg1size24[:transistionmap])
-rg2size24[:correlations]
+visualize(rg2size24[:correlations]|>getinspace|>getcrystal|>getunitcell)
 
 core24 = @time distillation(rg2size24[:correlations]|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
 coreemptyprojector24 = core24[:empty]|>crystalprojector
 
 fullfouriermap24 = fullftmap(blockedcorrelations24)
 
+realspacemat = fullfouriermap24'*blockedcorrelations24*fullfouriermap24
+sum([abs2(i) for i in regioncorrelations(blockedcorrelations24,localunitcellfock)[:, (regioncorrelations(blockedcorrelations24,localunitcellfock)|>getinspace|>orderedmodes)[3]]|>rep])
+ (realspacemat|>getinspace|>orderedmodes)[1]
+ det(FockMap(blockedcorrelations24))
+0.99^1152
 rg1size24approx = rg1size24[:gmera1stapprox]+rg1size24[:gmera2ndapprox]+rg1size24[:gmera3rdapprox]+rg1size24[:gmera4thapprox]
 rg2size24approx = rg2size24[:gmera1stapprox]+rg2size24[:gmera2ndapprox]+rg2size24[:gmera3rdapprox]+rg2size24[:gmera4thapprox]
 
-errormatink24 = blockedcorrelations24-rg1size24approx-rg2size24approx-rg2size24[:transistionmap]*coreemptyprojector24*rg2size24[:transistionmap]'
+errormatink24 = blockedcorrelations24-rg1size24approx-rg2size24approx-coreemptyprojector24
 errormat24 = fullfouriermap24'*errormatink24*fullfouriermap24
 
-# sum(abs(FockMap(errormatink24))|>rep)/1152
-error24 = sum(abs(FockMap(errormat24))|>rep)/1152
+rgblockedcorrelations24 = rg1size24[:rgblockedmap]*blockedcorrelations24*rg1size24[:rgblockedmap]'
+localunitcellfock = RegionFock(blockedcorrelations24|>getinspace|>unitcellfock)
 
-error24 = sum(abs(FockMap(errormat24))|>rep)/1152
+rg1size24[:gmera1stemptyisometry]*rg1size24[:gmera1stemptyisometry]'
+visualize(regioncorrelations(blockedcorrelations24,localunitcellfock))
+
+visualize(regioncorrelations(blockedcorrelations24-rg1size24approx-rg2size24approx,localunitcellfock))
+# sum(abs(FockMap(errormatink24))|>rep)/1152
+error24 = sum(abs(FockMap(errormatink24))|>rep)/1152
+
+
+error24 = sum(abs(FockMap(blockedcorrelations24)|>rep|>collect))/1152
 
 # visualize(errormat)
 

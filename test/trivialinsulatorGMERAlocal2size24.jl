@@ -56,7 +56,6 @@ blockedcrystalfock24 = blockedcorrelations24|>getoutspace
 blockedcrystal24::Crystal = blockedcrystalfock24|>getcrystal
 blockedspace24::RealSpace = blockedcrystal24|>getspace
 
-
 function gmera(correlations,reftransistionmap)
     @info("Starting RG...")
     crystalfock = correlations|>getoutspace
@@ -134,7 +133,19 @@ end
 
 # visualize(rg1size24[:gmera1stcorrelations]|>getinspace|>getcrystal|>getunitcell)
 rg1size24 = gmera(blockedcorrelations24,idmap(blockedcorrelations24|>getinspace))
-visualize(rg1size24[:gmera3rdcorrelations]|>getinspace|>getcrystal|>getunitcell)
-rg2size24 = gmera(rg1size24[:correlations],idmap(rg1size24[:correlations]|>getinspace))
-rg2size24[:correlations]
-correlations
+rg2size24 = gmera(rg1size24[:correlations],rg1size24[:transistionmap])
+
+rg1size24approx = rg1size24[:gmera1stapprox]+rg1size24[:gmera2ndapprox]+rg1size24[:gmera3rdapprox]+rg1size24[:gmera4thapprox]
+rg2size24approx = rg2size24[:gmera1stapprox]+rg2size24[:gmera2ndapprox]+rg2size24[:gmera3rdapprox]+rg2size24[:gmera4thapprox]
+
+core24 = @time distillation(rg2size24[:correlations]|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
+coreemptyprojector24 = core24[:empty]|>crystalprojector
+coreapprox = rg2size24[:transistionmap]*coreemptyprojector24*rg2size24[:transistionmap]'
+
+errormat = blockedcorrelations24-rg1size24approx-rg2size24approx-coreapprox
+visualize((errormat)|>crystalspectrum)
+tr(FockMap((errormat)*(errormat)))/1152
+evals = [abs(eval) for (mode,eval) in FockMap((errormat))|>eigspech|>geteigenvalues]
+sum(evals)/1152
+
+sum(evals)/1152

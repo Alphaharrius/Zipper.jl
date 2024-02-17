@@ -207,14 +207,15 @@ function fiosave(object; name::String)
     elseif haskey(STORAGE_TYPES, type.name.wrapper)
         storageobject = convert(STORAGE_TYPES[type], object)
     end
-    filepath = joinpath(fiodir(), "$name.json")
+    filepath = joinpath(fiodir(), "$name.dat")
     # Set the target name for the current thread.
     FIO_STATE.threadtargetname[Threads.threadid()] = name
     jsonstring = JSON.json(storageobject)
     # Reset the target name for the current thread.
     FIO_STATE.threadtargetname[Threads.threadid()] = ""
+    lzwcompressed::Vector = lzwcompress(jsonstring)
     open(filepath, "w") do io
-        write(io, jsonstring)
+        write(io, lzwcompressed)
         @info "Saved $type object to $filepath"
     end
     return filepath
@@ -229,7 +230,7 @@ the file to be loaded will be in the path `{project directory}/{name}.json`. Dep
 require extra data file to be loaded.
 """
 function fioload(name::String)
-    filepath = joinpath(fiodir(), "$name.json")
+    filepath = joinpath(fiodir(), "$name.dat")
     if !isfile(filepath)
         @error begin
             "Object $name does not exist in $(fiodir())!"
@@ -237,6 +238,10 @@ function fioload(name::String)
         end
         return
     end
+    datasize = filesize(filepath)
+    lzwcompressed = Vector{Int32}(undef, datasize/sizeof(Int32)|>round|>Integer)
+    read!(filepath, lzwcompressed)
+    jsonstring = lzwdecompress(lzwcompressed)
     jsonstring = read(filepath, String)
     object = JSON.parse(jsonstring)|>fioparse
     type = typeof(object)

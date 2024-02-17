@@ -4,7 +4,6 @@ function writesparse(sparse::SparseMatrixCSC; filename::String)
     Vr = [real(v) for v in V]
     Vi = [imag(v) for v in V]
     dataframe = DataFrame(I=I, J=J, Vr=Vr, Vi=Vi)
-    @info "Sparse data is written to $filepath"
     return CSV.write(filepath, dataframe)
 end
 

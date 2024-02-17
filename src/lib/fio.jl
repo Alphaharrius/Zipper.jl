@@ -116,6 +116,7 @@ function JSON.lower(o::Element)
         else
             data[fieldname] = fieldvalue
         end
+        updateprogress()
     end
     return Dict(JL_TYPE=>type|>string, JL_DATA=>data)
 end
@@ -131,6 +132,7 @@ function fiozipperparse(type::Type, data::Dict)
         parser::Function = haskey(SPECIAL_PARSERS, key) ? SPECIAL_PARSERS[key] : fioparse
         fieldvalue = data[fieldname|>string]|>parser
         push!(arguments, fieldvalue)
+        updateprogress()
     end
     constructor = type.name.wrapper
     haskey(SPECIAL_CONSTRUCTORS, type.name.wrapper) && (constructor = SPECIAL_CONSTRUCTORS[type.name.wrapper])
@@ -152,6 +154,7 @@ function fioparse(object::Dict)
     processed::Dict = Dict()
     for (k, v) in object
         processed[k] = fioparse(v)
+        updateprogress()
     end
     return processed
 end
@@ -210,7 +213,9 @@ function fiosave(object; name::String)
     filepath = joinpath(fiodir(), "$name.dat")
     # Set the target name for the current thread.
     FIO_STATE.threadtargetname[Threads.threadid()] = name
+    watchprogress(desc="fiosave lowering ($name)")
     jsonstring = JSON.json(storageobject)
+    unwatchprogress()
     # Reset the target name for the current thread.
     FIO_STATE.threadtargetname[Threads.threadid()] = ""
     lzwcompressed::Vector = lzwcompress(jsonstring)
@@ -242,8 +247,9 @@ function fioload(name::String)
     lzwcompressed = Vector{Int32}(undef, datasize/sizeof(Int32)|>round|>Integer)
     read!(filepath, lzwcompressed)
     jsonstring = lzwdecompress(lzwcompressed)
-    jsonstring = read(filepath, String)
+    watchprogress(desc="fioload parsing ($name)")
     object = JSON.parse(jsonstring)|>fioparse
+    unwatchprogress()
     type = typeof(object)
     if haskey(PARSED_TYPES, type)
         object = convert(PARSED_TYPES[type], object)

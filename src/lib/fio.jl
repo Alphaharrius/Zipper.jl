@@ -211,7 +211,7 @@ function fiosave(object; name::String)
     storageobject = object
     type = typeof(object)
     # We would like to see if there are any storage type registered for the parametric type first, 
-    # for example SparseFock{Region} vs SparseFock, we will flavor the former first.
+    # for example NormalFock{Region} vs NormalFock, we will flavor the former first.
     if haskey(STORAGE_TYPES, type)
         storageobject = convert(STORAGE_TYPES[type.name.wrapper], object)
     elseif haskey(STORAGE_TYPES, type.name.wrapper)

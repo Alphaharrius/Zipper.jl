@@ -59,9 +59,6 @@ function Zipper.:getspace(mode::Mode)
     return euclidean(RealSpace, 1)
 end
 
-""" Shorthand to create a one element `Subset{Mode}`. """
-Zipper.:Subset(modes::Mode...) = Subset(m for m in modes)
-
 """
     getpos(mode::Mode)::Point
 
@@ -80,6 +77,9 @@ function Zipper.:getpos(mode::Mode)::Point
 
     error("The mode does not have a primary position attribute!")
 end
+
+""" Added to support shorthand of `Subset(m0, m1, ...)`. """
+Zipper.:Subset(modes::Mode...) = Subset(modes)
 
 """
     hasattr(mode::Mode, key::Symbol)::Bool
@@ -141,7 +141,7 @@ same length as the input `modes` as some `Mode` might be **condensed** into a si
 ### Examples
 To remove the attribute of `:r` and `:b`, we use `removeattr(modes, :r, :b)`.
 """
-removeattr(modes, keys::Symbol...)::Subset{Mode} = Subset(OrderedSet{Mode}(removeattr(mode, keys...) for mode in modes))
+removeattr(modes, keys::Symbol...)::Subset{Mode} = Subset(removeattr(mode, keys...) for mode in modes)
 
 """
     setattr(mode::Mode, attrs::Pair{Symbol}...)::Mode
@@ -263,96 +263,118 @@ Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
 Base.:isequal(a::Mode, b::Mode) = a == b
 # ==================================================
 
-abstract type FockSpace <: AbstractSpace{Subset{Subset{Mode}}} end
+abstract type FockSpace <: AbstractSpace{Subset} end
+export FockSpace
 
-"""
-    SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)
-    SparseFock(subset::Subset{Mode}; reflected=Nothing)
-    SparseFock(fockspace::SparseFock; reflected=Nothing)
-    SparseFock(mode::Mode) = SparseFock(Subset(mode); reflected=Nothing)
-
-A collection of `Modes` or `Mode` partitions in the case of sparse fockspace, implicit ordering of underlying modes is assumed.
-
-The structure of fockspace is assume to hold partitions, a fockspace that **does not** have partition is assumed to have a single partition containing
-all underlying modes. The design can be seen with the type of the representation `Subset{Subset{Mode}}`, which the higher order `Subset` holds partitions
-represented by `Subset{Mode}`.
-
-The `reflected` attribute is used to store the object this fockspace is reflected to, such as `Crystal` for a crystal fockspace, by default it will be `Nothing`.
-
-### Examples
-- `SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, <: Integer}; reflected=Nothing)` is used when all the components of the `FockSpace`
-  is already constructed prior instantiation.
-- `SparseFock(subset::Subset{Mode}; reflected=Nothing)` is the normal use case to convert a `Subset{Mode}` into `FockSpace`.
-- `SparseFock(fockspace::SparseFock; reflected=Nothing)` is used to set the `reflected` attribute.
-- `SparseFock(mode::Mode; reflected=Nothing)` is used to create a fockspace with a single mode.
-"""
-struct SparseFock{T} <: FockSpace
+# ================================================================================================
+# NormalFock implementation
+struct NormalFock{T} <: Zipper.FockSpace
     reflected::T
-    rep::Subset{Subset{Mode}}
-    ordering::Dict{Mode, Integer}
-
-    SparseFock(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = new{typeof(reflected)}(reflected, subsets, ordering)
-    SparseFock(subset::Subset{Mode}; reflected=Nothing) = SparseFock(
-        Subset(subset),
-        Dict(mode => order for (order, mode) in enumerate(subset)),
-        reflected=reflected)
-    SparseFock(fockspace::SparseFock; reflected=Nothing) = SparseFock(rep(fockspace), fockspace.ordering, reflected=reflected)
-    SparseFock(mode::Mode; reflected=Nothing) = SparseFock(Subset(mode), reflected=reflected)
-    
-    SparseFock(input::Vector{Mode}; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
-    SparseFock(input::Base.Generator; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
-    SparseFock(input::Base.Iterators.Flatten; reflected=Nothing) = SparseFock(Subset(input), reflected=reflected)
+    subset::Subset
 end
-export SparseFock
+export NormalFock
 
-# SparseFock is the default implementation of FockSpace
-FockSpace(subsets::Subset{Subset{Mode}}, ordering::Dict{Mode, T}; reflected=Nothing) where {T <: Integer} = SparseFock(subsets, ordering, reflected=reflected)
-FockSpace(subset::Subset{Mode}; reflected=Nothing) = SparseFock(subset, reflected=reflected)
-FockSpace(fockspace::SparseFock; reflected=Nothing) = SparseFock(fockspace, reflected=reflected)
-FockSpace(mode::Mode; reflected=Nothing) = SparseFock(mode, reflected=reflected)
-FockSpace(input::Vector{Mode}; reflected=Nothing) = SparseFock(input, reflected=reflected)
-FockSpace(input::Base.Generator; reflected=Nothing) = SparseFock(input, reflected=reflected)
-FockSpace(input::Base.Iterators.Flatten; reflected=Nothing) = SparseFock(input, reflected=reflected)
+""" Create an empty fockspace. """
+NormalFock() = NormalFock(nothing, Subset{Mode}())
+"""
+    NormalFock(subset::Subset{Mode}; reflected=nothing)
 
-""" To retrieve the reflected property this `SparseFock` is reflected to. """
-getreflected(fockspace::SparseFock) = fockspace.reflected
+Create a `FockSpace` with the given `subset` of `Mode` which follows the ordering of the `subset`.
+
+### Input
+- `subset` The subset of `Mode` to use.
+- `reflected` The physical object this `FockSpace` is reflected to, defaults to `nothing`.
+"""
+NormalFock(subset::Subset{Mode}; reflected=nothing) = NormalFock(reflected, subset)
+""" Create a `FockSpace` from an iterator of `Mode`. """
+NormalFock(iter; reflected=nothing) = NormalFock(reflected, Subset(iter))
+""" Adding a reflected object to a `FockSpace`."""
+NormalFock(fock::NormalFock; reflected=nothing) = NormalFock(reflected, fock|>rep)
+""" Create a `FockSpace` with a single `Mode`. """
+NormalFock(mode::Mode; reflected=nothing) = NormalFock(reflected, Subset(mode))
+# ================================================================================================
+
+# ==========================================================================================
+# Since the name FockSpace is used in many legacy locations, 
+# we have to maintain backward compatabilities.
+FockSpace(subset::Subset{Mode}; reflected=nothing) = NormalFock(subset, reflected=reflected)
+FockSpace(iter; reflected=nothing) = NormalFock(iter, reflected=reflected)
+FockSpace(fock::NormalFock; reflected=nothing) = NormalFock(fock, reflected=reflected)
+FockSpace(mode::Mode; reflected=nothing) = NormalFock(mode, reflected=reflected)
+# ==========================================================================================
+
+# =============================================
+# NormalFock APIs
+getreflected(fock::NormalFock) = fock.reflected
 export getreflected
+# =============================================
+
+# ===============================================================================================================
+# NormalFock essentials
+Base.:convert(::Type{Subset}, fock::NormalFock) = fock.subset
+Base.:eltype(::NormalFock) = Mode
+# We will not include a hash function for NormalFock since it is handled by the default hash function of Element.
+# ===============================================================================================================
+
+# =========================================================================================================
+# NormalFock iterator methods
+""" Get the dimension of the `FockSpace` which is essentially the number of `Mode` objects it contains. """
+Zipper.:dimension(fock::NormalFock) = fock|>rep|>length
+
+"""
+    orderedmodes(fock::NormalFock)
+
+Get the `Mode` objects sequentially according to their order in the `FockSpace`.
+"""
+orderedmodes(fock::NormalFock) = fock|>rep
+
+# We don't have to include other iterator methods like `iterate`, `length` and `lastindex` since they are 
+# supported via the definition of `orderedmodes` and `dimension`.
+# =========================================================================================================
+
+# =======================================================================================
+# NormalFock indexing
+"""
+This have multiple implications, if the input is an Integer, it will return the `Mode` at 
+the `i`th order of the `FockSpace`; if the input is a `Mode`, it will return the order of 
+the `Mode` in the `FockSpace`.
+"""
+Base.:getindex(fock::NormalFock, v) = (fock|>rep)[v]
+""" Get a slice of the `FockSpace`, this will not preserve the `reflected` attribute. """
+Base.:getindex(fock::NormalFock, range::UnitRange) = NormalFock((fock|>rep)[range])
+# =======================================================================================
+
+# =================================================================================================
+# NormalFock display
+""" Displays the fock type, subspace count and dimension information of a `FockSpace`. """
+Base.:show(io::IO, fock::NormalFock) = print(io, string("$(fock|>typeof)(dim=$(fock|>dimension))"))
+# =================================================================================================
+
+# ================================================================================================
+# NormalFock common APIs for FockSpace
+
+""" There are no concrete subspace in `NormalFock`, but it is a subspace itself. """
+subspacecount(fock::NormalFock) = 1
+# ================================================================================================
 
 struct CrystalFock <: FockSpace
     crystal::Crystal
     korderings::Dict{Momentum, Integer}
-    homefock::SparseFock
+    homefock::NormalFock
 end
+export CrystalFock
 
-""" Shorthand alias for `SparseFock{Region}`. """
-RegionFock = SparseFock{Region}
+""" Shorthand alias for `NormalFock{Region}`. """
+RegionFock = NormalFock{Region}
 export RegionFock
 
-""" Shorthand alias for `SparseFock{Momentum}`. """
-MomentumFock = SparseFock{Momentum}
+""" Shorthand alias for `NormalFock{Momentum}`. """
+MomentumFock = NormalFock{Momentum}
 export MomentumFock
 
-""" Shorthand alias for `SparseFock{Offset}`. """
-SiteFock = SparseFock{Offset}
+""" Shorthand alias for `NormalFock{Offset}`. """
+SiteFock = NormalFock{Offset}
 export SiteFock
-
-"""
-    getsparsefock(basismodes::Subset{Mode}, points::Subset{<: Point})::FockSpace
-
-Given a set of `basismodes`, and the generator `points`, span the basis modes to the generator `Point` with attribute `:k` or `:r` depending on the type and form
-a `FockSpace`. Not to be mistakened with `spanoffset`, this method will partition the modes by the generator points.
-Noted that the ordering of the partitions will follow the ordering of `points`, and the ordering within each partition will follow the ordering of `basismodes`.
-"""
-getsparsefock(basismodes::Subset{Mode}, points::Subset{Momentum})::FockSpace = getsparsefock(basismodes, points, groupidentityattr=:k)
-getsparsefock(basismodes::Subset{Mode}, points::Subset{Offset})::FockSpace = getsparsefock(basismodes, points, groupidentityattr=:r)
-
-function getsparsefock(basismodes::Subset{Mode}, points::Subset{<: Point}; groupidentityattr::Symbol)::FockSpace
-    partitions::Subset{Subset{Mode}} = Subset(setattr(basismodes, groupidentityattr=>point) for point in points)
-    modes::Subset{Mode} = flatten(partitions)
-    orderings::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(partitions, orderings)
-end
-export getsparsefock
 
 """
     getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
@@ -360,7 +382,7 @@ export getsparsefock
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from `basismodes` by the brillouin zone of the `crystal`.
 """
 @memoize function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
-    homefock::SparseFock = basismodes|>FockSpace
+    homefock::NormalFock = basismodes|>FockSpace
     korderings::Dict{Momentum, Integer} = Dict(k=>n for (n, k) in crystal|>brillouinzone|>enumerate)
     return CrystalFock(crystal, korderings, homefock)
 end
@@ -416,13 +438,8 @@ Base.:show(io::IO, ::Type{RegionFock}) = print(io, string("RegionFock"))
 Base.:show(io::IO, ::Type{CrystalFock}) = print(io, string("CrystalFock"))
 
 """ Check whether a `Mode` is in the `FockSpace`. """
-Base.:in(mode::Mode, fockspace::FockSpace)::Bool = haskey(fockspace.ordering, mode)
+Base.:in(mode::Mode, fock::NormalFock)::Bool = in(mode, fock|>rep)
 Base.:in(mode::Mode, crystalfock::CrystalFock)::Bool = haskey(mode|>getattr(:k), crystalfock.korderings) && mode|>removeattr(:k) in crystalfock|>unitcellfock
-
-# TODO: Implement for CrystalFock
-""" Allow the retrieval of `Mode` at a given `order` index with syntax `fockspace[order]`. """
-Base.:getindex(fockspace::FockSpace, order::Integer)::Mode = (fockspace |> orderedmodes)[order]
-Base.:getindex(fockspace::FockSpace, range::UnitRange)::FockSpace = collect(fockspace|>orderedmodes)[range]|>FockSpace
 
 """
     fockspaceunion(fockspaces)::FockSpace
@@ -432,12 +449,7 @@ Union of fockspaces, the resulting fockspace will have the same span as the unio
 ### Input
 - `fockspaces` An iterable of fockspaces to be unioned.
 """
-function fockspaceunion(fockspaces)::FockSpace
-    subspaces::Subset{Subset{Mode}} = subsetunion(fockspace |> rep for fockspace in fockspaces if fockspace |> dimension != 0)
-    modes::Subset{Mode} = subspaces |> Iterators.flatten
-    ordering::Dict{Mode, Integer} = Dict(mode => index for (index, mode) in enumerate(modes))
-    return FockSpace(subspaces::Subset{Subset{Mode}}, ordering)
-end
+fockspaceunion(focks)::FockSpace = subsetunion(fock|>rep for fock in focks)|>FockSpace
 export fockspaceunion
 
 issubspace(super::FockSpace, sub::FockSpace)::Bool = issubset(sub|>orderedmodes, super|>orderedmodes)
@@ -460,7 +472,6 @@ Base.:lastindex(fockspace::FockSpace) = fockspace|>dimension
 
 Returns the number of unique member modes within the `fockspace`, each of those represents a vector from the Hilbert space.
 """
-Zipper.:dimension(fockspace::SparseFock) = length(fockspace.ordering) # This is a short cut to retrieve the length, which is the dimension.
 Zipper.:dimension(crystalfock::CrystalFock) = vol(crystalfock.crystal) * dimension(crystalfock.homefock)
 
 """
@@ -536,7 +547,6 @@ export subspaces
 
 Get the number of sub-fockspaces of this `fockspace`.
 """
-subspacecount(fockspace::SparseFock)::Integer = fockspace |> rep |> length
 subspacecount(crystalfock::CrystalFock)::Integer = vol(crystalfock.crystal)
 export subspacecount
 
@@ -547,11 +557,6 @@ Merge all subspaces within the `fockspace`.
 """
 flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mode in orderedmodes(fockspace)))
 export flattensubspaces
-
-"""
-Since the fockspace have implicit ordering, this function returns the order index of the `mode` in the `fockspace`.
-"""
-Base.:getindex(fockspace::SparseFock, mode::Mode) = fockspace.ordering[mode]
 
 function Base.:getindex(crystalfock::CrystalFock, mode::Mode)
     k = mode|>getattr(:k)
@@ -566,7 +571,7 @@ end
 Returns an unordered set of modes of `fockspace`, this is a more efficient way to retrieve the underlying modes for a fockspace with
 more than one partitions.
 """
-getmodes(fockspace::FockSpace)::Set{Mode} = Set(keys(fockspace.ordering)) # This is the most efficient way to get all distinct modes.
+getmodes(fock::NormalFock)::Set{Mode} = Set(mode for mode in fock) # This is the most efficient way to get all distinct modes.
 export getmodes
 
 getmodes(crystalfock::CrystalFock) = Set(crystalfock|>orderedmodes)
@@ -577,7 +582,6 @@ getmodes(crystalfock::CrystalFock) = Set(crystalfock|>orderedmodes)
 Returns an ordered `Subset` of modes of `fockspace`.
 """
 orderedmodes(fockspace::FockSpace)::Subset{Mode} = Iterators.flatten(rep(fockspace))
-# TODO: Implement for CrystalFock
 export orderedmodes
 
 orderedmodes(crystalfock::CrystalFock) = (
@@ -628,10 +632,9 @@ Base.kron(primary::FockSpace, secondary::FockSpace) = fockspaceunion(FockSpace(m
 """
     sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
 
-Grouping the modes within the `fockspace` by the attributes specified by `byattrs`, the resulting fockspace will have a sparse structure
-with the subspaces containing modes with the same specified attributes.
+Grouping the modes within the `fockspace` by the attributes specified by `byattrs` and return all groups as an iterator of `FockSpace` objects.
 """
-function sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
+function sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)
     getidentifier(mode)::Vector = [mode |> getattr(attr) for attr in byattrs]
 
     identifiedmodes::Base.Generator = (m |> getidentifier => m for m in fockspace)
@@ -639,7 +642,7 @@ function sparsegrouping(fockspace::FockSpace, byattrs::Symbol...)::FockSpace
         mergewith!(append!, d, LittleDict(k => [v]))
     end
 
-    return fockspaceunion(group |> FockSpace for group in groups |> values)
+    return (group|>FockSpace for group in groups|>values)
 end
 export sparsegrouping
 
@@ -652,8 +655,6 @@ Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
 # ======================================================================================
 # Overloads that makes rep(::FockSpace) works.
 Base.:convert(::Type{Subset}, source::FockSpace) = source.rep
-Base.:convert(::Type{Subset{Subset}}, source::FockSpace) = convert(Subset, source)
-Base.:convert(::Type{Subset{Subset{Mode}}}, source::FockSpace) = convert(Subset, source)
 # ======================================================================================
 
 Base.:convert(::Type{FockSpace}, source::Subset{Mode}) = FockSpace(source) # Added for completeness.
@@ -1016,6 +1017,7 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
     # Since each (n, m) only corresponds to one entry, thus this is thread-safe.
     paralleltasks(
         name="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)",
+        # TODO: Remove test code for isolating the issue.
         tasks=(()->fillvalues(n, homemode, m, inmode) for ((n, homemode), (m, inmode)) in Iterators.product(momentumhomefock|>enumerate, regionfock|>enumerate)),
         count=dimension(momentumhomefock)*dimension(regionfock))|>parallel
 

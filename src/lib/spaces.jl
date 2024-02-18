@@ -86,6 +86,8 @@ Base.:convert(::Type{MomentumSpace}, source::RealSpace)::MomentumSpace = Momentu
 Base.:convert(::Type{RealSpace}, source::MomentumSpace)::RealSpace = RealSpace(Matrix(transpose(inv(getbasis(source) / (2.0 * π)))))
 
 Base.:show(io::IO, point::Point) = print(io, string("$([trunc(v, digits=5) for v in vec(point)]) ∈ $(point |> getspace |> typeof)"))
+Base.:show(io::IO, ::Type{Offset}) = print(io, "Offset")
+Base.:show(io::IO, ::Type{Momentum}) = print(io, "Momentum")
 
 """
     getspace(point::Point)
@@ -252,57 +254,136 @@ Base.:*(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(poi
 Base.:/(point::Point, val::T) where {T <: Real} = Point(collect(Float64, vec(point)) / val, getspace(point))
 Base.:*(val::T, point::Point) where {T <: Real} = point * val
 
-Zipper.:Subset(points::Point...) = Subset(p for p in points)
+# ========================================================
+# Subset essentials
+Base.:convert(::Type{Vector}, set::Subset) = set.elements
+Base.:eltype(::Subset{T}) where T = T
+Base.:hash(set::Subset) = hash(set.orderings|>keys)
+# ========================================================
 
-Base.:show(io::IO, subset::Subset) = print(io, string("$(typeof(subset))(len=$(length(subset)))"))
+# ===============================================================================
+# Subset logical methods
+""" Equality like a mathematical set ignores orderings. """
+Base.:(==)(a::Subset, b::Subset)::Bool = keys(a.orderings) == keys(b.orderings)
+Base.:in(v, set::Subset)::Bool = haskey(set.orderings, v)
 
-Base.:in(item, subset::Subset)::Bool = item in (subset |> rep)
-
-""" Allows additions for a subset with another type. """
-# TODO: Requires revision.
-Base.:+(subset::Subset, val::Element)::Subset = Subset(p + val for p in subset)
-Base.:-(subset::Subset, val::Element)::Subset = subset + (-val)
-
-"""
-    getspace(subset::Subset)::AbstractSpace
-
-The space of a `Subset` have to be determined by all of it's underlying elements.
-
-### Error
-If the underlying elements of `subset` does not belongs to the same space from `getspace(element)`.
-"""
-function Zipper.:getspace(subset::Subset)
-    @assert(length(subset) > 0, "Cannot be determine the space of an empty set.")
-    space = getspace(first(subset))
-    @assert(all(Iterators.map(el -> getspace(el) == space, subset)))
-    return space
-end
-
-# Since it is not possible to hash the AffineSpace with Matrix{Float64}, we will hash only the OrderedSet representation and leave to the Base.isequal for identification.
-Base.:hash(subset::Subset)::UInt = hash([v for v in rep(subset)])
-Base.:isequal(a::Subset, b::Subset)::Bool = a == b
-
-# Overloads for iterators.
-Base.:iterate(subset::T, i...) where {T <: Subset} = iterate(rep(subset), i...)
-Base.:length(subset::T) where {T <: Subset} = subset |> rep |> length
-Base.:lastindex(subset::T) where {T <: Subset} = length(subset)
-Base.:getindex(subset::T, index) where {T <: Subset} = rep(subset)[index]
-Base.:getindex(subset::T, range::UnitRange) where {T <: Subset} = Subset([rep(subset)...][range])
-
-Base.:filter(f, subset::T) where {T <: Subset} = Subset(Iterators.filter(f, rep(subset)))
-Iterators.:filter(f, subset::T) where {T <: Subset} = Base.filter(f, subset)
-
-"""
-    flatten(subset::Subset{T})::Subset
-
-Flatten a higher order subset to order `1`, and preserves the element orderings of each order.
-"""
-function Iterators.flatten(subset::Subset{T})::Subset where {T}
-    if T <: Subset
-        return union((Iterators.flatten(element) for element in rep(subset))...)
+function Base.:union(set::Subset, iters...)
+    orderings = copy(set.orderings)
+    headelements = copy(set|>rep)
+    headlength = headelements|>length
+    others = iters|>Iterators.flatten|>enumerate
+    for (n, v) in others
+        if haskey(orderings, v)
+            continue
+        end
+        orderings[v] = headlength + n
+        push!(headelements, v)
     end
-    return subset
+    sorted = sort(orderings|>collect, by=last)
+    headorderings = Dict(v=>n for (n, (v, _)) in enumerate(sorted))
+    return Subset{set|>eltype}(headelements, headorderings)
 end
+
+"""
+    subsetunion(iters)
+
+Treating every iterator in `iters` as a mathematical set, 
+perform a union operation on all of the sets and return the 
+result as a `Subset`.
+"""
+function subsetunion(iters)
+    orderings = Dict()
+    elements = []
+    items = iters|>Iterators.flatten|>enumerate
+    for (n, v) in items
+        if haskey(orderings, v)
+            continue
+        end
+        orderings[v] = n
+        push!(elements, v)
+    end
+    sorted = sort(orderings|>collect, by=last)
+    orderings = Dict(v=>n for (n, (v, _)) in enumerate(sorted))
+    return Subset{elements|>first|>typeof}(elements, orderings)
+end
+export subsetunion
+
+function Base.:intersect(set::Subset, iters...)
+    orderings = copy(set.orderings)
+    others = Set(iters|>Iterators.flatten)
+    for (v, _) in set.orderings
+        v ∈ others || delete!(orderings, v)
+    end
+    sorted = sort(orderings|>collect, by=last)
+    headelements = [v for (v, _) in sorted]
+    headorderings = Dict(v=>n for (n, v) in enumerate(headelements))
+    return Subset{set|>eltype}(headelements, headorderings)
+end
+
+function Base.:setdiff(set::Subset, iters...)
+    orderings = copy(set.orderings)
+    others = iters|>Iterators.flatten
+    for v in others
+        if !haskey(orderings, v)
+            continue
+        end
+        delete!(orderings, v)
+    end
+    sorted = sort(orderings|>collect, by=last)
+    headelements = [v for (v, _) in sorted]
+    headorderings = Dict(v=>n for (n, v) in enumerate(headelements))
+    return Subset{set|>eltype}(headelements, headorderings)
+end
+
+Base.:issubset(a::Subset, b::Subset)::Bool = issubset(a.orderings|>keys, b.orderings|>keys)
+# ===============================================================================
+
+# ======================================================================================
+# Subset iterators methods
+Base.:length(set::Subset) = length(set.elements)
+Base.:iterate(set::Subset, i...) = iterate(set|>rep, i...)
+Base.:lastindex(set::Subset) = length(set)
+
+Base.:filter(f, set::Subset) = Subset(Iterators.filter(f, set|>rep))
+
+Iterators.:flatten(set::Subset{<:Subset}) = Subset(v for inner in set for v in inner)
+# ======================================================================================
+
+# =============================================================
+# Subset indexing
+Base.:getindex(set::Subset, index) = rep(set)[index]
+Base.:getindex(set::Subset, range::UnitRange) = Subset(rep(set)[range])
+Base.:getindex(set::Subset, v::Element) = set.orderings[v]
+# =============================================================
+
+# ========================================================================================================
+# Subset arithmetics
+Base.:+(a::Subset, b::Subset) = union(a, b)
+Base.:-(a::Subset, b::Subset) = setdiff(a, b)
+
+""" Performs element-wise additions. """
+Base.broadcasted(::typeof(+), left::Subset, right::Subset) = Subset(a+b for (a, b) in zip(left, right))
+""" Performs element-wise subtractions. """
+Base.broadcasted(::typeof(-), left::Subset, right::Subset) = Subset(a-b for (a, b) in zip(left, right))
+
+""" Add `v` to each element in the `Subset`. """
+Base.broadcasted(::typeof(+), set::Subset, v) = Subset(el+v for el in set)
+""" Subtract `v` from each element in the `Subset`. """
+Base.broadcasted(::typeof(-), set::Subset, v) = set .+ (-v)
+# ========================================================================================================
+
+# ========================================================================================
+# Subset display
+Base.:show(io::IO, set::Subset) = print(io, string("$(typeof(set))(len=$(set|>length))"))
+# ========================================================================================
+
+"""
+    getspace(set::SortSet)
+
+With the assumption that all elements in the `SortSet` resides in the same space, 
+this method returns the space of the first element in the `SortSet`.
+"""
+Zipper.:getspace(set::Subset) = set|>first|>getspace
 
 """
     members(subset::Subset)::Tuple
@@ -312,52 +393,8 @@ Convert the `Subset` into a `Tuple` with all its elements for easier accessing.
 ### Examples
 - `e₀, e₁ = members`
 """
-members(subset::Subset)::Tuple = (rep(subset)...,)
+members(set::Subset)::Tuple = (rep(set)...,)
 export members
-
-Base.:(==)(a::Subset, b::Subset)::Bool = Set(rep(a)) == Set(rep(b))
-
-Base.:convert(::Type{OrderedSet{T}}, source::Subset{T}) where {T} = source.rep
-""" Reflexive relation. """
-Base.:convert(::Type{Subset}, source::Subset{T}) where {T} = source
-Base.:convert(::Type{Subset{T}}, source::Subset{T}) where {T} = source
-""" Element-wise conversions. """
-Base.:convert(::Type{Subset{A}}, source::Subset{B}) where {A, B} = (
-    Subset(OrderedSet{A}([convert(A, el) for el in rep(source)])))
-""" Convert to the generalized type of `AbstractSubset`. """
-Base.:convert(::Type{Subset}, source::T) where {T} = Subset(rep(source))
-Base.:convert(::Type{Subset{T}}, source::T) where {T} = convert(Subset, source)
-
-Base.:eltype(subset::Subset) = subset |> rep |> eltype
-
-subsetunion(subsets)::Subset = union(OrderedSet(), (v for subset in subsets for v in subset |> rep)) |> Subset
-export subsetunion
-
-function subsetintersect(subsets)::Subset
-    intersections::OrderedSet = intersect((subset |> rep for subset in subsets)...)
-    if intersections |> isempty
-        return Subset{subsets |> first |> first |> typeof}()
-    end
-    return Subset(intersections)
-end
-export subsetintersect
-
-Base.:union(subsets::Subset...)::Subset = subsetunion(subsets)
-Base.:intersect(subsets::Subset...)::Subset = subsetintersect(subsets)
-
-Base.:+(a::Subset, b::Subset)::Subset = union(a, b)
-
-function Base.:setdiff(a::Subset, b::Subset)::Subset
-    diffresult::OrderedSet = setdiff(a |> rep, b |> rep)
-    if diffresult |> isempty
-        return Subset{a |> first |> typeof}()
-    end
-    return Subset(diffresult)
-end
-
-Base.:-(a::Subset, b::Subset)::Subset = setdiff(a, b)
-
-Base.:issubset(a::Subset, b::Subset)::Bool = issubset(a|>rep, b|>rep)
 
 struct SnappingResult
     forvalues::Vector{Number}

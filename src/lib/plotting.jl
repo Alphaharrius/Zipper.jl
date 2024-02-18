@@ -89,8 +89,8 @@ function visualize(source::SnappingResult; title::String = "")
 end
 
 function visualize(source::EigenSpectrum; title::String = "")
-    eigenfock::FockSpace = FockSpace(m for (m, _) in source |> geteigenvalues) |> sparsegrouping(:eigenindex)
-    realdatas::Vector = [[(source |> geteigenvalues)[m] |> real for m in subspace] for subspace in eigenfock |> subspaces]
+    eigenfocks = FockSpace(m for (m, _) in source |> geteigenvalues) |> sparsegrouping(:eigenindex)
+    realdatas::Vector = [[(source |> geteigenvalues)[m] |> real for m in subspace] for subspace in eigenfocks]
     # TODO: Think of a better way to visualize complex datas.
 
     function generateplot(datas::Vector, symbol::Symbol)::Vector

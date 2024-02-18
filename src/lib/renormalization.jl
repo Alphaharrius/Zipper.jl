@@ -254,7 +254,7 @@ function findlocalspstates(;
     localspectrum::EigenSpectrum = eigspech(localcorrelations, groupingthreshold=degeneracythreshold)
     groupeigenvalues::Base.Generator = (
         subset => (localspectrum |> geteigenvalues)[subset |> first]
-        for subset in localspectrum |> geteigenvectors |> getinspace |> sparsegrouping(:eigenindex) |> rep)
+        for subset in localspectrum |> geteigenvectors |> getinspace |> sparsegrouping(:eigenindex))
     selectedgroups = Iterators.filter(p -> p.second |> spectrumextractpredicate, groupeigenvalues)
 
     selectedisometries = ((localspectrum |> geteigenvectors)[:, group.first |> FockSpace] for group in selectedgroups)

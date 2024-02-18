@@ -119,7 +119,7 @@ localcorrelations = wannierrestrict' * quasistripmetalcorrelations * wannierrest
 localcorrelations|>eigspech|>visualize
 localstatesR00 = getregionstates(localcorrelations=localcorrelations, grouping=[3, 5])|>collect
 
-wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15) - normalvector*0.5
+wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15) .- normalvector*0.5
 wannierregionfock = quantize(wannierregion, 1)
 offsets = Subset(-(scaledspace*normalvector), scaledspace|>getorigin)
 remapper = spatialremapper(wannierregionfock, offsets=offsets, unitcell=quasistripmetalstate|>getcrystal|>getunitcell)
@@ -164,11 +164,16 @@ courierprojector = courierspectrum|>crystalprojector
 couriercorrelations = idmap(courierprojector|>getoutspace) - courierprojector
 couriercorrelationspectrum = couriercorrelations|>crystalspectrum
 
+m135c = m135 * getoutspace(couriercorrelations)
+m135c * couriercorrelations * m135c' |>crystalspectrum|>visualize
+m45c = m45 * getoutspace(couriercorrelations)
+m45c * couriercorrelations * m45c' |>crystalspectrum|>visualize
+
 wannierregion = couriercorrelations|>getoutspace|>getcrystal|>getunitcell
-wannierregion1 = wannierregion - ([0.25, 0.25]∈getspace(wannierregion))
-wannierregion2 = wannierregion + ([0.25, 0.25]∈getspace(wannierregion))
-wannierregion3 = wannierregion + ([0.25, -0.25]∈getspace(wannierregion))
-wannierregion4 = wannierregion + ([-0.25, 0.25]∈getspace(wannierregion))
+wannierregion1 = wannierregion .- ([0.25, 0.25]∈getspace(wannierregion))
+wannierregion2 = wannierregion .+ ([0.25, 0.25]∈getspace(wannierregion))
+wannierregion3 = wannierregion .+ ([0.25, -0.25]∈getspace(wannierregion))
+wannierregion4 = wannierregion .+ ([-0.25, 0.25]∈getspace(wannierregion))
 visualize(wannierregion, wannierregion1, wannierregion2, wannierregion3, wannierregion4)
 
 restrictfock = quantize(wannierregion1, 1)
@@ -211,7 +216,7 @@ pseudoidentities = (crystalseeds[subspace, :]' * crystalseeds[subspace, :] for (
 
 crystalseeds = Dict(k=>crystalseeds[subspace, :] for (k, subspace) in crystalseeds|>getoutspace|>crystalsubspaces)
 wanniercourierisometries = wannierprojection(crystalisometries=courierspectrum|>geteigenvectors, crystal=blockedcrystal, crystalseeds=crystalseeds)
-visualregion = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace) + ([0.5, 0.5]∈getspace(blockedcrystal))
+visualregion = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace) .+ ([0.5, 0.5]∈getspace(blockedcrystal))
 visualfock = quantize(visualregion, 1)
 leftfourier = fourier(wanniercourierisometries|>getoutspace, visualfock) / sqrt(wanniercourierisometries|>getoutspace|>getcrystal|>vol)
 rightfourier = fourier(wanniercourierisometries|>getinspace, wanniercourierisometries|>getinspace|>unitcellfock|>RegionFock)
@@ -219,6 +224,10 @@ wannierlocalstates = leftfourier' * FockMap(wanniercourierisometries) * rightfou
 visualize(wannierlocalstates|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
 
 wanniercourierisometries' * blockedcorrelations * wanniercourierisometries |>crystalspectrum|>visualize
+
+blockedcouriercorrelations = wanniercourierisometries' * blockedcorrelations * wanniercourierisometries
+blockedcouriercorrelationspectrum = blockedcouriercorrelations|>crystalspectrum
+sort([(m, v) for (m, v) in blockedcouriercorrelationspectrum|>geteigenvalues if v > 0.01 && v < 0.98], by=last)
 
 # TODO: This multiplication is wrong using CrystalFockMap
 c4transform = c4 * blockedcrystalfock |>FockMap

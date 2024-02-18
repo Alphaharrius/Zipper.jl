@@ -181,7 +181,7 @@ Get the dimension of the `Point`, which is the dimension of its vector represent
 Zipper.:dimension(point::Point)::Integer = point |> vec |> length
 
 # rpos is used to to equate the points to round off slight differences.
-Base.:(==)(a::Offset, b::Offset)::Bool = rpos(a) == rpos(b)
+Base.:(==)(a::Offset, b::Offset)::Bool = getspace(a) == getspace(b) && rpos(a) == rpos(b)
 # Reciprocal space points are equivalent only if they reside in the same space.
 Base.:(==)(a::Momentum, b::Momentum)::Bool = getspace(a) == getspace(b) && rpos(a) == rpos(b)
 

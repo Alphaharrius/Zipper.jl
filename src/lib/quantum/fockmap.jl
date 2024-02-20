@@ -376,6 +376,18 @@ export isapproxzero
 Base.:maximum(fockmap::FockMap)::Complex = (fockmap |> rep)[map(v -> v |> abs, fockmap |> rep) |> findmax |> last]
 """ Get the minimum data from the `FockMap` by absolute value. """
 Base.:minimum(fockmap::FockMap)::Complex = (fockmap |> rep)[map(v -> v |> abs, fockmap |> rep) |> findmin |> last]
+
+"""
+    columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
+
+Extract the column values as a `Mode` to `ComplexF64` pair from a `N×1` `FockMap`, 
+this is used when you need to visualize the column spectrum.
+"""
+function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
+    @assert(dimension(fockmap|>getinspace) == 1)
+    mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
+    return [outmode => mat[(fockmap|>getoutspace)[outmode], 1] for outmode in orderedmodes(fockmap|>getoutspace)]
+end
 # ===================================================================================================================
 
 # ===================================================================================================================

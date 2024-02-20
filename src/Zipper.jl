@@ -31,7 +31,6 @@ include("lib/quantum/decompositions.jl")
 include("lib/quantum/crystalfockmap.jl")
 include("lib/quantum/fouriertransform.jl")
 include("lib/quantum/regionstate.jl")
-include("lib/quantum.jl")
 include("lib/quantum/extensions.jl")
 include("lib/quantum/transformations.jl")
 

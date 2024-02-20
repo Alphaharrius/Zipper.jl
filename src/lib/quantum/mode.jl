@@ -230,6 +230,37 @@ setorbital(mode::Mode, basis::BasisFunction)::Mode = setattr(mode, :orbital => b
 export setorbital
 
 setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
+
+"""
+    mapmodes(mapper::Function, modes)::Subset{Mode}
+
+A standard way to apply a mapping function onto an iterator of `Mode` that might ends up with mode duplication.
+All duplications will be mapped with incremental `:flavor` indices starting from `1`. It is adviced that all code 
+that looks like `Subset(mode|>mapper for mode in modes)` to be replaced with this function.
+
+### Input
+- `mapper`  The mapping function to be applied to each `Mode` object, it should only be taking one `Mode` as argument.
+- `modes`   The iterator of `Mode` objects to be mapped.
+"""
+function mapmodes(mapper::Function, modes)::Subset{Mode}
+    # :flavor is removed to ensure there is not overlooked degeneracy lifted.
+    mapped::Base.Generator = (mode|>mapper|>removeattr(:flavor) for mode in modes)
+    degenerates::Dict = Dict()
+    flavoredmodes::Vector{Mode} = []
+    for mode in mapped
+        if !haskey(degenerates, mode)
+            degenerates[mode] = 1
+        else
+            degenerates[mode] += 1
+        end
+        push!(flavoredmodes, mode|>setattr(:flavor=>degenerates[mode]))
+    end
+    return Subset(flavoredmodes)
+end
+export mapmodes
+
+""" A shorthand for `mapmodes`. """
+mapmodes(mapper::Function)::Function = input -> mapmodes(mapper, input)
 # =============================================================================================================================
 
 # ================================================================================================

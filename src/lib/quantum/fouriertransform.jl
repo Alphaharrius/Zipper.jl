@@ -1,5 +1,5 @@
-# ===========
-# Fourier transform APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Fourier transform APIs ◆
 function mapunitcellfock(to::FockSpace, from::FockSpace)
     tohomefock::FockSpace = to|>unitcellfock
     fromhomefock::FockSpace = from|>unitcellfock
@@ -24,14 +24,19 @@ function rulemapunitcellfock(to::FockSpace, from::FockSpace, rule::Function = (a
 end
 export rulemapunitcellfock
 
-function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
+function fourier(
+    crystalfock::CrystalFock, regionfock::RegionFock,
+    unitcellfockmapping::Dict{Mode, Mode} = mapunitcellfock(crystalfock, regionfock))
+    
     momentummatrix::SparseMatrixCSC = crystalfock|>getcrystal|>computemomentummatrix
 
     momentumhomefock = crystalfock|>unitcellfock
     values::Array = zeros(Complex, momentumhomefock|>length, size(momentummatrix, 2), regionfock|>dimension)
     
     function fillvalues(n, homemode, m, inmode)
-        if !haskey(unitcellfockmapping, homemode) || unitcellfockmapping[homemode] != inmode|>removeattr(:r) return end
+        if !haskey(unitcellfockmapping, homemode) || unitcellfockmapping[homemode] != inmode|>removeattr(:r)
+            return
+        end
         offsetvector::Vector = inmode|>getattr(:r)|>euclidean|>vec
         values[n, :, m] = exp.(-1im * momentummatrix' * offsetvector)
     end
@@ -39,18 +44,22 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
     # Since each (n, m) only corresponds to one entry, thus this is thread-safe.
     paralleltasks(
         name="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)",
-        # TODO: Remove test code for isolating the issue.
-        tasks=(()->fillvalues(n, homemode, m, inmode) for ((n, homemode), (m, inmode)) in Iterators.product(momentumhomefock|>enumerate, regionfock|>enumerate)),
+        tasks=(
+            ()->fillvalues(n, homemode, m, inmode) 
+            for ((n, homemode), (m, inmode))
+            in Iterators.product(momentumhomefock|>enumerate, regionfock|>enumerate)),
         count=dimension(momentumhomefock)*dimension(regionfock))|>parallel
 
-    data::SparseMatrixCSC = reshape(values, (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
+    data::SparseMatrixCSC = reshape(
+        values,
+        (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
     return FockMap(crystalfock, regionfock, data)
 end
 export fourier
-# ===========
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===========
-# Fourier transform arithmetics
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Fourier transform arithmetics ◆
 """ Implemented to support Fourier transform of `CrystalFockMap` objects. """
 function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::CrystalFockMap)
     crystal::Crystal = fouriertransform|>getinspace|>getcrystal
@@ -61,7 +70,9 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
 
     blocks::Dict = paralleltasks(
         name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
-        tasks=(()->((Γ, k)=>fouriertransform[:, getsubspace(fouriertransform|>getinspace, k)]) for k in crystal|>brillouinzone),
+        tasks=(
+            ()->((Γ, k)=>fouriertransform[:, getsubspace(fouriertransform|>getinspace, k)])
+            for k in crystal|>brillouinzone),
         count=crystal|>vol)|>parallel|>Dict
     crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, crystal, blocks)
 
@@ -97,4 +108,4 @@ function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::Cr
 
     return FockMap(outspace, inspace, spdata)
 end
-# ===========
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

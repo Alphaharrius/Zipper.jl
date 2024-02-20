@@ -1,15 +1,15 @@
-# =====================================
-# CrystalFock definition
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalFock definition ◆
 struct CrystalFock <: FockSpace
     crystal::Crystal
     korderings::Dict{Momentum, Integer}
     homefock::NormalFock
 end
 export CrystalFock
-# =====================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =============================================================================================================
-# Implementation of FockSpace APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Implementation of FockSpace APIs ◆
 orderedmodes(crystalfock::CrystalFock) = (
     # brillouinzone is the default ordering of the momentums since korderings is generated from it too.
     mode|>setattr(:k=>k) for k in crystalfock|>getcrystal|>brillouinzone for mode in crystalfock|>unitcellfock)
@@ -43,10 +43,10 @@ end
 """ Check whether a `Mode` is in the `FockSpace`. """
 Base.:in(mode::Mode, crystalfock::CrystalFock)::Bool = (
     haskey(mode|>getattr(:k), crystalfock.korderings) && mode|>removeattr(:k) in crystalfock|>unitcellfock)
-# =============================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ======================================================================================================
-# Implementation of spatial/geometric APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Implementation of spatial/geometric APIs ◆
 """
     dimension(fockspace::FockSpace)
 
@@ -61,10 +61,10 @@ Zipper.:dimension(crystalfock::CrystalFock) = vol(crystalfock.crystal) * dimensi
 Shorthand for retrieving the `Crystal` of a `CrystalFock`.
 """
 Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock.crystal
-# ======================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===================================================================================================
-# CrystalFock APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalFock APIs ◆
 """
     getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
 
@@ -118,4 +118,4 @@ export crystalsubspaces
 function Zipper.:hassamespan(a::CrystalFock, b::CrystalFock)::Bool
     return getcrystal(a) == getcrystal(b) && hassamespan(a|>unitcellfock, b|>unitcellfock)
 end
-# ===================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

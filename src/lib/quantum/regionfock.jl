@@ -1,6 +1,7 @@
-# =========================================================================================================
-# RegionFock APIs
-# RegionFock is an extension of NormalFock which provide region information via the reflected attribute.
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ RegionFock APIs ◆
+# RegionFock is an extension of NormalFock which provide 
+# region information via the reflected attribute.
 
 """
     RegionFock(input)
@@ -30,22 +31,26 @@ end
 """ Get the reflected region of the regional `FockSpace`. """
 Zipper.:getregion(regionfock::RegionFock)::Region = regionfock |> getreflected
 
-""" Translate a `RegionFock` by a `Offset` and recompute the corresponding `:r` and `:b` attributes."""
+"""
+Translate a `RegionFock` by a `Offset` and recompute the 
+corresponding `:r` and `:b` attributes.
+"""
 function Base.:+(regionfock::RegionFock, offset::Offset)::RegionFock
     positiontomodes = ((getpos(mode) + offset)=>mode for mode in regionfock)
     return RegionFock(
-        mode|>setattr(:r=>(pos - basispoint(pos)), :b=>basispoint(pos)) for (pos, mode) in positiontomodes)
+        mode|>setattr(:r=>(pos - basispoint(pos)), :b=>basispoint(pos)) 
+        for (pos, mode) in positiontomodes)
 end
 
 Base.:-(regionfock::RegionFock, offset::Offset)::RegionFock = regionfock + (-offset)
-# =========================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ==========================================================================
-# RegionFock implementation of FockSpace interfaces
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ RegionFock implementation of FockSpace interfaces ◆
 unitcellfock(regionfock::RegionFock) = regionfock|>removeattr(:r)|>FockSpace
-# ==========================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ======================================================================
-# RegionFock display extension
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ RegionFock display extension ◆
 Base.:show(io::IO, ::Type{RegionFock}) = print(io, string("RegionFock"))
-# ======================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

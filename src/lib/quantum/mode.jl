@@ -1,19 +1,21 @@
-# =================================================================================================================================================
-# Mode definition
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Mode definition ◆
 """
     Mode(attrs::Dict{Symbol})
     Mode(generator::Base.Generator)
     Mode(input::Base.Iterators.Flatten)
     Mode(datas::Vector{Pair{Symbol, T}}) where {T}
 
-Represents an element in a `FockSpace`, and uniquely identifies a physical mode. The attribute `:orbital` is defaulted to `swave` if not specified.
+Represents an element in a `FockSpace`, and uniquely identifies a physical mode. 
+The attribute `:orbital` is defaulted to `swave` if not specified.
 
 ### Attributes to put in `attrs`
 - `:r` stores a `Offset` which is the offset in lattice unit.
 - `:k` stores a `Momentum` which is the offset in reciprocal lattice unit.
 - `:b` stores a `Point` which is the unit cell offset, this is associated to the attribute `:flavor`.
 - `:flavor` stores an `Integer` that identifies a fermionic freedom at a lattice site.
-- `:orbital` Defines which orbital this mode transforms like under a symmetry, for example for 𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
+- `:orbital` Defines which orbital this mode transforms like under a symmetry, for example for 
+             𝐶₃ symmetry and 𝑠 like orbital `Dict(:c3 => :s)`.
 
 ### Input
 - `attrs` The attributes which uniquely identifies the `Mode` object.
@@ -30,29 +32,29 @@ struct Mode <: Element{Mode}
     Mode(attrs::Pair{Symbol, <:Any}...) = Mode(Dict(attrs...))
 end
 export Mode
-# =================================================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ==================================================
-# Mode essentials
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Mode essentials ◆
 
 # Mode can be used as keys in dictionaries and sets.
 Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
-# ==================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =====================================================
-# Mode logicals
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Mode logicals ◆
 Base.:(==)(a::Mode, b::Mode)::Bool = a.attrs == b.attrs
-# =====================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===========================================================================================
-# Mode arithmetics
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Mode arithmetics ◆
 Base.:+(mode::Mode, offset::Offset)::Mode = setattr(mode, :r => getattr(mode, :r) + offset)
 Base.:+(mode::Mode, offset::Momentum)::Mode = setattr(mode, :k => getattr(mode, :k) + offset)
 Base.:-(mode::Mode, offset::Point)::Mode = mode + (-offset)
-# ===========================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =============================================================================================================================
-# Mode attribute API
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Mode attribute API ◆
 """
     hasattr(mode::Mode, key::Symbol)::Bool
 
@@ -168,8 +170,10 @@ Renames an attribute of a `Mode` object.
 # Returns
 - `Mode`: A new `Mode` object with the renamed attribute.
 """
-renameattr(mode::Mode, oldkey::Symbol, newkey::Symbol)::Mode = mode|>setattr(newkey=>getattr(mode, oldkey))|>removeattr(oldkey)
-renameattr(input, oldkey::Symbol, newkey::Symbol) = Subset(renameattr(mode, oldkey, newkey) for mode in input)
+renameattr(mode::Mode, oldkey::Symbol, newkey::Symbol)::Mode = (
+    mode|>setattr(newkey=>getattr(mode, oldkey))|>removeattr(oldkey))
+renameattr(input, oldkey::Symbol, newkey::Symbol) = Subset(
+    renameattr(mode, oldkey, newkey) for mode in input)
 renameattr(oldkey, newkey)::Function = m -> renameattr(m, oldkey, newkey)
 
 function renameattr(renamings::Pair{Symbol, Symbol}...)::Function
@@ -202,7 +206,8 @@ export commonattr
 """
     commonattrs(modes)::Base.Generator
 
-Retrieve all the attributes within the group of modes that has the same values and returned as a generator of `Symbol`.
+Retrieve all the attributes within the group of modes that has the same values and returned 
+as a generator of `Symbol`.
 """
 function commonattrs(modes)::Base.Generator
     attrs::Base.Generator = (Set(k => v for (k, v) in mode |> getattrs) for mode in modes)
@@ -213,7 +218,8 @@ export commonattrs
 """
     indexmodes(modes)::Subset{Mode}
 
-Retrieve the representative modes of this group of modes with their corresponding common attributes stripped.
+Retrieve the representative modes of this group of modes with their 
+corresponding common attributes stripped.
 """
 function indexmodes(modes)::Subset{Mode}
     cleanattrs::Base.Generator = modes |> commonattrs
@@ -221,7 +227,8 @@ function indexmodes(modes)::Subset{Mode}
 end
 export indexmodes
 
-getorbital(mode::Mode, default::BasisFunction)::BasisFunction = hasattr(mode, :orbital) ? getattr(mode, :orbital) : default
+getorbital(mode::Mode, default::BasisFunction)::BasisFunction = (
+    hasattr(mode, :orbital) ? getattr(mode, :orbital) : default)
 export getorbital
 
 getorbital(default::BasisFunction = swave) = mode -> getorbital(mode, default)
@@ -234,12 +241,14 @@ setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
 """
     mapmodes(mapper::Function, modes)::Subset{Mode}
 
-A standard way to apply a mapping function onto an iterator of `Mode` that might ends up with mode duplication.
-All duplications will be mapped with incremental `:flavor` indices starting from `1`. It is adviced that all code 
-that looks like `Subset(mode|>mapper for mode in modes)` to be replaced with this function.
+A standard way to apply a mapping function onto an iterator of `Mode` that might 
+ends up with mode duplication. All duplications will be mapped with incremental 
+`:flavor` indices starting from `1`. It is adviced that all code that looks like 
+`Subset(mode|>mapper for mode in modes)` to be replaced with this function.
 
 ### Input
-- `mapper`  The mapping function to be applied to each `Mode` object, it should only be taking one `Mode` as argument.
+- `mapper`  The mapping function to be applied to each `Mode` object, it should 
+            only be taking one `Mode` as argument.
 - `modes`   The iterator of `Mode` objects to be mapped.
 """
 function mapmodes(mapper::Function, modes)::Subset{Mode}
@@ -261,46 +270,49 @@ export mapmodes
 
 """ A shorthand for `mapmodes`. """
 mapmodes(mapper::Function)::Function = input -> mapmodes(mapper, input)
-# =============================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ================================================================================================
-# Mode display
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Mode display ◆
 """ Display the number of attributes that identifies this `Mode`. """
 Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
 
-""" Shorthand for accessing the attribute information of all modes within the `FockSpace` for visualization. """
+""" Shorthand for accessing the attribute information of all modes within the `FockSpace`. """
 modeattrs(modes)::OrderedSet{Dict} = OrderedSet(mode|>getattrs for mode in modes)
 export modeattrs
-# ================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =================================================================================================================================
-# Spatial API implementation
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Spatial API implementation ◆
 """
     getspace(mode::Mode)
 
-The space of a `Mode` comes from the physical quantities its defined on, such as `:r`, `:k` and `:b`, if none of those are defined,
-it will be `euclidean(RealSpace, 1)` as the mode and it's siblings can always be parameterized by a scalar.
+The space of a `Mode` comes from the physical quantities its defined on, such as 
+`:r`, `:k` and `:b`, if none of those are defined, it will be `euclidean(RealSpace, 1)` 
+as the mode and it's siblings can always be parameterized by a scalar.
 
 ### Output
-The space of the attribute `:k` or `:r` if available, fall back to `:b` if otherwise; returns a Euclidean space of dimension `1` no 
-position attributes is found.
+The space of the attribute `:k` or `:r` if available, fall back to `:b` if otherwise; 
+returns a Euclidean space of dimension `1` no position attributes is found.
 """
 function Zipper.:getspace(mode::Mode)
     # :r and :k have a higher priority in determining the space of the mode.
     if hasattr(mode, :k) return getspace(getattr(mode, :k)) end
     if hasattr(mode, :r) return getspace(getattr(mode, :r)) end
     if hasattr(mode, :b) return getspace(getattr(mode, :b)) end
-    # If the mode does not based on any physical position or quantities for associating with any space, then it will simply lives
-    # in a 1D euclidean space as the mode and it's siblings can always be parameterized by a scalar.
+    # If the mode does not based on any physical position or quantities for 
+    # associating with any space, then it will simply lives in a 1D euclidean 
+    # space as the mode and it's siblings can always be parameterized by a scalar.
     return euclidean(RealSpace, 1)
 end
 
 """
     getpos(mode::Mode)::Point
 
-Get the actual position of the mode, if the mode is associated with a `Momentum` which a `:k` attribute is attached, the return
-value will be the `Momentum`; if the mode is associated with a `Offset` which a `:r` attribute is attached, it will be returned,
-and if there is a intra unit cell offset `:b` attached, it will be added to the `Offset` as the final result.
+Get the actual position of the mode, if the mode is associated with a `Momentum` which a `:k` 
+attribute is attached, the return value will be the `Momentum`; if the mode is associated with 
+a `Offset` which a `:r` attribute is attached, it will be returned, and if there is a intra 
+unit cell offset `:b` attached, it will be added to the `Offset` as the final result.
 """
 function Zipper.:getpos(mode::Mode)::Point
     if hasattr(mode, :k)
@@ -313,20 +325,23 @@ function Zipper.:getpos(mode::Mode)::Point
 
     error("The mode does not have a primary position attribute!")
 end
-# =================================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ==========================================================================================================================================================
-# API extensions
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ API extensions ◆
 """ Added to support shorthand of `Subset(m0, m1, ...)`. """
 Zipper.:Subset(modes::Mode...) = Subset(modes)
 
 """
     spanoffset(basismodes::Subset{Mode}, points::Subset{<: Point})::Subset{Mode}
 
-Given a set of `basismodes`, and the generator `points`, span the basis modes with the primary position attribute `:r` or `:k`, the primary ordering will be
-the ordering of `points`, then follows the ordering of `basismodes`.
+Given a set of `basismodes`, and the generator `points`, span the basis modes with 
+the primary position attribute `:r` or `:k`, the primary ordering will be the ordering 
+of `points`, then follows the ordering of `basismodes`.
 """
-spanoffset(basismodes::Subset{Mode}, momentums::Subset{Momentum})::Subset{Mode} = Subset(setattr(mode, :k=>k) for k in momentums for mode in basismodes)
-spanoffset(basismodes::Subset{Mode}, offsets::Subset{Offset})::Subset{Mode} = Subset(setattr(mode, :r=>point) for point in offsets for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, momentums::Subset{Momentum})::Subset{Mode} = Subset(
+    setattr(mode, :k=>k) for k in momentums for mode in basismodes)
+spanoffset(basismodes::Subset{Mode}, offsets::Subset{Offset})::Subset{Mode} = Subset(
+    setattr(mode, :r=>point) for point in offsets for mode in basismodes)
 export spanoffset
-# ==========================================================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

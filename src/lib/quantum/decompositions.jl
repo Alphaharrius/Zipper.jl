@@ -1,15 +1,15 @@
-# ==================================================================
-# EigenSpectrum definition
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ EigenSpectrum definition ◆
 """ Packaging the result computed from eigenvalue decomposition. """
 struct EigenSpectrum
     eigenvalues::Dict{Mode, Number}
     eigenvectors::FockMap
 end
 export EigenSpectrum
-# ==================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ================================================================================
-# EigenSpectrum APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ EigenSpectrum APIs ◆
 function geteigenmodes(spectrum::EigenSpectrum)::Subset{Mode}
     return spectrum.eigenvectors|>getinspace |> orderedmodes
 end
@@ -24,9 +24,10 @@ export geteigenvectors
 """
     eigspech(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
 
-Perform Hermitian eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously, the corresponding eigenmodes will have
-the attributes of `:eigenindex` which corresponds to the degenerate group associated to a eigenvalue, and in ascending order of the eigenvalues;
-`:flavor` which indicates the individual degrees of freedom within the degenerate group; along with the attributes supplied by `attrs`.
+Perform Hermitian eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously, the 
+corresponding eigenmodes will have the attributes of `:eigenindex` which corresponds to the degenerate 
+group associated to a eigenvalue, and in ascending order of the eigenvalues; `:flavor` which indicates 
+the individual degrees of freedom within the degenerate group; along with the attributes supplied by `attrs`.
 
 ### Input
 - `hermitian`           The source of the decomposition, must be a Hermitian.
@@ -47,15 +48,16 @@ export eigspech
 """
     eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
 
-Perform eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously, the corresponding eigenmodes will have
-the attributes of `:eigenindex` which corresponds to the degenerate group associated to a eigenvalue; `:flavor` which indicates the
-individual degrees of freedom within the degenerate group; along with the attributes supplied by `attrs`.
+Perform eigenvalue decomposition to find the eigenvalues and eigenvectors simultaneously, the corresponding 
+eigenmodes will have the attributes of `:eigenindex` which corresponds to the degenerate group associated to 
+a eigenvalue; `:flavor` which indicates the individual degrees of freedom within the degenerate group; along 
+with the attributes supplied by `attrs`.
 
 ### Input
 - `fockmap`             The source of the decomposition.
 - `attrs`               Attributes to be inserted to the generated eigenmodes.
-- `groupingthreshold`   The threshold for grouping degenerated eigenvalues, since the eigenvalues are complex numbers, this threshold
-                        will be applied to the real and imaginary parts separately.
+- `groupingthreshold`   The threshold for grouping degenerated eigenvalues, since the eigenvalues are complex 
+                        numbers, this threshold will be applied to the real and imaginary parts separately.
 """
 function eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
     vals, U = fockmap |> rep |> Matrix |> eigen
@@ -68,28 +70,31 @@ export eigspec
 """
     groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-7)
 
-Given a spectrum, attempt to group the eigenmodes based on their corresponding eigenvalues with a eigenvalue grouping threshold.
+Given a spectrum, attempt to group the eigenmodes based on their corresponding eigenvalues with a 
+eigenvalue grouping threshold.
 
 ### Output
-A generator yielding `Pair{Number, Subset{Mode}}` objects, with the eigenvalues as keys and the corresponding eigenmodes as values.
+A generator yielding `Pair{Number, Subset{Mode}}` objects, with the eigenvalues as keys and the 
+corresponding eigenmodes as values.
 """
 function groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-7)::Base.Generator
-    denominator::Integer = (1 / groupingthreshold) |> round |> Integer
-    actualvalues::Dict{Rational, Number} = Dict(hashablereal(v, denominator) => v for (_, v) in spectrum |> geteigenvalues)
-    items::Base.Generator = (hashablereal(v, denominator) => m for (m, v) in spectrum |> geteigenvalues)
+    denominator::Integer = (1 / groupingthreshold)|>round|>Integer
+    actualvalues::Dict{Rational, Number} = Dict(
+        hashablereal(v, denominator)=>v for (_, v) in spectrum|>geteigenvalues)
+    items::Base.Generator = (hashablereal(v, denominator)=>m for (m, v) in spectrum|>geteigenvalues)
     groups::Dict{Rational, Vector{Mode}} = foldl(items; init=Dict{Rational, Vector{Mode}}()) do d, (k, v)
-        mergewith!(append!, d, LittleDict(k => [v]))
+        mergewith!(append!, d, LittleDict(k=>[v]))
     end
-    sortedrationals::Vector{Rational} = sort([(groups |> keys)...])
-    return (actualvalues[r] => groups[r] |> Subset for r in sortedrationals)
+    sortedrationals::Vector{Rational} = sort([(groups|>keys)...])
+    return (actualvalues[r]=>groups[r]|>Subset for r in sortedrationals)
 end
 export groupbyeigenvalues
-# ================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =========================================================================================================================
-# Internal methods
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Internal methods ◆
 """ Internal method that generates the `eigenmode => eigenvalue` pairs. """
-function digesteigenvalues(H::Type, V::Type, vals, groupingthreshold::Real, attrs::Pair{Symbol}...)::Base.Iterators.Flatten
+function digesteigenvalues(H::Type, V::Type, vals, groupingthreshold::Real, attrs::Pair{Symbol}...)
     denominator = (1 / groupingthreshold) |> round |> Integer
     valtable::Dict{H, V} = Dict(hashablenumber(v |> V, denominator) => v for v in vals)
     items::Base.Generator = (hashablenumber(v |> V, denominator) => n for (n, v) in vals |> enumerate)
@@ -103,16 +108,16 @@ function digesteigenvalues(H::Type, V::Type, vals, groupingthreshold::Real, attr
         for (n, group) in sortedgroups |> enumerate
         for f in group.second |> eachindex)
 end
-# =========================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =================================================================================
-# EigenSpectrum display
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ EigenSpectrum display ◆
 Base.:show(io::IO, spectrum::EigenSpectrum) = print(
     io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
-# =================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ==========================================================================================================
-# CrystalSpectrum definition
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum definition ◆
 """
 Decomposition of `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span,
 and store the underlying information into eigen value decomposed form indexed by the `Momentum` of the
@@ -131,15 +136,15 @@ end
 export CrystalSpectrum
 
 CrystalSpectrum(crystal::Crystal, arguments...) = CrystalSpectrum{crystal|>dimension}(crystal, arguments...)
-# ==========================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ====================================================================================================================================
-# CrystalSpectrum APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum APIs ◆
 """
     crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
 
-Given a collection of Hermitian `FockMap` objects each associated with a specific `Momentum` from the brillouin zone, pack into a
-`CrystalSpectrum` object.
+Given a collection of Hermitian `FockMap` objects each associated with a specific `Momentum` from the brillouin zone,
+pack into a `CrystalSpectrum` object.
 """
 function crystalspectrum(momentumfockmaps; crystal::Crystal)::CrystalSpectrum
     function compute(k, fockmap)
@@ -162,38 +167,43 @@ export crystalspectrum
 """
     crystalspectrum(fockmap::FockMap)::CrystalSpectrum
 
-Given a Hermitian `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span, pack into a `CrystalSpectrum` object.
+Given a Hermitian `FockMap` with `inspace` and `outspace` of type 
+`CrystalFock` of same span, pack into a `CrystalSpectrum` object.
 """
-crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(fockmap|>crystalsubmaps, crystal=fockmap|>getinspace|>getcrystal)
+crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(
+    fockmap|>crystalsubmaps, crystal=fockmap|>getinspace|>getcrystal)
 
 """
     linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
 
-Since some spectrum might be defined in a crystal that is implicitly on 1-D space, such as a line in the 2D plane, inorder to visualize
-the spectrum properly instead of using the plot in the original dimension, we can embed the spectrum into a 1-D space for plotting.
+Since some spectrum might be defined in a crystal that is implicitly on 1-D space, such as a line in 
+the 2D plane, inorder to visualize the spectrum properly instead of using the plot in the original 
+dimension, we can embed the spectrum into a 1-D space for plotting.
 """
 function linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
     crystal::Crystal = spectrum|>getcrystal
-    nontrivialbasis = Iterators.filter(v -> (v[1]) == 1, zip(crystal|>size, crystal|>getspace|>getbasisvectors))|>collect
+    nontrivialbasis = Iterators.filter(
+        v -> (v[1]) == 1, zip(crystal|>size, crystal|>getspace|>getbasisvectors))|>collect
     @assert(nontrivialbasis|>collect|>length == 1, "More than 1 non-trivial basis in this crystal.")
     embeddedbasis::Real = nontrivialbasis[1][2]|>norm
     embeddedspace::RealSpace = RealSpace([embeddedbasis][:, :])
     unitcelllength = crystal|>getunitcell|>length
     dummyunitcell::Region = Subset([r / unitcelllength] ∈ embeddedspace for r in (0:unitcelllength - 1))
     embeddedcrystal::Crystal = Crystal(dummyunitcell, [nontrivialbasis[1][1]])
-    return CrystalSpectrum(embeddedcrystal, spectrum|>geteigenmodes, spectrum|>geteigenvalues, spectrum|>geteigenvectors)
+    return CrystalSpectrum(
+        embeddedcrystal, spectrum|>geteigenmodes, spectrum|>geteigenvalues, spectrum|>geteigenvectors)
 end
 export linespectrum
-# ====================================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =======================================================================
-# CrystalSpectrum implementation of spatial interface
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum implementation of spatial interface ◆
 """ Get the associated crystal of a `CrystalSpectrum` object. """
 Zipper.:getcrystal(spectrum::CrystalSpectrum)::Crystal = spectrum.crystal
-# =======================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ============================================================================================
-# CrystalSpectrum extension to EigenSpectrum APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum extension to EigenSpectrum APIs ◆
 """
     geteigenmodes(spectrum::CrystalSpectrum)::Dict{Momentum, Subset{Mode}}
 
@@ -222,10 +232,10 @@ each with `inspace` corresponds to the returned `Subset{Mode}` of the same index
 from `geteigenmodes(spectrum)`.
 """
 geteigenvectors(spectrum::CrystalSpectrum)::Dict{Momentum, FockMap} = spectrum.eigenvectors
-# ============================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ============================================================================================================
-# CrystalSpectrum extension to other interfaces
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum extension to other interfaces ◆
 """ Shorthand to retrieve the unitcell fockspace from a `CrystalSpectrum`. """
 function unitcellfock(spectrum::CrystalSpectrum)
     sourcefock::FockSpace = spectrum |> geteigenvectors |> first |> last |> getoutspace
@@ -251,35 +261,39 @@ function FockMap(crystalspectrum::CrystalSpectrum)::FockMap
     crystalfock::FockSpace = FockSpace(fockmap|>getinspace, reflected=crystalspectrum.crystal)
     return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
 end
-# ============================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =================================================================================
-# CrystalSpectrum display
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum display ◆
 Base.:show(io::IO, spectrum::CrystalSpectrum) = print(
     io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
-# =================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ========================================================================================================================================
-# Decomposition APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Decomposition APIs ◆
 """
     svd(fockmap::FockMap)::Tuple{FockMap, Base.Generator, FockMap}
 
-Perform singular value decomposition on a FockMap and return the left singular vectors, singular values, and right singular vectors.
+Perform singular value decomposition on a FockMap and return the left singular vectors,
+singular values, and right singular vectors.
 """
 function LinearAlgebra.:svd(fockmap::FockMap)::Tuple{FockMap, Base.Generator, FockMap}
     leftmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap|>getinspace))
     rightmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap|>getoutspace))
     U, Σ, Vt = fockmap |> rep |> Matrix |> svd
     svdvalues::Base.Generator = (
-        (Mode([:svdindex => n]), Mode([:svdindex => n])) => Σ[n] for n in 1:min(leftmodes |> length, rightmodes |> length))
-    return FockMap(fockmap|>getoutspace, leftmodes |> FockSpace, U), svdvalues, FockMap(rightmodes |> FockSpace, fockmap|>getinspace, Vt')
+        (Mode([:svdindex => n]), Mode([:svdindex => n])) => Σ[n] for n in 1:min(leftmodes|>length, rightmodes|>length))
+    return (
+        FockMap(fockmap|>getoutspace, leftmodes|>FockSpace, U),
+        svdvalues,
+        FockMap(rightmodes|>FockSpace, fockmap|>getinspace, Vt'))
 end
 
 """ Shorthand for retrieving the eigenvectors from the `eigspech` function. """
-eigvecsh(hermitian::FockMap, attrs::Pair{Symbol}...)::FockMap = eigspech(hermitian, attrs...) |> geteigenvectors
+eigvecsh(hermitian::FockMap, attrs::Pair{Symbol}...)::FockMap = eigspech(hermitian, attrs...)|>geteigenvectors
 export eigvecsh
 
 """ Shorthand for retrieving the eigenvalues from the `eigspech` function. """
-eigvalsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...) |> geteigenvalues
+eigvalsh(hermitian::FockMap, attrs::Pair{Symbol}...)::Dict{Mode, Real} = eigspech(hermitian, attrs...)|>geteigenvalues
 export eigvalsh
-# ========================================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

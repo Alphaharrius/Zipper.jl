@@ -1,11 +1,11 @@
-# ======================================================================================================
-# FockMap definition
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap definition ◆
 abstract type FockMap{A <: FockSpace, B <: FockSpace} <: Element{SparseMatrixCSC{ComplexF64, Int64}} end
 export FockMap
-# ======================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===============================================================================================
-# FockMap interfaces
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap interfaces ◆
 
 # This allows rep(fockmap) to work.
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::FockMap) = typeof(v)|>notimplemented
@@ -17,29 +17,32 @@ export getoutspace
 getinspace(::Any) = notimplemented()
 getinspace(v::FockMap) = typeof(v)|>notimplemented
 export getinspace
-# ===============================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ==========================================================
-# FockMap logicals
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap logicals ◆
 Base.iszero(fockmap::FockMap)::Bool = iszero(fockmap |> rep)
-# ==========================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===================================================================================================================================================
-# FockMap indexing
-Base.:getindex(fockmap::FockMap, row, col) = restrict(fockmap, (fockmap|>getoutspace)[row]|>FockSpace, (fockmap|>getinspace)[col]|>FockSpace)
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap indexing ◆
+Base.:getindex(fockmap::FockMap, row, col) = restrict(
+    fockmap, (fockmap|>getoutspace)[row]|>FockSpace, (fockmap|>getinspace)[col]|>FockSpace)
 Base.:getindex(fockmap::FockMap, row::Mode, col::Mode) = restrict(fockmap, row|>FockSpace, col|>FockSpace)
-Base.:getindex(fockmap::FockMap, ::Colon, col) = restrict(fockmap, fockmap|>getoutspace, (fockmap|>getinspace)[col]|>FockSpace)
+Base.:getindex(fockmap::FockMap, ::Colon, col) = restrict(
+    fockmap, fockmap|>getoutspace, (fockmap|>getinspace)[col]|>FockSpace)
 Base.:getindex(fockmap::FockMap, ::Colon, col::Mode) = restrict(fockmap, fockmap|>getoutspace, col|>FockSpace)
-Base.:getindex(fockmap::FockMap, row, ::Colon) = restrict(fockmap, (fockmap|>getoutspace)[row]|>FockSpace, fockmap|>getinspace)
+Base.:getindex(fockmap::FockMap, row, ::Colon) = restrict(
+    fockmap, (fockmap|>getoutspace)[row]|>FockSpace, fockmap|>getinspace)
 Base.:getindex(fockmap::FockMap, row::Mode, ::Colon) = restrict(fockmap, row|>FockSpace, fockmap|>getinspace)
 Base.:getindex(fockmap::FockMap, ::Colon, ::Colon) = fockmap
 Base.:getindex(fockmap::FockMap, rowspace::FockSpace, colspace::FockSpace) = restrict(fockmap, rowspace, colspace)
 Base.:getindex(fockmap::FockMap, ::Colon, colspace::FockSpace) = columns(fockmap, colspace)
 Base.:getindex(fockmap::FockMap, rowspace::FockSpace, ::Colon) = rows(fockmap, rowspace)
-# ===================================================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# =============================================================================================
-# FockMap arithmetics
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap arithmetics ◆
 """ Shorthand to update the `outspace` of the `FockMap`. """
 Base.:*(fockspace::FockSpace, fockmap::FockMap)::FockMap = FockMap(fockmap, outspace=fockspace)
 """ Shorthand to update the `inspace` of the `FockMap`. """
@@ -57,7 +60,8 @@ Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 
 """ Matrix product of two `FockMap` aligned with their corresponding `FockSpace`. """
 function Base.:*(a::FockMap, b::FockMap)::FockMap
-    @assert(hassamespan(a|>getinspace, b|>getoutspace)) # Even if the fockspaces are different, composition works as long as they have same span.
+    # Even if the fockspaces are different, composition works as long as they have same span.
+    @assert(hassamespan(a|>getinspace, b|>getoutspace))
     return FockMap(a|>getoutspace, b|>getinspace, rep(a) * rep(permute(b, outspace=a|>getinspace, inspace=b|>getinspace)))
 end
     
@@ -76,7 +80,8 @@ Base.:adjoint(source::FockMap)::FockMap = FockMap(source|>getinspace, source|>ge
 """ Get the matrix norm of a `FockMap`. """
 LinearAlgebra.:norm(fockmap::FockMap)::Number = norm(fockmap|>rep)
 """ Normalize a `FockMap`. """
-LinearAlgebra.:normalize(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>normalize)
+LinearAlgebra.:normalize(fockmap::FockMap)::FockMap = FockMap(
+    fockmap|>getoutspace, fockmap|>getinspace, fockmap|>rep|>normalize)
 """ Find the absolute of a `FockMap` and store the result in the real part each index of its representation. """
 Base.:abs(fockmap::FockMap)::FockMap = FockMap(fockmap|>getoutspace, fockmap|>getinspace, map(abs, fockmap|>rep))
 
@@ -96,10 +101,10 @@ function Base.kron(primary::FockMap, secondary::FockMap)
     data::SparseMatrixCSC = kron(primary|>rep, secondary|>rep)
     FockMap(outspace, inspace, data)
 end
-# =============================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===================================================================================================================
-# FockMap APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap APIs ◆
 Base.:size(fockmap::FockMap)::Tuple{Int64, Int64} = (dimension(fockmap|>getoutspace), dimension(fockmap|>getinspace))
 
 """
@@ -131,14 +136,16 @@ function extractindices(fockmap::FockMap, indices)
 end
 export extractindices
 
-getmodepair(fockmap::FockMap, coords::CartesianIndex)::Pair{Mode, Mode} = (fockmap|>getinspace)[coords[2]] => (fockmap|>getoutspace)[coords[1]]
+getmodepair(fockmap::FockMap, coords::CartesianIndex)::Pair{Mode, Mode} = (
+    (fockmap|>getinspace)[coords[2]] => (fockmap|>getoutspace)[coords[1]])
 export getmodepair
 
 """
     idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
 
-Create an injective `FockMap` from `inspace` to `outspace` of the same dimension, and the mapping pairs are determined by the order of both spaces,
-i.e. the n-th element of the `inspace` will be mapped to the n-th element of the outspace.
+Create an injective `FockMap` from `inspace` to `outspace` of the same dimension, and the 
+mapping pairs are determined by the order of both spaces, i.e. the n-th element of the `inspace` 
+will be mapped to the n-th element of the outspace.
 """
 function idmap(outspace::FockSpace, inspace::FockSpace)::FockMap
     @assert(dimension(outspace) == dimension(inspace))
@@ -154,7 +161,8 @@ idmap(fockspace::FockSpace) = idmap(fockspace, fockspace)
 
 Generate a `FockMap` full of `1`s from `inspace` to `outspace`.
 """
-onesmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(outspace, inspace, spzeros(dimension(outspace), dimension(inspace)) .+ 1)
+onesmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(
+    outspace, inspace, spzeros(dimension(outspace), dimension(inspace)) .+ 1)
 export onesmap
 
 """
@@ -162,7 +170,8 @@ export onesmap
 
 Generate a `FockMap` full of `0`s from `inspace` to `outspace`.
 """
-zerosmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(outspace, inspace, spzeros(dimension(outspace), dimension(inspace)))
+zerosmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(
+    outspace, inspace, spzeros(dimension(outspace), dimension(inspace)))
 export zerosmap
 
 """
@@ -213,6 +222,7 @@ Permute the columns and rows of the representation of the `source` `FockMap` by 
 - `inspace`  A `FockSpace` with the same span as the `inspace` of the `source` `FockMap`.
 """
 function permute(source::FockMap; outspace::FockSpace=source|>getoutspace, inspace::FockSpace=source|>getinspace)::FockMap
+
     rowrule::Vector{Int64} = orderingrule(source|>getoutspace, outspace)
     colrule::Vector{Int64} = orderingrule(source|>getinspace, inspace)
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), rowrule, colrule))
@@ -220,13 +230,16 @@ end
 export permute
 
 """ Shorthand for creating a function with single parameter `FockMap` to perform `permute`. """
-permute(; outspace::FockSpace, inspace::FockSpace)::Function = fockmap::FockMap -> Zipper.permute(fockmap, outspace=outspace, inspace=inspace)
+permute(; outspace::FockSpace, inspace::FockSpace)::Function = (
+    fockmap::FockMap -> Zipper.permute(fockmap, outspace=outspace, inspace=inspace))
 
 """
-Perform addition of two `FockMap`s, if they carries `inspace` and `outspace` of same span, then this is just a sum of representation values; if they carries
-non-overlapping `inspace` and `outspace`, this corresponds to a direct sum; if they have overlapping but different span of `inspace` or `outspace`, the result will
-be a `FockMap` with `outspace` and `inspace` with 3 subspaces of (!intersect x 2, intersect x 1), with the corresponding representation summed. Noted that this
-function is accessed via `a::FockMap + b::FockMap`.
+Perform addition of two `FockMap`s, if they carries `inspace` and `outspace` of same span, 
+then this is just a sum of representation values; if they carries non-overlapping `inspace` 
+and `outspace`, this corresponds to a direct sum; if they have overlapping but different span 
+of `inspace` or `outspace`, the result will be a `FockMap` with `outspace` and `inspace` with 
+3 subspaces of (!intersect x 2, intersect x 1), with the corresponding representation summed. 
+Noted that this function is accessed via `a::FockMap + b::FockMap`.
 """
 function fockadd(a::FockMap, b::FockMap)::FockMap
     outspacesamespan::Bool = hassamespan(a|>getoutspace, b|>getoutspace)
@@ -278,7 +291,9 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
         inmodes::Subset{Mode} = is |> orderedmodes
 
         restricted::FockMap = restrict(source, os, is)
-        data[outspace[outmodes|>first]:outspace[outmodes|>last], inspace[inmodes|>first]:inspace[inmodes|>last]] += (restricted|>rep)
+        outrange::UnitRange = outspace[outmodes|>first]:outspace[outmodes|>last]
+        inrange::UnitRange = inspace[inmodes|>first]:inspace[inmodes|>last]
+        data[outrange, inrange] += (restricted|>rep)
     end
 
     internaladdition(a, outspace1, inspace1)
@@ -291,8 +306,10 @@ function fockadd(a::FockMap, b::FockMap)::FockMap
     internaladdition(b, outspace3, inspace3)
 
     # Prioritize the fockspaces of `a`.
-    returnoutspace::FockSpace = hassamespan(outspace, a|>getoutspace) ? a|>getoutspace : hassamespan(outspace, b|>getoutspace) ? b|>getoutspace : outspace
-    returninspace::FockSpace = hassamespan(inspace, a|>getinspace) ? a|>getinspace : hassamespan(inspace, b|>getinspace) ? b|>getinspace : inspace
+    returnoutspace::FockSpace = hassamespan(outspace, a|>getoutspace) ? 
+        a|>getoutspace : hassamespan(outspace, b|>getoutspace) ? b|>getoutspace : outspace
+    returninspace::FockSpace = hassamespan(inspace, a|>getinspace) ? 
+        a|>getinspace : hassamespan(inspace, b|>getinspace) ? b|>getinspace : inspace
 
     result::FockMap = FockMap(outspace, inspace, data)
     return FockMap(result, outspace=returnoutspace, inspace=returninspace)
@@ -347,17 +364,17 @@ function directsum(fockmaps)::FockMap
     foreach(filldata, fockmaps)
     return FockMap(outspace, inspace, data)
 end
-# ===================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===================================================================================================================
-# FockMap numerical APIs.
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap numerical APIs. ◆
 """
     makezero(fockmap::FockMap, eps::Number = 1e-7)::FockMap
 
 Round all numerical zeros within the `FockMap` to actual zero with a given tolerance `eps`.
 """
 makezero(fockmap::FockMap, eps::Number = 1e-7)::FockMap = FockMap(
-    fockmap|>getoutspace, fockmap|>getinspace, map(v -> abs(v |> real) < eps && abs(v |> imag) < eps ? 0im : v, fockmap |> rep))
+    fockmap|>getoutspace, fockmap|>getinspace, map(v -> abs(v|>real) < eps && abs(v|>imag) < eps ? 0im : v, fockmap|>rep))
 """ Shorthand returning a function that performs `makezero` with a given tolerance `eps` on parameter `fockmap`. """
 makezero(eps::Number = 1e-7)::Function = fockmap -> makezero(fockmap, eps)
 export makezero
@@ -388,10 +405,10 @@ function columnspec(fockmap::FockMap)::Vector{Pair{Mode, ComplexF64}}
     mat::SparseMatrixCSC{ComplexF64, Int64} = rep(fockmap)
     return [outmode => mat[(fockmap|>getoutspace)[outmode], 1] for outmode in orderedmodes(fockmap|>getoutspace)]
 end
-# ===================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===================================================================================================================
-# FockMap commutation APIs
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap commutation APIs ◆
 """
     commutation(a::FockMap, b::FockMap)::FockMap
 
@@ -407,9 +424,9 @@ Check if two `FockMap` objects commutes with each other, up to a numerical zero 
 """
 commute(a::FockMap, b::FockMap; eps::Number = 1e-7)::Bool = commutation(a, b) |> makezero(eps) |> iszero
 export commute
-# ===================================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ===========================================================================================================
-# FockMap display
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap display ◆
 Base.:show(io::IO, fockmap::FockMap) = print(io, string("$(fockmap|>getinspace) => $(fockmap|>getoutspace)"))
-# ===========================================================================================================
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

@@ -81,14 +81,14 @@ Subset{T}() where T = Subset{T}(tuple(), Dict())
 
 """ Create a `Subset` from an iterable `iter` of `T`. """
 function Subset(iter)
-    T::Type = iter|>first|>typeof
-    orderings::Dict{T, Integer} = Dict()
+    orderings::Dict = Dict()
     for (n, v) in iter|>enumerate
         haskey(orderings, v) || (orderings[v] = n)
     end
+    T::Type = orderings|>keys|>first|>typeof
     sorted = sort(orderings|>collect, by=last)
     # If there are repeative elements in iter, we need to reassign the orderings.
-    orderings = Dict(v=>n for (n, (v, _)) in sorted|>enumerate)
+    orderings = Dict(v::T=>n for (n, (v, _)) in sorted|>enumerate)
     elements::Vector{T} = [key for (key, _) in sorted]
     return Subset{T}(elements, orderings)
 end

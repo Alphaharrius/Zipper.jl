@@ -1,34 +1,3 @@
-"""
-    subspaces(fockspace::FockSpace)::Base.Generator
-
-Retrieve the sub-fockspaces of the `fockspace`.
-"""
-# TODO: Trivial methods
-subspaces(fockspace::FockSpace)::Base.Generator = (FockSpace(partition) for partition in rep(fockspace))
-export subspaces
-
-"""
-    flattensubspaces(fockspace::FockSpace)::FockSpace
-
-Merge all subspaces within the `fockspace`.
-"""
-# TODO: Trivial methods
-flattensubspaces(fockspace::FockSpace)::FockSpace = FockSpace(Subset(mode for mode in orderedmodes(fockspace)))
-export flattensubspaces
-
-"""
-    issparse(fockspace::FockSpace)::Bool
-
-Check if `fockspace` is a sparse fockspace.
-"""
-# TODO: Trivial methods
-issparse(fockspace::FockSpace)::Bool = subspacecount(fockspace) > 1
-export issparse
-
-""" Check if fockspaces of `a` and `b` has the exact same structure. """
-# TODO: Trivial methods, we will use the default method provided for Elements.
-Base.:(==)(a::FockSpace, b::FockSpace)::Bool = rep(a) == rep(b)
-
 abstract type FockMap{A <: FockSpace, B <: FockSpace} <: Element{SparseMatrixCSC{ComplexF64, Int64}} end
 export FockMap
 

@@ -6,15 +6,6 @@ Base.:isequal(a::BasisFunction, b::BasisFunction)::Bool = a == b
 swave::BasisFunction = BasisFunction([1], 0, 0)
 export swave
 
-swaveminus::BasisFunction = BasisFunction([-1], 0, 0)
-export swaveminus
-
-ppluswave::BasisFunction = BasisFunction([0.5+0.5*sqrt(3)im], 0, 0)
-export ppluswave
-
-pminuswave::BasisFunction = BasisFunction([0.5-0.5*sqrt(3)im], 0, 0)
-export ppluswave
-
 LinearAlgebra.:normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
 
 Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
@@ -189,7 +180,7 @@ Base.:convert(::Type{Matrix{Float64}}, source::AffineTransform) = source |> affi
 
 function Base.:(==)(a::AffineTransform, b::AffineTransform)::Bool
     localb::AffineTransform = (a |> getspace) * b
-    return isapprox(a |> rep, localb |> rep) && a.antiunitary == localb.antiunitary
+    return isapprox(a |> rep, localb |> rep) && a.antiunitary == localb.antiunitary && isapprox(a.shiftvector, b.shiftvector)
 end
 
 function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTransform

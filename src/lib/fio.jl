@@ -116,6 +116,7 @@ function JSON.lower(o::Element)
         else
             data[fieldname] = fieldvalue
         end
+        updateprogress()
     end
     return Dict(JL_TYPE=>type|>string, JL_DATA=>data)
 end
@@ -131,6 +132,7 @@ function fiozipperparse(type::Type, data::Dict)
         parser::Function = haskey(SPECIAL_PARSERS, key) ? SPECIAL_PARSERS[key] : fioparse
         fieldvalue = data[fieldname|>string]|>parser
         push!(arguments, fieldvalue)
+        updateprogress()
     end
     constructor = type.name.wrapper
     haskey(SPECIAL_CONSTRUCTORS, type.name.wrapper) && (constructor = SPECIAL_CONSTRUCTORS[type.name.wrapper])
@@ -152,6 +154,7 @@ function fioparse(object::Dict)
     processed::Dict = Dict()
     for (k, v) in object
         processed[k] = fioparse(v)
+        updateprogress()
     end
     return processed
 end
@@ -195,26 +198,36 @@ fiotargetname() = FIO_STATE.threadtargetname[Threads.threadid()]
     fiosave(object; name::String)
 
 Save the given `object` to a file with the given `name` in the current project directory defined in `fiodir()`, 
-the file name will be in the format of `{name}.json`.
+the file name will be in the format of `{name}.dat`.
+
+### Input
+- `object` The object to be saved.
+- `name` The name of the file to be saved.
+
+### Output
+The path to the file saved, in the format of `{project directory}/{name}.dat
 """
 function fiosave(object; name::String)
     storageobject = object
     type = typeof(object)
     # We would like to see if there are any storage type registered for the parametric type first, 
-    # for example SparseFock{Region} vs SparseFock, we will flavor the former first.
+    # for example NormalFock{Region} vs NormalFock, we will flavor the former first.
     if haskey(STORAGE_TYPES, type)
         storageobject = convert(STORAGE_TYPES[type.name.wrapper], object)
     elseif haskey(STORAGE_TYPES, type.name.wrapper)
         storageobject = convert(STORAGE_TYPES[type], object)
     end
-    filepath = joinpath(fiodir(), "$name.json")
+    filepath = joinpath(fiodir(), "$name.dat")
     # Set the target name for the current thread.
     FIO_STATE.threadtargetname[Threads.threadid()] = name
+    watchprogress(desc="fiosave lowering ($name)")
     jsonstring = JSON.json(storageobject)
+    unwatchprogress()
     # Reset the target name for the current thread.
     FIO_STATE.threadtargetname[Threads.threadid()] = ""
+    lzwcompressed::Vector = lzwcompress(jsonstring)
     open(filepath, "w") do io
-        write(io, jsonstring)
+        write(io, lzwcompressed)
         @info "Saved $type object to $filepath"
     end
     return filepath
@@ -225,11 +238,17 @@ export fiosave
     fioload(name::String)
 
 Load the object from the file with the given `name` from the current project directory defined in `fiodir()`, 
-the file to be loaded will be in the path `{project directory}/{name}.json`. Depands on the type some object might 
+the file to be loaded will be in the path `{project directory}/{name}.dat`. Depands on the type some object might 
 require extra data file to be loaded.
+
+### Input
+- `name` The name of the file to be loaded.
+
+### Output
+The object loaded from the file.
 """
 function fioload(name::String)
-    filepath = joinpath(fiodir(), "$name.json")
+    filepath = joinpath(fiodir(), "$name.dat")
     if !isfile(filepath)
         @error begin
             "Object $name does not exist in $(fiodir())!"
@@ -237,8 +256,13 @@ function fioload(name::String)
         end
         return
     end
-    jsonstring = read(filepath, String)
+    datasize = filesize(filepath)
+    lzwcompressed = Vector{Int32}(undef, datasize/sizeof(Int32)|>round|>Integer)
+    read!(filepath, lzwcompressed)
+    jsonstring = lzwdecompress(lzwcompressed)
+    watchprogress(desc="fioload parsing ($name)")
     object = JSON.parse(jsonstring)|>fioparse
+    unwatchprogress()
     type = typeof(object)
     if haskey(PARSED_TYPES, type)
         object = convert(PARSED_TYPES[type], object)

@@ -67,31 +67,35 @@ Momentum = Point{MomentumSpace}
 export Offset, Momentum
 
 """
-    Subset(elements::OrderedSet{T})
-    Subset(elements::Vector{T})
-
-A concrete type of `AbstractSubset` act as a container of elements of type `<: AbstractSubset` in ordered manner, as a subset of a larger set, this set is assumed
-to reside within a given `AbstractSpace`, which all of the elements also belongs to the `AbstractSpace`. To 
-
-### Input
-- `elements` The set of elements to be stored, can be type of `OrderedSet{T}` or `Vector{T}` depends on use case, normally `OrderedSet{T}` is suggested if possible
-             if it is created before the constructor of this type.
+A concrete type of `AbstractSubset` act as a container of elements of type `<: AbstractSubset` in ordered manner, 
+as a subset of a larger set, this set is assumed to reside within a given `AbstractSpace`, which all of the elements 
+also belongs to the `AbstractSpace`.
 """
-struct Subset{T} <: AbstractSubset{T}
-    rep::OrderedSet{T}
-
-    Subset(elements::OrderedSet) = new{elements |> first |> typeof}(elements)
-
-    Subset(generator::Base.Generator) = Subset(OrderedSet{generator |> first |> typeof}(generator))
-    Subset(input::Base.Iterators.Flatten) = Subset(OrderedSet{input |> first |> typeof}(input))
-    Subset(subset::Subset) = Subset(OrderedSet([subset]))
-    Subset(input::Base.Iterators.Filter) = Subset(OrderedSet{input |> first |> typeof}(input))
-
-    Subset(elements) = Subset(OrderedSet(elements))
-
-    # Allows the creation of a empty subset.
-    Subset{T}() where {T} = new{T}(OrderedSet())
+struct Subset{T} <: Element{Vector}
+    elements::Vector{T}
+    orderings::Dict{T, Integer}
 end
+
+""" Create an empty `Subset` with `eltype` of `T`. """
+Subset{T}() where T = Subset{T}(tuple(), Dict())
+
+""" Create a `Subset` from an iterable `iter` of `T`. """
+function Subset(iter)
+    orderings::Dict = Dict()
+    for (n, v) in iter|>enumerate
+        haskey(orderings, v) || (orderings[v] = n)
+    end
+    T::Type = orderings|>keys|>first|>typeof
+    sorted = sort(orderings|>collect, by=last)
+    # If there are repeative elements in iter, we need to reassign the orderings.
+    orderings = Dict(v::T=>n for (n, (v, _)) in sorted|>enumerate)
+    elements::Vector{T} = [key for (key, _) in sorted]
+    return Subset{T}(elements, orderings)
+end
+
+""" Allow using shorthand of `Subset(p0, p1, ...)`. """
+Subset(points::Point...) = Subset(points)
+
 export Subset
 
 """ Interface to get the dimension of an `Element`. """

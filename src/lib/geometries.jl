@@ -116,12 +116,39 @@ function brillouinmesh(crystal::Crystal)::Array{Point}
 end
 export brillouinmesh
 
+@memoize function computemomentummatrix(crystal::Crystal)
+    function computekmatrix(batch)
+        matrix::SparseMatrixCSC = spzeros(crystal|>dimension, crystal|>vol)
+        for (n, k) in batch
+            matrix[:, n] = k|>euclidean|>vec
+        end
+        return matrix
+    end
+
+    batchsize::Integer = ((crystal|>vol) / getmaxthreads())|>ceil
+    batches = Iterators.partition((el for el in crystal|>brillouinzone|>enumerate), batchsize)
+    matrixparts = paralleltasks(
+        name="computemomentummatrix",
+        tasks=(()->computekmatrix(batch) for batch in batches),
+        count=getmaxthreads())|>parallel
+
+    momentummatrix::SparseMatrixCSC = spzeros(crystal|>dimension, crystal|>vol)
+    watchprogress(desc="computemomentummatrix")
+    for part in matrixparts
+        momentummatrix[:, :] += part
+        updateprogress()
+    end
+    unwatchprogress()
+
+    return momentummatrix
+end
+
 function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
     generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
     generatinglength::Integer = generatingradius * 2
     generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
     crystalregion::Region = generatingcrystal|>sitepoints
-    centeredregion::Region = crystalregion - (crystalregion|>getcenter)
+    centeredregion::Region = crystalregion .- (crystalregion|>getcenter)
     return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
 end
 export getsphericalregion
@@ -153,7 +180,7 @@ function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real,
     end
 
     rawregion::Region = sphericalregion|>filter(crosssectionfilter)
-    proximityregion::Region = rawregion - normalvector
+    proximityregion::Region = rawregion .- normalvector
 
     return rawregion - intersect(rawregion, proximityregion)
 end

@@ -46,23 +46,6 @@ function fourier(crystalfock::CrystalFock, regionfock::RegionFock, unitcellfockm
 end
 export fourier
 
-"""
-    crystalsubmaps(fockmap::FockMap)
-
-Given a `FockMap` with `inspace` and `outspace` of type `CrystalFock` of same span, partition the `FockMap`
-into smaller `FockMap` objects by the subspaces indexed by the `Momentum` attribute.
-
-### Output
-A generator yielding `Pair{Momentum, FockMap}` objects, with the momentums corresponds to thw brillouin zone.
-"""
-function crystalsubmaps(fockmap::FockMap)::Base.Generator
-    (fockmap|>getinspace isa CrystalFock && fockmap|>getoutspace isa CrystalFock && hassamespan(fockmap|>getinspace, fockmap|>getoutspace) ||
-        error("The in/out spaces of the fock map must be the same crystal fock-spaces!"))
-    hassamespan(fockmap|>getinspace, fockmap|>getoutspace) || error("Required a FockMap with the same in/out CrystalFock!")
-    return (k => restrict(fockmap, fockspace, fockspace) for (k, fockspace) in fockmap|>getinspace|>crystalsubspaces|>Dict)
-end
-export crystalsubmaps
-
 
 
 """

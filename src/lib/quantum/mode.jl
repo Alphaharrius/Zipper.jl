@@ -186,6 +186,20 @@ end
 export renameattr
 
 """
+    commonattr(modes, key::Symbol)
+
+Retrieve the common attribute associated to `key` of all the child modes of the `fockspace`, 
+and throws assertion error if the attribute is not unique within the `fockspace`.
+"""
+function commonattr(modes, key::Symbol)
+    set::Set = Set()
+    foreach(m -> push!(set, getattr(m, key)), modes)
+    @assert(length(set) == 1, "The modes in this fockspace does not share the same attr `$(key)`!")
+    return first(set)
+end
+export commonattr
+
+"""
     commonattrs(modes)::Base.Generator
 
 Retrieve all the attributes within the group of modes that has the same values and returned as a generator of `Symbol`.
@@ -222,6 +236,10 @@ setorbital(basis::BasisFunction) = mode -> setorbital(mode, basis)
 # Mode display
 """ Display the number of attributes that identifies this `Mode`. """
 Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(mode.attrs)...))"))
+
+""" Shorthand for accessing the attribute information of all modes within the `FockSpace` for visualization. """
+modeattrs(modes)::OrderedSet{Dict} = OrderedSet(mode|>getattrs for mode in modes)
+export modeattrs
 # ================================================================================================
 
 # =================================================================================================================================

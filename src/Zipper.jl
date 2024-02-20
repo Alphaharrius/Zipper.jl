@@ -26,7 +26,7 @@ include("lib/quantum/normalfock.jl")
 include("lib/quantum/regionfock.jl")
 include("lib/quantum/crystalfock.jl")
 include("lib/quantum.jl")
-include("lib/quantumtransformations.jl")
+include("lib/quantum/transformations.jl")
 
 include("lib/physics.jl")
 include("lib/renormalization.jl")

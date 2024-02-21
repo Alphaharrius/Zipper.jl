@@ -335,7 +335,7 @@ function Base.:*(transformation::AffineTransform, basisfunction::BasisFunction):
     return BasisFunction(transformed, basisfunction |> dimension, basisfunction.rank)
 end
 
-function pointgroupelements(pointgroup::AffineTransform; maxelements=128)::Vector{AffineTransform}
+@memoize function pointgroupelements(pointgroup::AffineTransform, maxelements)::Vector{AffineTransform}
     identity::AffineTransform = pointgroup ^ 0
     elements::Vector{AffineTransform} = [identity]
     for n in 1:(maxelements - 1)
@@ -348,6 +348,8 @@ function pointgroupelements(pointgroup::AffineTransform; maxelements=128)::Vecto
     return elements
 end
 export pointgroupelements
+
+pointgroupelements(symmetry::AffineTransform; maxelements=128) = pointgroupelements(symmetry, maxelements)
 
 pointgrouporder(pointgroup::AffineTransform; maxorder=128)::Integer = pointgroupelements(pointgroup; maxelements=maxorder) |> length
 export pointgrouporder

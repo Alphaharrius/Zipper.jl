@@ -50,7 +50,7 @@ end
 
 function Base.:show(io::IO, basisfunction::BasisFunction)
     if basisfunction.rank == 0 # Handles the case of rank 0 basis function.
-        print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(basisfunction |> rep |> first))"))
+        print(io, string("$(basisfunction|>rep|>first)"))
         return
     end
 
@@ -64,7 +64,7 @@ function Base.:show(io::IO, basisfunction::BasisFunction)
         return "($printnumber)*" * reduce(*, Iterators.map(c -> indexnametable[c], coords))
     end
     expression::String = join(filter(v -> v != "", map(generatesymbol, basisfunction |> rep |> enumerate)), " + ")
-    print(io, string("$(typeof(basisfunction))(rank=$(basisfunction.rank), $(expression))"))
+    print(io, expression)
 end
 
 function BasisFunction(expressions::Pair{Symbol, <:Number}...; dimension::Integer)::BasisFunction

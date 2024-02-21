@@ -191,6 +191,6 @@ function Base.:show(io::IO, fockspace::FockSpace)
     T::Type = typeof(fockspace)
     sub = subspacecount(fockspace)
     dim = dimension(fockspace)
-    print(io, string("$T(sub=$sub, dim=$dim"))
+    print(io, string("$T(sub=$sub, dim=$dim)"))
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

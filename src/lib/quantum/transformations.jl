@@ -106,26 +106,54 @@ function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::Foc
 end
 
 function Base.:*(symmetry::AffineTransform, state::RegionState)
+    # We will first generate the inspace symmetry representation to check if there are any unitary transformation 
+    # to bring the set of modes to the symmetry eigenbasis.
     statemap::FockMap = state|>FockMap
     stateregionfock::RegionFock = statemap|>getoutspace
     localsymmetry::AffineTransform = symmetry|>recenter(stateregionfock|>getregion|>getcenter)
     outspacerep::FockMap = localsymmetry * stateregionfock
-    hassamespan(outspacerep|>getoutspace, stateregionfock) || error("The symmetry action on the state region fockspace in not closed!")
+    # We requires the the RegionFock of the state to be closed under symmetry.
+    hassamespan(outspacerep|>getoutspace, stateregionfock) || error(
+        "The symmetry action on the state region fockspace in not closed!")
     inspacerep::FockMap = statemap' * outspacerep * statemap
     phasespectrum::EigenSpectrum = inspacerep|>eigspec
+    # We will then use the eigenvectors of the inspace representation to transform the state into a quasi-symmetric state.
+    transform::FockMap = phasespectrum|>geteigenvectors
+    quasistates = statemap * transform
 
-    function mapper(mode::Mode)::Mode
+    # After that we will try to force each state to be symmetric if they are quasi-symmetric using manual symmetrization.
+    function symmetrize(mode::Mode, eigenvector::FockMap)::Tuple{Mode, FockMap}
         eigenvalue::Complex = (phasespectrum|>geteigenvalues)[mode]
-        basisfunction::BasisFunction = findeigenfunction(localsymmetry, eigenvalue=eigenvalue)
-        # The existing :flavor attribute is not needed since we will use mapmodes to determine the new one;
-        # the :eigenindex is not needed since it does not represent any physical attributes.
-        return mode|>setattr(:orbital=>basisfunction)|>removeattr(:eigenindex, :flavor)
+        phasetable = PhaseTable(symmetry, realprecision=1e-5, imagprecision=1e-5)
+        if haskey(phasetable, eigenvalue)
+            # If the eigenvalue is registered in the phase table, we consider the associated eigenvector 
+            # is symmetric under the symmetry.
+            phase, basisfunction = phasetable[eigenvalue]
+            symmetricalmap = eigenvector
+        else
+            @warn "Quasi-symmetric phase $eigenvalue is found, performing manual symmetrization..."
+            # Else we will try to get the actual phase from a phase table with lower precision of eigenvalue registration.
+            lowprectable = PhaseTable(symmetry, realprecision=1e-1, imagprecision=1e-1)
+            phase, basisfunction = lowprectable[eigenvalue]
+            # Performing manual symmetrization.
+            elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
+            symmetricalmap = eigenvector
+            for element in elements
+                symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector*phase
+            end
+            symmetricalmap = symmetricalmap|>normalize
+        end
+        newmode = mode|>setattr(:orbital=>basisfunction)
+        inspace = newmode|>FockSpace
+        return newmode, FockMap(symmetricalmap, inspace=inspace, performpermute=false)
     end
 
-    symmetricfock::FockSpace = phasespectrum|>geteigenvectors|>getinspace|>mapmodes(mapper)|>FockSpace
-    symmetrizer::FockMap = FockMap(phasespectrum|>geteigenvectors, inspace=symmetricfock, performpermute=false)
-
-    return RegionState(statemap * symmetrizer)
+    symmetricstates = [symmetrize(m, quasistates[:, m]) for m in quasistates|>getinspace]
+    inspace = (m for (m, _) in symmetricstates)|>mapmodes(m -> m|>removeattr(:eigenindex, :flavor))|>FockSpace
+    symmetricstatemap = stateregionfock*sum(u for (_, u) in symmetricstates)
+    symmetricstatemap = symmetricstatemap*idmap(symmetricstatemap|>getinspace, inspace)
+    symmetricstatemap = symmetricstatemap*spatialmap(symmetricstatemap)
+    return symmetricstatemap|>RegionState
 end
 
 function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap

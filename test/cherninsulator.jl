@@ -180,6 +180,13 @@ rg1 = @time zer(correlations)
 
 rg2 = @time zer(rg1[:correlations])
 
+localunitcellfock = RegionFock(rg1[:blocker]*correlations*rg1[:blocker]'|>getinspace|>unitcellfock)
+visualize(regioncorrelations(rg1[:blocker]*correlations*rg1[:blocker]',localunitcellfock))
+
+rg1[:courierisometry]*rg2[:blocker]'*rg2[:emptyisometry]*rg2[:emptyisometry]'*rg2[:blocker]*rg1[:courierisometry]'
+visualize(regioncorrelations(rg1[:blocker]*correlations*rg1[:blocker]' - rg1[:emptyisometry]*rg1[:emptyisometry]',localunitcellfock))
+visualize(regioncorrelations(rg1[:blocker]*correlations*rg1[:blocker]' - rg1[:emptyisometry]*rg1[:emptyisometry]'-rg1[:courierisometry]*rg2[:blocker]'*rg2[:emptyisometry]*rg2[:emptyisometry]'*rg2[:blocker]*rg1[:courierisometry]',localunitcellfock))
+
 rg3 = @time zer(rg2[:correlations])
 
 rg4 = @time zer(rg3[:correlations])

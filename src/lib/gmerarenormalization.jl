@@ -14,45 +14,90 @@ keyed by three grouping symbols with their associated local isometries selected 
 `:courier` represents the eigenmodes that corresponds to 0 ≈< γ <≈ 1
 """
 function modeselectionbythreshold(threshold::Float64)::Function
-    function modesfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
+    function modesfockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, Dict{Symbol, Any}}
         spectrum::EigenSpectrum = 𝐶ᵣ |> eigspech
+        evals = spectrum |> geteigenvalues
         filledmodes::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> p.second < threshold, spectrum |> geteigenvalues))
+        filledmodewifevaldict = Dict(mode=> evals[mode] for mode in filledmodes)
+        println("no of distillable filledmodes ", length(filledmodes))
         emptymodes::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> p.second > 1.0 - threshold, spectrum |> geteigenvalues))
+        emptymodewifevaldict =  Dict(mode=> evals[mode] for mode in emptymodes)
+        println("no of distillable emptymodes ", length(emptymodes))
         couriermodes::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> threshold <= p.second <= 1.0 - threshold, spectrum |> geteigenvalues))
-        return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),
-        :courier => columns(spectrum |> geteigenvectors, FockSpace(couriermodes)))
+        couriermodewifevaldict =  Dict(mode=> evals[mode] for mode in couriermodes)
+        println("no of couriermodes ", length(couriermodes))
+        # return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),
+        # :courier => columns(spectrum |> geteigenvectors, FockSpace(couriermodes)))
+        return Dict(:filled => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(filledmodes)),:modewifevaldict =>filledmodewifevaldict), 
+        :empty => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),:modewifevaldict =>emptymodewifevaldict),
+        :courier => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(couriermodes)),:modewifevaldict =>couriermodewifevaldict))
     end
     return modesfockmaps
 end
 export modeselectionbythreshold
 
-function modeselectionbycount(count::Integer)
-    function modefockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
-        𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
-        modes::Vector{Mode} = [orderedmodes(𝑈ᵣ.inspace)...]
-        return Dict(:filled => columns(𝑈ᵣ, FockSpace(Subset(modes[1:count]))), :empty => columns(𝑈ᵣ, FockSpace(Subset(modes[(end - count + 1):end]))),
-        :courier => columns(𝑈ᵣ, FockSpace(Subset(modes[count+1:(end - count)]))))
+# function modeselectionbycount(count::Integer)
+#     function modefockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
+#         𝑈ᵣ::FockMap = eigvecsh(𝐶ᵣ)
+#         modes::Vector{Mode} = [orderedmodes(𝑈ᵣ.inspace)...]
+#         return Dict(:filled => columns(𝑈ᵣ, FockSpace(Subset(modes[1:count]))), :empty => columns(𝑈ᵣ, FockSpace(Subset(modes[(end - count + 1):end]))),
+#         :courier => columns(𝑈ᵣ, FockSpace(Subset(modes[count+1:(end - count)]))))
+#     end
+#     return modefockmaps
+# end
+function modeselectionbycount(count::Integer)::Function
+    function modefockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, Dict{Symbol, Any}}
+        spectrum::EigenSpectrum = 𝐶ᵣ |> eigspech
+        evals = spectrum |> geteigenvalues
+        sortedmodeandevalpairs = sort!(collect(evals), by = x->x.second)
+        filledmodes::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[1:count])
+        filledmodewifevaldict = Dict(mode=> evals[mode] for mode in filledmodes)
+        reffilledeval = sortedmodeandevalpairs[count][2]
+        println("ref filled eigenvalue ", reffilledeval)
+        emptymodes::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[(end - count + 1):end])
+        emptymodewifevaldict =  Dict(mode=> evals[mode] for mode in emptymodes)
+        refemptyeval = sortedmodeandevalpairs[end - count + 1][2]
+        println("ref empty eigenvalue ", refemptyeval)
+        couriermodes::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[count+1:end-count])
+        couriermodewifevaldict =  Dict(mode=> evals[mode] for mode in couriermodes)
+        println("no of couriermodes ", length(couriermodes))
+        # return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),
+        # :courier => columns(spectrum |> geteigenvectors, FockSpace(couriermodes)))
+        return Dict(:filled => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(filledmodes)),:modewifevaldict =>filledmodewifevaldict), 
+        :empty => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),:modewifevaldict =>emptymodewifevaldict),
+        :courier => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(couriermodes)),:modewifevaldict =>couriermodewifevaldict))
     end
     return modefockmaps
 end
 export modeselectionbycount
 
 function modeselection1stbycountthenbythreshold(count::Integer,threshold::Float64)::Function
-    function modefockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, FockMap}
+    function modefockmaps(𝐶ᵣ::FockMap)::Dict{Symbol, Dict{Symbol, Any}}
         spectrum::EigenSpectrum = 𝐶ᵣ |> eigspech
         evals = spectrum |> geteigenvalues
         sortedmodeandevalpairs = sort!(collect(evals), by = x->x.second)
         filledmodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[1:count])
         reffilledeval = sortedmodeandevalpairs[count][2]
+        println("ref filled eigenvalue ", reffilledeval)
         emptymodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[(end - count + 1):end])
         refemptyeval = sortedmodeandevalpairs[end - count + 1][2]
+        println("ref empty eigenvalue ", refemptyeval)
         filledmodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> p.second-reffilledeval < threshold, spectrum |> geteigenvalues))
         emptymodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> 1-threshold < p.second+1-refemptyeval, spectrum |> geteigenvalues))
         filledmodes = filledmodesbycount + filledmodesbythreshold
+        filledmodewifevaldict = Dict(mode=> evals[mode] for mode in filledmodes)
+        println("no of distillable filledmodes ", length(filledmodes))
         emptymodes = emptymodesbycount + emptymodesbythreshold
+        emptymodewifevaldict =  Dict(mode=> evals[mode] for mode in emptymodes)
+        println("no of distillable emptymodes ", length(emptymodes))
         couriermodes::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> threshold + reffilledeval <= p.second <= refemptyeval - threshold, spectrum |> geteigenvalues))
-        return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),
-        :courier => columns(spectrum |> geteigenvectors, FockSpace(couriermodes)))
+        couriermodewifevaldict =  Dict(mode=> evals[mode] for mode in couriermodes)
+        println("no of couriermodes ", length(couriermodes))
+        # return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),
+        # :courier => columns(spectrum |> geteigenvectors, FockSpace(couriermodes)))
+        return Dict(:filled => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(filledmodes)),:modewifevaldict =>filledmodewifevaldict), 
+        :empty => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),:modewifevaldict =>emptymodewifevaldict),
+        :courier => Dict(:isometry =>columns(spectrum |> geteigenvectors, FockSpace(couriermodes)),:modewifevaldict =>couriermodewifevaldict))
     end
     return modefockmaps
 end
@@ -60,9 +105,20 @@ export modeselection1stbycountthenbythreshold
 
 localisometries(
     correlations::FockMap, regionfock::FockSpace;
-    selectionstrategy::Function = modeselectionbythreshold(1e-3))::Dict{Symbol, FockMap} = (
+    selectionstrategy::Function = modeselectionbythreshold(1e-3))::Dict{Symbol, Dict{Symbol, Any}} = (
     regioncorrelations(correlations, regionfock) |> selectionstrategy)
 export localisometries
+
+
+function fullftmap(correlations::FockMap)
+    crystal = correlations|>getinspace|>getcrystal
+    crystalpoints::Subset{Offset} = latticepoints(crystal)
+    crystalfock::CrystalFock = correlations|>getinspace
+    realspacemodes::RegionFock = RegionFock(spanoffset(correlations|>getinspace|>unitcellfock|>orderedmodes, crystalpoints))
+    fouriermap::FockMap = fourier(crystalfock, realspacemodes)/ (crystalfock|>subspacecount|>sqrt)
+    return fouriermap
+end
+export fullftmap
 
 function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
     addinspacemomentuminfo::Bool = false)
@@ -132,21 +188,85 @@ end
 export groupmodesbydistwifb
 
 
-function localwannierseedslists(modebydistwifb,localiso::Dict{Symbol,FockMap})
-    modeorderedbydist = [modewifdistandb[2] for r in range(1,length(modebydistwifb)) for modewifdistandb in modebydistwifb[length(modebydistwifb)-r+1]]
-    borderedbydist = [modewifdistandb[3] for r in range(1,length(modebydistwifb)) for modewifdistandb in modebydistwifb[length(modebydistwifb)-r+1]]
-    nooffilledmodes = localiso[:filled]|>getinspace|>dimension
-    noofemptymodes = localiso[:empty]|>getinspace|>dimension
-    emptyseedslist = modeorderedbydist[1:noofemptymodes]
-    filledseedslist = modeorderedbydist[noofemptymodes+1:noofemptymodes+nooffilledmodes]
-    courierseedslist = modeorderedbydist[noofemptymodes+nooffilledmodes+1:length(modeorderedbydist)]
-    emptybslist = borderedbydist[1:noofemptymodes]
-    filledbslist = borderedbydist[noofemptymodes+1:noofemptymodes+nooffilledmodes]
-    courierbslist = borderedbydist[noofemptymodes+nooffilledmodes+1:length(modeorderedbydist)]
+# function localwannierseedslists(modebydistwifb,localiso::Dict{Symbol,FockMap})
+#     modeorderedbydist = [modewifdistandb[2] for r in range(1,length(modebydistwifb)) for modewifdistandb in modebydistwifb[length(modebydistwifb)-r+1]]
+#     borderedbydist = [modewifdistandb[3] for r in range(1,length(modebydistwifb)) for modewifdistandb in modebydistwifb[length(modebydistwifb)-r+1]]
+#     nooffilledmodes = localiso[:filled]|>getinspace|>dimension
+#     noofemptymodes = localiso[:empty]|>getinspace|>dimension
+#     emptyseedslist = modeorderedbydist[1:noofemptymodes]
+#     filledseedslist = modeorderedbydist[noofemptymodes+1:noofemptymodes+nooffilledmodes]
+#     courierseedslist = modeorderedbydist[noofemptymodes+nooffilledmodes+1:length(modeorderedbydist)]
+#     emptybslist = borderedbydist[1:noofemptymodes]
+#     filledbslist = borderedbydist[noofemptymodes+1:noofemptymodes+nooffilledmodes]
+#     courierbslist = borderedbydist[noofemptymodes+nooffilledmodes+1:length(modeorderedbydist)]
+#     return Dict(:filled => filledseedslist, :empty => emptyseedslist, :courier => courierseedslist,
+#     :bempty=>emptybslist,:bfilled=>filledbslist,:bcourier=>courierbslist)
+# end
+
+# function localwannierseedslists(localiso::Dict{Symbol,FockMap})
+#     refmode = Subset(localiso[:empty]|>getoutspace)
+#     filledseedslist = []
+#     emptyseedslist = []
+#     localisoempty = localiso[:empty]
+#     localisofilled = localiso[:filled]
+#     for inmode in localisofilled|>getinspace
+#         chosenmode = sort!(collect(Dict((mode,norm(sum(localisofilled[mode,inmode]|>rep))) for mode in refmode)), by = x->x.second)[end].first
+#         push!(filledseedslist,chosenmode)
+#         refmode = refmode-Subset(chosenmode)
+#     end
+#     for inmode in localisoempty|>getinspace
+#         chosenmode = sort!(collect(Dict((mode,norm(sum(localisoempty[mode,inmode]|>rep))) for mode in refmode)), by = x->x.second)[end].first
+#         push!(emptyseedslist,chosenmode)
+#         refmode = refmode-Subset(chosenmode)
+#     end
+#     courierseedslist = [mode for mode in refmode]
+#     emptybslist = [mode |> getattr(:b) for mode in emptyseedslist]
+#     filledbslist = [mode |> getattr(:b) for mode in filledseedslist]
+#     courierbslist = [mode |> getattr(:b) for mode in courierseedslist]
+#     return Dict(:filled => filledseedslist, :empty => emptyseedslist, :courier => courierseedslist,
+#     :bempty=>emptybslist,:bfilled=>filledbslist,:bcourier=>courierbslist)
+# end
+# export localwannierseedslists
+
+function localwannierseedslists(localiso::Dict{Symbol, Dict{Symbol, Any}})
+    localisoempty = localiso[:empty][:isometry]
+    emptymodewitheval = localiso[:empty][:modewifevaldict]
+    noofemptyseeds = length(emptymodewitheval)
+    localisofilled = localiso[:filled][:isometry]
+    filledmodewitheval = localiso[:filled][:modewifevaldict]
+    nooffilledseeds = length(filledmodewitheval)
+    localisowannier = localiso[:courier][:isometry]
+    couriermodewitheval = localiso[:courier][:modewifevaldict]
+    noofcourierseeds = length(couriermodewitheval)
+   
+    realspacemodes = Subset(localisoempty|>getoutspace)
+
+    # filledcountour = Dict(rmode=>sum([abs2(sum(localisofilled[rmode,inmode]|>rep)) for (inmode,eval) in filledmodewitheval]) for rmode in realspacemodes)
+    # filledseedslist = [pair.first for pair in sort!(collect(filledcountour), by = x->x.second)[end-nooffilledseeds+1:end]]
+    # realspacemodes = realspacemodes-Subset(filledseedslist)
+
+    courierecountour = Dict(rmode=>sum([abs2(sum(localisowannier[rmode,inmode]|>rep)) for (inmode,eval) in couriermodewitheval]) for rmode in realspacemodes)
+    courierseedslist = [pair.first for pair in sort!(collect(courierecountour), by = x->x.second)[end-noofcourierseeds+1:end]]
+    realspacemodes = realspacemodes-Subset(courierseedslist)
+
+    emptycountour = Dict(rmode=>sum([abs2(sum(localisoempty[rmode,inmode]|>rep)) for (inmode,eval) in emptymodewitheval]) for rmode in realspacemodes)
+    emptyseedslist = [pair.first for pair in sort!(collect(emptycountour), by = x->x.second)[end-noofemptyseeds+1:end]]
+    realspacemodes = realspacemodes-Subset(emptyseedslist)
+
+    filledseedslist = [rmode for rmode in realspacemodes]
+
+    emptybslist = [mode |> getattr(:b) for mode in emptyseedslist]
+    filledbslist = [mode |> getattr(:b) for mode in filledseedslist]
+    courierbslist = [mode |> getattr(:b) for mode in courierseedslist]
     return Dict(:filled => filledseedslist, :empty => emptyseedslist, :courier => courierseedslist,
     :bempty=>emptybslist,:bfilled=>filledbslist,:bcourier=>courierbslist)
 end
 export localwannierseedslists
+
+function entanglemententropy(eval::Number)
+    return -eval*log(eval)-(1-eval)*log(1-eval)
+end
+export entanglemententropy
 
 function localwannierseedslistsfromref(modekeybyb,refselectionstragedydict)
     emptyseedslist = [modekeybyb[b] for b in refselectionstragedydict[:empty]]
@@ -180,9 +300,9 @@ function startingcombinedlocalwannierization(localiso,localwannierseedslists, lo
     filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:filled])] 
     courierseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:courier])]
 
-    wannierempty = localwannierization(localiso[:empty], emptyseeds)
-    wannierfilled = localwannierization(localiso[:filled], filledseeds)
-    wanniercourier = localwannierization(localiso[:courier], courierseeds)
+    wannierempty = localwannierization(localiso[:empty][:isometry], emptyseeds)
+    wannierfilled = localwannierization(localiso[:filled][:isometry], filledseeds)
+    wanniercourier = localwannierization(localiso[:courier][:isometry], courierseeds)
 
     return Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
     :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
@@ -195,9 +315,9 @@ function combinedlocalwannierization(localiso,localwannierseedslists, localseedi
     filledseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:filled])] 
     courierseeds = idmap(localseedingfock, localseedingfock)[:,FockSpace(mode for mode in localwannierseedslists[:courier])]
 
-    wannierempty = localwannierization(localiso[:empty], emptyseeds)
-    wannierfilled = localwannierization(localiso[:filled], filledseeds)
-    wanniercourier = localwannierization(localiso[:courier], courierseeds)
+    wannierempty = localwannierization(localiso[:empty][:isometry], emptyseeds)
+    wannierfilled = localwannierization(localiso[:filled][:isometry], filledseeds)
+    wanniercourier = localwannierization(localiso[:courier][:isometry], courierseeds)
 
     return Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
     :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds)
@@ -213,7 +333,7 @@ function gmerastep1(correlations::CrystalFockMap,localcenterlist)
         localseedingfock::RegionFock = quantize(localregion,1)
         modebydistwifb = groupmodesbydistwifb(region = localregion,regionfock = localseedingfock,center = localcenter+shift) 
         localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstrategy)
-        localwannierlist = localwannierseedslists(modebydistwifb,localiso)
+        localwannierlist = localwannierseedslists(localiso)
         return startingcombinedlocalwannierization(localiso,localwannierlist,localseedingfock)
     end
 
@@ -375,9 +495,10 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
             localregion = crystal|>getunitcell
         end
         localseedingfock::RegionFock = quantize(localregion,1)
-        modebydistwifb = groupmodesbydistwifb(region = localregion,regionfock = localseedingfock,center = offset+shift) 
+        # modebydistwifb = groupmodesbydistwifb(region = localregion,regionfock = localseedingfock,center = offset+shift) 
         localiso = localisometries(correlations, localseedingfock, selectionstrategy=selectionstragedy)
-        localwannierlist = localwannierseedslists(modebydistwifb,localiso)
+        # localwannierlist = localwannierseedslists(modebydistwifb,localiso)
+        localwannierlist = localwannierseedslists(localiso)
         return startingcombinedlocalwannierization(localiso,localwannierlist,localseedingfock)
     end
 

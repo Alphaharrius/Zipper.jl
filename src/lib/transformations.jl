@@ -309,14 +309,6 @@ end
 #\begin:PhaseSignature display
 Base.:show(io::IO, o::PhaseTable) = print(io, "$(o|>typeof)(realdenom=$(o.realdenom), imagdenom=$(o.imagdenom))")
 #\end
-function findeigenfunction(transformation::AffineTransform; eigenvalue::Number = 1)::BasisFunction
-    eigenvaluekey::Tuple = hashablecomplex(eigenvalue |> Complex, transformation.eigenvaluehashdenominator)
-    if !haskey(transformation.eigenfunctions, eigenvaluekey)
-        error("No eigenfunction is found for eigenvalue $(eigenvalue)!")
-    end
-    return transformation.eigenfunctions[eigenvaluekey]
-end
-export findeigenfunction
 
 function Base.:*(transformation::AffineTransform, basisfunction::BasisFunction)::BasisFunction
     if basisfunction.rank == 0

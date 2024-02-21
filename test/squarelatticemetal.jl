@@ -1,4 +1,4 @@
-using Revise, LinearAlgebra, AbstractAlgebra, SmithNormalForm
+using Revise, LinearAlgebra, SmithNormalForm
 using Zipper
 
 setmaxthreads(Threads.nthreads())
@@ -35,6 +35,10 @@ end
 crystalfock = correlations|>getoutspace
 
 scale = Scale([4 0; 0 4], square)
+
+# TODO: Remove test
+# correlations = purifiedcouriercorrelations
+# scale = Scale([2 0; 0 2], correlations|>getoutspace|>getcrystal|>getspace)
 
 @info("Performing blocking...")
 @time begin
@@ -162,7 +166,9 @@ courierspectrum = groundstatespectrum(globaldistillerspectrum, perunitcellfillin
 courierspectrum|>visualize
 courierprojector = courierspectrum|>crystalprojector
 couriercorrelations = idmap(courierprojector|>getoutspace) - courierprojector
+
 couriercorrelationspectrum = couriercorrelations|>crystalspectrum
+couriercorrelationspectrum|>visualize
 
 m135c = m135 * getoutspace(couriercorrelations)
 m135c * couriercorrelations * m135c' |>crystalspectrum|>visualize
@@ -196,6 +202,34 @@ restrict = fourier(couriercorrelations|>getoutspace, restrictfock) / (couriercor
 localcorrelations = restrict' * couriercorrelations * restrict
 localstates4 = getregionstates(localcorrelations=localcorrelations, grouping=[1, 2, 4])|>collect
 
+struct EigenTable
+end
+
+function Base.:*(symmetry::AffineTransform, state::RegionState)
+    function symmetrization(mode, statevector)
+        outspacerep = symmetry*getoutspace(statevector)
+        statevector = statevector|>normalize
+        phase = statevector'*outspacerep*statevector
+        @info phase|>rep
+    end
+
+    for (mode, statevector) in state
+        symmetrization(mode, statevector)
+    end
+end
+
+localstates1[1]|>visualize
+c4 = c4|>recenter(localstates1[1]|>getoutspace|>getregion|>getcenter)
+m135 = m135|>recenter(localstates1[1]|>getoutspace|>getregion|>getcenter)
+c4l = c4 * getoutspace(localstates1[1])
+teststate = RegionState(FockMap(localstates1[1]) + c4l*FockMap(localstates1[1]) + c4l*c4l*FockMap(localstates1[1]) + c4l*c4l*c4l*FockMap(localstates1[1]) |>normalize)
+teststate|>visualize
+m135l = m135 * getoutspace(teststate)
+teststate = RegionState(FockMap(teststate) + m135l*FockMap(teststate) |>normalize)
+teststate|>visualize
+m135 * teststate
+c4 * teststate
+
 wannierregionorigin = wannierregion
 wannierregionorigin|>visualize
 restrictfock = quantize(wannierregionorigin, 1)
@@ -223,10 +257,12 @@ rightfourier = fourier(wanniercourierisometries|>getinspace, wanniercourierisome
 wannierlocalstates = leftfourier' * FockMap(wanniercourierisometries) * rightfourier
 visualize(wannierlocalstates|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
 
-wanniercourierisometries' * blockedcorrelations * wanniercourierisometries |>crystalspectrum|>visualize
-
 blockedcouriercorrelations = wanniercourierisometries' * blockedcorrelations * wanniercourierisometries
 blockedcouriercorrelationspectrum = blockedcouriercorrelations|>crystalspectrum
+blockedcouriercorrelationspectrum|>visualize
+purifiedcouriercorrelationspectrum = blockedcouriercorrelationspectrum|>roundingpurification
+purifiedcouriercorrelationspectrum|>visualize
+purifiedcouriercorrelations = purifiedcouriercorrelationspectrum|>CrystalFockMap
 sort([(m, v) for (m, v) in blockedcouriercorrelationspectrum|>geteigenvalues if v > 0.01 && v < 0.98], by=last)
 
 # TODO: This multiplication is wrong using CrystalFockMap
@@ -350,8 +386,8 @@ visualize(getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=block
 
 function Zipper.spatialremapper(regionfock::RegionFock, region::Region)
     basispoints = (p=>p|>basispoint for p in region)
-    positions::Dict{Offset, Tuple} = Dict(p=>(p - b, b) for (p, b) in basispoints)
-    remappingdata::Base.Generator = ((positions[mode|>getpos], mode) for mode in regionfock)
+    positions::Dict{Offset, Tuple} = Dict(p|>euclidean=>(p - b, b) for (p, b) in basispoints)
+    remappingdata::Base.Generator = ((positions[mode|>getpos|>euclidean], mode) for mode in regionfock)
     remappedfock::RegionFock = RegionFock(mode|>setattr(:r=>r, :b=>b) for ((r, b), mode) in remappingdata)
     return idmap(remappedfock, regionfock)
 end

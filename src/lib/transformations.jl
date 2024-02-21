@@ -102,28 +102,17 @@ function pointgrouprepresentation(irrep::Matrix; rank::Integer = 1)::Matrix
     return contractmatrix * fullpointgrouprepresentation(irrep, rank=rank) * selectormatrix'
 end
 
-function computeeigenfunctions(pointgroupmatrix::Matrix; functionorderrange::UnitRange = 1:3)::Base.Iterators.Flatten
-    dimension::Integer = pointgroupmatrix |> size |> first
-    function computeeigenfunctionsatorder(functionorder::Integer)
-        matrixatorder::Matrix = pointgrouprepresentation(pointgroupmatrix; rank=functionorder)
-        eigenvalues, eigenvectors = matrixatorder |> eigen
-        basisfunctions = (eigenvalue => BasisFunction(eigenvectors[:, n], dimension, functionorder) |> normalize for (n, eigenvalue) in eigenvalues |> enumerate)
-        return Iterators.filter(p -> !(p.second |> iszero), basisfunctions)
-    end
-
-    return (p for functionorder in functionorderrange |> reverse for p in functionorder |> computeeigenfunctionsatorder)
+function Base.:hash(transform::AffineTransform)::UInt
+    matrixhash = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, transform.transformmatrix))
+    shifthash = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, transform.shiftvector))
+    return hash((matrixhash, shifthash, transform.antiunitary))
 end
 
 function AffineTransform(
-    transformmatrix::Matrix, shiftvector::Vector = zeros(Float64, transformmatrix |> size |> first);
-    antiunitary::Bool = false,
-    localspace::AffineSpace = euclidean(RealSpace, transformmatrix |> size |> first))::AffineTransform
+    transformmatrix::Matrix, shiftvector::Vector = zeros(Float64, transformmatrix|>size|>first);
+    antiunitary::Bool = false, localspace::AffineSpace = euclidean(RealSpace, transformmatrix|>size|>first))::AffineTransform
 
-    eigenfunctions = transformmatrix |> computeeigenfunctions
-    eigenvaluehashdenominator::Integer = findcomplexdenominator(v for (v, _) in eigenfunctions; denominatorrange=64:128).denominator
-    eigenfunctiontable::Dict{Tuple, BasisFunction} = Dict(hashablecomplex(v |> Complex, eigenvaluehashdenominator) => f for (v, f) in eigenfunctions)
-    eigenfunctiontable[hashablecomplex(1 + 0im, eigenvaluehashdenominator)] = swave
-    return AffineTransform(localspace, shiftvector, transformmatrix, eigenfunctiontable, eigenvaluehashdenominator, antiunitary)
+    return AffineTransform(localspace, shiftvector, transformmatrix, antiunitary)
 end
 
 function addeigenfunction!(transform::AffineTransform; eigenvalue::Number, eigenfunction::BasisFunction)
@@ -251,6 +240,75 @@ Zipper.:dimension(transformation::AffineTransform)::Integer = transformation.tra
 
 pointgrouprepresentation(transformation::AffineTransform; rank::Integer = 1)::Matrix = pointgrouprepresentation(transformation.transformmatrix; rank=rank)
 
+#\begin:PhaseTable definition
+struct PhaseTable
+    lookuptable::Dict{Tuple, Tuple}
+    realdenom::Integer
+    imagdenom::Integer
+end
+export PhaseTable
+
+@memoize function PhaseTable(symmetry::AffineTransform, realdenom::Integer, imagdenom::Integer)::PhaseTable
+    eigenfunctions = computeeigenfunctions(symmetry, 1:3) # Zipper.jl only support up to 3-dimensions
+    eigenvalues = (v for (v, _) in eigenfunctions)
+    realvalues = (real(v) for v in eigenvalues)
+    imagvalues = (imag(v) for v in eigenvalues)
+    functions = (f for (_, f) in eigenfunctions)
+
+    realdenominator = snappingdenominator(realvalues, denominatorrange=realdenom:realdenom+128).denominator
+    imagdenominator = snappingdenominator(imagvalues, denominatorrange=imagdenom:realdenom+128).denominator
+
+    # We requires that lower rank functions have higher priority.
+    entries = sort([(f.rank, r, i, f) for (r, i, f) in zip(realvalues, imagvalues, functions)], by=first, rev=true)
+
+    lookuptable = Dict(
+        (hashablereal(r, realdenominator), hashablereal(i, imagdenominator))=>(r+i*im, f) 
+        for (_, r, i, f) in entries)
+
+    return PhaseTable(lookuptable, realdenominator, imagdenominator)
+end
+
+function PhaseTable(symmetry::AffineTransform; realprecision::Real = 1e-3, imagprecision::Real = 1e-3)
+    realdenom::Integer = 1/realprecision|>round
+    imagdenom::Integer = 1/imagprecision|>round
+    return PhaseTable(symmetry, realdenom, imagdenom)
+end
+#\end
+
+#\begin:PhaseSignature APIs
+function Base.:getindex(table::PhaseTable, v::Complex)::Tuple{Complex, BasisFunction}
+    key::Tuple = (hashablereal(v|>real, table.realdenom), hashablereal(v|>imag, table.imagdenom))
+    if !haskey(table.lookuptable, key)
+        error("No eigenfunction is found for eigenvalue $(v)!")
+    end
+    return table.lookuptable[key]
+end
+
+function Base.:haskey(table::PhaseTable, v::Complex)::Bool
+    key::Tuple = (hashablereal(v|>real, table.realdenom), hashablereal(v|>imag, table.imagdenom))
+    return haskey(table.lookuptable, key)
+end
+#\end
+
+#\begin:PhaseTable utilities
+@memoize function computeeigenfunctions(transform::AffineTransform, functionorderrange::UnitRange)
+    dimension::Integer = transform.transformmatrix|>size|>first
+    function computeeigenfunctionsatorder(functionorder::Integer)
+        matrixatorder::Matrix = pointgrouprepresentation(transform.transformmatrix; rank=functionorder)
+        eigenvalues, eigenvectors = matrixatorder |> eigen
+        basisfunctions = (
+            eigenvalue=>BasisFunction(eigenvectors[:, n], dimension, functionorder)|>normalize 
+            for (n, eigenvalue) in eigenvalues|>enumerate)
+        return Iterators.filter(p -> !(p.second|>iszero), basisfunctions)
+    end
+
+    return [1+0im=>swave, (p for functionorder in functionorderrange|>reverse for p in functionorder|>computeeigenfunctionsatorder)...]
+end
+#\end
+
+#\begin:PhaseSignature display
+Base.:show(io::IO, o::PhaseTable) = print(io, "$(o|>typeof)(realdenom=$(o.realdenom), imagdenom=$(o.imagdenom))")
+#\end
 function findeigenfunction(transformation::AffineTransform; eigenvalue::Number = 1)::BasisFunction
     eigenvaluekey::Tuple = hashablecomplex(eigenvalue |> Complex, transformation.eigenvaluehashdenominator)
     if !haskey(transformation.eigenfunctions, eigenvaluekey)

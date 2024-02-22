@@ -149,7 +149,6 @@ visualize(wannierseedstate, markersizemultiplier=20, markersizescaling=0.1)
 wannierseeds = wannierseedstate|>FockMap
 
 seedstransform = fourier(quasistripmetalcorrelations|>getoutspace, wannierseeds|>getoutspace) / (scaledcrystal|>vol|>sqrt)
-seedstransform[1:128, :]|>visualize
 crystalseeds = seedstransform * wannierseeds
 pseudoidentities = (crystalseeds[subspace, :]' * crystalseeds[subspace, :] for (_, subspace) in crystalseeds|>getoutspace|>crystalsubspaces)
 (v for id in pseudoidentities for (_, v) in id|>eigvalsh)|>minimum
@@ -161,7 +160,7 @@ wanniermetalisometries' * stripcorrelations * wanniermetalisometries |>crystalsp
 leftrestrict = fourier(wanniermetalisometries|>getoutspace, wannierseeds|>getoutspace) / (scaledcrystal|>vol|>sqrt)
 wanniercrystal = wanniermetalisometries|>getinspace|>getcrystal
 rightrestrict = fourier(wanniermetalisometries|>getinspace, wanniermetalisometries|>getinspace|>unitcellfock|>RegionFock) / (wanniercrystal|>vol|>sqrt)
-wannierlocalisometries = leftrestrict' * FockMap(wanniermetalisometries) * rightrestrict
+wannierlocalisometries = leftrestrict' * wanniermetalisometries * rightrestrict
 visualize(wannierlocalisometries|>RegionState, markersizemultiplier=20, markersizescaling=0.1)
 
 remapper = spatialremapper(wannierlocalisometries|>getoutspace, getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace))
@@ -184,7 +183,6 @@ couriercorrelationspectrum = couriercorrelations|>crystalspectrum
 couriercorrelationspectrum|>visualize
 
 wannierregion = couriercorrelations|>getoutspace|>getcrystal|>getunitcell
-visualize(wannierregion)
 wannierregion1 = wannierregion .- ([0.25, 0.25]∈getspace(wannierregion))
 wannierregion2 = wannierregion .+ ([0.25, 0.25]∈getspace(wannierregion))
 wannierregion3 = wannierregion .+ ([0.25, -0.25]∈getspace(wannierregion))
@@ -242,7 +240,7 @@ visualregion = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=
 visualfock = quantize(visualregion, 1)
 leftfourier = fourier(wanniercourierisometries|>getoutspace, visualfock) / sqrt(wanniercourierisometries|>getoutspace|>getcrystal|>vol)
 rightfourier = fourier(wanniercourierisometries|>getinspace, wanniercourierisometries|>getinspace|>unitcellfock|>RegionFock)
-wannierlocalstates = leftfourier' * FockMap(wanniercourierisometries) * rightfourier
+wannierlocalstates = leftfourier' * wanniercourierisometries * rightfourier
 visualize(wannierlocalstates|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
 
 blockedcouriercorrelations = wanniercourierisometries' * blockedcorrelations * wanniercourierisometries

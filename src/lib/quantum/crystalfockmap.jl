@@ -131,10 +131,10 @@ function Base.:*(left::CrystalFockMap, right::CrystalFockMap)
     # with the output subspace keyed by the same `k`.
 
     function compute(outk, ink, block)
-        batch = []
+        batch = Dict()
         if !haskey(rightblocks, ink) return batch end
         for (rink, rightblock) in rightblocks[ink]
-            push!(batch, (outk, rink)=>block*rightblock)
+            batch[(outk, rink)] = block*rightblock
         end
         return batch
     end
@@ -144,45 +144,18 @@ function Base.:*(left::CrystalFockMap, right::CrystalFockMap)
         tasks=(()->compute(outk, ink, block) for ((outk, ink), block) in left.blocks),
         count=length(left.blocks))|>parallel
 
-    # Since the results are batched into a Vector for each batch, we have to flatten it 
-    # before merging the result into a single Dict.
-    multiplied = (el for batch in multiplied for el in batch)
-
-    # [Third]
     # We will merge the multiplied results using batched multithreading, then we will perform 
     # one final merge to get the final result.
 
     function mergemultiplied(batch)
         merged = Dict()
-        for (index, block) in batch
+        for v in batch, (index, block) in v
             haskey(merged, index) ? (merged[index] += block) : (merged[index] = block)
         end
         return merged
     end
 
-    count = 0
-    watchprogress(desc="CrystalFockMap * CrystalFockMap")
-    for _ in multiplied
-        count += 1
-        if count % 512 == 0
-            updateprogress()
-        end
-    end
-    unwatchprogress()
-
-    batchsize = (count / getmaxthreads())|>ceil
-    mergedbatch = paralleltasks(
-        name="CrystalFockMap * CrystalFockMap",
-        tasks=(()->mergemultiplied(batch) for batch in Iterators.partition(multiplied, batchsize)),
-        count=getmaxthreads())|>parallel
-
-    blocks = Dict()
-    watchprogress(desc="CrystalFockMap * CrystalFockMap")
-    for merged in mergedbatch, (index, block) in merged
-        haskey(blocks, index) ? (blocks[index] += block) : (blocks[index] = block)
-        updateprogress()
-    end
-    unwatchprogress()
+    blocks = paralleldivideconquer(mergemultiplied, multiplied, count=left.blocks|>length)
 
     return CrystalFockMap(left.outcrystal, right.incrystal, blocks)
 end
@@ -263,10 +236,12 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
 
     batchsize::Integer = (length(fockmap.blocks) / getmaxthreads())|>ceil
     batches = Iterators.partition(fockmap.blocks, batchsize)
-    spdata = paralleltasks(
+    datas = paralleltasks(
         name="FockMap(::CrystalFockMap)",
         tasks=(()->compute(batch) for batch in batches),
-        count=getmaxthreads())|>parallel|>sum
+        count=getmaxthreads())|>parallel
+
+    spdata = paralleldivideconquer(sum, datas, count=getmaxthreads())
 
     return FockMap(outspace, inspace, spdata)
 end

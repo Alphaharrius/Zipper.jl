@@ -16,10 +16,10 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
     end
     unwatchprogress()
 
-    restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
+    restrictedfourier = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
 
     function compute(scaledk, k)
-        kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
+        kfourier::FockMap = restrictedfourier[:, k] / sqrt(volumeratio)
         scaledksubspace::FockSpace =  FockSpace(
             setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
         return (scaledk, k)=>FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)

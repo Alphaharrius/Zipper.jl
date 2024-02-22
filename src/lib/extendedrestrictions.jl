@@ -36,8 +36,7 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
     bz::Subset{Momentum} = crystal|>brillouinzone
     momentummappings::Base.Generator = (basispoint(scaledkspace * k) => k for k in bz)
 
-    crystalfocksubspaces::Dict{Momentum, FockSpace} = crystalfock|>crystalsubspaces|>Dict
-    restrictedfourier::FockMap = fourier(crystalfock, unscaledextendedhomefock)'
+    restrictedfourier = fourier(crystalfock, unscaledextendedhomefock)'
     blocks::Dict = Dict()
 
     stripunitcell::Region = Subset(scaledspace * r for r in unscaledextendedunitcell)
@@ -46,7 +45,7 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
 
     scaledksubspaces::Dict{Momentum, FockSpace} = Dict()
     for (scaledk, k) in momentummappings
-        kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
+        kfourier::FockMap = restrictedfourier[:, k] / sqrt(volumeratio)
         if !haskey(scaledksubspaces, scaledk)
             scaledksubspaces[scaledk] = FockSpace(
                 setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)

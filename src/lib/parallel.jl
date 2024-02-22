@@ -81,6 +81,27 @@ function parallel(tasks::ParallelTasks)
     return (item for bucket in buckets for item in bucket)
 end
 
+function singlestageparalleldivideconquer(f::Function, iter, count::Integer)
+    actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
+    countmetric::Integer = count/actualcorecount|>ceil
+    batchsize::Integer = countmetric > 1 ? count/actualcorecount|>ceil : 2
+    itembatches = Iterators.partition(iter, batchsize)
+    batchcount::Integer = count/batchsize|>ceil
+    return batchcount, paralleltasks(
+        name="paralleldivideconquer count=$count",
+        tasks=(()->f(batch) for batch in itembatches),
+        count=batchcount)|>parallel
+end
+
+function paralleldivideconquer(f::Function, iter; count::Integer=iter|>length)
+    batchcount, current = singlestageparalleldivideconquer(f, iter, count)
+    while batchcount > 2
+        batchcount, current = singlestageparalleldivideconquer(f, current, batchcount)
+    end
+    return f(current)
+end
+export paralleldivideconquer
+#\end
 function watchprogress(; desc::String)
     if Threads.threadid() != 1 || !parallelsettings.showmeter
         return

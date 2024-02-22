@@ -200,6 +200,7 @@ function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol
         bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> FockSpace)
         updateprogress()
     end
+    unwatchprogress()
 
     function repacktospectrum(isometries::Dict{Momentum, FockMap})::CrystalSpectrum
         eigenmodes::Dict{Momentum, Subset{Mode}} = Dict(k => fockmap |> getinspace |> orderedmodes for (k, fockmap) in isometries)

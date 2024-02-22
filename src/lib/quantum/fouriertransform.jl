@@ -133,7 +133,7 @@ function FockMap(fockmap::InvFourierMap)
         tasks=(()->compute(batch) for batch in batches),
         count=getmaxthreads())|>parallel
 
-    spdata = parallelreduce(sum, datas, count=getmaxthreads())
+    spdata = paralleldivideconquer(sum, datas, count=getmaxthreads())
 
     return FockMap(outspace, inspace, spdata)
 end

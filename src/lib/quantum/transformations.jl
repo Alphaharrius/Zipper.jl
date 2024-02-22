@@ -16,10 +16,10 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
     end
     unwatchprogress()
 
-    restrictedfourier::FockMap = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
+    restrictedfourier = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
 
     function compute(scaledk, k)
-        kfourier::FockMap = columns(restrictedfourier, crystalfocksubspaces[k]) / sqrt(volumeratio)
+        kfourier::FockMap = restrictedfourier[:, k] / sqrt(volumeratio)
         scaledksubspace::FockSpace =  FockSpace(
             setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
         return (scaledk, k)=>FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
@@ -106,36 +106,66 @@ function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::Foc
 end
 
 function Base.:*(symmetry::AffineTransform, state::RegionState)
+    # We will first generate the inspace symmetry representation to check if there are any unitary transformation 
+    # to bring the set of modes to the symmetry eigenbasis.
     statemap::FockMap = state|>FockMap
     stateregionfock::RegionFock = statemap|>getoutspace
     localsymmetry::AffineTransform = symmetry|>recenter(stateregionfock|>getregion|>getcenter)
     outspacerep::FockMap = localsymmetry * stateregionfock
-    hassamespan(outspacerep|>getoutspace, stateregionfock) || error("The symmetry action on the state region fockspace in not closed!")
+    # We requires the the RegionFock of the state to be closed under symmetry.
+    hassamespan(outspacerep|>getoutspace, stateregionfock) || error(
+        "The symmetry action on the state region fockspace in not closed!")
     inspacerep::FockMap = statemap' * outspacerep * statemap
     phasespectrum::EigenSpectrum = inspacerep|>eigspec
+    # We will then use the eigenvectors of the inspace representation to transform the state into a quasi-symmetric state.
+    transform::FockMap = phasespectrum|>geteigenvectors
+    quasistates = statemap * transform
 
-    function mapper(mode::Mode)::Mode
+    # After that we will try to force each state to be symmetric if they are quasi-symmetric using manual symmetrization.
+    function symmetrize(mode::Mode, eigenvector::FockMap)::Tuple{Mode, FockMap}
         eigenvalue::Complex = (phasespectrum|>geteigenvalues)[mode]
-        basisfunction::BasisFunction = findeigenfunction(localsymmetry, eigenvalue=eigenvalue)
-        # The existing :flavor attribute is not needed since we will use mapmodes to determine the new one;
-        # the :eigenindex is not needed since it does not represent any physical attributes.
-        return mode|>setattr(:orbital=>basisfunction)|>removeattr(:eigenindex, :flavor)
+        phasetable = PhaseTable(symmetry, realprecision=1e-5, imagprecision=1e-5)
+        if haskey(phasetable, eigenvalue)
+            # If the eigenvalue is registered in the phase table, we consider the associated eigenvector 
+            # is symmetric under the symmetry.
+            phase, basisfunction = phasetable[eigenvalue]
+            symmetricalmap = eigenvector
+        else
+            @warn "Quasi-symmetric phase $eigenvalue is found, performing manual symmetrization..."
+            # Else we will try to get the actual phase from a phase table with lower precision of eigenvalue registration.
+            lowprectable = PhaseTable(symmetry, realprecision=1e-1, imagprecision=1e-1)
+            phase, basisfunction = lowprectable[eigenvalue]
+            # Performing manual symmetrization.
+            elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
+            symmetricalmap = eigenvector
+            for element in elements
+                symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector*phase
+            end
+            symmetricalmap = symmetricalmap|>normalize
+        end
+        newmode = mode|>setattr(:orbital=>basisfunction)
+        inspace = newmode|>FockSpace
+        return newmode, FockMap(symmetricalmap, inspace=inspace, performpermute=false)
     end
 
-    symmetricfock::FockSpace = phasespectrum|>geteigenvectors|>getinspace|>mapmodes(mapper)|>FockSpace
-    symmetrizer::FockMap = FockMap(phasespectrum|>geteigenvectors, inspace=symmetricfock, performpermute=false)
-
-    return RegionState(statemap * symmetrizer)
+    symmetricstates = [symmetrize(m, quasistates[:, m]) for m in quasistates|>getinspace]
+    inspace = (m for (m, _) in symmetricstates)|>mapmodes(m -> m|>removeattr(:eigenindex, :flavor))|>FockSpace
+    symmetricstatemap = stateregionfock*sum(u for (_, u) in symmetricstates)
+    symmetricstatemap = symmetricstatemap*idmap(symmetricstatemap|>getinspace, inspace)
+    symmetricstatemap = symmetricstatemap*spatialmap(symmetricstatemap)
+    return symmetricstatemap|>RegionState
 end
 
 function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
     inspacerep::FockMap = *(symmetry, fockmap |> getinspace)
-    hassamespan(inspacerep |> getoutspace, fockmap |> getinspace) || error("The symmetry action on the inspace in not closed!")
+    hassamespan(
+        inspacerep |> getoutspace, fockmap |> getinspace) || error("The symmetry action on the inspace in not closed!")
     outspacerep::FockMap = fockmap' * inspacerep * fockmap
 
     phasespectrum::EigenSpectrum = outspacerep |> eigspec
+    phasetable = PhaseTable(symmetry)
     outspace::FockSpace = FockSpace(
-        m |> setattr(:orbital => findeigenfunction(symmetry, eigenvalue=(phasespectrum |> geteigenvalues)[m]))
+        m |> setattr(:orbital => phasetable[(phasespectrum|>geteigenvalues)[m]][2])
           |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
         for m in phasespectrum |> geteigenvectors |> getinspace)s
     return FockMap(phasespectrum |> geteigenvectors, inspace=outspace, performpermute=false)'
@@ -143,7 +173,8 @@ end
 
 function Base.:*(fockmap::FockMap, symmetry::AffineTransform)
     outspacerep::FockMap = *(symmetry, fockmap |> getoutspace)
-    hassamespan(outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
+    hassamespan(
+        outspacerep |> getoutspace, fockmap |> getoutspace) || error("The symmetry action on the outspace in not closed!")
     inspacerep::FockMap = fockmap' * outspacerep * fockmap
     phasespectrum::EigenSpectrum = inspacerep |> eigspec
     # This is used to correct the :flavor attribute when there are multiple mode with the same orbital is found.
@@ -151,12 +182,13 @@ function Base.:*(fockmap::FockMap, symmetry::AffineTransform)
     newmodes::Vector{Mode} = []
     # Previously this is using a function to generate the new mode, but it is not working with the FockSpace constructor 
     # when creating the inspace since it will call the constructor of Subset(::Base.Generator), which it uses Base.first 
-    # to determine the type of the generator elements, which will invoke the function and cause the first mode to be processed 
-    # once before the main iteration. This will cause one of the orbital group start with index 2 instead of 1 since it 
-    # has been processed once and loaded into the dictionary processedmodes.
+    # to determine the type of the generator elements, which will invoke the function and cause the first mode to be 
+    # processed once before the main iteration. This will cause one of the orbital group start with index 2 instead of 1 
+    # since it has been processed once and loaded into the dictionary processedmodes.
+    phasetable = PhaseTable(symmetry)
     for mode in phasespectrum|>geteigenvectors|>getinspace
         eigenvalue::Complex = (phasespectrum|>geteigenvalues)[mode]
-        basisfunction::BasisFunction = findeigenfunction(symmetry, eigenvalue=eigenvalue)
+        basisfunction::BasisFunction = phasetable[eigenvalue][2]
         newmode::Mode = mode|>setattr(:orbital=>basisfunction)|>removeattr(:eigenindex, :flavor)
         if !haskey(processedmodes, newmode)
             processedmodes[newmode] = 1

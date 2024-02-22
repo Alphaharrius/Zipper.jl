@@ -1,3 +1,5 @@
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆  Global settings definition ◆
 mutable struct ParallelSettings
     showmeter::Bool
     maxthreads::Integer
@@ -12,12 +14,18 @@ global parallelsettings = ParallelSettings(
     # I have to set this value to 128 since Threads.nthreads() at initialization of Julia env 
     # seems to be 1 for some reason...
     undef) # 128 threads should be enough for everyone.
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ ParallelTasks definition ◆
 mutable struct ParallelTasks
     tasks
     meter
 end
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Parallel computing configuration APIs ◆
 function showtaskmeter(bool::Bool)
     @warn("Task meter visibility is set to $bool")
     parallelsettings.showmeter = bool
@@ -32,7 +40,10 @@ export setmaxthreads
 
 getmaxthreads() = parallelsettings.maxthreads
 export getmaxthreads
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Parallel computing APIs ◆
 function paralleltasks(; name::String, tasks, count::Integer)
     actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
     batchsize::Integer = (count / actualcorecount)|>ceil
@@ -81,6 +92,35 @@ function parallel(tasks::ParallelTasks)
     return (item for bucket in buckets for item in bucket)
 end
 
+function singlestageparalleldivideconquer(f::Function, iter, count::Integer)
+    actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
+    countmetric::Integer = count/actualcorecount|>ceil
+    batchsize::Integer = countmetric > 1 ? count/actualcorecount|>ceil : 2
+    itembatches = Iterators.partition(iter, batchsize)
+    batchcount::Integer = count/batchsize|>ceil
+    return batchcount, paralleltasks(
+        name="paralleldivideconquer count=$count",
+        tasks=(()->f(batch) for batch in itembatches),
+        # Encountered issue of segmentation fault here...
+        # Solution: Collect the results from the threads as a vector to prevent
+        # the threads from the next stage to access data owned by another thread.
+        # TODO: The issue is still totally unknown and more test have to be performed 
+        # to identify the issue.
+        count=batchcount)|>parallel|>collect
+end
+
+function paralleldivideconquer(f::Function, iter; count::Integer=iter|>length)
+    batchcount, current = singlestageparalleldivideconquer(f, iter, count)
+    while batchcount > 2
+        batchcount, current = singlestageparalleldivideconquer(f, current, batchcount)
+    end
+    return f(current)
+end
+export paralleldivideconquer
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ Progress meter APIs ◆
 function watchprogress(; desc::String)
     if Threads.threadid() != 1 || !parallelsettings.showmeter
         return
@@ -97,12 +137,14 @@ function updateprogress()
     try
         progress = parallelsettings.mainthreadmeter
         if typeof(progress) == UndefInitializer
-            # This branch is for the case where the current thread have called watchprogress before.
+            # This branch is for the case where the current 
+            # thread have called watchprogress before.
             return
         end
         ProgressMeter.update!(progress)
     catch _ # UndefRefError
-        # This branch is for the case where the current thread have not called watchprogress before.
+        # This branch is for the case where the current thread 
+        # have not called watchprogress before.
     end
     return
 end
@@ -115,13 +157,16 @@ function unwatchprogress()
     try
         progress = parallelsettings.mainthreadmeter
         if typeof(progress) == UndefInitializer
-            # This branch is for the case where the current thread have called watchprogress before.
+            # This branch is for the case where the current thread 
+            # have called watchprogress before.
             return
         end
         ProgressMeter.finish!(progress)
     catch _ # UndefRefError
-        # This branch is for the case where the current thread have not called watchprogress before.
+        # This branch is for the case where the current thread have 
+        # not called watchprogress before.
     end
     return
 end
 export unwatchprogress
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

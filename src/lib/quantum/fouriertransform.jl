@@ -50,62 +50,198 @@ function fourier(
             in Iterators.product(momentumhomefock|>enumerate, regionfock|>enumerate)),
         count=dimension(momentumhomefock)*dimension(regionfock))|>parallel
 
-    data::SparseMatrixCSC = reshape(
-        values,
-        (length(momentumhomefock) * size(momentummatrix, 2), regionfock|>dimension))|>SparseMatrixCSC
-    return FockMap(crystalfock, regionfock, data)
+    function getktransform(n, k)
+        outspace = getsubspace(crystalfock, k)
+        data = values[:, n, :]
+        return k=>FockMap(outspace, regionfock, data)
+    end
+
+    blocks = paralleltasks(
+        name="fourier $(crystalfock|>dimension)×$(regionfock|>dimension)",
+        tasks=(()->getktransform(n, k) for (n, k) in crystalfock|>getcrystal|>brillouinzone|>enumerate),
+        count=crystalfock|>getcrystal|>vol)|>parallel|>Dict
+
+    return FourierMap(crystalfock|>getcrystal, regionfock, blocks)
 end
 export fourier
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
-# ◆ Fourier transform arithmetics ◆
-""" Implemented to support Fourier transform of `CrystalFockMap` objects. """
-function Base.:*(fouriertransform::FockMap{RegionFock, CrystalFock}, fockmap::CrystalFockMap)
-    crystal::Crystal = fouriertransform|>getinspace|>getcrystal
-    realspace::RealSpace = crystal|>getspace
-    kspace::MomentumSpace = convert(MomentumSpace, realspace)
-    Γ::Momentum = kspace|>getorigin
-    singularcrystal::Crystal = Crystal(realspace|>getorigin|>Subset, realspace|>dimension|>ones)
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FourierMap definition ◆
+struct FourierMap <: FockMap{CrystalFock, RegionFock}
+    crystal::Crystal
+    regionfock::RegionFock
+    data::Dict{Momentum, SparseFockMap}
+end
 
-    blocks::Dict = paralleltasks(
-        name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
-        tasks=(
-            ()->((Γ, k)=>fouriertransform[:, getsubspace(fouriertransform|>getinspace, k)])
-            for k in crystal|>brillouinzone),
-        count=crystal|>vol)|>parallel|>Dict
-    crystaltransform::CrystalFockMap = CrystalFockMap(singularcrystal, crystal, blocks)
+struct InvFourierMap <: FockMap{RegionFock, CrystalFock}
+    crystal::Crystal
+    regionfock::RegionFock
+    data::Dict{Momentum, SparseFockMap}
+end
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
-    transformed::CrystalFockMap = crystaltransform * fockmap
-    outspace::RegionFock = fouriertransform|>getoutspace
-    inspace::CrystalFock = fouriertransform|>getinspace
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FourierMap essentials ◆
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::FourierMap) = v|>FockMap|>rep
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::InvFourierMap) = v|>FockMap|>rep
 
-    function compute(blocks)
-        data::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
-        for block in blocks
-            blockinspace::FockSpace = block|>getinspace
+Base.:adjoint(::Type{FourierMap}) = InvFourierMap
+Base.:adjoint(::Type{InvFourierMap}) = FourierMap
+
+FourierMapType = Union{FourierMap, InvFourierMap}
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FourierMap conversions ◆
+function FockMap(fockmap::FourierMap)::SparseFockMap{CrystalFock, RegionFock}
+    outspace::CrystalFock = fockmap|>getoutspace
+    inspace::RegionFock = fockmap|>getinspace
+
+    function compute(batch)
+        data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace|>dimension, inspace|>dimension)
+        for (k, block) in batch
+            blockoutspace::FockSpace = getsubspace(outspace, k)
+            outorder::UnitRange = outspace[blockoutspace|>first]:outspace[blockoutspace|>last]
+            data[outorder, :] += block|>rep
+        end
+        return data
+    end
+
+    batchsize::Integer = length(fockmap.data)/getmaxthreads()|>ceil
+    batches = Iterators.partition(fockmap.data, batchsize)
+    datas = paralleltasks(
+        name="FockMap(::FourierMap)",
+        tasks=(()->compute(batch) for batch in batches),
+        count=getmaxthreads())|>parallel
+
+    spdata = paralleldivideconquer(sum, datas, count=getmaxthreads())
+
+    return FockMap(outspace, inspace, spdata)
+end
+
+function FockMap(fockmap::InvFourierMap)
+    outspace::RegionFock = fockmap|>getoutspace
+    inspace::CrystalFock = fockmap|>getinspace
+
+    function compute(batch)
+        data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(outspace|>dimension, inspace|>dimension)
+        for (k, block) in batch
+            blockinspace::FockSpace = getsubspace(inspace, k)
             inorder::UnitRange = inspace[blockinspace|>first]:inspace[blockinspace|>last]
             data[:, inorder] += block|>rep
         end
         return data
     end
 
-    # Without doing the followings this step is unbearablelly slow for large system size.
-    batchsize::Integer = (length(transformed.blocks) / getmaxthreads())|>ceil
-    summingbatches = Iterators.partition((block for (_, block) in transformed.blocks), batchsize)
-    reps = paralleltasks(
-        name="FockMap{RegionFock, CrystalFock} * CrystalFockMap",
-        tasks=(()->compute(partition) for partition in summingbatches),
+    batchsize::Integer = length(fockmap.data)/getmaxthreads()|>ceil
+    batches = Iterators.partition(fockmap.data, batchsize)
+    datas = paralleltasks(
+        name="FockMap(::FourierMap)",
+        tasks=(()->compute(batch) for batch in batches),
         count=getmaxthreads())|>parallel
-    
-    watchprogress(desc="FockMap{RegionFock, CrystalFock} * CrystalFockMap")
-    spdata::SparseMatrixCSC = spzeros(Complex, outspace|>dimension, inspace|>dimension)
-    for rep in reps
-        spdata[:, :] += rep
-        updateprogress()
-    end
-    unwatchprogress()
+
+    spdata = paralleldivideconquer(sum, datas, count=getmaxthreads())
 
     return FockMap(outspace, inspace, spdata)
 end
-# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FockMap interface implementations ◆
+getinspace(fockmap::FourierMap) = fockmap.regionfock
+
+function getoutspace(fockmap::FourierMap)::CrystalFock
+    basismodes::Subset{Mode} = fockmap.data|>first|>last|>getoutspace|>removeattr(:k)
+    return getcrystalfock(basismodes, fockmap.crystal)
+end
+
+function getinspace(fockmap::InvFourierMap)::CrystalFock
+    basismodes::Subset{Mode} = fockmap.data|>first|>last|>getinspace|>removeattr(:k)
+    return getcrystalfock(basismodes, fockmap.crystal)
+end
+
+getoutspace(fockmap::InvFourierMap) = fockmap.regionfock
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FourierMap indexing ◆
+Base.:getindex(::FourierMap, a::Any, b::Any) = error("::FourierMap[$(a|>typeof), $(b|>typeof)] is not supported!")
+Base.:getindex(fockmap::FourierMap, k::Momentum, ::Colon) = fockmap.data[k]
+Base.:getindex(fockmap::InvFourierMap, ::Colon, k::Momentum) = fockmap.data[k]
+Base.:getindex(fockmap::FourierMap, subspace::MomentumFock, ::Colon) = fockmap[subspace|>getmomentum, :]
+Base.:getindex(fockmap::InvFourierMap, ::Colon, subspace::MomentumFock) = fockmap[:, subspace|>getmomentum]
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FourierMap arithmetics ◆
+""" Perform multiplication of `F' * M`. """
+function Base.:*(fouriermap::InvFourierMap, fockmap::CrystalFockMap)::InvFourierMap
+    rightblocks::Dict = outspacesubmaps(fockmap)
+
+    compute(k::Momentum, block::SparseFockMap) = Dict(rk=>block*rblock for (rk, rblock) in rightblocks[k])
+
+    batches = paralleltasks(
+        name="InvFourierMap * CrystalFockMap",
+        tasks=(()->compute(k, block) for (k, block) in fouriermap.data),
+        count=length(fouriermap.data))|>parallel
+    
+    function merger(batch)
+        merged = Dict()
+        for v in batch, (k, block) in v
+            if haskey(merged, k)
+                merged[k] += block
+            else
+                merged[k] = block
+            end
+        end
+        return merged
+    end
+
+    blocks = paralleldivideconquer(merger, batches, count=length(fouriermap.data))
+
+    return InvFourierMap(fouriermap.crystal, fouriermap.regionfock, blocks)
+end
+
+Base.:*(::CrystalFockMap, ::FourierMap)::FourierMap = notimplemented()
+
+function Base.:*(fockmap::FourierMapType, v::Number)
+    blocks = paralleltasks(
+        name="FourierMap * Number",
+        tasks=(()->k=>block*v for (k, block) in fockmap.data),
+        count=fockmap.data|>length)|>parallel|>Dict
+    return typeof(fockmap)(fockmap.crystal, fockmap.regionfock, blocks)
+end
+
+Base.:*(v::Number, fockmap::FourierMapType) = fockmap * v
+
+function Base.:*(left::InvFourierMap, right::FourierMap)
+    multiplied = paralleltasks(
+        name="InvFourierMap * FourierMap",
+        tasks=(()->block*right.data[k] for (k, block) in left.data),
+        count=left.data|>length)|>parallel
+    return paralleldivideconquer(sum, multiplied, count=left.data|>length)
+end
+
+Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)
+
+Base.:*(::FourierMap, ::InvFourierMap) = notimplemented()
+
+function Base.:transpose(fockmap::FourierMapType)
+    compute(k, block) = k=>transpose(block)
+    blocks = paralleltasks(
+        name="transpose(::$(fockmap|>typeof))",
+        tasks=(()->compute(k, block) for (k, block) in fockmap.data),
+        count=fockmap.data|>length)|>parallel|>Dict
+    return (fockmap|>typeof)'(fockmap.crystal, fockmap.regionfock, blocks)
+end
+
+function Base.:adjoint(fockmap::FourierMapType)::InvFourierMap
+    compute(k, block) = k=>block'
+    blocks = paralleltasks(
+        name="adjoint(::$(fockmap|>typeof))",
+        tasks=(()->compute(k, block) for (k, block) in fockmap.data),
+        count=fockmap.data|>length)|>parallel|>Dict
+    return (fockmap|>typeof)'(fockmap.crystal, fockmap.regionfock, blocks)
+end
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

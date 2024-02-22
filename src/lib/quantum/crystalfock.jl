@@ -40,6 +40,8 @@ function Base.:getindex(crystalfock::CrystalFock, mode::Mode)
     return (kordering - 1) * dimension(homefock) + (crystalfock|>unitcellfock)[mode|>removeattr(:k)]
 end
 
+Base.:getindex(crystalfock::CrystalFock, range::UnitRange) = (crystalfock|>collect)[range]
+
 """ Check whether a `Mode` is in the `FockSpace`. """
 Base.:in(mode::Mode, crystalfock::CrystalFock)::Bool = (
     haskey(mode|>getattr(:k), crystalfock.korderings) && mode|>removeattr(:k) in crystalfock|>unitcellfock)

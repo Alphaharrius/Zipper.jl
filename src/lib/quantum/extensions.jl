@@ -58,8 +58,8 @@ It creates a new `RegionFock` object with the remapped modes and returns an iden
 `RegionFock` objects.
 """
 function spatialremapper(regionfock::RegionFock; offsets::Region, unitcell::Region)
-    positions::Dict{Offset, Tuple} = Dict((r + b)=>(r, b) for (r, b) in Iterators.product(offsets, unitcell))
-    remappingdata::Base.Generator = ((positions[mode|>getpos], mode) for mode in regionfock)
+    positions::Dict{Offset, Tuple} = Dict((r + b)|>euclidean=>(r, b) for (r, b) in Iterators.product(offsets, unitcell))
+    remappingdata::Base.Generator = ((positions[mode|>getpos|>euclidean], mode) for mode in regionfock)
     remappedfock::RegionFock = RegionFock(mode|>setattr(:r=>r, :b=>b) for ((r, b), mode) in remappingdata)
     return idmap(remappedfock, regionfock)
 end

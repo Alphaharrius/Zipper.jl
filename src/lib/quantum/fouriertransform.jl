@@ -177,19 +177,19 @@ function Base.:*(fouriermap::InvFourierMap, fockmap::CrystalFockMap)::InvFourier
 
     batches = paralleltasks(
         name="InvFourierMap * CrystalFockMap",
-        tasks=(()->(k, compute(k, block)) for (k, block) in fouriermap.data),
+        tasks=(()->compute(k, block) for (k, block) in fouriermap.data),
         count=length(fouriermap.data))|>parallel
-
+    
     function merger(batch)
-        if length(batch) == 1 return batch[1] end
-        blocks = Dict()
+        merged = Dict()
         for v in batch, (k, block) in v
-            if haskey(blocks, k)
-                blocks[k] += block
+            if haskey(merged, k)
+                merged[k] += block
             else
-                blocks[k] = block
+                merged[k] = block
             end
         end
+        return merged
     end
 
     blocks = paralleldivideconquer(merger, batches, count=length(fouriermap.data))

@@ -1,18 +1,22 @@
-Base.:(==)(a::BasisFunction, b::BasisFunction) = a.rank == b.rank && (a |> dimension) == (b |> dimension) && isapprox(a |> rep, b |> rep)
+Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
 
-Base.:hash(basisfunction::BasisFunction)::UInt = (map(hashablecomplex, basisfunction |> rep), basisfunction |> dimension, basisfunction.rank) |> hash
+Base.:(==)(a::BasisFunction, b::BasisFunction) = (
+    a.rank == b.rank && (a|>dimension) == (b|>dimension) && isapprox(a|>rep, b|>rep))
+
+Base.:hash(basisfunction::BasisFunction)::UInt = (
+    map(hashablecomplex, basisfunction |> rep), basisfunction |> dimension, basisfunction.rank)|>hash
 Base.:isequal(a::BasisFunction, b::BasisFunction)::Bool = a == b
 
 swave::BasisFunction = BasisFunction([1], 0, 0)
 export swave
 
-LinearAlgebra.:normalize(basis::BasisFunction)::BasisFunction = BasisFunction(basis.rep |> normalize, basis.dimension, basis.rank)
-
-Base.:convert(::Type{Vector{Complex}}, source::BasisFunction) = source.rep
+LinearAlgebra.:normalize(basis::BasisFunction)::BasisFunction = BasisFunction(
+    basis|>rep|>normalize, basis.dimension, basis.rank)
 
 Zipper.:dimension(basisfunction::BasisFunction)::Integer = basisfunction.dimension
 
-NAMEINDEXTABLE::Dict{String, Integer} = Dict("x" => 1, "y" => 2, "z" => 3) # The mappings for axis (x y z) in basis functions to tensor indicies.
+# The mappings for axis (x y z) in basis functions to tensor indicies.
+NAMEINDEXTABLE::Dict{String, Integer} = Dict("x" => 1, "y" => 2, "z" => 3)
 
 resolveentrycoords(expression::Symbol)::Vector{Integer} = map(v -> NAMEINDEXTABLE[v], split(expression |> string, ""))
 
@@ -110,22 +114,24 @@ end
 
 function AffineTransform(
     transformmatrix::Matrix, shiftvector::Vector = zeros(Float64, transformmatrix|>size|>first);
-    antiunitary::Bool = false, localspace::AffineSpace = euclidean(RealSpace, transformmatrix|>size|>first))::AffineTransform
+    antiunitary::Bool = false,
+    localspace::AffineSpace = euclidean(RealSpace, transformmatrix|>size|>first))::AffineTransform
 
     return AffineTransform(localspace, shiftvector, transformmatrix, antiunitary)
 end
 
-pointgrouptransform(
-    pointgroupmatrix::Matrix;
+pointgrouptransform(pointgroupmatrix::Matrix;
     dimension::Integer = pointgroupmatrix |> size |> first,
     localspace::RealSpace = euclidean(RealSpace, dimension),
     referencepoint::Offset = localspace |> getorigin,
-    antiunitary::Bool = false)::AffineTransform = AffineTransform(pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
-    localspace=localspace, antiunitary=antiunitary)
+    antiunitary::Bool = false)::AffineTransform = AffineTransform(
+        pointgroupmatrix, transformationshift(pointgroupmatrix, localspace, referencepoint);
+        localspace=localspace, antiunitary=antiunitary)
 export pointgrouptransform
 
 recenter(transformation::AffineTransform, center::Offset)::AffineTransform = AffineTransform(
-    transformation.transformmatrix, transformationshift(transformation.transformmatrix, transformation.localspace, center);
+    transformation.transformmatrix, 
+    transformationshift(transformation.transformmatrix, transformation.localspace, center);
     localspace=transformation |> getspace, antiunitary=transformation.antiunitary)
 export recenter
 
@@ -160,8 +166,8 @@ Zipper.:getspace(transformation::AffineTransform)::AffineSpace = transformation.
 Base.:convert(::Type{Matrix{Float64}}, source::AffineTransform) = source |> affinematrix
 
 function Base.:(==)(a::AffineTransform, b::AffineTransform)::Bool
-    localb::AffineTransform = (a |> getspace) * b
-    return isapprox(a |> rep, localb |> rep) && a.antiunitary == localb.antiunitary && isapprox(a.shiftvector, b.shiftvector)
+    localb::AffineTransform = (a|>getspace) * b
+    return isapprox(a|>rep, localb|>rep) && a.antiunitary == localb.antiunitary && isapprox(a.shiftvector, b.shiftvector)
 end
 
 function Base.:*(space::RealSpace, transformation::AffineTransform)::AffineTransform
@@ -201,7 +207,8 @@ function Base.:inv(transform::AffineTransform)::AffineTransform
         localspace=transform |> getspace, antiunitary=transform.antiunitary)
 end
 
-Base.:*(transformation::AffineTransform, space::RealSpace)::RealSpace = RealSpace((transformation.transformmatrix) * (space |> rep))
+Base.:*(transformation::AffineTransform, space::RealSpace)::RealSpace = RealSpace(
+    transformation.transformmatrix * (space|>rep))
 
 function Base.:^(source::AffineTransform, exponent::Number)::AffineTransform
     if exponent == 0
@@ -230,7 +237,8 @@ Base.:*(transformation::AffineTransform, point::Point) = (transformation * Subse
 
 Zipper.:dimension(transformation::AffineTransform)::Integer = transformation.transformmatrix |> size |> first
 
-pointgrouprepresentation(transformation::AffineTransform; rank::Integer = 1)::Matrix = pointgrouprepresentation(transformation.transformmatrix; rank=rank)
+pointgrouprepresentation(transformation::AffineTransform; rank::Integer = 1)::Matrix = pointgrouprepresentation(
+    transformation.transformmatrix; rank=rank)
 
 #\begin:PhaseTable definition
 struct PhaseTable
@@ -294,7 +302,9 @@ end
         return Iterators.filter(p -> !(p.second|>iszero), basisfunctions)
     end
 
-    return [1+0im=>swave, (p for functionorder in functionorderrange|>reverse for p in functionorder|>computeeigenfunctionsatorder)...]
+    return [
+        1+0im=>swave,
+        (p for functionorder in functionorderrange|>reverse for p in functionorder|>computeeigenfunctionsatorder)...]
 end
 #\end
 
@@ -313,7 +323,8 @@ function Base.:*(transformation::AffineTransform, basisfunction::BasisFunction):
 
     matrix::Matrix = pointgrouprepresentation(transformation; rank=basisfunction.rank)
     # TODO: Is this really the case?
-    functionrep::Vector = transformation.antiunitary ? basisfunction |> rep |> conj : basisfunction |> rep  # Handling anti-unitary.
+    # Handling anti-unitary.
+    functionrep::Vector = transformation.antiunitary ? basisfunction |> rep |> conj : basisfunction |> rep
     transformed::Vector = matrix * functionrep
 
     return BasisFunction(transformed, basisfunction |> dimension, basisfunction.rank)
@@ -335,7 +346,8 @@ export pointgroupelements
 
 pointgroupelements(symmetry::AffineTransform; maxelements=128) = pointgroupelements(symmetry, maxelements)
 
-pointgrouporder(pointgroup::AffineTransform; maxorder=128)::Integer = pointgroupelements(pointgroup; maxelements=maxorder) |> length
+pointgrouporder(pointgroup::AffineTransform; maxorder=128)::Integer = pointgroupelements(
+    pointgroup; maxelements=maxorder)|>length
 export pointgrouporder
 
 function relativephase(target::BasisFunction, ref::BasisFunction)::Complex
@@ -369,7 +381,8 @@ end
 
 Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space |> rep, space * scale |> rep))
 
-Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(*(space |> rep, convert(RealSpace, space) * scale |> inv |> rep))
+Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(
+    *(space |> rep, convert(RealSpace, space) * scale |> inv |> rep))
 Base.:*(scale::Scale, point::Point)::Point = *(scale, point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
@@ -386,8 +399,10 @@ function Base.:*(scale::Scale, crystal::Crystal)::Crystal
         newrelativebasis = -newrelativebasis
     end
 
-    subunitcell = Subset((transpose(Vd) * (r|>collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S|>diag)...))
+    subunitcell = Subset(
+        (transpose(Vd) * (r|>collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S|>diag)...))
     newscale = Scale(newrelativebasis, realspace)
-    newunitcell = Subset(newscale * (a + b)|>basispoint for (a, b) in Iterators.product(subunitcell, crystal|>getunitcell))
+    newunitcell = Subset(
+        newscale * (a + b)|>basispoint for (a, b) in Iterators.product(subunitcell, crystal|>getunitcell))
     return Crystal(newunitcell, newsizes)
 end

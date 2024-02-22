@@ -112,8 +112,8 @@ c2 = pointgrouptransform([-1 0; 0 -1], localspace=square)
 m135 = pointgrouptransform([0 -1; -1 0], localspace=square)
 m45 = pointgrouptransform([0 1; 1 0], localspace=square)
 
-wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15)
-wannierregionfock = quantize(wannierregion, 1)
+wannierregion1 = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15)
+wannierregionfock = quantize(wannierregion1, 1)
 scaledcrystal = quasistripmetalstate|>getcrystal
 scaledspace = scaledcrystal|>getspace
 remapper = spatialremapper(wannierregionfock, offsets=scaledspace|>getorigin|>Subset, unitcell=quasistripmetalstate|>getcrystal|>getunitcell)
@@ -123,8 +123,13 @@ localcorrelations = wannierrestrict' * quasistripmetalcorrelations * wannierrest
 localcorrelations|>eigspech|>visualize
 localstatesR00 = getregionstates(localcorrelations=localcorrelations, grouping=[3, 5])|>collect
 
-wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15) .- normalvector*0.5
-wannierregionfock = quantize(wannierregion, 1)
+localstateR00 = remapper'*FockMap(localstatesR00[1])|>RegionState
+localstateR00 = m45*(m135*localstateR00)
+localstateR00 = remapper*FockMap(localstateR00)|>RegionState
+visualize(localstateR00, markersizemultiplier=20, markersizescaling=0.1)
+
+wannierregion2 = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15) .- normalvector*0.5
+wannierregionfock = quantize(wannierregion2, 1)
 offsets = Subset(-(scaledspace*normalvector), scaledspace|>getorigin)
 remapper = spatialremapper(wannierregionfock, offsets=offsets, unitcell=quasistripmetalstate|>getcrystal|>getunitcell)
 wannierregionfock = remapper|>getoutspace
@@ -133,10 +138,18 @@ localcorrelations = wannierrestrict' * quasistripmetalcorrelations * wannierrest
 localcorrelations|>eigspech|>visualize
 localstatesR05 = getregionstates(localcorrelations=localcorrelations, grouping=[2, 5])|>collect
 
-wannierseedstate = localstatesR00[1] + localstatesR05[2]
+localstateR05 = remapper'*FockMap(localstatesR05[2])|>RegionState
+localstateR05 = m45*(m135*localstateR05)
+localstateR05 = remapper*FockMap(localstateR05)|>RegionState
+visualize(localstateR05, markersizemultiplier=20, markersizescaling=0.1)
+
+# wannierseedstate = m45*(m135*localstateR00) + m45*(m135*localstateR05)
+wannierseedstate = localstateR00 + localstateR05
+visualize(wannierseedstate, markersizemultiplier=20, markersizescaling=0.1)
 wannierseeds = wannierseedstate|>FockMap
 
 seedstransform = fourier(quasistripmetalcorrelations|>getoutspace, wannierseeds|>getoutspace) / (scaledcrystal|>vol|>sqrt)
+seedstransform[1:128, :]|>visualize
 crystalseeds = seedstransform * wannierseeds
 pseudoidentities = (crystalseeds[subspace, :]' * crystalseeds[subspace, :] for (_, subspace) in crystalseeds|>getoutspace|>crystalsubspaces)
 (v for id in pseudoidentities for (_, v) in id|>eigvalsh)|>minimum
@@ -170,12 +183,8 @@ couriercorrelations = idmap(courierprojector|>getoutspace) - courierprojector
 couriercorrelationspectrum = couriercorrelations|>crystalspectrum
 couriercorrelationspectrum|>visualize
 
-m135c = m135 * getoutspace(couriercorrelations)
-m135c * couriercorrelations * m135c' |>crystalspectrum|>visualize
-m45c = m45 * getoutspace(couriercorrelations)
-m45c * couriercorrelations * m45c' |>crystalspectrum|>visualize
-
 wannierregion = couriercorrelations|>getoutspace|>getcrystal|>getunitcell
+visualize(wannierregion)
 wannierregion1 = wannierregion .- ([0.25, 0.25]∈getspace(wannierregion))
 wannierregion2 = wannierregion .+ ([0.25, 0.25]∈getspace(wannierregion))
 wannierregion3 = wannierregion .+ ([0.25, -0.25]∈getspace(wannierregion))
@@ -186,60 +195,39 @@ restrictfock = quantize(wannierregion1, 1)
 restrict = fourier(couriercorrelations|>getoutspace, restrictfock) / (couriercorrelations|>getoutspace|>getcrystal|>vol|>sqrt)
 localcorrelations = restrict' * couriercorrelations * restrict
 localstates1 = getregionstates(localcorrelations=localcorrelations, grouping=[1, 2, 4])|>collect
+localstate1 = m45*(m135*localstates1[1])
 
 restrictfock = quantize(wannierregion2, 1)
 restrict = fourier(couriercorrelations|>getoutspace, restrictfock) / (couriercorrelations|>getoutspace|>getcrystal|>vol|>sqrt)
 localcorrelations = restrict' * couriercorrelations * restrict
 localstates2 = getregionstates(localcorrelations=localcorrelations, grouping=[1, 2, 4])|>collect
+localstate2 = m45*(m135*localstates2[1])
 
 restrictfock = quantize(wannierregion3, 1)
 restrict = fourier(couriercorrelations|>getoutspace, restrictfock) / (couriercorrelations|>getoutspace|>getcrystal|>vol|>sqrt)
 localcorrelations = restrict' * couriercorrelations * restrict
 localstates3 = getregionstates(localcorrelations=localcorrelations, grouping=[1, 2, 4])|>collect
+localstate3 = m45*(m135*localstates3[1])
 
 restrictfock = quantize(wannierregion4, 1)
 restrict = fourier(couriercorrelations|>getoutspace, restrictfock) / (couriercorrelations|>getoutspace|>getcrystal|>vol|>sqrt)
 localcorrelations = restrict' * couriercorrelations * restrict
 localstates4 = getregionstates(localcorrelations=localcorrelations, grouping=[1, 2, 4])|>collect
+localstate4 = m45*(m135*localstates4[1])
 
-struct EigenTable
-end
-
-function Base.:*(symmetry::AffineTransform, state::RegionState)
-    function symmetrization(mode, statevector)
-        outspacerep = symmetry*getoutspace(statevector)
-        statevector = statevector|>normalize
-        phase = statevector'*outspacerep*statevector
-        @info phase|>rep
-    end
-
-    for (mode, statevector) in state
-        symmetrization(mode, statevector)
-    end
-end
-
-localstates1[1]|>visualize
-c4 = c4|>recenter(localstates1[1]|>getoutspace|>getregion|>getcenter)
-m135 = m135|>recenter(localstates1[1]|>getoutspace|>getregion|>getcenter)
-c4l = c4 * getoutspace(localstates1[1])
-teststate = RegionState(FockMap(localstates1[1]) + c4l*FockMap(localstates1[1]) + c4l*c4l*FockMap(localstates1[1]) + c4l*c4l*c4l*FockMap(localstates1[1]) |>normalize)
-teststate|>visualize
-m135l = m135 * getoutspace(teststate)
-teststate = RegionState(FockMap(teststate) + m135l*FockMap(teststate) |>normalize)
-teststate|>visualize
-m135 * teststate
-c4 * teststate
-
-wannierregionorigin = wannierregion
+circleregion = getsphericalregion(crystal=blockedcrystal, radius=0.75, metricspace=blockedcrystal|>getspace)
+circleregion|>visualize
+wannierregionorigin = circleregion .- getcenter(circleregion)
 wannierregionorigin|>visualize
 restrictfock = quantize(wannierregionorigin, 1)
 restrict = fourier(couriercorrelations|>getoutspace, restrictfock) / (couriercorrelations|>getoutspace|>getcrystal|>vol|>sqrt)
 localcorrelations = restrict' * couriercorrelations * restrict
 localcorrelations|>eigspech|>visualize
-localstatesorigin = getregionstates(localcorrelations=localcorrelations, grouping=[2, 2])|>collect
+localstatesorigin = getregionstates(localcorrelations=localcorrelations, grouping=[4])|>collect
 visualize(localstatesorigin[1], markersizemultiplier=20, markersizescaling=0.3)
+visualize(c4*localstatesorigin[1], markersizemultiplier=20, markersizescaling=0.3)
 
-seeds = localstates1[1] + localstates2[1] + localstates3[1] + localstates4[1]
+seeds = localstate1 + localstate2 + localstate3 + localstate4
 visualize(seeds|>FockMap|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
 wannierseeds = seeds|>FockMap
 

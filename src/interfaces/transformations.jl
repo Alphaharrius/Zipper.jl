@@ -12,8 +12,6 @@ struct AffineTransform <: Transformation{Matrix{Float64}}
     localspace::AffineSpace
     shiftvector::Vector{Float64}
     transformmatrix::Matrix{Float64}
-    eigenfunctions::Dict{Tuple, BasisFunction}
-    eigenvaluehashdenominator::Integer
     antiunitary::Bool
 end
 export AffineTransform

@@ -83,6 +83,11 @@ end
 #\begin:FourierMap essentials
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::FourierMap) = v|>FockMap|>rep
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::InvFourierMap) = v|>FockMap|>rep
+
+Base.:adjoint(::Type{FourierMap}) = InvFourierMap
+Base.:adjoint(::Type{InvFourierMap}) = FourierMap
+
+FourierMapType = Union{FourierMap, InvFourierMap}
 #\end
 
 #\begin:FourierMap conversions
@@ -194,6 +199,16 @@ end
 
 Base.:*(::CrystalFockMap, ::FourierMap)::FourierMap = notimplemented()
 
+function Base.:*(fockmap::FourierMapType, v::Number)
+    blocks = paralleltasks(
+        name="FourierMap * Number",
+        tasks=(()->k=>block*v for (k, block) in fockmap.data),
+        count=fockmap.data|>length)|>parallel|>Dict
+    return typeof(fockmap)(fockmap.crystal, fockmap.regionfock, blocks)
+end
+
+Base.:*(v::Number, fockmap::FourierMapType) = fockmap * v
+
 function Base.:*(left::InvFourierMap, right::FourierMap)
     multiplied = paralleltasks(
         name="InvFourierMap * FourierMap",
@@ -202,21 +217,25 @@ function Base.:*(left::InvFourierMap, right::FourierMap)
     return paralleldivideconquer(sum, multiplied, count=left.data|>length)
 end
 
-function Base.:transpose(fockmap::FourierMap)::InvFourierMap
+Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)
+
+Base.:*(::FourierMap, ::InvFourierMap) = notimplemented()
+
+function Base.:transpose(fockmap::FourierMapType)
     compute(k, block) = k=>transpose(block)
     blocks = paralleltasks(
-        name="transpose(::FourierMap)",
+        name="transpose(::$(fockmap|>typeof))",
         tasks=(()->compute(k, block) for (k, block) in fockmap.data),
         count=fockmap.data|>length)|>parallel|>Dict
-    return InvFourierMap(fockmap.crystal, fockmap.regionfock, blocks)
+    return (fockmap|>typeof)'(fockmap.crystal, fockmap.regionfock, blocks)
 end
 
-function Base.:adjoint(fockmap::FourierMap)::InvFourierMap
+function Base.:adjoint(fockmap::FourierMapType)::InvFourierMap
     compute(k, block) = k=>block'
     blocks = paralleltasks(
-        name="adjoint(::FourierMap)",
+        name="adjoint(::$(fockmap|>typeof))",
         tasks=(()->compute(k, block) for (k, block) in fockmap.data),
         count=fockmap.data|>length)|>parallel|>Dict
-    return InvFourierMap(fockmap.crystal, fockmap.regionfock, blocks)
+    return (fockmap|>typeof)'(fockmap.crystal, fockmap.regionfock, blocks)
 end
 #\end

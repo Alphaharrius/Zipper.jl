@@ -192,13 +192,31 @@ function Base.:*(fouriermap::InvFourierMap, fockmap::CrystalFockMap)::InvFourier
     return InvFourierMap(fouriermap.crystal, fouriermap.regionfock, blocks)
 end
 
-function Base.:*(left::InvFourierMap, right::FourierMap)
-    multiplied = paralleltask(
-        name="InvFourierMap * FourierMap",
-        task=(()->(k, block*right.data[k]) for (k, block) in left.data))|>parallel
-    return paralleldivideconquer(sum, multiplied, count=length(left.data))
-end
-#\end
+Base.:*(::CrystalFockMap, ::FourierMap)::FourierMap = notimplemented()
 
-#\begin:FourierMap display
+function Base.:*(left::InvFourierMap, right::FourierMap)
+    multiplied = paralleltasks(
+        name="InvFourierMap * FourierMap",
+        tasks=(()->block*right.data[k] for (k, block) in left.data),
+        count=left.data|>length)|>parallel
+    return paralleldivideconquer(sum, multiplied, count=left.data|>length)
+end
+
+function Base.:transpose(fockmap::FourierMap)::InvFourierMap
+    compute(k, block) = k=>transpose(block)
+    blocks = paralleltasks(
+        name="transpose(::FourierMap)",
+        tasks=(()->compute(k, block) for (k, block) in fockmap.data),
+        count=fockmap.data|>length)|>parallel|>Dict
+    return InvFourierMap(fockmap.crystal, fockmap.regionfock, blocks)
+end
+
+function Base.:adjoint(fockmap::FourierMap)::InvFourierMap
+    compute(k, block) = k=>block'
+    blocks = paralleltasks(
+        name="adjoint(::FourierMap)",
+        tasks=(()->compute(k, block) for (k, block) in fockmap.data),
+        count=fockmap.data|>length)|>parallel|>Dict
+    return InvFourierMap(fockmap.crystal, fockmap.regionfock, blocks)
+end
 #\end

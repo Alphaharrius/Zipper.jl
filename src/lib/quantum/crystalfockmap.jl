@@ -26,6 +26,8 @@ export CrystalFockMap
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ FockMap interfaces implementation ◆
+Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::CrystalFockMap) = v|>FockMap|>rep
+
 """
 Generates the input `CrystalFock` of the `CrystalFockMap`, if this requires frequent access, 
 it is recommended to store the result.

@@ -46,7 +46,7 @@ H = CrystalFockMap(energyspectrum)
 @info("Starting RG...")
 crystalfock = correlations|>getoutspace
 
-scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
+scale = Scale([4 0; 0 4], crystalfock|>getcrystal|>getspace)
 @info("Performing unitcellblocking...")
 @info("Generating unitcellblocking transformation...")
 blocker24 = @time scale * crystalfock
@@ -55,6 +55,19 @@ blockedcorrelations24 = @time blocker24 * correlations * blocker24'
 blockedcrystalfock24 = blockedcorrelations24|>getoutspace
 blockedcrystal24::Crystal = blockedcrystalfock24|>getcrystal
 blockedspace24::RealSpace = blockedcrystal24|>getspace
+
+refcorr = regioncorrelations(blockedcorrelations24,RegionFock(blockedcrystalfock24|>unitcellfock))
+Xpos = genposX(refcorr)
+Ypos = genposY(refcorr)
+
+localiso = localisometries(blockedcorrelations24,RegionFock(blockedcrystalfock24|>unitcellfock),selectionstrategy=modeselectionbycount(6))
+visualize(localiso[:courier][:isometry]'*Xpos*localiso[:courier][:isometry]|>eigspech)
+visualize(localiso[:courier][:isometry]'*Ypos*localiso[:courier][:isometry]|>eigspech)
+visualize(localiso[:filled][:isometry]*localiso[:filled][:isometry]')
+uni = localiso[:courier][:isometry]'*Xpos*localiso[:courier][:isometry]|>eigspech|>geteigenvectors
+uni[:,1]
+rotlocaliso = localiso[:courier][:isometry]*uni[:,4:8]
+visualize(rotlocaliso'*Ypos*rotlocaliso|>eigspech)
 
 function gmera(correlations,reftransistionmap)
     @info("Starting RG...")

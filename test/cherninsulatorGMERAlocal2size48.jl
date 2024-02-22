@@ -53,7 +53,7 @@ H = CrystalFockMap(energyspectrum)
 @info("Starting RG...")
 crystalfock = correlations|>getoutspace
 
-scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
+scale = Scale([8 0; 0 8], crystalfock|>getcrystal|>getspace)
 @info("Performing unitcellblocking...")
 @info("Generating unitcellblocking transformation...")
 blocker48 = @time scale * crystalfock
@@ -62,6 +62,59 @@ blockedcorrelations48 = @time blocker48 * correlations * blocker48'
 blockedcrystalfock48 = blockedcorrelations48|>getoutspace
 blockedcrystal48::Crystal = blockedcrystalfock48|>getcrystal
 blockedspace48::RealSpace = blockedcrystal48|>getspace
+
+# localfock = RegionFock(blockedcrystalfock48|>unitcellfock)
+# visualize(regioncorrelations(blockedcorrelations48,localfock)|>eigspech)
+# localiso = localisometries(blockedcorrelations48,localfock,selectionstrategy=modeselectionbycount(16))
+
+# refcorr = regioncorrelations(blockedcorrelations48,RegionFock(blockedcrystalfock48|>unitcellfock))
+# Xpos = genposX(refcorr)
+# Ypos = genposY(refcorr)
+# localfock = RegionFock(blockedcrystalfock48|>unitcellfock)
+# visualize(regioncorrelations(blockedcorrelations48,localfock)|>eigspech)
+# localiso = localisometries(blockedcorrelations48,localfock,selectionstrategy=modeselectionbycount(5))
+# projfilled|>getinspace|>orderedmodes
+# projfilled = localiso[:filled]*localiso[:filled]'
+# projcourier = localiso[:courier]*localiso[:courier]'
+# localiso[:courier][:isometry]|>getinspace|>orderedmodes|>length
+# chosencouriermodes = modewifdiagpairs(projector=projcourier,noofchosen=localiso[:courier]|>getinspace|>orderedmodes|>length)
+# couriermodes = Subset([pair[1] for pair in chosencouriermodes])
+# courierseeds = idmap(localfock, localfock)[:,FockSpace(mode for mode in couriermodes)]
+# wanniercourier = localwannierization(localiso[:courier], courierseeds)
+
+# frozenmodes = Subset(projfilled|>getinspace)-couriermodes
+# chosenfrozenmodes = modewifdiagpairs(projector=projfilled,modes=frozenmodes)
+# groupedfrozenmodes = groupmodesbydiag(chosenfrozenmodes)
+# filledmodes = Subset([pair[2][i][2] for pair in groupedfrozenmodes for i in range(Int((pair[2]|>length)/2)+1,Int((pair[2]|>length)))])
+# filledmodes = frozenmodes[3:7]
+
+# filledseeds = idmap(localfock, localfock)[:,FockSpace(mode for mode in filledmodes)]
+# wannierfilled = localwannierization(localiso[:filled][:isometry], filledseeds)
+
+# Subset(mode for mode in projfilled|>getinspace)
+# sort([norm(projfilled[mode,mode]) for mode in projfilled|>getinspace])[end-12:end]
+# sort([norm(d) for d in diag(projfilled|>rep)])
+# sort([norm(d) for d in diag(projcourier|>rep)])[end-22:end]
+# sort([calnorm(projcourier[i,:]|>rep) for i in range(1,72)])
+# sort([norm(projcourier[i,:]) for i in range(1,32)])
+# sort([norm(projcourier[:,i]) for i in range(1,72)])
+# sort([norm(projfilled[:,i]) for i in range(1,32)])[end-10:end]
+# visualize(localiso[:filled][:isometry]'*Ypos*localiso[:filled][:isometry]|>eigspech)
+# # visualize(localiso[:filled][:isometry]*localiso[:filled][:isometry]')
+# uni = localiso[:filled][:isometry]'*Xpos*localiso[:filled][:isometry]|>eigspech|>geteigenvectors
+# rotlocaliso = localiso[:filled][:isometry]*uni[:,5:7]
+# visualize(rotlocaliso'*Ypos*rotlocaliso|>eigspech)
+
+# [ComplexF64(0),ComplexF64(0),ComplexF64(0)]
+# spdiagm([0,1,2])
+# sparse(I,4,4)
+# [m|>getattr(:b) for m in blockedcrystalfock48|>unitcellfock|>orderedmodes]
+# RegionFock(blockedcrystalfock48|>unitcellfock)
+# Complex(0)+1
+# id = FockMap(RegionFock(blockedcrystalfock48|>unitcellfock),RegionFock(blockedcrystalfock48|>unitcellfock),2*sparse(I,8,8))
+# (id*refcorr)|>rep
+# [m|>getattr(:b)  for m in FockMap(RegionFock(blockedcrystalfock48|>unitcellfock),RegionFock(blockedcrystalfock48|>unitcellfock),sparse(I,8,8))|>getinspace|>orderedmodes]
+# Point([1, 1], triangular).pos[1]
 
 function gmera(correlations,reftransistionmap)
     @info("Starting RG...")
@@ -135,6 +188,9 @@ function gmera(correlations,reftransistionmap)
 end
 
 rg1size48 = gmera(blockedcorrelations48,idmap(blockedcorrelations48|>getinspace))
+# rgblockedcorrelations = gmera(blockedcorrelations48,idmap(blockedcorrelations48|>getinspace))
+rgblockedcorrelations|>getoutspace|>unitcellfock
+visualize(regioncorrelations(rgblockedcorrelations,RegionFock(rgblockedcorrelations|>getoutspace|>unitcellfock))|>eigspech)
 rg2size48 = gmera(rg1size48[:correlations],rg1size48[:transistionmap])
 rg3size48 = gmera(rg2size48[:correlations],rg2size48[:transistionmap])
 

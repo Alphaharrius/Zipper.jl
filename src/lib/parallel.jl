@@ -101,7 +101,12 @@ function singlestageparalleldivideconquer(f::Function, iter, count::Integer)
     return batchcount, paralleltasks(
         name="paralleldivideconquer count=$count",
         tasks=(()->f(batch) for batch in itembatches),
-        count=batchcount)|>parallel
+        # Encountered issue of segmentation fault here...
+        # Solution: Collect the results from the threads as a vector to prevent
+        # the threads from the next stage to access data owned by another thread.
+        # TODO: The issue is still totally unknown and more test have to be performed 
+        # to identify the issue.
+        count=batchcount)|>parallel|>collect
 end
 
 function paralleldivideconquer(f::Function, iter; count::Integer=iter|>length)

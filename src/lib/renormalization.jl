@@ -281,7 +281,8 @@ function wannierprojection(; crystalisometries::Dict{Momentum, <:FockMap}, cryst
         unitary::FockMap = U * Vt
         approximated::FockMap = isometry * unitary
 
-        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:k => k)), performpermute=false)
+        inspace=FockSpace(approximated|>getinspace|>mapmodes(m->m|>setattr(:k=>k)|>removeattr(:r)))
+        return FockMap(approximated, inspace=inspace, performpermute=false)
     end
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"

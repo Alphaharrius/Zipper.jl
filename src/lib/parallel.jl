@@ -97,7 +97,7 @@ function updatedivideconquer()
     if parallelsettings.divideconquermeter == undef || !parallelsettings.showmeter
         return
     end
-    ProgressMeter.update!(parallelsettings.divideconquermeter)
+    next!(parallelsettings.divideconquermeter)
 end
 export updatedivideconquer
 

@@ -131,9 +131,10 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
             phase, basisfunction = phasetable[eigenvalue]
             symmetricalmap = eigenvector
         else
-            @warn "Quasi-symmetric phase $eigenvalue is found, performing manual symmetrization..."
+            @warn "Quasi-symmetric phase $eigenvalue is found..."
             # Else we will try to get the actual phase from a phase table with lower precision of eigenvalue registration.
-            lowprectable = PhaseTable(symmetry, realprecision=1e-1, imagprecision=1e-1)
+            # Set the precision to 2e-1 cover all phases that are within 0.1 of the actual value.
+            lowprectable = PhaseTable(symmetry, realprecision=2e-1, imagprecision=2e-1)
             phase, basisfunction = lowprectable[eigenvalue]
             # Performing manual symmetrization.
             elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.

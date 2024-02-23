@@ -101,12 +101,12 @@ export groundstatespectrum
 Round the correlation eigenvalues of the `correlationspectrum` to `0` or `1`, this is
 useful when the eigenvalues in the pure state are close to `0` or `1` but not exactly.
 """
-function roundingpurification(correlationspectrum::CrystalSpectrum)::CrystalSpectrum
+function roundingpurification(correlationspectrum::CrystalSpectrum; tolerance::Real=1e-1)::CrystalSpectrum
     function fixeigenvalues(eigenvalue::Number)
-        if isapprox(eigenvalue, 1, atol=1e-1)
+        if isapprox(eigenvalue, 1, atol=tolerance)
             return 1
         end
-        if isapprox(eigenvalue, 0, atol=1e-1)
+        if isapprox(eigenvalue, 0, atol=tolerance)
             return 0
         end
         @warn("Eigenvalue $(eigenvalue) is not close to 0 or 1!")

@@ -230,6 +230,16 @@ Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)
 
 Base.:*(::FourierMap, ::InvFourierMap) = notimplemented()
 
+""" Diagonal composition. """
+function Base.broadcasted(::typeof(*), left::FourierMap, right::InvFourierMap)
+    @assert(left.crystal == right.crystal)
+    multiplied = paralleltasks(
+        name="FourierMap * InvFourierMap",
+        tasks=(()->(k, k)=>block*right.data[k] for (k, block) in left.data),
+        count=left.data|>length)|>parallel
+    return CrystalFockMap(left.crystal, left.crystal, multiplied)
+end
+
 function Base.:transpose(fockmap::FourierMapType)
     compute(k, block) = k=>transpose(block)
     blocks = paralleltasks(

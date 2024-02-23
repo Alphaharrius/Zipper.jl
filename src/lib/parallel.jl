@@ -117,19 +117,20 @@ function paralleldivideconquer(f::Function, iter, count::Integer)
     batchsize::Integer = countmetric > 1 ? count/actualcorecount|>ceil : 2
     itembatches = Iterators.partition(iter, batchsize)
     batchcount::Integer = count/batchsize|>ceil
+    @debug "batchsize: $batchsize, batchcount: $batchcount, count: $count, actualcorecount: $actualcorecount"
     tasks = paralleltasks(
-        name="paralleldivideconquer count=$count",
+        name="",
         tasks=(()->f(batch) for batch in itembatches),
         # Encountered issue of segmentation fault here...
         # Possible cause: Its unknown but it only happens after we include 
         # this method here. Yet it might also be a bug in Julia's threading 
         # implementation.
-        count=batchcount)
+        count=batchcount,
+        showmeter=false)
     # Add the progress meter to the global accessible variable.
-    parallelsettings.divideconquermeter = tasks.meter
+    parallelsettings.divideconquermeter = Progress(count, desc="paralleldivideconquer count=$count")
     result = tasks|>parallel|>collect
-    # Remove the progress meter.
-    parallelsettings.divideconquermeter = undef
+    ProgressMeter.finish!(parallelsettings.divideconquermeter)
     # Since the issue is still unknown after checking, we suspect that some variables 
     # passing through the iterative approach might be marked as garbage while it should 
     # not be. Therefore we will take a more functional approach (since Julia is functional) 

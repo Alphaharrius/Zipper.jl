@@ -5,7 +5,7 @@ mutable struct ParallelSettings
     maxthreads::Integer
     taskmeterlock::ReentrantLock
     mainthreadmeter::Union{UndefInitializer, ProgressUnknown}
-    divideconquermeter::Union{UndefInitializer, Progress}
+    divideconquermeter::Union{UndefInitializer, Progress, ProgressUnknown}
 end
 
 global parallelsettings = ParallelSettings(
@@ -111,13 +111,13 @@ function sumwithprogress(iter)
 end
 export sumwithprogress
 
-function paralleldivideconquer(f::Function, iter, count::Integer)
+function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
     actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
     countmetric::Integer = count/actualcorecount|>ceil
     batchsize::Integer = countmetric > 1 ? count/actualcorecount|>ceil : 2
     itembatches = Iterators.partition(iter, batchsize)
     batchcount::Integer = count/batchsize|>ceil
-    @debug "batchsize: $batchsize, batchcount: $batchcount, count: $count, actualcorecount: $actualcorecount"
+    @debug "batchsize: $batchsize, batchcount: $batchcount, count: $count"
     tasks = paralleltasks(
         name="",
         tasks=(()->f(batch) for batch in itembatches),
@@ -128,7 +128,8 @@ function paralleldivideconquer(f::Function, iter, count::Integer)
         count=batchcount,
         showmeter=false)
     # Add the progress meter to the global accessible variable.
-    parallelsettings.divideconquermeter = Progress(count, desc="paralleldivideconquer count=$count")
+    parallelsettings.divideconquermeter = (
+        Progress(count, desc="divideconquer $desc count=$count"))
     result = tasks|>parallel|>collect
     ProgressMeter.finish!(parallelsettings.divideconquermeter)
     # Since the issue is still unknown after checking, we suspect that some variables 
@@ -136,13 +137,17 @@ function paralleldivideconquer(f::Function, iter, count::Integer)
     # not be. Therefore we will take a more functional approach (since Julia is functional) 
     # in hopes that the vm will lift this issue automatically.
     if batchcount > 2
-        return paralleldivideconquer(f, result, batchcount)
+        return paralleldivideconquer(f, result, batchcount, desc)
     end
-    return f(result)
+    parallelsettings.divideconquermeter = ProgressUnknown(
+        desc="divideconquer $desc merge", spinner=true)
+    result = f(result)
+    ProgressMeter.finish!(parallelsettings.divideconquermeter)
+    return result
 end
 
-paralleldivideconquer(
-    f::Function, iter; count::Integer=iter|>length) = paralleldivideconquer(f, iter, count)
+paralleldivideconquer(f::Function, iter; count::Integer=iter|>length, desc::String="any") = (
+    paralleldivideconquer(f, iter, count, desc))
 
 export paralleldivideconquer
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -169,7 +174,7 @@ function updateprogress()
             # thread have called watchprogress before.
             return
         end
-        ProgressMeter.update!(progress)
+        ProgressMeter.next!(progress)
     catch _ # UndefRefError
         # This branch is for the case where the current thread 
         # have not called watchprogress before.

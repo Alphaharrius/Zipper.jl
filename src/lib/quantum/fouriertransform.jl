@@ -115,7 +115,7 @@ function FockMap(fockmap::FourierMap)::SparseFockMap{CrystalFock, RegionFock}
         tasks=(()->compute(batch) for batch in batches),
         count=getmaxthreads())|>parallel
 
-    spdata = paralleldivideconquer(sumwithprogress, datas, count=getmaxthreads())
+    spdata = paralleldivideconquer(sumwithprogress, datas, count=getmaxthreads(), desc="FockMap(::FourierMap)")
 
     return FockMap(outspace, inspace, spdata)
 end
@@ -141,7 +141,7 @@ function FockMap(fockmap::InvFourierMap)
         tasks=(()->compute(batch) for batch in batches),
         count=getmaxthreads())|>parallel
 
-    spdata = paralleldivideconquer(sumwithprogress, datas, count=getmaxthreads())
+    spdata = paralleldivideconquer(sumwithprogress, datas, count=getmaxthreads(), desc="FockMap(::InvFourierMap)")
 
     return FockMap(outspace, inspace, spdata)
 end
@@ -199,7 +199,8 @@ function Base.:*(fouriermap::InvFourierMap, fockmap::CrystalFockMap)::InvFourier
         return merged
     end
 
-    blocks = paralleldivideconquer(merger, batches, count=length(fouriermap.data))
+    blocks = paralleldivideconquer(
+        merger, batches, count=length(fouriermap.data), desc="InvFourierMap * CrystalFockMap")
 
     return InvFourierMap(fouriermap.crystal, fouriermap.regionfock, blocks)
 end
@@ -221,7 +222,8 @@ function Base.:*(left::InvFourierMap, right::FourierMap)
         name="InvFourierMap * FourierMap",
         tasks=(()->block*right.data[k] for (k, block) in left.data),
         count=left.data|>length)|>parallel
-    return paralleldivideconquer(sumwithprogress, multiplied, count=left.data|>length)
+    return paralleldivideconquer(
+        sumwithprogress, multiplied, count=left.data|>length, desc="InvFourierMap * FourierMap")
 end
 
 Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)

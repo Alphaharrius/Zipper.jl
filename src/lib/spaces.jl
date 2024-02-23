@@ -90,6 +90,23 @@ Base.:show(io::IO, ::Type{Offset}) = print(io, "Offset")
 Base.:show(io::IO, ::Type{Momentum}) = print(io, "Momentum")
 
 """
+    getprecdenom(prec::Real)::Integer
+
+Get the denominator for rationalizing a floating point representation 
+with the given precision `prec`, the way of working is the number will 
+be mapped to a discrete number line spaces by the `prec`, and the closest 
+number on the discrete line will be the rationalized actual value.
+
+### Input
+- `prec` The precision which should be a real number that is commensurate with `1`.
+
+### Error
+InexactError if `prec` is not commensurate with `1`.
+"""
+getprecdenom(prec::Real)::Integer = 1/prec|>Integer
+export getprecdenom
+
+"""
     getspace(point::Point)
 
 Retrieve the `AffineSpace` of the `Point`.

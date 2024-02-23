@@ -45,7 +45,9 @@ export getmaxthreads
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ Parallel computing APIs ◆
-function paralleltasks(; name::String, tasks, count::Integer, showmeter::Bool = parallelsettings.showmeter)
+function paralleltasks(;
+    name::String, tasks, count::Integer, showmeter::Bool = parallelsettings.showmeter)
+
     actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
     batchsize::Integer = (count / actualcorecount)|>ceil
     taskpartitions = Iterators.partition(tasks, batchsize)

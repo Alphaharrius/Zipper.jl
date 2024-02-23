@@ -102,13 +102,9 @@ end
 export updatedivideconquer
 
 function sumwithprogress(iter)
-    ret = undef
-    for item in iter
-        if ret == undef
-            ret = item
-        else
-            ret += item
-        end
+    ret = first(iter)
+    for item in Iterators.drop(iter, 1)
+        ret += item
         updatedivideconquer()
     end
     return ret

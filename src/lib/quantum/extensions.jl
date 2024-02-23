@@ -64,4 +64,18 @@ function spatialremapper(regionfock::RegionFock; offsets::Region, unitcell::Regi
     return idmap(remappedfock, regionfock)
 end
 export spatialremapper
+
+"""
+    spatialremapper(regionfock::RegionFock, region::Region)
+
+This function remaps the positions of modes in the `regionfock` to the positions from the `region`, the new positions 
+will have the `:b` attribute set to the basis position given by `basispoint(r)`, and the `:r` attribute set to `r - b`.
+"""
+function spatialremapper(regionfock::RegionFock, region::Region)
+    basispoints = (p=>p|>basispoint for p in region)
+    positions::Dict{Offset, Tuple} = Dict(p|>euclidean=>(p - b, b) for (p, b) in basispoints)
+    remappingdata::Base.Generator = ((positions[mode|>getpos|>euclidean], mode) for mode in regionfock)
+    remappedfock::RegionFock = RegionFock(mode|>setattr(:r=>r, :b=>b) for ((r, b), mode) in remappingdata)
+    return idmap(remappedfock, regionfock)
+end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

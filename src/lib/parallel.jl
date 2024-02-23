@@ -5,7 +5,7 @@ mutable struct ParallelSettings
     maxthreads::Integer
     taskmeterlock::ReentrantLock
     mainthreadmeter::Union{UndefInitializer, ProgressUnknown}
-    divideconquermeter::Union{UndefInitializer, Progress, ProgressUnknown}
+    divideconquermeter::Union{UndefInitializer, ProgressUnknown}
 end
 
 global parallelsettings = ParallelSettings(
@@ -131,7 +131,7 @@ function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
         showmeter=false)
     # Add the progress meter to the global accessible variable.
     parallelsettings.divideconquermeter = (
-        Progress(count, desc="divideconquer $desc count=$count"))
+        ProgressUnknown(desc="divideconquer $desc count=$count", spinner=true))
     result = tasks|>parallel|>collect
     ProgressMeter.finish!(parallelsettings.divideconquermeter)
     # Since the issue is still unknown after checking, we suspect that some variables 

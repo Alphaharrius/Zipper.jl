@@ -24,6 +24,7 @@ bonds::FockMap = bondmap([
 
 @info("Computing energy spectrum...")
 energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
+energyspectrum|>visualize
 
 @info("Computing ground state correlations...")
 @time begin
@@ -31,6 +32,8 @@ energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
     groundstateprojector = groundstates |> crystalprojector
     correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 end
+
+correlations|>crystalspectrum|>visualize
 
 crystalfock = correlations|>getoutspace
 
@@ -245,6 +248,37 @@ visualize(wannierlocalstates|>RegionState, markersizemultiplier=20, markersizesc
 
 blockedcouriercorrelations = wanniercourierisometries' * blockedcorrelations * wanniercourierisometries
 blockedcouriercorrelationspectrum = blockedcouriercorrelations|>crystalspectrum
+entanglemententropy(blockedcouriercorrelationspectrum)/4096
+
+using SparseArrays
+function Zipper.momentumoccupations(correlations::FockMap)::FockMap
+    kcorrelations::Base.Generator = correlations |> crystalsubmaps
+    crystal::Crystal = correlations |> getoutspace |> getcrystal
+    center::Offset = crystal |> getspace |> getorigin
+    tracecrystal::Crystal = Crystal(center |> Subset, crystal |> size)
+    mode::Mode = Mode(:b => center)
+
+    function tracing(k::Momentum, corr::FockMap)::FockMap
+        space::FockSpace = mode |> setattr(:k => k) |> FockSpace
+        return FockMap(space, space, [corr |> tr][:, :] |> SparseMatrixCSC) / dimension(corr |> getoutspace)
+    end
+
+    blocks = Dict((k, k)=>tracing(k, corr) for (k, corr) in kcorrelations)
+    return CrystalFockMap(tracecrystal, tracecrystal, blocks)
+end
+
+occ = momentumoccupations(blockedcouriercorrelations)
+visualize(occ|>crystalspectrum, usecontour=true)
+
+occ = momentumoccupations(physcouriercorrelations)
+visualize(occ|>crystalspectrum, usecontour=true)
+
+
+physcouriercorrelations|>crystalspectrum|>visualize
+
+courierzipper = wanniercourierisometries' * blocker
+physcouriercorrelations = courierzipper' * blockedcouriercorrelations * courierzipper
+
 blockedcouriercorrelationspectrum|>visualize
 purifiedcouriercorrelationspectrum = blockedcouriercorrelationspectrum|>roundingpurification
 purifiedcouriercorrelationspectrum|>visualize

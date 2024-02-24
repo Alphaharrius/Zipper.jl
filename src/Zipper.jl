@@ -4,10 +4,10 @@ using OrderedCollections, Base.Iterators, SparseArrays
 using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
 using ExprTools, ConcurrentCollections
-include("lib/memoization.jl")
+include("tools/memoization.jl")
 
 using ProgressMeter
-include("lib/parallel.jl")
+include("tools/parallel.jl")
 
 include("core.jl")
 
@@ -43,8 +43,8 @@ using Plotly, ColorTypes, Compat
 include("lib/plotting.jl")
 
 using JSON, DataFrames, CSV, Dates
-include("lib/lzw.jl")
-include("lib/fio.jl")
-include("lib/fioinjection.jl")
+include("tools/lzw.jl")
+include("tools/fio.jl")
+include("lib/fioadapt.jl")
 
 end

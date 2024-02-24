@@ -3,7 +3,6 @@
 mutable struct ParallelSettings
     showmeter::Bool
     maxthreads::Integer
-    taskmeterlock::ReentrantLock
     mainthreadmeter::Union{UndefInitializer, ProgressUnknown}
     divideconquermeter::Union{UndefInitializer, ProgressUnknown}
 end
@@ -11,7 +10,6 @@ end
 global parallelsettings = ParallelSettings(
     true, # Show meter by default.
     1, # Zipper.jl will use 1 thread by default.
-    ReentrantLock(),
     # I have to set this value to 128 since Threads.nthreads() at initialization of Julia env 
     # seems to be 1 for some reason...
     undef, undef)
@@ -20,7 +18,9 @@ global parallelsettings = ParallelSettings(
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ ParallelTasks definition ◆
 mutable struct ParallelTasks
-    tasks
+    taskchannel::Channel
+    resultchannel::Channel
+    corecount::Integer
     meter
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -48,52 +48,41 @@ export getmaxthreads
 function paralleltasks(;
     name::String, tasks, count::Integer, showmeter::Bool = parallelsettings.showmeter)
 
-    actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
-    batchsize::Integer = (count / actualcorecount)|>ceil
-    taskpartitions = Iterators.partition(tasks, batchsize)
-    paralleltasks = ParallelTasks(undef, Progress(count, desc="#threads($actualcorecount) $name"))
-    @debug begin
-        "paralleltasks: $name"
-        "actualcorecount: $actualcorecount"
-        "batchsize: $batchsize"
-    end
-
-    function runnable(tasks)::Vector
-        rets = []
+    function producer(ch::Channel)
         for task in tasks
-            ret = task()
-            if typeof(ret) != Nothing
-                push!(rets, ret)
-            end
-            if showmeter
-                # TODO: Might have race conditions.
-                lock(()->next!(paralleltasks.meter), parallelsettings.taskmeterlock)
-            end
+            put!(ch, task)
         end
-        return rets
     end
 
-    watchprogress(desc="paralleltasks ($name)")
-    partitioned::Vector = []
-    for partition in taskpartitions
-        push!(partitioned, (runnable, partition))
-        updateprogress()
-    end
-    paralleltasks.tasks = partitioned
-    unwatchprogress()
-    return paralleltasks
+    taskchannel = Channel(producer)
+    resultchannel = Channel(count)
+    actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
+    meter = showmeter ? Progress(count, desc="#threads($actualcorecount) $name", dt=0.2) : undef
+
+    return ParallelTasks(taskchannel, resultchannel, actualcorecount, meter)
 end
+export paralleltasks
 
 function parallel(tasks::ParallelTasks)
-    # Wait for the previous task meter to be cleared.
-    lock(()->(), parallelsettings.taskmeterlock)
-    threads = map(tasks.tasks) do (runnable, partition)
-        Threads.@spawn runnable(partition)
+    function producer()
+        for task in tasks.taskchannel
+            put!(tasks.resultchannel, task())
+            tasks.meter == undef || ProgressMeter.next!(tasks.meter)
+        end
     end
-    buckets = fetch.(threads)
-    finish!(tasks.meter)
-    return (item for bucket in buckets for item in bucket)
+    threads = [Threads.@spawn producer() for _ in 1:tasks.corecount]
+    fetch.(threads)
+    close(tasks.taskchannel)
+    results = []
+    watchprogress(desc="parallel")
+    while isready(tasks.resultchannel)
+        push!(results, take!(tasks.resultchannel))
+        updateprogress()
+    end
+    unwatchprogress()
+    return results
 end
+export parallel
 
 function updatedivideconquer()
     if parallelsettings.divideconquermeter == undef || !parallelsettings.showmeter

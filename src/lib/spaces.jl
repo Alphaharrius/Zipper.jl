@@ -99,11 +99,8 @@ number on the discrete line will be the rationalized actual value.
 
 ### Input
 - `prec` The precision which should be a real number that is commensurate with `1`.
-
-### Error
-InexactError if `prec` is not commensurate with `1`.
 """
-getprecdenom(prec::Real)::Integer = 1/prec|>Integer
+getprecdenom(prec::Real)::Integer = 1/prec|>round|>Integer
 export getprecdenom
 
 """

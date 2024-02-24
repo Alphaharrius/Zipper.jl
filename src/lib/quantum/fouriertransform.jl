@@ -68,16 +68,16 @@ export fourier
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ FourierMap definition ◆
-struct FourierMap <: FockMap{CrystalFock, RegionFock}
+struct FourierMap{T} <: FockMap{CrystalFock, T}
     crystal::Crystal
-    regionfock::RegionFock
-    data::Dict{Momentum, SparseFockMap}
+    inspace::T
+    data::Dict{Momentum, <:SparseFockMap}
 end
 
-struct InvFourierMap <: FockMap{RegionFock, CrystalFock}
+struct InvFourierMap{T} <: FockMap{T, CrystalFock}
     crystal::Crystal
-    regionfock::RegionFock
-    data::Dict{Momentum, SparseFockMap}
+    outspace::T
+    data::Dict{Momentum, <:SparseFockMap}
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
@@ -86,8 +86,8 @@ end
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::FourierMap) = v|>FockMap|>rep
 Base.:convert(::Type{SparseMatrixCSC{ComplexF64, Int64}}, v::InvFourierMap) = v|>FockMap|>rep
 
-Base.:adjoint(::Type{FourierMap}) = InvFourierMap
-Base.:adjoint(::Type{InvFourierMap}) = FourierMap
+Base.:adjoint(::Type{FourierMap{T}}) where T = InvFourierMap{T}
+Base.:adjoint(::Type{InvFourierMap{T}}) where T = FourierMap{T}
 
 FourierMapType = Union{FourierMap, InvFourierMap}
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -149,7 +149,7 @@ end
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ FockMap interface implementations ◆
-getinspace(fockmap::FourierMap) = fockmap.regionfock
+getinspace(fockmap::FourierMap) = fockmap.inspace
 
 function getoutspace(fockmap::FourierMap)::CrystalFock
     basismodes::Subset{Mode} = fockmap.data|>first|>last|>getoutspace|>removeattr(:k)
@@ -161,7 +161,14 @@ function getinspace(fockmap::InvFourierMap)::CrystalFock
     return getcrystalfock(basismodes, fockmap.crystal)
 end
 
-getoutspace(fockmap::InvFourierMap) = fockmap.regionfock
+getoutspace(fockmap::InvFourierMap) = fockmap.outspace
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ FourierMap APIs ◆
+getadjspace(fockmap::FourierMap) = fockmap|>getinspace
+getadjspace(fockmap::InvFourierMap) = fockmap|>getoutspace
+export getadjspace
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -199,10 +206,10 @@ function Base.:*(fouriermap::InvFourierMap, fockmap::CrystalFockMap)::InvFourier
         return merged
     end
 
-    blocks = paralleldivideconquer(
+    blocks::Dict{Momentum, SparseFockMap} = paralleldivideconquer(
         merger, batches, count=length(fouriermap.data), desc="InvFourierMap * CrystalFockMap")
 
-    return InvFourierMap(fouriermap.crystal, fouriermap.regionfock, blocks)
+    return InvFourierMap(fouriermap.crystal, fouriermap|>getoutspace, blocks)
 end
 
 Base.:*(::CrystalFockMap, ::FourierMap)::FourierMap = notimplemented()
@@ -212,7 +219,7 @@ function Base.:*(fockmap::FourierMapType, v::Number)
         name="FourierMap * Number",
         tasks=(()->k=>block*v for (k, block) in fockmap.data),
         count=fockmap.data|>length)|>parallel|>Dict
-    return typeof(fockmap)(fockmap.crystal, fockmap.regionfock, blocks)
+    return typeof(fockmap)(fockmap.crystal, fockmap|>getadjspace, blocks)
 end
 
 Base.:*(v::Number, fockmap::FourierMapType) = fockmap * v
@@ -228,6 +235,14 @@ end
 
 Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)
 
+function Base.:*(left::FourierMap{T}, right::SparseFockMap{O, T}) where {O, T}
+    multiplied = paralleltasks(
+        name="FourierMap * SparseFockMap",
+        tasks=(()->k=>block*right for (k, block) in left.data),
+        count=left.data|>length)|>parallel|>Dict
+    return FourierMap(left.crystal, right|>getoutspace, multiplied)
+end
+
 Base.:*(::FourierMap, ::InvFourierMap) = notimplemented()
 
 """ Diagonal composition. """
@@ -236,7 +251,7 @@ function Base.broadcasted(::typeof(*), left::FourierMap, right::InvFourierMap)
     multiplied = paralleltasks(
         name="FourierMap * InvFourierMap",
         tasks=(()->(k, k)=>block*right.data[k] for (k, block) in left.data),
-        count=left.data|>length)|>parallel
+        count=left.data|>length)|>parallel|>Dict
     return CrystalFockMap(left.crystal, left.crystal, multiplied)
 end
 
@@ -246,7 +261,7 @@ function Base.:transpose(fockmap::FourierMapType)
         name="transpose(::$(fockmap|>typeof))",
         tasks=(()->compute(k, block) for (k, block) in fockmap.data),
         count=fockmap.data|>length)|>parallel|>Dict
-    return (fockmap|>typeof)'(fockmap.crystal, fockmap.regionfock, blocks)
+    return (fockmap|>typeof)'(fockmap.crystal, fockmap|>getadjspace, blocks)
 end
 
 function Base.:adjoint(fockmap::FourierMapType)::InvFourierMap
@@ -255,6 +270,6 @@ function Base.:adjoint(fockmap::FourierMapType)::InvFourierMap
         name="adjoint(::$(fockmap|>typeof))",
         tasks=(()->compute(k, block) for (k, block) in fockmap.data),
         count=fockmap.data|>length)|>parallel|>Dict
-    return (fockmap|>typeof)'(fockmap.crystal, fockmap.regionfock, blocks)
+    return (fockmap|>typeof)'(fockmap.crystal, fockmap|>getadjspace, blocks)
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

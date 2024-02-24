@@ -38,8 +38,8 @@ Compute the momentum space energy spectrum within a `Crystal` brillouin zone for
 """
 function computeenergyspectrum(bonds::FockMap; crystal::Crystal)::CrystalSpectrum
     bondmodes::Subset{Mode} = bonds|>getoutspace|>orderedmodes
-    basismodes::Subset{Mode} = bonds|>getoutspace|>RegionFock|>unitcellfock|>orderedmodes
-    transform = fourier(getcrystalfock(basismodes, crystal), bondmodes|>RegionFock)
+    homefock::NormalFock = bonds|>getoutspace|>RegionFock|>unitcellfock
+    transform = fourier(getcrystalfock(homefock, crystal), bondmodes|>RegionFock)
     function compute(k)
         ktransform = transform[k, :]
         return k=>(ktransform*bonds*ktransform')

@@ -68,16 +68,18 @@ Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock.crystal
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ CrystalFock APIs ◆
 """
-    getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)::FockSpace
+    getcrystalfock(homefock::NormalFock, crystal::Crystal)
 
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from 
-`basismodes` by the brillouin zone of the `crystal`.
+`homefock` by the brillouin zone of the `crystal`.
 """
-@memoize function getcrystalfock(basismodes::Subset{Mode}, crystal::Crystal)
-    homefock::NormalFock = basismodes|>FockSpace
+@memoize function getcrystalfock(homefock::NormalFock, crystal::Crystal)
     korderings::Dict{Momentum, Integer} = Dict(k=>n for (n, k) in crystal|>brillouinzone|>enumerate)
     return CrystalFock(crystal, korderings, homefock)
 end
+
+getcrystalfock(homemodes::Subset{Mode}, crystal::Crystal) = getcrystalfock(FockSpace(homemodes), crystal)
+
 export getcrystalfock
 
 """

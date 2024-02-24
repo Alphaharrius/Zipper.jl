@@ -40,7 +40,7 @@ correlations|>crystalspectrum|>visualize
 
 crystalfock = correlations|>getoutspace
 
-scale = Scale([4 0; 0 4], square)
+scale = Scale([2 0; 0 2], square)
 @info("Performing blocking...")
 @time begin
     blocker = scale * (correlations|>getoutspace)
@@ -49,10 +49,19 @@ scale = Scale([4 0; 0 4], square)
     blockedcrystal = blockedcrystalfock|>getcrystal
 end
 
-function zer(blockedcorrelations)
-    blockedcrystalfock = blockedcorrelations|>getoutspace
-    blockedcrystal = blockedcrystalfock|>getcrystal
+function zer(correlations)
+    @info "Starting RG..."
+    @info "Performing blocking..."
+    @time begin
+        scale = Scale([2 0; 0 2], correlations|>getoutspace|>getcrystal|>getspace)
+        blocker = scale * (correlations|>getoutspace)
+        blockedcorrelations = blocker * correlations * blocker'
 
+        blockedcrystalfock = blockedcorrelations|>getoutspace
+        blockedcrystal = blockedcrystalfock|>getcrystal
+    end
+
+    @info "Computing extended restrictor..."
     normalvector = (1, 1) ∈ (blockedcrystal|>getspace)
     extendedrestrict = extendedcrystalrestrict(crystal=blockedcrystal, normalvector=normalvector, stripradius=0.5)
 
@@ -157,8 +166,16 @@ function zer(blockedcorrelations)
 
     c4T = c4 * blockedcrystalfock
     c4wanniermetalprojector = c4T * wanniermetalprojector * c4T'
-
     globaldistiller = wanniermetalprojector + c4wanniermetalprojector
+
+    @info "Symmetrizing global distiller..."
+    m135T = m135 * blockedcrystalfock
+    m135globaldistiller = m135T * globaldistiller * m135T'
+    globaldistiller = globaldistiller + m135globaldistiller
+    m45T = m45 * blockedcrystalfock
+    m45globaldistiller = m45T * globaldistiller * m45T'
+    globaldistiller = globaldistiller + m45globaldistiller
+
     globaldistillerspectrum = globaldistiller|>crystalspectrum
     
     @info "Distilling courier states..."
@@ -190,6 +207,12 @@ function zer(blockedcorrelations)
     localstate3 = getcourierseed(wannierregion3)
     localstate4 = getcourierseed(wannierregion4)
 
+    @info "Symmetrizing courier seeds..."
+    localstate1 = m135*(m45*localstate1)
+    localstate2 = m135*(m45*localstate2)
+    localstate3 = m45*(m135*localstate3)
+    localstate4 = m45*(m135*localstate4)
+
     seeds = localstate1 + localstate2 + localstate3 + localstate4
     wannierseeds = seeds|>FockMap
 
@@ -211,39 +234,55 @@ function zer(blockedcorrelations)
     @info "Computing courier correlations..."
     wannierdcouriercorrelations = wanniercourierisometries' * blockedcorrelations * wanniercourierisometries
     wanniercouriercorrelationspectrum = wannierdcouriercorrelations|>crystalspectrum
+
     @info "Purifying courier correlations..."
-    purifiedcouriercorrelationspectrum = wanniercouriercorrelationspectrum|>roundingpurification
+    purifiedcouriercorrelationspectrum = roundingpurification(wanniercouriercorrelationspectrum, tolerance=2e-1)
     purifiedcouriercorrelations = purifiedcouriercorrelationspectrum|>CrystalFockMap
 
     return Dict(
         :correlations=>purifiedcouriercorrelations,
+        :rawcorrelations=>wannierdcouriercorrelations,
         :wannierstates=>wannierlocalstates,
         :courierisometry=>wanniercourierisometries,
-        :globaldistiller=>globaldistiller)
+        :globaldistiller=>globaldistiller,
+        :courierzipper=>(wanniercourierisometries' * blocker)',
+        :ee=>entanglemententropy(wanniercouriercorrelationspectrum)/(wannierdcouriercorrelations|>getoutspace|>dimension))
 end
 
 rg1 = zer(blockedcorrelations)
 
-scale = Scale([2 0; 0 2], rg1[:correlations]|>getoutspace|>getcrystal|>getspace)
-rg2blocker = scale * (rg1[:correlations]|>getoutspace)
-
-rg2 = zer(rg2blocker * rg1[:correlations] * rg2blocker')
-
-scale = Scale([2 0; 0 2], rg2[:correlations]|>getoutspace|>getcrystal|>getspace)
-rg3blocker = scale * (rg2[:correlations]|>getoutspace)
-
-rg3 = zer(rg3blocker * rg2[:correlations] * rg3blocker')
-
 rg1[:correlations]|>crystalspectrum|>visualize
-rg1courierzipper = rg1[:courierisometry]' * blocker
+rg1[:globaldistiller]|>crystalspectrum|>visualize
+visualize(rg1[:wannierstates]|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
+
+[v for v in rg1[:wannierstates][:, 1]|>rep|>Matrix|>normalize if abs(v) > 0.1]
+
+rg2 = zer(rg1[:correlations])
+
+rg2[:rawcorrelations]|>crystalspectrum|>visualize
+rg2[:correlations]|>crystalspectrum|>visualize
+rg2[:globaldistiller]|>crystalspectrum|>visualize
+visualize(rg2[:wannierstates]|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
+
+rg3 = zer(rg2[:correlations])
+
+rg3[:correlations]|>crystalspectrum|>visualize
+rg3[:globaldistiller]|>crystalspectrum|>visualize
+visualize(rg3[:wannierstates]|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
+
+rg4 = zer(rg3[:correlations])
+
+rg3courierzipper = rg3[:courierzipper]' * rg2[:courierzipper]' * rg1[:courierzipper]'
+rg3courierprojector = rg3courierzipper' * rg3courierzipper
+
+rg2courierzipper = rg2[:courierzipper]' * rg1[:courierzipper]'
+rg2courierprojector = rg2courierzipper' * rg2courierzipper
+
+rg1courierzipper = rg1[:courierzipper]'
 rg1courierprojector = rg1courierzipper' * rg1courierzipper
 
-rg2[:correlations]|>crystalspectrum|>visualize
-rg2courierzipper = rg2[:courierisometry]' * rg2blocker * rg1courierzipper
-
-rg3[:globaldistiller]|>crystalspectrum|>visualize
-
-rg2courierprojector = rg2courierzipper' * rg2courierzipper
+occ = momentumoccupations(rg3courierprojector)
+visualize(occ|>crystalspectrum, usecontour=true)
 
 using SparseArrays
 function Zipper.momentumoccupations(correlations::FockMap)::FockMap

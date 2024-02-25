@@ -235,7 +235,7 @@ end
 
 Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)
 
-function Base.:*(left::FourierMap{T}, right::SparseFockMap{O, T}) where {O, T}
+function Base.:*(left::FourierMap{T}, right::SparseFockMap{T, O}) where {T, O}
     multiplied = paralleltasks(
         name="FourierMap * SparseFockMap",
         tasks=(()->k=>block*right for (k, block) in left.data),

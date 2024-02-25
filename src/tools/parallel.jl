@@ -66,18 +66,31 @@ export paralleltasks
 function parallel(tasks::ParallelTasks)
     counter = Threads.Atomic{Int}(0)
     monitorthreadid = rand(1:tasks.corecount)
+
     function producer()
         results = Queue{Any}()
         for task in tasks.taskchannel
             enqueue!(results, task())
             Threads.atomic_add!(counter, 1)
-            (tasks.meter != undef &&
-            Threads.threadid() == monitorthreadid &&
-            ProgressMeter.update!(tasks.meter, counter[]))
         end
         return results
     end
-    threads = [Threads.@spawn producer() for _ in 1:tasks.corecount]
+
+    # To prevent checking the monitor thread condition everytime, we will introduce a specific 
+    # producer method for the monitor thread so it can update the progress bar directly.
+    function monitorproducer()
+        results = Queue{Any}()
+        for task in tasks.taskchannel
+            enqueue!(results, task())
+            Threads.atomic_add!(counter, 1)
+            ProgressMeter.update!(tasks.meter, counter[])
+        end
+        return results
+    end
+
+    threads = [
+        Threads.@spawn (i == monitorthreadid ? monitorproducer : producer)() 
+        for i in 1:tasks.corecount]
     resultbatches = fetch.(threads)
     tasks.meter == undef || ProgressMeter.finish!(tasks.meter)
     return (v for batch in resultbatches for v in batch)

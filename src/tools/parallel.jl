@@ -64,11 +64,16 @@ end
 export paralleltasks
 
 function parallel(tasks::ParallelTasks)
+    counter = Threads.Atomic{Int}(0)
+    monitorthreadid = rand(1:tasks.corecount)
     function producer()
         results = Queue{Any}()
         for task in tasks.taskchannel
             enqueue!(results, task())
-            tasks.meter == undef || ProgressMeter.next!(tasks.meter)
+            Threads.atomic_add!(counter, 1)
+            (tasks.meter != undef &&
+            Threads.threadid() == monitorthreadid &&
+            ProgressMeter.update!(tasks.meter, counter[]))
         end
         return results
     end

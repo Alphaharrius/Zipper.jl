@@ -65,22 +65,17 @@ export paralleltasks
 
 function parallel(tasks::ParallelTasks)
     function producer()
+        results = Queue{Any}()
         for task in tasks.taskchannel
-            put!(tasks.resultchannel, task())
+            enqueue!(results, task())
             tasks.meter == undef || ProgressMeter.next!(tasks.meter)
         end
+        return results
     end
     threads = [Threads.@spawn producer() for _ in 1:tasks.corecount]
-    fetch.(threads)
-    close(tasks.taskchannel)
-    results = []
-    watchprogress(desc="parallel")
-    while isready(tasks.resultchannel)
-        push!(results, take!(tasks.resultchannel))
-        updateprogress()
-    end
-    unwatchprogress()
-    return results
+    resultbatches = fetch.(threads)
+    tasks.meter == undef || ProgressMeter.finish!(tasks.meter)
+    return (v for batch in resultbatches for v in batch)
 end
 export parallel
 

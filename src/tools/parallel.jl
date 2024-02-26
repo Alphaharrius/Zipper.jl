@@ -89,7 +89,7 @@ function parallel(tasks::ParallelTasks)
     end
 
     threads = [
-        Threads.@spawn (i == monitorthreadid ? monitorproducer : producer)() 
+        Threads.@spawn (tasks.meter != undef && i == monitorthreadid ? monitorproducer : producer)() 
         for i in 1:tasks.corecount]
     resultbatches = fetch.(threads)
     tasks.meter == undef || ProgressMeter.finish!(tasks.meter)

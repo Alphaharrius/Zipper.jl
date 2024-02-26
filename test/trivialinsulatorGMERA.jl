@@ -72,132 +72,122 @@ function gmera(correlations,reftransistionmap)
     rgblockedspace::RealSpace = rgblockedcrystal|>getspace
 
     transistionmap = reftransistionmap*rgblocker'
+    transistionmapdict = Dict(:orig=>transistionmap)
 
     firstcenterlist = [[1/2,0] ∈ rgblockedspace,[-1/2,0] ∈ rgblockedspace]
     secondcenterlist = [[0,1/2] ∈ rgblockedspace,[0,-1/2] ∈ rgblockedspace]
     thirdcenterlist = [[1/2,1/2] ∈ rgblockedspace,[-1/2,-1/2] ∈ rgblockedspace, [-1/2,1/2] ∈ rgblockedspace,[1/2,-1/2] ∈ rgblockedspace]
     finalcenterlist = [[0,0] ∈ rgblockedspace]
+
     @info ("1st gmera step...")
     gmera1 = @time gmerastep(rgblockedcorrelations,rgblockedcorrelations,firstcenterlist, modeselection1stbycountthenbythreshold(1,0.005))
     # gmera1 = @time gmerastep1(rgblockedcorrelations,firstcenterlist)
     @info ("1st gmera approximation to correlations...")
     gmera1approx = transistionmap*gmera1[:emptyisometry]*gmera1[:emptyisometry]'*transistionmap'
+    approxdict = Dict(:first=>gmera1approx)
+    filledisometrydict = Dict(:first=>gmera1[:filledisometry])
+    emptyisometrydict = Dict(:first=>gmera1[:emptyisometry])
 
     if haskey(gmera1,:correlations)
         transistionmap = transistionmap*gmera1[:courierisometry]
+        correlationsdict = Dict(:first=>gmera1[:correlations])
+        transistionmapdict[:first] = transistionmap
         @info ("2nd gmera step...")
         gmera2 = @time gmerastep(rgblockedcorrelations,gmera1[:correlations],secondcenterlist,modeselection1stbycountthenbythreshold(1,0.005))
         @info ("2nd gmera approximation to correlations...")
         gmera2approx = transistionmap*gmera2[:emptyisometry]*gmera2[:emptyisometry]'*transistionmap'
+        approxdict[:second] = gmera2approx
+        filledisometrydict[:second] = gmera2[:filledisometry]
+        emptyisometrydict[:second] = gmera2[:emptyisometry]
         if haskey(gmera2,:correlations)
             transistionmap = transistionmap*gmera2[:courierisometry]
+            transistionmapdict[:second] = transistionmap
+            correlationsdict[:second] = gmera2[:correlations]
             @info ("3rd gmera step...")
             gmera3 = @time gmerastep(rgblockedcorrelations,gmera2[:correlations],thirdcenterlist,modeselection1stbycountthenbythreshold(1,0.005))
             @info ("3rd gmera approximation to correlations...")
             gmera3approx = transistionmap*gmera3[:emptyisometry]*gmera3[:emptyisometry]'*transistionmap'
+            approxdict[:third] = gmera3approx
+            filledisometrydict[:third] = gmera3[:filledisometry]
+            emptyisometrydict[:third] = gmera3[:emptyisometry]
             if haskey(gmera3,:correlations)
                 transistionmap = transistionmap*gmera3[:courierisometry]
+                transistionmapdict[:third] = transistionmap
+                correlationsdict[:third] = gmera3[:correlations]
                 @info ("final gmera step...")
                 gmera4 = @time gmerastep(rgblockedcorrelations,gmera3[:correlations],finalcenterlist,modeselection1stbycountthenbythreshold(1,0.005))
                 @info ("4th gmera approximation to correlations...")
                 gmera4approx = transistionmap*gmera4[:emptyisometry]*gmera4[:emptyisometry]'*transistionmap'
+                approxdict[:forth] = gmera4approx
+                filledisometrydict[:forth] = gmera4[:filledisometry]
+                emptyisometrydict[:forth] = gmera4[:emptyisometry]
                 if haskey(gmera4,:correlations)
                     transistionmap = transistionmap*gmera4[:courierisometry]
+                    transistionmapdict[:forth] = transistionmap
+                    correlationsdict[:forth] = gmera4[:correlations]
                     @info("go through all gmera step")
                     return Dict(
                         :rgblockedmap => rgblocker,
-                        :gmera1stemptyisometry => gmera1[:emptyisometry],
-                        :gmera1stfilledisometry => gmera1[:filledisometry],
-                        :gmera1stcourierisometry => gmera1[:courierisometry],
-                        :gmera1stcorrelations => gmera1[:correlations],
-                        :gmera1stapprox => gmera1approx,
-                        :gmera2ndemptyisometry => gmera2[:emptyisometry],
-                        :gmera2ndfilledisometry => gmera2[:filledisometry],
-                        :gmera2ndcourierisometry => gmera2[:courierisometry],
-                        :gmera2ndcorrelations => gmera2[:correlations],
-                        :gmera2ndapprox => gmera2approx,
-                        :gmera3rdemptyisometry => gmera3[:emptyisometry],
-                        :gmera3rdfilledisometry => gmera3[:filledisometry],
-                        :gmera3rdcourierisometry => gmera3[:courierisometry],
-                        :gmera3rdcorrelations => gmera3[:correlations],
-                        :gmera3rdapprox => gmera3approx,
-                        :gmera4themptyisometry => gmera4[:emptyisometry],
-                        :gmera4thfilledisometry => gmera4[:filledisometry],
-                        :gmera4thcourierisometry => gmera4[:courierisometry],
-                        :gmera4thapprox => gmera4approx,
-                        :correlations => gmera4[:correlations],
-                        :transistionmap => transistionmap)
+                        :emptyisometryresults => emptyisometrydict,
+                        :filledisometryresults => filledisometrydict,
+                        :correlationsresults => correlationsdict,
+                        :approxresults => approxdict,
+                        :transistionmaps => transistionmapdict,
+                        :correlations => gmera4[:correlations])
                 else
                     @info("terminate at 4th gmera step")
                     return Dict(
                         :rgblockedmap => rgblocker,
-                        :gmera1stemptyisometry => gmera1[:emptyisometry],
-                        :gmera1stfilledisometry => gmera1[:filledisometry],
-                        :gmera1stcourierisometry => gmera1[:courierisometry],
-                        :gmera1stcorrelations => gmera1[:correlations],
-                        :gmera1stapprox => gmera1approx,
-                        :gmera2ndemptyisometry => gmera2[:emptyisometry],
-                        :gmera2ndfilledisometry => gmera2[:filledisometry],
-                        :gmera2ndcourierisometry => gmera2[:courierisometry],
-                        :gmera2ndcorrelations => gmera2[:correlations],
-                        :gmera2ndapprox => gmera2approx,
-                        :gmera3rdemptyisometry => gmera3[:emptyisometry],
-                        :gmera3rdfilledisometry => gmera3[:filledisometry],
-                        :gmera3rdcourierisometry => gmera3[:courierisometry],
-                        :gmera3rdcorrelations => gmera3[:correlations],
-                        :gmera3rdapprox => gmera3approx,
-                        :gmera4themptyisometry => gmera4[:emptyisometry],
-                        :gmera4thfilledisometry => gmera4[:filledisometry],
-                        :gmera4thapprox => gmera4approx,
-                        :transistionmap => transistionmap)
+                        :emptyisometryresults => emptyisometrydict,
+                        :filledisometryresults => filledisometrydict,
+                        :correlationsresults => correlationsdict,
+                        :approxresults => approxdict,
+                        :transistionmaps => transistionmapdict)
                 end
             else
                 @info("terminate at 3rd gmera step")
                 return Dict(
                     :rgblockedmap => rgblocker,
-                    :gmera1stemptyisometry => gmera1[:emptyisometry],
-                    :gmera1stfilledisometry => gmera1[:filledisometry],
-                    :gmera1stcourierisometry => gmera1[:courierisometry],
-                    :gmera1stcorrelations => gmera1[:correlations],
-                    :gmera1stapprox => gmera1approx,
-                    :gmera2ndemptyisometry => gmera2[:emptyisometry],
-                    :gmera2ndfilledisometry => gmera2[:filledisometry],
-                    :gmera2ndcourierisometry => gmera2[:courierisometry],
-                    :gmera2ndcorrelations => gmera2[:correlations],
-                    :gmera2ndapprox => gmera2approx,
-                    :gmera3rdemptyisometry => gmera3[:emptyisometry],
-                    :gmera3rdfilledisometry => gmera3[:filledisometry],
-                    :gmera3rdapprox => gmera3approx,
-                    :transistionmap => transistionmap)
+                    :emptyisometryresults => emptyisometrydict,
+                    :filledisometryresults => filledisometrydict,
+                    :correlationsresults => correlationsdict,
+                    :approxresults => approxdict,
+                    :transistionmaps => transistionmapdict)
             end
         else
             @info("terminate at 2nd gmera step")
             return Dict(
                 :rgblockedmap => rgblocker,
-                :gmera1stemptyisometry => gmera1[:emptyisometry],
-                :gmera1stfilledisometry => gmera1[:filledisometry],
-                :gmera1stcourierisometry => gmera1[:courierisometry],
-                :gmera1stcorrelations => gmera1[:correlations],
-                :gmera1stapprox => gmera1approx,
-                :gmera2ndemptyisometry => gmera2[:emptyisometry],
-                :gmera2ndfilledisometry => gmera2[:filledisometry],
-                :gmera2ndapprox => gmera2approx,
-                :transistionmap => transistionmap)
+                :emptyisometryresults => emptyisometrydict,
+                :filledisometryresults => filledisometrydict,
+                :correlationsresults => correlationsdict,
+                :approxresults => approxdict,
+                :transistionmaps => transistionmapdict
+                )
         end
     else
         @info("terminate at 1st gmera step")
         return Dict(
-        :rgblockedmap => rgblocker,
-        :gmera1stemptyisometry => gmera1[:emptyisometry],
-        :gmera1stfilledisometry => gmera1[:filledisometry],
-        :gmera1stapprox => gmera1approx,
-        :transistionmap => transistionmap)
+            :rgblockedmap => rgblocker,
+            :emptyisometryresults => emptyisometrydict,
+            :filledisometryresults => filledisometrydict,
+            :approxresults => approxdict,
+            :transistionmaps => transistionmapdict)
     end
 end
 
 rg1 = gmera(blockedcorrelations,idmap(blockedcorrelations|>getinspace))
-rg2 = gmera(rg1[:correlations],rg1[:transistionmap])
-rg3 = gmera(rg2[:correlations],rg2[:transistionmap])
+rg2 = gmera(rg1[:correlations],rg1[:transistionmaps][:forth])
+# rg3 = gmera(rg2[:correlations],rg2[:transistionmap])
 
-rg1[:correlations]|>getinspace|>getcrystal
-rg2[:gmera3rdcorrelations]|>getinspace|>getcrystal
+rg1[:approxresults][:first]+rg1[:approxresults][:second]
+rg2[:approxresults]
+
+sum([pair[2] for rgresult in [rg1[:approxresults],rg2[:approxresults]] for pair in rgresult ])
+
+a = [1,2,3]
+b = [4,5,6]
+[(i,j) for i in a for j in b]
+
+FockMap(blockedcorrelations*blockedcorrelations') |> eigspech|>geteigenvalues
+

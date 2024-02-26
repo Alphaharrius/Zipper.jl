@@ -84,11 +84,12 @@ function outspacesubmaps(right::CrystalFockMap)::Dict
         for v in batch, (outk, blocks) in v
             !haskey(merged, outk) && (merged[outk] = [])
             append!(merged[outk], blocks)
+            updatedivideconquer()
         end
         return merged
     end
 
-    return paralleldivideconquer(merger, groupedbatches, count=getmaxthreads())
+    return paralleldivideconquer(merger, groupedbatches, count=getmaxthreads(), desc="outspacesubmaps")
 end
 export outspacesubmaps
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -152,11 +153,13 @@ function Base.:*(left::CrystalFockMap, right::CrystalFockMap)
         merged = Dict()
         for v in batch, (index, block) in v
             haskey(merged, index) ? (merged[index] += block) : (merged[index] = block)
+            updatedivideconquer()
         end
         return merged
     end
 
-    blocks = paralleldivideconquer(mergemultiplied, multiplied, count=left.blocks|>length)
+    blocks = paralleldivideconquer(
+        mergemultiplied, multiplied, count=left.blocks|>length, desc="CrystalFockMap * CrystalFockMap")
 
     return CrystalFockMap(left.outcrystal, right.incrystal, blocks)
 end
@@ -242,7 +245,8 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
         tasks=(()->compute(batch) for batch in batches),
         count=getmaxthreads())|>parallel
 
-    spdata = paralleldivideconquer(sum, datas, count=getmaxthreads())
+    spdata = paralleldivideconquer(
+        sumwithprogress, datas, count=getmaxthreads(), desc="FockMap(::CrystalFockMap)")
 
     return FockMap(outspace, inspace, spdata)
 end

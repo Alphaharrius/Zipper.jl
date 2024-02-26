@@ -270,8 +270,8 @@ export PhaseTable
 end
 
 function PhaseTable(symmetry::AffineTransform; realprecision::Real = 1e-3, imagprecision::Real = 1e-3)
-    realdenom::Integer = 1/realprecision|>round
-    imagdenom::Integer = 1/imagprecision|>round
+    realdenom::Integer = getprecdenom(realprecision)
+    imagdenom::Integer = getprecdenom(imagprecision)
     return PhaseTable(symmetry, realdenom, imagdenom)
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

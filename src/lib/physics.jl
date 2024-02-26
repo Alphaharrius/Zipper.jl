@@ -38,8 +38,8 @@ Compute the momentum space energy spectrum within a `Crystal` brillouin zone for
 """
 function computeenergyspectrum(bonds::FockMap; crystal::Crystal)::CrystalSpectrum
     bondmodes::Subset{Mode} = bonds|>getoutspace|>orderedmodes
-    basismodes::Subset{Mode} = bonds|>getoutspace|>RegionFock|>unitcellfock|>orderedmodes
-    transform = fourier(getcrystalfock(basismodes, crystal), bondmodes|>RegionFock)
+    homefock::NormalFock = bonds|>getoutspace|>RegionFock|>unitcellfock
+    transform = fourier(getcrystalfock(homefock, crystal), bondmodes|>RegionFock)
     function compute(k)
         ktransform = transform[k, :]
         return k=>(ktransform*bonds*ktransform')
@@ -101,12 +101,12 @@ export groundstatespectrum
 Round the correlation eigenvalues of the `correlationspectrum` to `0` or `1`, this is
 useful when the eigenvalues in the pure state are close to `0` or `1` but not exactly.
 """
-function roundingpurification(correlationspectrum::CrystalSpectrum)::CrystalSpectrum
+function roundingpurification(correlationspectrum::CrystalSpectrum; tolerance::Real=1e-1)::CrystalSpectrum
     function fixeigenvalues(eigenvalue::Number)
-        if isapprox(eigenvalue, 1, atol=1e-1)
+        if isapprox(eigenvalue, 1, atol=tolerance)
             return 1
         end
-        if isapprox(eigenvalue, 0, atol=1e-1)
+        if isapprox(eigenvalue, 0, atol=tolerance)
             return 0
         end
         @warn("Eigenvalue $(eigenvalue) is not close to 0 or 1!")

@@ -5,6 +5,7 @@ mutable struct ParallelSettings
     maxthreads::Integer
     taskmeterlock::ReentrantLock
     mainthreadmeter::Union{UndefInitializer, ProgressUnknown}
+    divideconquermeter::Union{UndefInitializer, ProgressUnknown}
 end
 
 global parallelsettings = ParallelSettings(
@@ -13,7 +14,7 @@ global parallelsettings = ParallelSettings(
     ReentrantLock(),
     # I have to set this value to 128 since Threads.nthreads() at initialization of Julia env 
     # seems to be 1 for some reason...
-    undef) # 128 threads should be enough for everyone.
+    undef, undef)
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -44,7 +45,9 @@ export getmaxthreads
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ Parallel computing APIs ◆
-function paralleltasks(; name::String, tasks, count::Integer)
+function paralleltasks(;
+    name::String, tasks, count::Integer, showmeter::Bool = parallelsettings.showmeter)
+
     actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
     batchsize::Integer = (count / actualcorecount)|>ceil
     taskpartitions = Iterators.partition(tasks, batchsize)
@@ -62,7 +65,7 @@ function paralleltasks(; name::String, tasks, count::Integer)
             if typeof(ret) != Nothing
                 push!(rets, ret)
             end
-            if parallelsettings.showmeter
+            if showmeter
                 # TODO: Might have race conditions.
                 lock(()->next!(paralleltasks.meter), parallelsettings.taskmeterlock)
             end
@@ -92,30 +95,62 @@ function parallel(tasks::ParallelTasks)
     return (item for bucket in buckets for item in bucket)
 end
 
-function singlestageparalleldivideconquer(f::Function, iter, count::Integer)
+function updatedivideconquer()
+    if parallelsettings.divideconquermeter == undef || !parallelsettings.showmeter
+        return
+    end
+    next!(parallelsettings.divideconquermeter)
+end
+export updatedivideconquer
+
+function sumwithprogress(iter)
+    ret = first(iter)
+    for item in Iterators.drop(iter, 1)
+        ret += item
+        updatedivideconquer()
+    end
+    return ret
+end
+export sumwithprogress
+
+function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
     actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
     countmetric::Integer = count/actualcorecount|>ceil
     batchsize::Integer = countmetric > 1 ? count/actualcorecount|>ceil : 2
     itembatches = Iterators.partition(iter, batchsize)
     batchcount::Integer = count/batchsize|>ceil
-    return batchcount, paralleltasks(
-        name="paralleldivideconquer count=$count",
+    @debug "batchsize: $batchsize, batchcount: $batchcount, count: $count"
+    tasks = paralleltasks(
+        name="",
         tasks=(()->f(batch) for batch in itembatches),
         # Encountered issue of segmentation fault here...
-        # Solution: Collect the results from the threads as a vector to prevent
-        # the threads from the next stage to access data owned by another thread.
-        # TODO: The issue is still totally unknown and more test have to be performed 
-        # to identify the issue.
-        count=batchcount)|>parallel|>collect
+        # Possible cause: Its unknown but it only happens after we include 
+        # this method here. Yet it might also be a bug in Julia's threading 
+        # implementation.
+        count=batchcount,
+        showmeter=false)
+    # Add the progress meter to the global accessible variable.
+    parallelsettings.divideconquermeter = (
+        ProgressUnknown(desc="divideconquer $desc count=$count", spinner=true))
+    result = tasks|>parallel|>collect
+    ProgressMeter.finish!(parallelsettings.divideconquermeter)
+    # Since the issue is still unknown after checking, we suspect that some variables 
+    # passing through the iterative approach might be marked as garbage while it should 
+    # not be. Therefore we will take a more functional approach (since Julia is functional) 
+    # in hopes that the vm will lift this issue automatically.
+    if batchcount > 2
+        return paralleldivideconquer(f, result, batchcount, desc)
+    end
+    parallelsettings.divideconquermeter = ProgressUnknown(
+        desc="divideconquer $desc merge", spinner=true)
+    result = f(result)
+    ProgressMeter.finish!(parallelsettings.divideconquermeter)
+    return result
 end
 
-function paralleldivideconquer(f::Function, iter; count::Integer=iter|>length)
-    batchcount, current = singlestageparalleldivideconquer(f, iter, count)
-    while batchcount > 2
-        batchcount, current = singlestageparalleldivideconquer(f, current, batchcount)
-    end
-    return f(current)
-end
+paralleldivideconquer(f::Function, iter; count::Integer=iter|>length, desc::String="any") = (
+    paralleldivideconquer(f, iter, count, desc))
+
 export paralleldivideconquer
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
@@ -141,7 +176,7 @@ function updateprogress()
             # thread have called watchprogress before.
             return
         end
-        ProgressMeter.update!(progress)
+        ProgressMeter.next!(progress)
     catch _ # UndefRefError
         # This branch is for the case where the current thread 
         # have not called watchprogress before.

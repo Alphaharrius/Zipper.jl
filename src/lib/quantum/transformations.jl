@@ -125,15 +125,16 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
     function symmetrize(mode::Mode, eigenvector::FockMap)::Tuple{Mode, FockMap}
         eigenvalue::Complex = (phasespectrum|>geteigenvalues)[mode]
         phasetable = PhaseTable(symmetry, realprecision=1e-5, imagprecision=1e-5)
+        lowprectable = PhaseTable(symmetry, realprecision=2e-1, imagprecision=2e-1)
         if haskey(phasetable, eigenvalue)
             # If the eigenvalue is registered in the phase table, we consider the associated eigenvector 
             # is symmetric under the symmetry.
             phase, basisfunction = phasetable[eigenvalue]
             symmetricalmap = eigenvector
-        else
-            @warn "Quasi-symmetric phase $eigenvalue is found, performing manual symmetrization..."
+        elseif haskey(lowprectable, eigenvalue)
+            @warn "Quasi-symmetric phase $eigenvalue is found..."
             # Else we will try to get the actual phase from a phase table with lower precision of eigenvalue registration.
-            lowprectable = PhaseTable(symmetry, realprecision=1e-1, imagprecision=1e-1)
+            # Set the precision to 2e-1 cover all phases that are within 0.1 of the actual value.
             phase, basisfunction = lowprectable[eigenvalue]
             # Performing manual symmetrization.
             elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
@@ -142,6 +143,8 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
                 symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector*phase
             end
             symmetricalmap = symmetricalmap|>normalize
+        else
+            @error("Assymmetric state found!")
         end
         newmode = mode|>setattr(:orbital=>basisfunction)
         inspace = newmode|>FockSpace

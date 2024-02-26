@@ -48,6 +48,32 @@ function regionalrestriction(crystalstate::FockMap, regionfock::RegionFock)::Reg
         for mode in eigenmodes)|>RegionState{crystalstate|>getoutspace|>getcrystal|>dimension}
 end
 export regionalrestriction
+
+"""
+    getregionstates(localcorrelations::FockMap{RegionFock, RegionFock}, grouping::Vector{<:Integer})
+
+Decompose the correlations spectrum of a local correlation matrix, and group the eigenstates based on 
+the provided grouping strategy and return each group as a `RegionState`.
+
+### Input
+- `localcorrelations` The local correlation matrix.
+- `grouping` The grouping strategy in ascending order, for example we want to extract the eigenstates 
+             in groups of the first `3`, `2` and `2` sets, then we will use `[3, 2, 2]`.
+"""
+function getregionstates(;
+    localcorrelations::FockMap{RegionFock, RegionFock}, grouping::Vector{<:Integer})
+
+    localspectrum::EigenSpectrum = localcorrelations|>eigspech
+    current = 1
+    states = []
+    for group in grouping
+        currentstate = geteigenvectors(localspectrum)[:, current:current+group-1]
+        push!(states, currentstate|>RegionState)
+        current += group
+    end
+    return states
+end
+export getregionstates
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

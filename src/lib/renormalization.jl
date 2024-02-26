@@ -200,6 +200,7 @@ function distillation(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol
         bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> FockSpace)
         updateprogress()
     end
+    unwatchprogress()
 
     function repacktospectrum(isometries::Dict{Momentum, FockMap})::CrystalSpectrum
         eigenmodes::Dict{Momentum, Subset{Mode}} = Dict(k => fockmap |> getinspace |> orderedmodes for (k, fockmap) in isometries)
@@ -266,7 +267,9 @@ function findlocalspstates(;
 end
 export findlocalspstates
 
-function wannierprojection(; crystalisometries::Dict{Momentum, <:FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:FockMap}, svdorthothreshold::Number = 1e-1)
+function wannierprojection(;
+    crystalisometries::Dict{Momentum, <:FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:FockMap}, svdorthothreshold::Number = 1e-1)
+
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
     overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
@@ -280,7 +283,8 @@ function wannierprojection(; crystalisometries::Dict{Momentum, <:FockMap}, cryst
         unitary::FockMap = U * Vt
         approximated::FockMap = isometry * unitary
 
-        return FockMap(approximated, inspace=FockSpace(approximated.inspace |> orderedmodes |> setattr(:k => k)), performpermute=false)
+        inspace=FockSpace(approximated|>getinspace|>mapmodes(m->m|>setattr(:k=>k)|>removeattr(:r)))
+        return FockMap(approximated, inspace=inspace, performpermute=false)
     end
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"

@@ -163,25 +163,22 @@ function getcourierseeds(region::Region)
 end
 
 wannierregion = getsphericalregion(crystal=blockedcrystal, radius=0.25, metricspace=blockedcrystal|>getspace)
-wannierregion1 = wannierregion .+ ([0.25, 0.25]∈getspace(wannierregion))
-wannierregion2 = wannierregion .+ ([0.75, 0.75]∈getspace(wannierregion))
-wannierregion3 = wannierregion .+ ([0.25, 0.75]∈getspace(wannierregion))
-wannierregion4 = wannierregion .+ ([0.75, 0.25]∈getspace(wannierregion))
+wannierregion = wannierregion .+ ([0.25, 0.25]∈getspace(wannierregion))
+regionseeds = getcourierseeds(wannierregion)
 
-wannierregion|>visualize
+regionseedmap = regionseeds|>FockMap
+for element in pointgroupelements(c4|>recenter([0.5, 0.5]∈getspace(wannierregion)))
+    lefttransform = element * RegionFock(regionseedmap|>getoutspace)
+    righttransform = element * RegionFock(regionseedmap|>getinspace)
+    regionseedmap += lefttransform * regionseedmap * righttransform'
+end
+courierseeds = RegionFock(regionseedmap|>getoutspace) * regionseedmap * RegionFock(regionseedmap|>getinspace)
 
-region1seeds = getcourierseeds(wannierregion1)
-region2seeds = getcourierseeds(wannierregion2)
-region3seeds = getcourierseeds(wannierregion3)
-region4seeds = getcourierseeds(wannierregion4)
-
-courierseeds = FockMap(region1seeds + region2seeds + region3seeds + region4seeds)
-visualize(courierseeds|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
 transform = fourier(blockedcrystalfock, courierseeds|>getoutspace) / (blockedcrystal|>vol|>sqrt)
 crystalcourierseeds = transform * courierseeds
 crystalcourierseeds = Dict(k=>crystalcourierseeds[k, :] for k in blockedcrystal|>brillouinzone)
 pseudoidens = (u' * u for (_, u) in crystalcourierseeds)
-lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh if v < 0.2)|>minimum
+lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
 
 wanniercourierisometry = wannierprojection(crystalisometries=courierstates|>geteigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds)
 visualregion = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace)

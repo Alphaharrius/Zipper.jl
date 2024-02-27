@@ -144,7 +144,14 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
             end
             symmetricalmap = symmetricalmap|>normalize
         else
-            @error("Assymmetric state found!")
+            @warn "Manually symmetrizing asymmetric state..."
+            basisfunction = swave
+            elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
+            symmetricalmap = eigenvector
+            for element in elements
+                symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector
+            end
+            symmetricalmap = symmetricalmap|>normalize
         end
         newmode = mode|>setattr(:orbital=>basisfunction)
         inspace = newmode|>FockSpace

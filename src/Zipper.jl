@@ -1,6 +1,6 @@
 module Zipper
 
-using DataStructures, OrderedCollections, Base.Iterators, SparseArrays
+using DataStructures, OrderedCollections, Base.Iterators, SparseArrays, PrettyTables
 using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
 include("tools/collectiontools.jl")

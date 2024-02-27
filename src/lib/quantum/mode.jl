@@ -39,6 +39,8 @@ export Mode
 
 # Mode can be used as keys in dictionaries and sets.
 Base.:hash(mode::Mode)::UInt = hash(mode.attrs)
+# Since Mode is a wrapper around a Dict, supporting getting all attribute keys.
+Base.keys(mode::Mode) = mode.attrs|>keys
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -215,6 +217,9 @@ function commonattrs(modes)::Base.Generator
 end
 export commonattrs
 
+""" Get all the available attribute keys of all the modes. """
+attrkeys(modes) = Set(key for mode in modes for key in mode|>keys)
+
 """
     indexmodes(modes)::Subset{Mode}
 
@@ -280,6 +285,24 @@ Base.:show(io::IO, mode::Mode) = print(io, string("$(typeof(mode))$(tuple(keys(m
 """ Shorthand for accessing the attribute information of all modes within the `FockSpace`. """
 modeattrs(modes)::OrderedSet{Dict} = OrderedSet(mode|>getattrs for mode in modes)
 export modeattrs
+
+"""
+    showmodes(modes; showkeys)
+
+Display the mode attribute information in form of a table.
+
+### Input
+- `modes`    The modes to be displayed.
+- `showkeys` The keys to be displayed, if not provided, all keys will be displayed.
+"""
+function showmodes(modes; showkeys=modes|>attrkeys|>collect)
+    header = ["order", showkeys...]
+    getrow(mode) = (mode|>getattr(key) for key in showkeys)
+    rowlength = length(header)
+    rows = (reshape([n, getrow(mode)...], (1, rowlength)) for (n, mode) in modes|>enumerate)
+    pretty_table(vcat(rows...), header=header)
+end
+export showmodes
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

@@ -188,14 +188,10 @@ rightrestrict = fourier(wanniercourierisometry|>getinspace, wanniercourierisomet
 courierlocalstates = leftrestrict' * wanniercourierisometry * rightrestrict
 visualize(courierlocalstates|>RegionState, markersizemultiplier=20, markersizescaling=0.3)
 
-courierid = wanniercourierisometry' * wanniercourierisometry
-(v for (_, v) in courierid|>crystalspectrum|>geteigenvalues)|>minimum
-courierprojector = wanniercourierisometry * wanniercourierisometry'
-groundstatespectrum(courierprojector|>crystalspectrum, perunitcellfillings=12)|>visualize
-
-fiosave(wanniercourierisometry, name="verifiedRG3wanniercourierisometry")
-fiosave(blockedcorrelations, name="verifiedRG3blockedcorrelations")
-fiosave(globaldistiller, name="verifiedRG3globaldistiller")
+# courierid = wanniercourierisometry' * wanniercourierisometry
+# (v for (_, v) in courierid|>crystalspectrum|>geteigenvalues)|>minimum
+# courierprojector = wanniercourierisometry * wanniercourierisometry'
+# groundstatespectrum(courierprojector|>crystalspectrum, perunitcellfillings=12)|>visualize
 
 couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
 courierspectrum = couriercorrelations|>crystalspectrum

@@ -1,6 +1,6 @@
 module Zipper
 
-using DataStructures, OrderedCollections, Base.Iterators, SparseArrays
+using DataStructures, OrderedCollections, Base.Iterators, SparseArrays, PrettyTables
 using LinearAlgebra, Combinatorics, Statistics, SmithNormalForm
 
 include("tools/collectiontools.jl")
@@ -41,7 +41,7 @@ include("lib/renormalization.jl")
 include("lib/extendedrestrictions.jl")
 include("lib/gmerarenormalization.jl")
 
-using Plotly, ColorTypes, Compat
+using Plots
 include("lib/plotting.jl")
 
 using JSON, DataFrames, CSV, Dates

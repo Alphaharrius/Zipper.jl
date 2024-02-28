@@ -132,10 +132,28 @@ struct CrystalSpectrum{Dim}
     eigenmodes::Dict{Momentum, Subset{Mode}}
     eigenvalues::Dict{Mode, Number}
     eigenvectors::Dict{Momentum, FockMap}
+    bandcount::Tuple
 end
 export CrystalSpectrum
 
-CrystalSpectrum(crystal::Crystal, arguments...) = CrystalSpectrum{crystal|>dimension}(crystal, arguments...)
+function CrystalSpectrum(crystal::Crystal, crystaleigenmodes, args...)
+    maxbands = 0
+    minbands = typemax(Int)
+    watchprogress(desc="CrystalSpectrum")
+    for k in crystal|>brillouinzone
+        if !haskey(crystaleigenmodes, k)
+            minbands = 0
+            continue
+        end
+        modes = crystaleigenmodes[k]
+        count = modes|>length
+        maxbands = max(maxbands, count)
+        minbands = min(minbands, count)
+        updateprogress()
+    end
+    unwatchprogress()
+    return CrystalSpectrum{crystal|>dimension}(crystal, crystaleigenmodes, args..., (minbands, maxbands))
+end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -265,8 +283,13 @@ end
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ CrystalSpectrum display ◆
-Base.:show(io::IO, spectrum::CrystalSpectrum) = print(
-    io, string("$(spectrum |> typeof)(entries=$(spectrum.eigenvalues |> length))"))
+function Base.:show(io::IO, spectrum::CrystalSpectrum)
+    minbands = spectrum.bandcount[1]
+    maxbands = spectrum.bandcount[2]
+    bandcountcontext = minbands == maxbands ? "$minbands" : "($minbands->$maxbands)"
+    print(io, string(
+        "$(spectrum |> typeof)(bandcount=$bandcountcontext, entries=$(spectrum.eigenvalues|>length))"))
+end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

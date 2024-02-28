@@ -41,7 +41,7 @@ include("lib/renormalization.jl")
 include("lib/extendedrestrictions.jl")
 include("lib/gmerarenormalization.jl")
 
-using Plotly, ColorTypes, Compat
+using Plots
 include("lib/plotting.jl")
 
 using JSON, DataFrames, CSV, Dates

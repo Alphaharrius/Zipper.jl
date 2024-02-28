@@ -1,5 +1,6 @@
 using LinearAlgebra
-using Zipper
+using Zipper, Plots
+plotlyjs()
 
 setmaxthreads(Threads.nthreads())
 
@@ -155,9 +156,40 @@ visualize(stripfilledlocalstates, markersizemultiplier=20, markersizescaling=0.3
 
 wannierlocalisometry|>getinspace|>unitcellfock|>showmodes
 
-fiodir("/Users/alphaharrius/ZERData/squaremetal/RG1")
+stripfilledprojector = wannierfilledisometry * wannierfilledisometry'
+
+stripspectrum|>linespectrum|>visualize
+distillation(stripspectrum, :frozen=>(v -> v < 0.5))[:frozen]
+stripfrozenprojector = idmap(stripcorrelations|>getoutspace) - stripcorrelations
+stripfrozenprojector|>crystalspectrum|>linespectrum|>visualize
+trialspectrum = stripfilledprojector * stripfrozenprojector * stripfilledprojector'|>crystalspectrum
+distillation(trialspectrum, :frozen=>(v -> v > 0.5))[:frozen]
+
 blockedcorrelations = block * physcorrelations * block'
-wannierfilledisometry
+
+wannierfilledisometry' * wannierfilledisometry |>FockMap|>visualize
+
+blockedcorrelations|>crystalspectrum|>visualize
+distillation(blockedcorrelations|>crystalspectrum, :frozen=>(v -> v > 0.5))[:frozen]
+
+blockedprojector = idmap(blockedcorrelations|>getoutspace) - blockedcorrelations
+blockedfrozenprojector = frozenprojector * blockedprojector * frozenprojector'
+blockedfrozencorrelations = idmap(blockedfrozenprojector|>getoutspace) - blockedfrozenprojector
+distillation(blockedfrozencorrelations|>crystalspectrum, :frozen=>(v -> v > 0.5))[:frozen]
+purifiedfrozencorrelations = blockedfrozencorrelations|>crystalspectrum|>roundingpurification|>CrystalFockMap
+purifiedfrozencorrelations|>crystalspectrum|>visualize
+
+wannierfilledprojector = wannierfilledisometry * wannierfilledisometry'
+
 restrict = extendedrestrict * crystalfock
-globalfilledisometry = wannierfilledisometry' * restrict
-globalfilledisometry * blockedcorrelations * globalfilledisometry' |>crystalspectrum|>linespectrum|>visualize
+globalfilledisometry = wannierfilledprojector * restrict
+
+purifiedfrozenprojector = idmap(purifiedfrozencorrelations|>getoutspace) - purifiedfrozencorrelations
+
+projectedstripfilledprojector = globalfilledisometry * purifiedfrozenprojector * globalfilledisometry'
+projectedstripfilledprojector |>crystalspectrum|>linespectrum|>visualize
+
+projectedstripfilledcorrelations = idmap(projectedstripfilledprojector|>getoutspace) - projectedstripfilledprojector
+
+projectedstripfilledcorrelations|>crystalspectrum|>linespectrum|>visualize
+distillation(projectedstripfilledcorrelations|>crystalspectrum, :frozen=>(v -> v < 0.5))[:frozen]

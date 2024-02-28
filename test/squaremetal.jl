@@ -1,5 +1,6 @@
 using LinearAlgebra
-using Zipper
+using Zipper, Plots
+plotlyjs()
 
 setmaxthreads(Threads.nthreads())
 

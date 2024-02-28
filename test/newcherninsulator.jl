@@ -1,5 +1,6 @@
-using Plotly, SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
-using Zipper
+using SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+using Zipper, Plots
+plotlyjs()
 
 fiodir("/Users/alphaharrius/ZERData")
 setmaxthreads(Threads.nthreads())

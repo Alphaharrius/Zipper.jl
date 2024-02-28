@@ -16,7 +16,7 @@ function readsparse(filename::String)
     Vr = dataframe.Vr
     Vi = dataframe.Vi
     V = [Complex(vr, vi) for (vr, vi) in zip(Vr, Vi)]
-    return sparse(I, J, V)
+    return SparseArrays.sparse(I, J, V)
 end
 
 # Defining a more convenient way of serializing a Matrix.

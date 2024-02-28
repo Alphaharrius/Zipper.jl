@@ -1,6 +1,34 @@
 # Zipper.jl
 Implementation of Zipper Entanglement Renormalization on Julia platform.
 
+## Plotting data
+`Zipper.jl` uses `Plots.jl` as its plotting backend, and the plotting API can be accessed via `Zipper.visualize`.
+
+### Selecting backend for `Plots.jl`
+One can specify the plotting backend for `Plots.jl` by a specified function and with the certain backend package installed, for example the plotting backend tested in `Zipper.jl` is `PlotlyJS`, and we have to setup the environment before plotting data using `Zipper.visualize`.
+```
+# Include the module to gain access to plotlyjs() method.
+import Plots
+# Specify PlotlyJS as the backend.
+plotlyjs()
+```
+Before doing so one have to install `PlotlyJS` via `Pkg.add("PlotlyJS")`, by default `PlotlyJS` is included in the `Zipper.jl` package.
+
+### `Element` type that supports `Zipper.visualize`
+You can use `visualize` directly with `T<:FockMap`, `Subset{T<:Point}`, `RegionState{2}`, `CrystalSpectrum{1}`, `CrystalSpectrum{2}`, `SnappingResult` and `EigenSpectrum`. 
+
+### Modifying plots beyond `Zipper.visualize`
+If you want to modify the plots after they have been shown, you can use `Plots.plot!` to adjust the figures.
+For example modifying the size,
+```
+state::RegionState{2} = ...
+visualize(state)
+
+# Change the plot size to 800x800.
+plot!(size=(800, 800))
+```
+Noted that not all functions support this feature, the notable one is `Zipper.visualize(::CrystalSpectrum{2})` which utilizes `mesh3d` from `PlotlyJS` directly, thus the plot cannot be modified using `plot!`.
+
 ## Using multithreading to enhance performance
 `Zipper.jl` by default disabled support for multithreading, by setting up multithreading environment by `Zipper.setmaxthreads` it will utilize all threads available to the Julia environment to enhance the performance of many functions related to the generation or operation of type `CrystalFock` and `CrystalFockMap`.
 

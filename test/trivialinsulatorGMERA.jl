@@ -350,13 +350,14 @@ dataloc12size48 = focktracenorm(FockMap(blockedcorrelationsloc12size48-rgapproxl
 
 log.([1,1])
 radiuslist12 = [2,3]
-errorlist12 = [dataloc2size12,dataloc3size12]
+errorlist12 = log.([dataloc2size12,dataloc3size12])
 radiuslist24 = [2,3,4,6]
-errorlist24 = [dataloc2size24,dataloc3size24,dataloc4size24,dataloc6size24]
+errorlist24 = log.([dataloc2size24,dataloc3size24,dataloc4size24,dataloc6size24])
 radiuslist48 = [2,3,4,6,8,12]
-errorlist48 = [dataloc2size48,dataloc3size48,dataloc4size48,dataloc6size48,dataloc8size48,dataloc12size48]
+errorlist48 = log.([dataloc2size48,dataloc3size48,dataloc4size48,dataloc6size48,dataloc8size48,dataloc12size48])
 
 plot([scatter(x=radiuslist12, y=errorlist12, mode="markers", name="size12"),scatter(x=radiuslist24, y=errorlist24, mode="markers", name="size24"),scatter(x=radiuslist48, y=errorlist48, mode="markers", name="size48")],
 Layout(
-        title="Tr(sqrt(C_orig-C_approx)) vs radius for trivial insulator "
+        title="log(Tr(sqrt(C_orig-C_approx))) vs radius for trivial insulator ",
+        template="simple_white"
     ))

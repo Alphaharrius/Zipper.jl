@@ -1,6 +1,12 @@
+""" Plot an `Element` for visualization. """
 visualize(o::Element) = @warn "Plotting function for $(o|>typeof) is not defined."
 export visualize
 
+"""
+    visualize(fockmap::FockMap)
+
+Visualize the FockMap as a heatmap in real and imaginary part separately.
+"""
 function visualize(fockmap::FockMap)
     source = fockmap|>rep
     realplot = heatmap(source|>real, title="Re")
@@ -14,11 +20,20 @@ end
 
 PlotRegion(region::Region) = PlotRegion{region|>getspace|>dimension}(region)
 
+"""
+    visualize(region::Region)
+
+Visualize the region as a scatter plot.
+
+### Keyword Arguments
+- `visualspace` The `AffineSpace` to visualize the region.
+"""
 function visualize(region::Region; kwargs...)
     plotregion = PlotRegion(region)
     return visualize(plotregion, kwargs...)
 end
 
+""" The `2D` backend for plotting a region. """
 function visualize(region::PlotRegion{2}; visualspace::AffineSpace = region.region|>getspace|>euclidean)
     r = [visualspace*r|>vec for r in region.region]
     x = [v|>first for v in r]
@@ -27,6 +42,23 @@ function visualize(region::PlotRegion{2}; visualspace::AffineSpace = region.regi
     return scatter(x, y, aspect_ratio=1.1, xlims=(minimum(x)-1, maximum(x)+1), ylims=(minimum(y)-1, maximum(y)+1))
 end
 
+"""
+    visualize(states::RegionState{2})
+
+Visualize all the single particle state from a `RegionState` as a set of scatter plot, the size of each marker 
+defines the magnitude of the function at that position; the color of the marker defines the complex phase of 
+the function in `HSV` color scale. Hovering over each marker will show a truncated complex number of the function.
+Each subplot of the state will have a title of `Mode {order}` and a table of the plotted modes will be shown in 
+the terminal, and the table column `order` will corresponds to the title of the subplot.
+
+### Keyword Arguments
+- `visualspace` The `RealSpace` to visualize the region.
+- `markersize`  The size of the marker.
+- `logscale`    Depending on the function some marker will be much larger than the others, this parameter 
+                will scale the size of the marker logarithmically, while a smaller value will decrease the 
+                size distribution, a larger value will increase the size distribution. This value normally 
+                should be between `0` and `1`.
+"""
 function visualize(
     states::RegionState{2};
     visualspace::RealSpace = states|>getoutspace|>getregion|>getspace|>euclidean,
@@ -54,6 +86,13 @@ function visualize(
     return p
 end
 
+"""
+    visualize(spectrum::CrystalSpectrum{1})
+
+Visualize the eigenmodes of a `CrystalSpectrum` as a line plot, the y-axis is the spectrum values and 
+the x-axis is sorted with the corresponding `Momentum` by their `norm`. Each band will be plotted as an 
+individual line.
+"""
 function visualize(spectrum::CrystalSpectrum{1})
     eigenmodes = sort([(k|>norm, modes) for (k, modes) in spectrum|>geteigenmodes], by=(in -> in[1]))
     data = hcat(([spectrum.eigenvalues[mode] for mode in modes]|>sort for (_, modes) in eigenmodes)...)
@@ -62,6 +101,19 @@ function visualize(spectrum::CrystalSpectrum{1})
 end
 
 import PlotlyJS
+"""
+    visualize(spectrum::CrystalSpectrum{2})
+
+Visualize the eigenmodes of a `CrystalSpectrum` as a 3D mesh plot, the z-axis is the spectrum values, 
+the xy-plane will be the identity reciprocal space, and restricted to the brillouin zone of the crystal 
+for plotting the spectrum. Each band will be plotted as an individual surface.
+
+### Keyword Arguments
+- `paddirection` The direction to pad the spectrum, either `:top` or `:bottom`, this is used when some bands 
+                 at a `Momentum` have different count of eigenmodes than the others, the shorter bands will 
+                 be padded with `NaN` to the direction specified, the `NaN` values will be ignored by `Plots.jl` 
+                 and therefore shown as empty.  
+"""
 function visualize(spectrum::CrystalSpectrum{2}; paddirection::Symbol=:top)
     eigenmodes = spectrum|>geteigenmodes
     eigenvalues = spectrum|>geteigenvalues
@@ -105,6 +157,13 @@ function visualize(spectrum::CrystalSpectrum{2}; paddirection::Symbol=:top)
     return PlotlyJS.plot([plotband(n|>getband) for n in 1:bandcount])
 end
 
+"""
+    visualize(source::SnappingResult)
+
+Visualize the snapping result as a scatter plot, the blue markers specifies the snapping grid, and the orange
+markers specifies the input values, from this plot you can observe how well the snapping is performing for your 
+given values.
+"""
 function visualize(source::SnappingResult)
     p = scatter(
         LinRange(0, 1, source.denominator + 1), 
@@ -116,6 +175,13 @@ function visualize(source::SnappingResult)
     return p
 end
 
+"""
+    visualize(source::EigenSpectrum)
+
+Visualize the eigenvalues of a `EigenSpectrum` as a scatter plot, the x-axis is the index of the eigen-modes, 
+since the eigen-modes in the `EigenSpectrum` is grouped by their eigenvalues, each group of eigen-modes will 
+have their own color in the plot.
+"""
 function visualize(source::EigenSpectrum)
     eigenfocks = FockSpace(m for (m, _) in source |> geteigenvalues) |> sparsegrouping(:eigenindex)
     datas::Vector = [[(source |> geteigenvalues)[m] |> real for m in subspace] for subspace in eigenfocks]

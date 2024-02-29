@@ -28,7 +28,11 @@ function Base.:+(a::RegionState, b::RegionState)
     mappedstates = (
         mode=>FockMap(state, inspace=mode|>FockSpace, performpermute=false) 
         for (mode, (_, state)) in zip(mergedmodes, combinedstates))
-    return RegionState{dim}(mappedstates|>Dict)
+
+function LinearAlgebra.normalize(state::RegionState)
+    spstates = Dict(m=>normalize(u) for (m, u) in state)
+    return RegionState{state|>dimension}(state|>getinspace, spstates)
+end
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 

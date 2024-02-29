@@ -212,6 +212,61 @@ function linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
         embeddedcrystal, spectrum|>geteigenmodes, spectrum|>geteigenvalues, spectrum|>geteigenvectors)
 end
 export linespectrum
+
+"""
+    groupbands(spectrum::CrystalSpectrum)
+
+Group the bands of the `CrystalSpectrum` by a specified band grouping strategy.
+
+### Keyword Arguments
+- `bandgrouping` The grouping strategy specified by `[count1, count2, ...]`.
+- `frombottom`   Whether to group the bands from the bottom of the spectrum, if set to `false` this will group 
+                 from the top of the spectrum.
+"""
+function groupbands(spectrum::CrystalSpectrum; bandgrouping=[spectrum.bandcount|>last], frombottom::Bool = true)
+    kvalues = (
+        k=>(m=>geteigenvalues(spectrum)[m] for m in (spectrum|>geteigenmodes)[k]) 
+        for k in spectrum|>getcrystal|>brillouinzone)
+    
+    function grouping(k, iter)
+        sorted = sort(iter|>collect, by=last)
+        frombottom || reverse!(sorted)
+        groupedvalues = []
+        n = 1
+        for g in bandgrouping
+            group = sorted[n:n+g-1]
+            push!(groupedvalues, group)
+            n += g
+        end
+        groupedmodes = [Subset(m for (m, _) in group) for group in groupedvalues]
+        groupedvectors = [geteigenvectors(spectrum)[k][:, modes|>FockSpace] for modes in groupedmodes]
+        return k=>(groupedvalues, groupedmodes, groupedvectors)
+    end
+
+    kgrouped = paralleltasks(name="groupbands",
+        tasks=(()->grouping(k, iter) for (k, iter) in kvalues),
+        count=spectrum|>getcrystal|>vol)|>parallel|>Dict
+    
+    function getgroupspectrum(n)
+        eigenvalues = Dict()
+        eigenmodes = Dict()
+        eigenvectors = Dict()
+        for k in spectrum|>getcrystal|>brillouinzone
+            values, modes, vectors = kgrouped[k]
+            eigenmodes[k] = modes[n]
+            eigenvectors[k] = vectors[n]
+            for (m, v) in values[n]
+                eigenvalues[m] = v
+            end
+        end
+        return CrystalSpectrum(spectrum|>getcrystal, eigenmodes, eigenvalues, eigenvectors)
+    end
+
+    return paralleltasks(name="groupbands",
+        tasks=(()->getgroupspectrum(n) for n in 1:length(bandgrouping)),
+        count=length(bandgrouping))|>parallel|>collect
+end
+export groupbands
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

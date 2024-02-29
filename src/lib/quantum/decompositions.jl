@@ -358,13 +358,14 @@ singular values, and right singular vectors.
 function LinearAlgebra.:svd(fockmap::FockMap)::Tuple{FockMap, Base.Generator, FockMap}
     leftmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap|>getinspace))
     rightmodes::Subset{Mode} = Subset(Mode([:svdindex => n]) for n in 1:dimension(fockmap|>getoutspace))
+    svdmodes = length(leftmodes) < length(rightmodes) ? leftmodes : rightmodes
     U, Σ, Vt = fockmap |> rep |> Matrix |> svd
     svdvalues::Base.Generator = (
-        (Mode([:svdindex => n]), Mode([:svdindex => n])) => Σ[n] for n in 1:min(leftmodes|>length, rightmodes|>length))
+        (Mode([:svdindex => n]), Mode([:svdindex => n])) => Σ[n] for n in 1:length(svdmodes))
     return (
-        FockMap(fockmap|>getoutspace, leftmodes|>FockSpace, U),
+        FockMap(fockmap|>getoutspace, svdmodes|>FockSpace, U),
         svdvalues,
-        FockMap(rightmodes|>FockSpace, fockmap|>getinspace, Vt'))
+        FockMap(svdmodes|>FockSpace, fockmap|>getinspace, Vt'))
 end
 
 """ Shorthand for retrieving the eigenvectors from the `eigspech` function. """

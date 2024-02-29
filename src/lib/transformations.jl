@@ -383,6 +383,9 @@ export relativephase
 
 relativephase(ref::BasisFunction) = target::BasisFunction -> relativephase(target, ref)
 
+""" Division of `BasisFunction` will return the phase difference. """
+Base.:/(target::BasisFunction, ref::BasisFunction)::Complex = relativephase(target, ref)
+
 Zipper.:dimension(scale::Scale)::Integer = scale |> rep |> size |> first
 Zipper.:getspace(scale::Scale)::RealSpace = scale.localspace
 

@@ -297,7 +297,7 @@ Display the mode attribute information in form of a table.
 """
 function showmodes(modes; showkeys=modes|>attrkeys|>collect)
     header = ["order", showkeys...]
-    getrow(mode) = (mode|>getattr(key) for key in showkeys)
+    getrow(mode) = (hasattr(mode, key) ? mode|>getattr(key) : "N/A" for key in showkeys)
     rowlength = length(header)
     rows = (reshape([n, getrow(mode)...], (1, rowlength)) for (n, mode) in modes|>enumerate)
     pretty_table(vcat(rows...), header=header)

@@ -70,7 +70,7 @@ function visualize(
         y = [v|>last for v in r]
         f = ((statemap[mode, :]|>rep)[1, 1] for mode in statemap|>getoutspace)
         color = [convert(RGB{Float64}, HSV(angle(v) / 2π * 360, 1, 1)) for v in f]
-        size = [markersize*(abs(v)^logscale) for v in f]
+        size = [max(markersize*(abs(v)^logscale), 1e-5) for v in f]
         hover = [trunc(v|>real, digits=3)+trunc(v|>imag, digits=3)*im|>string for v in f]
         return scatter(
             x, y, markersize=size, markercolor=color, hover=hover,

@@ -249,6 +249,8 @@ struct PhaseTable
 end
 export PhaseTable
 
+ADDEDFUNCTIONS::Dict{Tuple{AffineTransform, BasisFunction}, BasisFunction} = Dict()
+
 @memoize function PhaseTable(symmetry::AffineTransform, realdenom::Integer, imagdenom::Integer)::PhaseTable
     eigenfunctions = computeeigenfunctions(symmetry, 1:3) # Zipper.jl only support up to 3-dimensions
     eigenvalues = (v for (v, _) in eigenfunctions)
@@ -266,6 +268,11 @@ export PhaseTable
         (hashablereal(r, realdenominator), hashablereal(i, imagdenominator))=>(r+i*im, f) 
         for (_, r, i, f) in entries)
 
+    # Use the added eigenfunctions to override the default eigenfunctions.
+    for (key, (phase, f)) in lookuptable
+        haskey(ADDEDFUNCTIONS, (symmetry, f)) && (lookuptable[key] = (phase, ADDEDFUNCTIONS[(symmetry, f)]))
+    end
+
     return PhaseTable(lookuptable, realdenominator, imagdenominator)
 end
 
@@ -274,10 +281,19 @@ function PhaseTable(symmetry::AffineTransform; realprecision::Real = 1e-3, imagp
     imagdenom::Integer = getprecdenom(imagprecision)
     return PhaseTable(symmetry, realdenom, imagdenom)
 end
+
+function seteigenfunction(g::AffineTransform, f::BasisFunction)
+    tbl = PhaseTable(g)
+    phase = (g * f) / f
+    phase, bf = tbl[phase]
+    @info "Binded function $f to phase $phase."
+    ADDEDFUNCTIONS[(g, bf)] = f
+end
+export seteigenfunction
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
-# ◆ PhaseSignature APIs ◆
+# ◆ PhaseTable APIs ◆
 function Base.:getindex(table::PhaseTable, v::Complex)::Tuple{Complex, BasisFunction}
     key::Tuple = (hashablereal(v|>real, table.realdenom), hashablereal(v|>imag, table.imagdenom))
     if !haskey(table.lookuptable, key)
@@ -366,6 +382,9 @@ end
 export relativephase
 
 relativephase(ref::BasisFunction) = target::BasisFunction -> relativephase(target, ref)
+
+""" Division of `BasisFunction` will return the phase difference. """
+Base.:/(target::BasisFunction, ref::BasisFunction)::Complex = relativephase(target, ref)
 
 Zipper.:dimension(scale::Scale)::Integer = scale |> rep |> size |> first
 Zipper.:getspace(scale::Scale)::RealSpace = scale.localspace

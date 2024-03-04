@@ -27,6 +27,7 @@ Zipper.:hassamespan(a::T, b::F) where {T <: AbstractSpace, F <: AbstractSpace} =
 
 """ Shorthand for creating a `Point` within the specified space. """
 Base.:∈(data, space::AffineSpace)::Point = Point(data |> collect, space)
+Base.:*(space::AffineSpace, data::Union{Vector, Tuple}) = Point(data|>collect, space)
 
 """
     hassamespan(a::T, b::F) where {T <: AffineSpace, F <: AffineSpace}

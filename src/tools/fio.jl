@@ -249,13 +249,7 @@ The object loaded from the file.
 """
 function fioload(name::String)
     filepath = joinpath(fiodir(), "$name.dat")
-    if !isfile(filepath)
-        @error begin
-            "Object $name does not exist in $(fiodir())!"
-            "Expected file name: $filepath" 
-        end
-        return
-    end
+    !isfile(filepath) && error("Object $name does not exist in $(fiodir())!")
     datasize = filesize(filepath)
     lzwcompressed = Vector{Int32}(undef, datasize/sizeof(Int32)|>round|>Integer)
     read!(filepath, lzwcompressed)

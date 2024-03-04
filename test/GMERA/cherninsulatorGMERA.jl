@@ -223,37 +223,37 @@ end
 
 H, correlations = H_haldane(12,ComplexF64(-1),0.4im)
 
-blockedcorrelationsloc2size12 = startingcorrelations(correlations,2)
-rgresultsloc2size12 = rg(blockedcorrelationsloc2size12,modeselection1stbycountthenbythreshold(1,0.001))
-rgresultsloc2size12[:rg1][:correlations]
-rgapproxloc2size12 = rgapproximation(rgresultsloc2size12)
-dataloc2size12 = focktracenorm(FockMap(blockedcorrelationsloc2size12-rgapproxloc2size12),288)
+blockedcorrelationsloc2size12chern = startingcorrelations(correlations,2)
+rgresultsloc2size12chern = rg(blockedcorrelationsloc2size12chern,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc2size12chern[:rg1][:correlations]
+rgapproxloc2size12chern = rgapproximation(rgresultsloc2size12chern)
+dataloc2size12chern = focktracenorm(FockMap(blockedcorrelationsloc2size12chern-rgapproxloc2size12chern),288)
 
-blockedcorrelationsloc3size12 = startingcorrelations(correlations,3)
-rgresultsloc3size12 = rg(blockedcorrelationsloc3size12,modeselection1stbycountthenbythreshold(1,0.001))
-rgresultsloc3size12[:rg1][:correlations]
-rgapproxloc3size12 = rgapproximation(rgresultsloc3size12)
-dataloc3size12 = focktracenorm(FockMap(blockedcorrelationsloc3size12-rgapproxloc3size12),288)
+blockedcorrelationsloc3size12chern = startingcorrelations(correlationschern,3)
+rgresultsloc3size12chern = rg(blockedcorrelationsloc3size12chern,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc3size12chern[:rg1][:correlations]
+rgapproxloc3size12chern = rgapproximation(rgresultsloc3size12chern)
+dataloc3size12chern = focktracenorm(FockMap(blockedcorrelationsloc3size12chern-rgapproxloc3size12chern),288)
 
 H, correlations = H_trivial(24,ComplexF64(-1),0.4im)
 
-blockedcorrelationsloc2size24 = startingcorrelations(correlations,2)
-rgresultsloc2size24 = rg(blockedcorrelationsloc2size24,modeselection1stbycountthenbythreshold(1,0.001))
-rgresultsloc2size24[:rg2][:correlations]
-rgapproxloc2size24 = rgapproximation(rgresultsloc2size24)
-dataloc2size24 = focktracenorm(FockMap(blockedcorrelationsloc2size24-rgapproxloc2size24),1152)
+blockedcorrelationsloc2size24chern = startingcorrelations(correlations,2)
+rgresultsloc2size24chern = rg(blockedcorrelationsloc2size24chern,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc2size24chern[:rg2][:correlations]
+rgapproxloc2size24chern = rgapproximation(rgresultsloc2size24chern)
+dataloc2size24chern = focktracenorm(FockMap(blockedcorrelationsloc2size24chern-rgapproxloc2size24chern),1152)
 
-blockedcorrelationsloc3size24 = startingcorrelations(correlations,3)
-rgresultsloc3size24 = rg(blockedcorrelationsloc3size24,modeselection1stbycountthenbythreshold(1,0.001))
-rgresultsloc3size24[:rg2][:correlations]
-rgapproxloc3size24 = rgapproximation(rgresultsloc3size24)
-dataloc3size24 = focktracenorm(FockMap(blockedcorrelationsloc3size24-rgapproxloc3size24),1152)
+blockedcorrelationsloc3size24chern = startingcorrelations(correlations,3)
+rgresultsloc3size24chern = rg(blockedcorrelationsloc3size24chern,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc3size24chern[:rg2][:correlations]
+rgapproxloc3size24chern = rgapproximation(rgresultsloc3size24chern)
+dataloc3size24chern = focktracenorm(FockMap(blockedcorrelationsloc3size24chern-rgapproxloc3size24chern),1152)
 
-blockedcorrelationsloc4size24 = startingcorrelations(correlations,4)
-rgresultsloc4size24 = rg(blockedcorrelationsloc4size24,modeselection1stbycountthenbythreshold(1,0.001))
-rgresultsloc4size24[:rg1][:correlations]
-rgapproxloc4size24 = rgapproximation(rgresultsloc4size24)
-dataloc4size24 = focktracenorm(FockMap(blockedcorrelationsloc4size24-rgapproxloc4size24),1152)
+blockedcorrelationsloc4size24chern = startingcorrelations(correlations,4)
+rgresultsloc4size24chern = rg(blockedcorrelationsloc4size24chern,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc4size24chern[:rg1][:correlations]
+rgapproxloc4size24chern = rgapproximation(rgresultsloc4size24chern)
+dataloc4size24chern = focktracenorm(FockMap(blockedcorrelationsloc4size24chern-rgapproxloc4size24chern),1152)
 
 blockedcorrelationsloc6size24 = startingcorrelations(correlations,6)
 rgresultsloc6size24 = rg(blockedcorrelationsloc6size24,modeselection1stbycountthenbythreshold(1,0.001))

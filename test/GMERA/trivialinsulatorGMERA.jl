@@ -232,16 +232,18 @@ function rg(correlations,selectionstrategy)
     return rgresult
 end
 
+modeselectionstrategy = modeselection1stbycountthenbythreshold(1,0.001)
+
 H, correlations = H_trivial(12,ComplexF64(-1),-0.2,-0.8)
 
 blockedcorrelationsloc2size12 = startingcorrelations(correlations,2)
-rgresultsloc2size12 = rg(blockedcorrelationsloc2size12,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc2size12 = rg(blockedcorrelationsloc2size12,modeselectionstrategy)
 rgresultsloc2size12[:rg1][:correlations]
 rgapproxloc2size12 = rgapproximation(rgresultsloc2size12)
 dataloc2size12 = focktracenorm(FockMap(blockedcorrelationsloc2size12-rgapproxloc2size12),288)
 
 blockedcorrelationsloc3size12 = startingcorrelations(correlations,3)
-rgresultsloc3size12 = rg(blockedcorrelationsloc3size12,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc3size12 = rg(blockedcorrelationsloc3size12,modeselectionstrategy)
 rgresultsloc3size12[:rg1][:correlations]
 rgapproxloc3size12 = rgapproximation(rgresultsloc3size12)
 dataloc3size12 = focktracenorm(FockMap(blockedcorrelationsloc3size12-rgapproxloc3size12),288)
@@ -249,25 +251,25 @@ dataloc3size12 = focktracenorm(FockMap(blockedcorrelationsloc3size12-rgapproxloc
 H, correlations = H_trivial(24,ComplexF64(-1),-0.2,-0.8)
 
 blockedcorrelationsloc2size24 = startingcorrelations(correlations,2)
-rgresultsloc2size24 = rg(blockedcorrelationsloc2size24,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc2size24 = rg(blockedcorrelationsloc2size24,modeselectionstrategy)
 rgresultsloc2size24[:rg2][:correlations]
 rgapproxloc2size24 = rgapproximation(rgresultsloc2size24)
 dataloc2size24 = focktracenorm(FockMap(blockedcorrelationsloc2size24-rgapproxloc2size24),1152)
 
 blockedcorrelationsloc3size24 = startingcorrelations(correlations,3)
-rgresultsloc3size24 = rg(blockedcorrelationsloc3size24,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc3size24 = rg(blockedcorrelationsloc3size24,modeselectionstrategy)
 rgresultsloc3size24[:rg2][:correlations]
 rgapproxloc3size24 = rgapproximation(rgresultsloc3size24)
 dataloc3size24 = focktracenorm(FockMap(blockedcorrelationsloc3size24-rgapproxloc3size24),1152)
 
 blockedcorrelationsloc4size24 = startingcorrelations(correlations,4)
-rgresultsloc4size24 = rg(blockedcorrelationsloc4size24,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc4size24 = rg(blockedcorrelationsloc4size24,modeselectionstrategy)
 rgresultsloc4size24[:rg1][:correlations]
 rgapproxloc4size24 = rgapproximation(rgresultsloc4size24)
 dataloc4size24 = focktracenorm(FockMap(blockedcorrelationsloc4size24-rgapproxloc4size24),1152)
 
 blockedcorrelationsloc6size24 = startingcorrelations(correlations,6)
-rgresultsloc6size24 = rg(blockedcorrelationsloc6size24,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc6size24 = rg(blockedcorrelationsloc6size24,modeselectionstrategy)
 rgresultsloc6size24[:rg1][:correlations]
 rgapproxloc6size24 = rgapproximation(rgresultsloc6size24)
 dataloc6size24 = focktracenorm(FockMap(blockedcorrelationsloc6size24-rgapproxloc6size24),1152)
@@ -275,37 +277,37 @@ dataloc6size24 = focktracenorm(FockMap(blockedcorrelationsloc6size24-rgapproxloc
 H, correlations = H_trivial(48,ComplexF64(-1),-0.2,-0.8)
 
 blockedcorrelationsloc2size48 = startingcorrelations(correlations,2)
-rgresultsloc2size48 = rg(blockedcorrelationsloc2size48,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc2size48 = rg(blockedcorrelationsloc2size48,modeselectionstrategy)
 rgresultsloc2size48[:rg3]
 rgapproxloc2size48 = rgapproximation(rgresultsloc2size48)
 dataloc2size48 = focktracenorm(FockMap(blockedcorrelationsloc2size48-rgapproxloc2size48),4608)
 
 blockedcorrelationsloc3size48 = startingcorrelations(correlations,3)
-rgresultsloc3size48 = rg(blockedcorrelationsloc3size48,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc3size48 = rg(blockedcorrelationsloc3size48,modeselectionstrategy)
 rgresultsloc3size48[:rg3][:correlations]
 rgapproxloc3size48 = rgapproximation(rgresultsloc3size48)
 dataloc3size48 = focktracenorm(FockMap(blockedcorrelationsloc3size48-rgapproxloc3size48),4608)
 
 blockedcorrelationsloc4size48 = startingcorrelations(correlations,4)
-rgresultsloc4size48 = rg(blockedcorrelationsloc4size48,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc4size48 = rg(blockedcorrelationsloc4size48,modeselectionstrategy)
 rgresultsloc4size48[:rg2][:correlations]
 rgapproxloc4size48 = rgapproximation(rgresultsloc4size48)
 dataloc4size48 = focktracenorm(FockMap(blockedcorrelationsloc4size48-rgapproxloc4size48),4608)
 
 blockedcorrelationsloc6size48 = startingcorrelations(correlations,6)
-rgresultsloc6size48 = rg(blockedcorrelationsloc6size48,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc6size48 = rg(blockedcorrelationsloc6size48,modeselectionstrategy)
 rgresultsloc6size48[:rg2][:correlations]
 rgapproxloc6size48 = rgapproximation(rgresultsloc6size48)
 dataloc6size48 = focktracenorm(FockMap(blockedcorrelationsloc6size48-rgapproxloc6size48),4608)
 
 blockedcorrelationsloc8size48 = startingcorrelations(correlations,8)
-rgresultsloc8size48 = rg(blockedcorrelationsloc8size48,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc8size48 = rg(blockedcorrelationsloc8size48,modeselectionstrategy)
 rgresultsloc8size48[:rg1][:correlations]
 rgapproxloc8size48 = rgapproximation(rgresultsloc8size48)
 dataloc8size48 = focktracenorm(FockMap(blockedcorrelationsloc8size48-rgapproxloc8size48),4608)
 
 blockedcorrelationsloc12size48 = startingcorrelations(correlations,12)
-rgresultsloc12size48 = rg(blockedcorrelationsloc12size48,modeselection1stbycountthenbythreshold(1,0.001))
+rgresultsloc12size48 = rg(blockedcorrelationsloc12size48,modeselectionstrategy)
 rgresultsloc12size48[:rg1][:correlations]
 rgapproxloc12size48 = rgapproximation(rgresultsloc12size48)
 dataloc12size48 = focktracenorm(FockMap(blockedcorrelationsloc12size48-rgapproxloc12size48),4608)
@@ -348,16 +350,16 @@ dataloc12size48 = focktracenorm(FockMap(blockedcorrelationsloc12size48-rgapproxl
 # rgapproxloc12size48 = rgapproximation(rgresultsloc12size48)
 # dataloc12size48 = focktracenorm(FockMap(blockedcorrelationsloc12size48-rgapproxloc12size48),4608)
 
-log.([1,1])
-radiuslist12 = [2,3]
-errorlist12 = log.([dataloc2size12,dataloc3size12])
-radiuslist24 = [2,3,4,6]
-errorlist24 = log.([dataloc2size24,dataloc3size24,dataloc4size24,dataloc6size24])
-radiuslist48 = [2,3,4,6,8,12]
-errorlist48 = log.([dataloc2size48,dataloc3size48,dataloc4size48,dataloc6size48,dataloc8size48,dataloc12size48])
+# log.([1,1])
+# radiuslist12 = [2,3]
+# errorlist12 = log.([dataloc2size12,dataloc3size12])
+# radiuslist24 = [2,3,4,6]
+# errorlist24 = log.([dataloc2size24,dataloc3size24,dataloc4size24,dataloc6size24])
+# radiuslist48 = [2,3,4,6,8,12]
+# errorlist48 = log.([dataloc2size48,dataloc3size48,dataloc4size48,dataloc6size48,dataloc8size48,dataloc12size48])
 
-plot([scatter(x=radiuslist12, y=errorlist12, mode="markers", name="size12"),scatter(x=radiuslist24, y=errorlist24, mode="markers", name="size24"),scatter(x=radiuslist48, y=errorlist48, mode="markers", name="size48")],
-Layout(
-        title="log(Tr(sqrt(C_orig-C_approx))) vs radius for trivial insulator ",
-        template="simple_white"
-    ))
+# plot([scatter(x=radiuslist12, y=errorlist12, mode="markers", name="size12"),scatter(x=radiuslist24, y=errorlist24, mode="markers", name="size24"),scatter(x=radiuslist48, y=errorlist48, mode="markers", name="size48")],
+# Layout(
+#         title="log(Tr(sqrt(C_orig-C_approx))) vs radius for trivial insulator ",
+#         template="simple_white"
+#     ))

@@ -240,7 +240,7 @@ function Base.:*(left::FourierMap{T}, right::SparseFockMap{T, O}) where {T, O}
         name="FourierMap * SparseFockMap",
         tasks=(()->k=>block*right for (k, block) in left.data),
         count=left.data|>length)|>parallel|>Dict
-    return FourierMap(left.crystal, right|>getoutspace, multiplied)
+    return FourierMap(left.crystal, right|>getinspace, multiplied)
 end
 
 Base.:*(::FourierMap, ::InvFourierMap) = notimplemented()

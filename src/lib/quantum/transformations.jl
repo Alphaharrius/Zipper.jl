@@ -166,6 +166,18 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
     return symmetricstatemap|>RegionState
 end
 
+function Base.broadcasted(::typeof(*), g::AffineTransform, state::RegionState)
+    function applytransform(m, u)
+        right = g * RegionFock([m])
+        left = g * getoutspace(u)
+        return first(right|>getoutspace)=>left*u*right'
+    end
+    spstates = (applytransform(m, u) for (m, u) in state)
+    modes = (m for (m, _) in spstates)|>mapmodes(m->m)|>Subset
+    spstates = Dict(m=>u*idmap(m|>FockSpace, nm|>FockSpace) for (nm, (m, u)) in zip(modes, spstates))
+    return RegionState{state|>dimension}(modes, spstates)
+end
+
 function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
     inspacerep::FockMap = *(symmetry, fockmap |> getinspace)
     hassamespan(

@@ -30,11 +30,7 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
     scaledkspace::MomentumSpace = convert(MomentumSpace, scaledspace)
     # This is the unit cell of the 1-D embedded crystal defining the strip region in the blocked crystal metric space.
     unscaledextendedunitcell::Region = getcrosssection(crystal=crystal, normalvector=restrict.normalvector, radius=restrict.stripradius)
-    unscaledextendedhomefock = matchreduce(
-        quantize(unscaledextendedunitcell, 1), crystalfock|>unitcellfock,
-        leftmatch=m->m|>getattr(:b)|>euclidean,
-        rightmatch=m->m|>getattr(:b)|>euclidean,
-        reducer=(a, b)->merge(a, b))|>RegionFock
+    unscaledextendedhomefock = getregionfock(crystalfock, unscaledextendedunitcell)
 
     bz::Subset{Momentum} = crystal|>brillouinzone
     momentummappings::Base.Generator = (basispoint(scaledkspace * k) => k for k in bz)

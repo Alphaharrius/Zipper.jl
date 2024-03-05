@@ -122,4 +122,19 @@ export crystalsubspaces
 function Zipper.:hassamespan(a::CrystalFock, b::CrystalFock)::Bool
     return getcrystal(a) == getcrystal(b) && hassamespan(a|>unitcellfock, b|>unitcellfock)
 end
+
+"""
+    getregionfock(crystalfock::CrystalFock, region::Region)::RegionFock
+
+Retrieve the `RegionFock` which contain all the modes within the specified `region` from the `crystalfock`.
+"""
+function getregionfock(crystalfock::CrystalFock, region::Region)::RegionFock
+    crystalspace = crystalfock|>getcrystal|>getspace
+    transformed = (crystalspace*r for r in region)
+    offsets = (r-basispoint(r) for r in transformed)
+    modes = (m+r for (m, r) in Iterators.product(crystalfock|>unitcellfock|>RegionFock, offsets))
+
+    physregion = Subset(r|>euclidean for r in region)
+    return RegionFock(m for m in modes if m|>getpos|>euclidean ∈ physregion)
+end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

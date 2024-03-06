@@ -97,6 +97,9 @@ export outspacesubmaps
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ CrystalFockMap arithmetics ◆
 function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
+    @assert hassamespan(a|>getoutspace, b|>getoutspace)
+    @assert hassamespan(a|>getinspace, b|>getinspace)
+
     function compute(data)
         pair, block = data
         return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
@@ -126,6 +129,8 @@ end
 Base.:-(a::CrystalFockMap, b::CrystalFockMap) = a + (-b)
 
 function Base.:*(left::CrystalFockMap, right::CrystalFockMap)
+    @assert hassamespan(left|>getinspace, right|>getoutspace)
+
     rightblocks::Dict = outspacesubmaps(right)
 
     # We can then perform the multiplication procedure using multithreading.

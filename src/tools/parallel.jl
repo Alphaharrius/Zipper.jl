@@ -140,7 +140,7 @@ function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
     # passing through the iterative approach might be marked as garbage while it should 
     # not be. Therefore we will take a more functional approach (since Julia is functional) 
     # in hopes that the vm will lift this issue automatically.
-    if batchcount > 2
+    if batchcount > 3
         return paralleldivideconquer(f, result, batchcount, desc)
     end
     parallelsettings.divideconquermeter = ProgressUnknown(

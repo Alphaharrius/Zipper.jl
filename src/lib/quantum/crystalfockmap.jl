@@ -157,7 +157,9 @@ function Base.:*(left::CrystalFockMap, right::CrystalFockMap)
     function mergemultiplied(batch)
         merged = Dict()
         for v in batch, (index, block) in v
-            haskey(merged, index) ? (merged[index] += block) : (merged[index] = block)
+            if !iszero(block)
+                haskey(merged, index) ? (merged[index] += block) : (merged[index] = block)
+            end
             updatedivideconquer()
         end
         return merged

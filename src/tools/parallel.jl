@@ -121,7 +121,7 @@ function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
     batchsize::Integer = countmetric > 1 ? count/actualcorecount|>ceil : 2
     itembatches = Iterators.partition(iter, batchsize)
     batchcount::Integer = count/batchsize|>ceil
-    @debug "batchsize: $batchsize, batchcount: $batchcount, count: $count"
+    @debug "divideconquer batchsize: $batchsize, batchcount: $batchcount, count: $count"
     tasks = paralleltasks(
         name="",
         tasks=(()->f(batch) for batch in itembatches),
@@ -133,7 +133,7 @@ function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
         showmeter=false)
     # Add the progress meter to the global accessible variable.
     parallelsettings.divideconquermeter = (
-        ProgressUnknown(desc="divideconquer $desc count=$count", spinner=true))
+        ProgressUnknown(desc="divideconquer $desc count=$count batch=$batchsize", spinner=true))
     result = tasks|>parallel|>collect
     ProgressMeter.finish!(parallelsettings.divideconquermeter)
     # Since the issue is still unknown after checking, we suspect that some variables 

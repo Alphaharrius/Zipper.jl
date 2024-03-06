@@ -137,4 +137,5 @@ function getregionfock(crystalfock::CrystalFock, region::Region)::RegionFock
     physregion = Subset(r|>euclidean for r in region)
     return RegionFock(m for m in modes if m|>getpos|>euclidean ∈ physregion)
 end
+export getregionfock
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

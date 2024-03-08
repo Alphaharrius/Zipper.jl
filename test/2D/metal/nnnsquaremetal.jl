@@ -41,6 +41,116 @@ initscale = Scale([2 0; 0 2], square)
 initblock = initscale * (correlations|>getoutspace)
 inputcorrelations = initblock * correlations * initblock'
 
+correlations = inputcorrelations
+
+@info "Starting RG..."
+@info "Performing blocking..."
+scale = Scale([2 0; 0 2], square)
+block = scale * (correlations|>getoutspace)
+blockedcorrelations = block * correlations * block'
+blockedcrystalfock = blockedcorrelations|>getoutspace
+blockedcrystal = blockedcrystalfock|>getcrystal
+
+@info "Performing extended restrictions..."
+normalvector = (blockedcrystal|>getspace)*(2, 0)
+contractbasis = (blockedcrystal|>getspace)*(0, blockedcrystal|>size|>first)
+extendedscale = Scale(affinespace(normalvector, contractbasis)|>rep, blockedcrystal|>getspace)
+extendedrestrict = ExtendedRestrict(extendedscale, normalvector, 0.5)
+restrict = extendedrestrict * blockedcrystalfock
+stripcorrelations = restrict * blockedcorrelations * restrict'
+stripcorrelations|>getoutspace|>getcrystal|>getunitcell|>visualize
+stripspectrum = stripcorrelations|>crystalspectrum
+stripspectrum|>linespectrum|>visualize
+
+@info "Computing strip frozen correlations..."
+stripfrozenstates = groupbands(stripspectrum, :frozen=>(v -> v < 0.003 || v > 0.99))[:frozen]
+stripfrozenprojector = stripfrozenstates|>crystalprojector
+stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
+
+@info "Computing strip truncation restricted Fourier transform..."
+stripunitcell = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*3, radius=0.5)
+truncatedstripfrozencorrelations = truncatetoregion(stripfrozencorrelations, stripunitcell)
+truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
+truncatedstripfrozencorrelationspectrum|>linespectrum|>visualize
+
+@info "Extracting strip filled states..."
+stripfilledstates = groundstatespectrum(truncatedstripfrozencorrelationspectrum, perunitcellfillings=1)
+stripfilledprojector = stripfilledstates|>crystalprojector
+stripfilledcorrelations = idmap(stripfilledprojector|>getoutspace) - stripfilledprojector
+
+@info "Searching strip filled seeds..."
+scaledcrystal = stripfilledstates|>getcrystal
+scaledspace = scaledcrystal|>getspace
+
+wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector, radius=0.5)
+regionfock = quantize(wannierregion, 1)
+remapper = spatialremapper(regionfock, offsets=scaledspace|>getorigin|>Subset, unitcell=scaledcrystal|>getunitcell)
+wannierregionfock = remapper|>getoutspace
+restrict = fourier(stripfilledcorrelations|>getoutspace, wannierregionfock) / (scaledcrystal|>vol|>sqrt)
+localcorrelations = restrict' * stripfilledcorrelations * restrict
+localcorrelations = remapper' * localcorrelations * remapper
+localcorrelations|>eigspech|>visualize
+localstates = getregionstates(localcorrelations=localcorrelations, grouping=[1])[1]
+localstates = remapper*FockMap(localstates)|>RegionState
+
+visualize(localstates, markersize=5, logscale=0.5)
+
+localseeds = localstates|>FockMap
+transform = fourier(stripfilledcorrelations|>getoutspace, localseeds|>getoutspace) / (scaledcrystal|>vol|>sqrt)
+crystalseeds = transform * localseeds
+crystalseeds = Dict(k=>crystalseeds[k, :] for k in scaledcrystal|>brillouinzone)
+pseudoidens = (u' * u for (_, u) in crystalseeds)
+lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh if v < 0.2)|>minimum
+@info "Local seeds linear-dependence metric: $lineardepmetric"
+
+@info "Wannierizing strip filled states..."
+wannierfilledisometry = wannierprojection(
+    crystalisometries=stripfilledstates|>geteigenvectors, crystal=scaledcrystal, crystalseeds=crystalseeds)
+wanniercrystal = wannierfilledisometry|>getinspace|>getcrystal
+rightrestrict = (
+    fourier(wannierfilledisometry|>getinspace, wannierfilledisometry|>getinspace|>unitcellfock|>RegionFock) / (wanniercrystal|>vol|>sqrt))
+wannierlocalisometry = transform' * wannierfilledisometry * rightrestrict
+stripfilledlocalstates = wannierlocalisometry|>RegionState
+visualize(stripfilledlocalstates, markersize=5, logscale=0.5)
+
+@info "Computing strip filled projector..."
+remapper = spatialremapper(
+    wannierlocalisometry|>getoutspace, getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace))
+wannierlocalisometry = remapper * wannierlocalisometry
+transform = fourier(blockedcrystalfock, wannierlocalisometry|>getoutspace)
+wanniercrystalisometry = transform * wannierlocalisometry
+wanniermetalprojector = wanniercrystalisometry .* wanniercrystalisometry'
+
+@info "Computing global distiller..."
+transform = c4 * blockedcrystalfock
+globaldistiller = wanniermetalprojector + transform * wanniermetalprojector * transform'
+globaldistillerspectrum = globaldistiller|>crystalspectrum
+globaldistillerspectrum|>visualize
+
+bands = groupbands(globaldistillerspectrum, :metal=>(v -> v > 1))
+metalprojector = bands[:metal]|>crystalprojector
+otherprojector = bands[:others]|>crystalprojector
+
+otherprojector|>crystalspectrum|>visualize
+
+function blockdiag(fockmap::CrystalFockMap)
+    @assert hassamespan(fockmap|>getoutspace, fockmap|>getinspace)
+    blocks = Dict((ok, ik)=>block for ((ok, ik), block) in fockmap.blocks if ok == ik)
+    crystal = fockmap|>getoutspace|>getcrystal
+    return CrystalFockMap(crystal, crystal, blocks)
+end
+correlations
+otherprojector = blockdiag(otherprojector)
+
+iscale = Scale([4 0; 0 4], square)
+iblock = iscale * (groundstateprojector|>getoutspace)
+
+unblockedotherprojector = iblock' * otherprojector * iblock
+unblockedotherprojector|>crystalspectrum|>visualize
+
+testcorrelations = 1 - otherprojector * blockedcorrelations * otherprojector
+testcorrelations|>crystalspectrum|>visualize
+
 function zer(correlations)
     @info "Starting RG..."
     @info "Performing blocking..."
@@ -68,6 +178,7 @@ function zer(correlations)
     stripunitcell = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*3, radius=0.5)
     truncatedstripfrozencorrelations = truncatetoregion(stripfrozencorrelations, stripunitcell)
     truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
+    return truncatedstripfrozencorrelationspectrum
 
     @info "Extracting strip filled states..."
     stripfilledstates = groundstatespectrum(truncatedstripfrozencorrelationspectrum, perunitcellfillings=8)
@@ -188,6 +299,9 @@ function zer(correlations)
 end
 
 rg1 = zer(inputcorrelations)
+
+rg1|>linespectrum|>visualize
+
 rg2 = zer(rg1[:correlations])
 rg3 = zer(rg2[:correlations])
 rg4 = zer(rg3[:correlations])

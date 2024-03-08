@@ -471,8 +471,9 @@ function findcomplexdenominator(values; denominatorrange::UnitRange = 2:128, tol
 end
 export findcomplexdenominator
 
-function dosnf(matrix::Matrix)::Tuple{Matrix, Matrix, Matrix}
-    snf = smith(matrix)
-    return snf.S, diagm(snf), snf.T
+function dosnf(mat::Matrix)::Tuple{Matrix, Matrix, Matrix}
+    M = matrix(ZZ, map(Int, mat))
+    S, Ud, V = snf_with_transform(M)
+    return map(Int, Ud|>inv)|>Matrix, map(Int, S)|>Matrix, map(Int, V|>inv)|>Matrix
 end
 export dosnf

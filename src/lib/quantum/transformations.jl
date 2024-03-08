@@ -110,11 +110,15 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
     # to bring the set of modes to the symmetry eigenbasis.
     statemap::FockMap = state|>FockMap
     stateregionfock::RegionFock = statemap|>getoutspace
-    localsymmetry::AffineTransform = symmetry|>recenter(stateregionfock|>getregion|>getcenter)
-    outspacerep::FockMap = localsymmetry * stateregionfock
+    # Support RegionState with unusual regionfock.
+    snapregionfock = stateregionfock|>snap2unitcell
+    localsymmetry::AffineTransform = symmetry|>recenter(snapregionfock|>getregion|>getcenter)
+    outspacerep::FockMap = localsymmetry * snapregionfock
     # We requires the the RegionFock of the state to be closed under symmetry.
-    hassamespan(outspacerep|>getoutspace, stateregionfock) || error(
+    hassamespan(outspacerep|>getoutspace, snapregionfock) || error(
         "The symmetry action on the state region fockspace in not closed!")
+    remap = idmap(stateregionfock, snapregionfock)
+    outspacerep = remap * outspacerep * remap'
     inspacerep::FockMap = statemap' * outspacerep * statemap
     phasespectrum::EigenSpectrum = inspacerep|>eigspec
     # We will then use the eigenvectors of the inspace representation to transform the state into a quasi-symmetric state.
@@ -138,20 +142,22 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
             phase, basisfunction = lowprectable[eigenvalue]
             # Performing manual symmetrization.
             elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
+            eigenvector = remap' * eigenvector
             symmetricalmap = eigenvector
             for element in elements
                 symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector*phase
             end
-            symmetricalmap = symmetricalmap|>normalize
+            symmetricalmap = remap * (symmetricalmap|>normalize)
         else
             @warn "Manually symmetrizing asymmetric state..."
             basisfunction = swave
             elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
+            eigenvector = remap' * eigenvector
             symmetricalmap = eigenvector
             for element in elements
                 symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector
             end
-            symmetricalmap = symmetricalmap|>normalize
+            symmetricalmap = remap * (symmetricalmap|>normalize)
         end
         newmode = mode|>setattr(:orbital=>basisfunction)
         inspace = newmode|>FockSpace

@@ -77,10 +77,10 @@ localseed = columns(locseedregionevec, localseedvec |> Subset |> FockSpace )
 
 c3rep = c3 * (localseed |> getoutspace)
 c3localseed = c3rep * localseed
-c3localseed = FockMap(c3localseed,inspace=c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3a")|> FockSpace,performpermute=false)
+c3localseed = FockMap(c3localseed,inspace=c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3a")|> FockSpace,permute=false)
 c3c3rep = c3^2 * (localseed |> getoutspace)
 c3c3localseed = c3c3rep * localseed
-c3c3localseed = FockMap(c3c3localseed,inspace=c3c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3c3a")|> FockSpace,performpermute=false)
+c3c3localseed = FockMap(c3c3localseed,inspace=c3c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3c3a")|> FockSpace,permute=false)
 aseed = (localseed+c3localseed+c3c3localseed)
 
 courierseedingcenter::Offset = (blockedmodes |> getspace) & [1/3, 2/3]
@@ -92,14 +92,14 @@ locseedregionevec = regioncorrelations(blockedcorrelations,courierseedingfock) |
 [(regioncorrelations(blockedcorrelations,courierseedingfock) |> eigvalsh)...]
 localseedvec = (locseedregionevec |> getinspace |> orderedmodes |> collect)[1:3]
 localseed = columns(locseedregionevec, localseedvec |> Subset |> FockSpace )
-localseed = FockMap(localseed,inspace=localseed |> getinspace |> orderedmodes |> setattr(:name=> "b")|> FockSpace,performpermute=false)
+localseed = FockMap(localseed,inspace=localseed |> getinspace |> orderedmodes |> setattr(:name=> "b")|> FockSpace,permute=false)
 
 c3rep = c3 * (localseed |> getoutspace)
 c3localseed = c3rep * localseed
-c3localseed = FockMap(c3localseed,inspace=c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3b")|> FockSpace,performpermute=false)
+c3localseed = FockMap(c3localseed,inspace=c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3b")|> FockSpace,permute=false)
 c3c3rep = c3^2 * (localseed |> getoutspace)
 c3c3localseed = c3c3rep * localseed
-c3c3localseed = FockMap(c3c3localseed,inspace=c3c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3c3b")|> FockSpace,performpermute=false)
+c3c3localseed = FockMap(c3c3localseed,inspace=c3c3localseed |> getinspace |> orderedmodes |> setattr(:name=> "c3c3b")|> FockSpace,permute=false)
 bseed = (localseed+c3localseed+c3c3localseed)
 aseed
 
@@ -241,7 +241,7 @@ realfilledC = Ft' * filledC * Ft
 
 U = regioncorrelations(filledC, frozenseedingfock) |> eigvecsh
 
-M = idmap(somemodes |> FockSpace) - idmap(frozenseedingfock) + FockMap(U, inspace=U |> getoutspace, performpermute=false)
+M = idmap(somemodes |> FockSpace) - idmap(frozenseedingfock) + FockMap(U, inspace=U |> getoutspace, permute=false)
 
 R = M * realfilledC * M'
 

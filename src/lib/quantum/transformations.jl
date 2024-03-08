@@ -161,7 +161,7 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
         end
         newmode = mode|>setattr(:orbital=>basisfunction)
         inspace = newmode|>FockSpace
-        return newmode, FockMap(symmetricalmap, inspace=inspace, performpermute=false)
+        return newmode, FockMap(symmetricalmap, inspace=inspace, permute=false)
     end
 
     symmetricstates = [symmetrize(m, quasistates[:, m]) for m in quasistates|>getinspace]
@@ -196,7 +196,7 @@ function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
         m |> setattr(:orbital => phasetable[(phasespectrum|>geteigenvalues)[m]][2])
           |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
         for m in phasespectrum |> geteigenvectors |> getinspace)s
-    return FockMap(phasespectrum |> geteigenvectors, inspace=outspace, performpermute=false)'
+    return FockMap(phasespectrum |> geteigenvectors, inspace=outspace, permute=false)'
 end
 
 function Base.:*(fockmap::FockMap, symmetry::AffineTransform)
@@ -227,5 +227,5 @@ function Base.:*(fockmap::FockMap, symmetry::AffineTransform)
     end
 
     inspace::FockSpace = FockSpace(newmodes)
-    return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
+    return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, permute=false)
 end

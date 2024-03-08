@@ -102,7 +102,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
             return localisometry
         end
         inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:k => k) |> removeattr(:r) |> FockSpace
-        return FockMap(localisometry, inspace=inspace, performpermute=false)
+        return FockMap(localisometry, inspace=inspace, permute=false)
     end
 
     isometries = paralleltasks(
@@ -284,7 +284,7 @@ function wannierprojection(;
         approximated::FockMap = isometry * unitary
 
         inspace=FockSpace(approximated|>getinspace|>mapmodes(m->m|>setattr(:k=>k)|>removeattr(:r)))
-        return FockMap(approximated, inspace=inspace, performpermute=false)
+        return FockMap(approximated, inspace=inspace, permute=false)
     end
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"

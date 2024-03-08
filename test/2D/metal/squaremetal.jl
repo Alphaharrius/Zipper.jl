@@ -38,6 +38,26 @@ initscale = Scale([2 0; 0 2], square)
 initblock = initscale * (correlations|>getoutspace)
 inputcorrelations = initblock * correlations * initblock'
 
+function truncatetoregion(crystalmap::CrystalFockMap, region::Region)
+    crystalfock = crystalmap|>getoutspace
+    crystal = crystalfock|>getcrystal
+    truncatefock = getregionfock(crystalfock, region)
+    transform = fourier(crystalfock, truncatefock)
+
+    localcorrelations = transform' * crystalmap * transform / (crystal|>vol)
+    modecombinations = Iterators.product(localcorrelations|>getoutspace, localcorrelations|>getoutspace)
+
+    getconn(from::Mode, to::Mode) = (
+        getattr(to, :r) - getattr(from, :r), from|>removeattr(:r), to|>removeattr(:r))
+    # Using a Dict to filter out unique (:r, :b) -> (:r', :b') connections and get the corresponding indices 
+    # that we wish to kept.
+    modebonds = Dict(
+        getconn(frommode, tomode)=>(frommode, tomode) for (frommode, tomode) in modecombinations)
+    pruningindices = (index for (_, index) in modebonds)
+    crystalpruned = transform * extractindices(localcorrelations, pruningindices)
+    return crystalpruned .* crystalpruned'
+end
+
 function zer(correlations)
     @info "Performing blocking..."
     scale = Scale([2 0; 0 2], square)
@@ -55,7 +75,7 @@ function zer(correlations)
     stripspectrum = stripcorrelations|>crystalspectrum
 
     @info "Computing strip frozen correlations..."
-    stripfrozenstates = distillation(stripspectrum, :frozen=>(v -> v < 0.003 || v > 0.99))[:frozen]
+    stripfrozenstates = groupbands(stripspectrum, :frozen=>(v -> v < 0.003 || v > 0.99))[:frozen]
     stripfrozenprojector = stripfrozenstates|>crystalprojector
     stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
 
@@ -91,6 +111,7 @@ function zer(correlations)
     truncatedstripfrozencorrelations = crystaldirectsum(
         (transform * prunedcorrelations * transform' for transform in stripfouriers), 
         outcrystal=stripcrystal, incrystal=stripcrystal)
+    truncatedstripfrozencorrelations = truncatetoregion(stripfrozencorrelations, stripunitcell)
     truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
 
     @info "Extracting strip filled states..."
@@ -208,6 +229,11 @@ function zer(correlations)
         :globaldistiller=>globaldistiller,
         :block=>block)
 end
+
+suc, sfc = zer(inputcorrelations)
+sfc|>crystalspectrum|>linespectrum|>visualize
+
+truncatetoregion(sfc, suc)|>crystalspectrum|>linespectrum|>visualize
 
 rg1 = zer(inputcorrelations)
 rg2 = zer(rg1[:correlations])

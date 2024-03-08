@@ -17,14 +17,14 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [384, 384])
+crystal = Crystal(unitcell, [192, 192])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
 m0, m1 = members(modes)
 
-t_a = -0.9 + 0im
-t_b = -0.1 + 0im
+t_a = -0.55 + 0im
+t_b = -0.45 + 0im
 tₙ = -1 + 0im
 
 onsite = [
@@ -66,14 +66,16 @@ function zer(correlations)
     @info "Computing local correlations..."
     localrestrict = fourier(blockedcrystalfock, frozenseedingfock) / (blockedcrystal|>vol|>sqrt)
     localcorrelations = localrestrict' * blockedcorrelations * localrestrict
-    localstates = getregionstates(localcorrelations=localcorrelations, grouping=[3, 18, 3])
+    localspectrum = localcorrelations|>eigspech
+    filledfock = FockSpace(m for (m, v) in localspectrum|>geteigenvalues if v < 0.0088)
+    emptyfock = FockSpace(m for (m, v) in localspectrum|>geteigenvalues if v > 0.9911)
 
     @info "Computing frozen projectors..."
-    localfilledisometry = localstates[1]|>FockMap
+    localfilledisometry = geteigenvectors(localspectrum)[:, filledfock]
     crystalfilledisometry = frozenrestrict * localfilledisometry
     filledprojector = crystalfilledisometry .* crystalfilledisometry'
 
-    localemptyisometry = localstates[3]|>FockMap
+    localemptyisometry = geteigenvectors(localspectrum)[:, emptyfock]
     crystalemptyisometry = frozenrestrict * localemptyisometry
     emptyprojector = crystalemptyisometry .* crystalemptyisometry'
 
@@ -179,3 +181,8 @@ rg2 = @time zer(rg1[:couriercorrelations])
 rg3 = @time zer(rg2[:couriercorrelations])
 rg4 = @time zer(rg3[:couriercorrelations])
 rg5 = @time zer(rg4[:couriercorrelations])
+rg6 = @time zer(rg5[:couriercorrelations])
+
+plot([-0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, -0], [1, 1, 2, 2, 3, 3, 3, 4, 6])
+
+plot!(xlabel="t_a - t_b", ylabel="RG Depth", legend=false)

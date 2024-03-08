@@ -38,27 +38,8 @@ initscale = Scale([2 0; 0 2], square)
 initblock = initscale * (correlations|>getoutspace)
 inputcorrelations = initblock * correlations * initblock'
 
-function truncatetoregion(crystalmap::CrystalFockMap, region::Region)
-    crystalfock = crystalmap|>getoutspace
-    crystal = crystalfock|>getcrystal
-    truncatefock = getregionfock(crystalfock, region)
-    transform = fourier(crystalfock, truncatefock)
-
-    localcorrelations = transform' * crystalmap * transform / (crystal|>vol)
-    modecombinations = Iterators.product(localcorrelations|>getoutspace, localcorrelations|>getoutspace)
-
-    getconn(from::Mode, to::Mode) = (
-        getattr(to, :r) - getattr(from, :r), from|>removeattr(:r), to|>removeattr(:r))
-    # Using a Dict to filter out unique (:r, :b) -> (:r', :b') connections and get the corresponding indices 
-    # that we wish to kept.
-    modebonds = Dict(
-        getconn(frommode, tomode)=>(frommode, tomode) for (frommode, tomode) in modecombinations)
-    pruningindices = (index for (_, index) in modebonds)
-    crystalpruned = transform * extractindices(localcorrelations, pruningindices)
-    return crystalpruned .* crystalpruned'
-end
-
 function zer(correlations)
+    @info "Starting RG..."
     @info "Performing blocking..."
     scale = Scale([2 0; 0 2], square)
     block = scale * (correlations|>getoutspace)
@@ -67,9 +48,10 @@ function zer(correlations)
     blockedcrystal = blockedcrystalfock|>getcrystal
 
     @info "Performing extended restrictions..."
-    normalvector = (1, 1) ∈ (blockedcrystal|>getspace)
-    extendedrestrict = extendedcrystalrestrict(
-        crystal=blockedcrystal, normalvector=normalvector, stripradius=0.5)
+    normalvector = (blockedcrystal|>getspace)*(1, 1)
+    contractbasis = (blockedcrystal|>getspace)*(0, blockedcrystal|>size|>first)
+    extendedscale = Scale(affinespace(normalvector, contractbasis)|>rep, blockedcrystal|>getspace)
+    extendedrestrict = ExtendedRestrict(extendedscale, normalvector, 0.5)
     restrict = extendedrestrict * blockedcrystalfock
     stripcorrelations = restrict * blockedcorrelations * restrict'
     stripspectrum = stripcorrelations|>crystalspectrum
@@ -81,36 +63,6 @@ function zer(correlations)
 
     @info "Computing strip truncation restricted Fourier transform..."
     stripunitcell = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*3, radius=0.5)
-    striphomefock = stripfrozencorrelations|>getoutspace|>unitcellfock
-    basistohomemodes = ((mode|>getattr(:b)|>basispoint)=>mode for mode in striphomefock)
-    conversionmappings = Dict(
-        mode=>(mode|>setattr(:r=>getattr(mode, :b)-b)|>setattr(:b=>b)) for (b, mode) in basistohomemodes)
-    actualstriphomefock = conversionmappings|>values|>RegionFock
-    truncationregionfock = RegionFock(
-        mode|>setattr(:r=>getattr(mode, :r)+normalvector*n) for mode in actualstriphomefock for n in 0:2)
-    homemappings = Dict(tomode=>frommode|>removeattr(:r) for (tomode, frommode) in conversionmappings)
-    truncate = (
-        fourier(stripfrozencorrelations|>getoutspace, truncationregionfock, homemappings) / sqrt(stripfrozencorrelations|>getoutspace|>getcrystal|>vol))
-
-    @info "Performing truncation..."
-    truncatedregioncorrelations = truncate' * stripfrozencorrelations * truncate
-    offsets = Subset(normalvector * n for n in 0:2)
-    remapper = spatialremapper(truncationregionfock; offsets=offsets, unitcell=stripunitcell)
-    truncatedregioncorrelations = remapper * truncatedregioncorrelations * remapper'
-
-    truncationregionindices = Iterators.product(
-        truncatedregioncorrelations|>getoutspace, truncatedregioncorrelations|>getoutspace)
-    truncationregionbonds = Dict(
-        (getattr(tomode, :r) - getattr(frommode, :r), frommode|>removeattr(:r), tomode|>removeattr(:r))=>(frommode, tomode) 
-        for (frommode, tomode) in truncationregionindices)
-    pruningindices = (index for (_, index) in truncationregionbonds)
-    prunedcorrelations = extractindices(truncatedregioncorrelations, pruningindices)
-    prunedcorrelations = remapper' * prunedcorrelations * remapper
-    stripfouriers = (truncate[subspace, :] for (_, subspace) in truncate|>getoutspace|>crystalsubspaces)
-    stripcrystal = truncate|>getoutspace|>getcrystal
-    truncatedstripfrozencorrelations = crystaldirectsum(
-        (transform * prunedcorrelations * transform' for transform in stripfouriers), 
-        outcrystal=stripcrystal, incrystal=stripcrystal)
     truncatedstripfrozencorrelations = truncatetoregion(stripfrozencorrelations, stripunitcell)
     truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
 
@@ -227,13 +179,10 @@ function zer(correlations)
         :courierlocalstates=>courierlocalstates|>RegionState,
         :stripfilledlocalstates=>stripfilledlocalstates,
         :globaldistiller=>globaldistiller,
-        :block=>block)
+        :block=>block,
+        :stripspectrum=>stripspectrum,
+        :extendedrestrict=>extendedrestrict)
 end
-
-suc, sfc = zer(inputcorrelations)
-sfc|>crystalspectrum|>linespectrum|>visualize
-
-truncatetoregion(sfc, suc)|>crystalspectrum|>linespectrum|>visualize
 
 rg1 = zer(inputcorrelations)
 rg2 = zer(rg1[:correlations])

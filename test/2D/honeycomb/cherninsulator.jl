@@ -1,4 +1,4 @@
-using SmithNormalForm, LinearAlgebra, OrderedCollections, SparseArrays, Combinatorics
+using LinearAlgebra
 using Zipper, Plots
 plotlyjs()
 
@@ -184,3 +184,5 @@ rg2 = @time zer(rg1[:couriercorrelations])
 rg3 = @time zer(rg2[:couriercorrelations])
 rg4 = @time zer(rg3[:couriercorrelations])
 rg5 = @time zer(rg4[:couriercorrelations])
+
+visualize(rg4[:wannieremptystates], markersize=4, logscale=0.5)

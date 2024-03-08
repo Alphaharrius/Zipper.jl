@@ -267,6 +267,71 @@ function groupbands(spectrum::CrystalSpectrum; bandgrouping=[spectrum.bandcount|
         count=length(bandgrouping))|>parallel|>collect
 end
 export groupbands
+
+"""
+    groupbands(spectrum::CrystalSpectrum, bandpredicates...)
+
+Group the bands of the `CrystalSpectrum` by a specified band grouping strategy.
+
+### Input
+- `spectrum`        The source of the grouping.
+- `bandpredicates`  Predicates to group the bands, each predicate should be a function that 
+                    takes a single eigenvalue and returns a boolean value, and the structure of 
+                    this argument is a `Pair` `bandname=>predicate`.
+
+### Output
+A dictionary of `bandname=>CrystalSpectrum` objects, each containing the eigenmodes and eigenvalues, 
+the bands that is excluded from all the required bands will be grouped as `:others`.
+"""
+function groupbands(spectrum::CrystalSpectrum, bandpredicates...)::Dict{Symbol, CrystalSpectrum}
+    labels::Vector{Symbol} = [label for (label, _) in bandpredicates]
+    predicates::Vector{Function} = [predicate for (_, predicate) in bandpredicates]
+
+    function classifier(value::Number)::Symbol
+        # This modification is added to support grouping the eigenvalues by rules that
+        # are not fully include the entire spectrum, all remaining elements will be grouped
+        # into the `:others` group.
+        index = findfirst(p -> value |> p, predicates)
+        return index|>isnothing ? :others : labels[index]
+    end
+
+    labeled::Base.Generator = ((mode|>getattr(:k), v|>classifier) => mode for (mode, v) in spectrum|>geteigenvalues)
+    momentumgroups::Dict{Tuple, Vector{Mode}} = Dict()
+    
+    watchprogress(desc="groupbands: labelling")
+    for (key, mode) in labeled
+        !haskey(momentumgroups, key) && (momentumgroups[key] = [])
+        push!(momentumgroups[key], mode)
+        updateprogress()
+    end
+    unwatchprogress()
+
+    bands::Dict{Symbol, Dict{Momentum, FockMap}} = Dict()
+    watchprogress(desc="groupbands: band grouping")
+    for ((k, band), modes) in momentumgroups
+        !haskey(bands, band) && (bands[band] = Dict())
+        bands[band][k] = columns((spectrum |> geteigenvectors)[k], modes |> FockSpace)
+        updateprogress()
+    end
+    unwatchprogress()
+
+    function repacktospectrum(isometries::Dict{Momentum, FockMap})::CrystalSpectrum
+        eigenmodes::Dict{Momentum, Subset{Mode}} = Dict(
+            k => fockmap |> getinspace |> orderedmodes for (k, fockmap) in isometries)
+        eigenvalues::Dict{Mode, Number} = Dict(
+            mode => (spectrum |> geteigenvalues)[mode] for (_, modes) in eigenmodes for mode in modes)
+        return CrystalSpectrum(spectrum.crystal, eigenmodes, eigenvalues, isometries)
+    end
+
+    watchprogress(desc="groupbands: finalizing")
+    result = Dict()
+    for (band, isometries) in bands
+        result[band] = isometries|>repacktospectrum
+        updateprogress()
+    end
+    unwatchprogress()
+    return result
+end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

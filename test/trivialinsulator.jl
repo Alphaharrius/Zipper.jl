@@ -68,8 +68,8 @@ function zer(correlations)
 
     globaldistillerspectrum = globaldistiller|>crystalspectrum
 
-    @info("Performing distillation...")
-    distillresult = @time distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
+    @info("Performing groupbands...")
+    distillresult = @time groupbands(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :empty => v -> v > 1e-5, :filled => v -> v < -1e-5)
 
     couriersamplingregion::Region = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace|>orthospace)
     courierseedingcenter::Offset = [2/3, 1/3] ∈ blockedspace

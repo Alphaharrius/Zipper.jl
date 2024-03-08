@@ -141,7 +141,7 @@ globaldistiller = globaldistillerhamiltonian(
 globaldistillerspectrum = globaldistiller |> crystalspectrum
 visualize(globaldistillerspectrum, title="Global Distiller")
 
-distillresult = distillation(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
+distillresult = groupbands(globaldistillerspectrum, :courier => v -> abs(v) < 1e-5, :filled => v -> v > 1e-5, :empty => v -> v < -1e-5)
 
 courierseedingcenter::Offset = (blockedmodes |> getspace) & [2/3, 1/3]
 courierseedingmodes::Subset{Mode} = circularregionmodes(courierseedingcenter, physicalmodes, 1.8)

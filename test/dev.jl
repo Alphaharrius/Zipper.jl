@@ -165,7 +165,7 @@ fiodir("/Users/alphaharrius/ZERData/squaremetal/RG1")
 globaldistiller = fioload("rg1globaldistiller")
 globaldistillerspectrum = globaldistiller|>crystalspectrum
 
-frozenbands = distillation(globaldistillerspectrum, :frozen=>(v -> v > 0.5))[:frozen]
+frozenbands = groupbands(globaldistillerspectrum, :frozen=>(v -> v > 0.5))[:frozen]
 frozenbands|>visualize
 frozenprojector = frozenbands|>crystalprojector
 frozencorrelations = idmap(frozenprojector|>getoutspace) - frozenprojector

@@ -81,7 +81,7 @@ function zer(correlations)
     globaldistiller = emptyprojector - filledprojector
 
     @info "Distilling..."
-    distilled = distillation(globaldistiller|>crystalspectrum, :filled=>(v->v < -1e-3), :empty=>(v->v > 1e-3))
+    distilled = groupbands(globaldistiller|>crystalspectrum, :filled=>(v->v < -1e-3), :empty=>(v->v > 1e-3))
     if !haskey(distilled, :others)
         @warn "No courier bands found, RG terminated."
         return

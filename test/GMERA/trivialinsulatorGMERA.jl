@@ -16,7 +16,7 @@ end
 function rgapproximation(rgresults)
     finalrg = Symbol("rg"*string(length(rgresults)))
     if haskey(rgresults[finalrg],:correlations)
-        core = @time distillation(rgresults[finalrg][:correlations]|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
+        core = @time groupbands(rgresults[finalrg][:correlations]|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
         coreproj = core[:empty]|>crystalprojector
         coreapprox = rgresults[finalrg][:transistionmap]*coreproj*rgresults[finalrg][:transistionmap]'
         return sum([rgresult[2][:approximation] for rgresult in rgresults])+coreapprox
@@ -25,7 +25,7 @@ function rgapproximation(rgresults)
     end
 end
 
-# crystalproj = @time distillation(correlations|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
+# crystalproj = @time groupbands(correlations|>crystalspectrum, :filled=> v -> v < 1e-5, :empty => v -> v > 1e-5)
 # crystalprojempty = crystalproj[:filled]|>crystalprojector
 
 # crystalfocktracenorm(correlations-crystalprojempty,4608)

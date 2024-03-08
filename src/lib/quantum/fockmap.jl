@@ -48,8 +48,10 @@ Base.:-(v::Number, fockmap::FockMap) = v + (-fockmap)
 
 """ Shorthand to update the `outspace` of the `FockMap`. """
 Base.:*(fockspace::FockSpace, fockmap::FockMap)::FockMap = FockMap(fockmap, outspace=fockspace)
+Base.broadcasted(::typeof(*), fockspace::FockSpace, fockmap::FockMap) = FockMap(fockmap, outspace=fockspace, performpermute=false)
 """ Shorthand to update the `inspace` of the `FockMap`. """
 Base.:*(fockmap::FockMap, fockspace::FockSpace)::FockMap = FockMap(fockmap, inspace=fockspace)
+Base.broadcasted(::typeof(*), fockmap::FockMap, fockspace::FockSpace) = FockMap(fockmap, inspace=fockspace, performpermute=false)
 
 LinearAlgebra.:tr(fockmap::FockMap) = fockmap|>rep|>tr
 LinearAlgebra.:det(fockmap::FockMap) = fockmap|>rep|>det

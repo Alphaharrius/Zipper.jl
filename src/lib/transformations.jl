@@ -409,23 +409,11 @@ Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(
 Base.:*(scale::Scale, point::Point)::Point = *(scale, point |> getspace) * point
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
-function Base.:*(scale::Scale, crystal::Crystal)::Crystal
-    realspace::RealSpace = crystal|>getspace
-    snfinput::Matrix{Integer} = map(Integer, vcat(scale|>rep|>transpose, crystal|>size|>diagm))
-    U, S, Vd = snfinput|>dosnf
-    snfinput = U[end - dimension(realspace) + 1:end, 1:dimension(realspace)]
-    _, bS, bVd = snfinput|>dosnf
-    newsizes = bS|>diag
-    newrelativebasis = bVd * (S|>diag|>diagm) * Vd |>transpose
-
-    if reduce(+, newrelativebasis) < 0
-        newrelativebasis = -newrelativebasis
-    end
-
-    subunitcell = Subset(
-        (transpose(Vd) * (r|>collect)) ∈ realspace for r in Iterators.product((0:(s-1) for s in S|>diag)...))
-    newscale = Scale(newrelativebasis, realspace)
-    newunitcell = Subset(
-        newscale * (a + b)|>basispoint for (a, b) in Iterators.product(subunitcell, crystal|>getunitcell))
-    return Crystal(newunitcell, newsizes)
+function Base.:*(scale::Scale, crystal::Crystal)
+    _, uniform, _ = dosnf(scale|>rep)
+    newsize = map(Int, size(crystal)./diag(uniform))
+    homesize = map(Int, size(crystal)./newsize)
+    homeoffs = (getspace(crystal)*r for r in Iterators.product((0:s-1 for s in homesize)...))
+    newunitcell = Subset(scale*(off+r) for off in homeoffs for r in crystal|>getunitcell)
+    return Crystal(newunitcell, newsize)
 end

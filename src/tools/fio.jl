@@ -28,7 +28,7 @@ function fiodir(path::String)
         try
             mkdir(path)
         catch _
-            @error "Could not create resource directory at $path"
+            error("Could not create resource directory at $path")
         end
     end
     FIO_STATE.projectpath = path

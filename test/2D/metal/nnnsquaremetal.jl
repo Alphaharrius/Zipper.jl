@@ -52,18 +52,17 @@ blockedcrystalfock = blockedcorrelations|>getoutspace
 blockedcrystal = blockedcrystalfock|>getcrystal
 
 @info "Performing extended restrictions..."
-normalvector = (blockedcrystal|>getspace)*(2, 0)
+normalvector = (blockedcrystal|>getspace)*(1, 1)
 contractbasis = (blockedcrystal|>getspace)*(0, blockedcrystal|>size|>first)
 extendedscale = Scale(affinespace(normalvector, contractbasis)|>rep, blockedcrystal|>getspace)
 extendedrestrict = ExtendedRestrict(extendedscale, normalvector, 0.5)
 restrict = extendedrestrict * blockedcrystalfock
 stripcorrelations = restrict * blockedcorrelations * restrict'
-stripcorrelations|>getoutspace|>getcrystal|>getunitcell|>visualize
 stripspectrum = stripcorrelations|>crystalspectrum
 stripspectrum|>linespectrum|>visualize
 
 @info "Computing strip frozen correlations..."
-stripfrozenstates = groupbands(stripspectrum, :frozen=>(v -> v < 0.003 || v > 0.99))[:frozen]
+stripfrozenstates = groupbands(stripspectrum, :frozen=>(v -> v < 0.01 || v > 0.99))[:frozen]
 stripfrozenprojector = stripfrozenstates|>crystalprojector
 stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
 
@@ -71,31 +70,74 @@ stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozen
 stripunitcell = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*3, radius=0.5)
 truncatedstripfrozencorrelations = truncatetoregion(stripfrozencorrelations, stripunitcell)
 truncatedstripfrozencorrelationspectrum = truncatedstripfrozencorrelations|>crystalspectrum
+
 truncatedstripfrozencorrelationspectrum|>linespectrum|>visualize
 
 @info "Extracting strip filled states..."
-stripfilledstates = groundstatespectrum(truncatedstripfrozencorrelationspectrum, perunitcellfillings=1)
+stripfilledstates = groundstatespectrum(truncatedstripfrozencorrelationspectrum, perunitcellfillings=6)
 stripfilledprojector = stripfilledstates|>crystalprojector
 stripfilledcorrelations = idmap(stripfilledprojector|>getoutspace) - stripfilledprojector
+
+stripfilledstates|>linespectrum|>visualize
 
 @info "Searching strip filled seeds..."
 scaledcrystal = stripfilledstates|>getcrystal
 scaledspace = scaledcrystal|>getspace
 
-wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector, radius=0.5)
-regionfock = quantize(wannierregion, 1)
-remapper = spatialremapper(regionfock, offsets=scaledspace|>getorigin|>Subset, unitcell=scaledcrystal|>getunitcell)
-wannierregionfock = remapper|>getoutspace
-restrict = fourier(stripfilledcorrelations|>getoutspace, wannierregionfock) / (scaledcrystal|>vol|>sqrt)
+wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.4, radius=0.5, minbottomheight=0.15) .- normalvector*0.25
+regionfock = getregionfock(stripfilledcorrelations|>getoutspace, wannierregion)
+restrict = fourier(stripfilledcorrelations|>getoutspace, regionfock) / (scaledcrystal|>vol|>sqrt)
 localcorrelations = restrict' * stripfilledcorrelations * restrict
-localcorrelations = remapper' * localcorrelations * remapper
 localcorrelations|>eigspech|>visualize
-localstates = getregionstates(localcorrelations=localcorrelations, grouping=[1])[1]
-localstates = remapper*FockMap(localstates)|>RegionState
+localstates = getregionstates(localcorrelations=localcorrelations, grouping=[3])[1]
+localstates = localstates|>normalize
+localstates = m45 * localstates
+localstates = m135 * localstates
+visualize(localstates|>normalize, markersize=5, logscale=0.5)
 
+localseeds = localstates
+
+wannierregion = wannierregion .+ normalvector*0.5
+regionfock = getregionfock(stripfilledcorrelations|>getoutspace, wannierregion)
+restrict = fourier(stripfilledcorrelations|>getoutspace, regionfock) / (scaledcrystal|>vol|>sqrt)
+localcorrelations = restrict' * stripfilledcorrelations * restrict
+localcorrelations|>eigspech|>visualize
+localstates = getregionstates(localcorrelations=localcorrelations, grouping=[3])[1]
+localstates = localstates|>normalize
+localstates = m45 * localstates
+localstates = m135 * localstates
 visualize(localstates, markersize=5, logscale=0.5)
 
-localseeds = localstates|>FockMap
+localseeds += localstates
+
+wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.4, radius=0.5, minbottomheight=0.15)
+regionfock = getregionfock(stripfilledcorrelations|>getoutspace, wannierregion)
+restrict = fourier(stripfilledcorrelations|>getoutspace, regionfock) / (scaledcrystal|>vol|>sqrt)
+localcorrelations = restrict' * stripfilledcorrelations * restrict
+localcorrelations|>eigspech|>visualize
+localstates = getregionstates(localcorrelations=localcorrelations, grouping=[2, 1])[2]
+localstates = localstates|>normalize
+localstates = m45 * localstates
+localstates = m135 * localstates
+visualize(localstates, markersize=5, logscale=0.5)
+
+localseeds += localstates
+
+wannierregion = wannierregion .+ normalvector*0.5
+regionfock = getregionfock(stripfilledcorrelations|>getoutspace, wannierregion)
+restrict = fourier(stripfilledcorrelations|>getoutspace, regionfock) / (scaledcrystal|>vol|>sqrt)
+localcorrelations = restrict' * stripfilledcorrelations * restrict
+localcorrelations|>eigspech|>visualize
+localstates = getregionstates(localcorrelations=localcorrelations, grouping=[2, 1])[2]
+localstates = localstates|>normalize
+localstates = m45 * localstates
+localstates = m135 * localstates
+visualize(localstates, markersize=5, logscale=0.5)
+
+localseeds += localstates
+
+localseeds = localseeds|>FockMap
+visualize(localseeds|>RegionState, markersize=5, logscale=0.5)
 transform = fourier(stripfilledcorrelations|>getoutspace, localseeds|>getoutspace) / (scaledcrystal|>vol|>sqrt)
 crystalseeds = transform * localseeds
 crystalseeds = Dict(k=>crystalseeds[k, :] for k in scaledcrystal|>brillouinzone)
@@ -114,24 +156,59 @@ stripfilledlocalstates = wannierlocalisometry|>RegionState
 visualize(stripfilledlocalstates, markersize=5, logscale=0.5)
 
 @info "Computing strip filled projector..."
-remapper = spatialremapper(
-    wannierlocalisometry|>getoutspace, getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace))
+remapper = spatialremapper(wannierlocalisometry|>getoutspace, blockedcrystalfock)
 wannierlocalisometry = remapper * wannierlocalisometry
 transform = fourier(blockedcrystalfock, wannierlocalisometry|>getoutspace)
 wanniercrystalisometry = transform * wannierlocalisometry
 wanniermetalprojector = wanniercrystalisometry .* wanniercrystalisometry'
+wanniermetalprojector|>crystalspectrum|>visualize
 
 @info "Computing global distiller..."
-transform = c4 * blockedcrystalfock
-globaldistiller = wanniermetalprojector + transform * wanniermetalprojector * transform'
+globaldistiller = wanniermetalprojector + c4 * wanniermetalprojector * c4
 globaldistillerspectrum = globaldistiller|>crystalspectrum
 globaldistillerspectrum|>visualize
 
-bands = groupbands(globaldistillerspectrum, :metal=>(v -> v > 1))
-metalprojector = bands[:metal]|>crystalprojector
-otherprojector = bands[:others]|>crystalprojector
+@info "Distilling courier bands..."
+bands = groupbands(globaldistillerspectrum, :metal=>(v -> v > 0.05))
+courierstates = bands[:others]
+courierprojector = courierstates|>crystalprojector
+couriercorrelations = 1 - courierprojector
 
-otherprojector|>crystalspectrum|>visualize
+@info "Searching courier seeds..."
+wannierregion = getsphericalregion(crystal=blockedcrystal, radius=0.25, metricspace=blockedcrystal|>getspace)
+wannierregion = wannierregion .+ getspace(wannierregion)*(0.25, 0.25)
+regionfock = quantize(wannierregion, 1)
+restrict = fourier(blockedcrystalfock, regionfock) / (blockedcrystal|>vol|>sqrt)
+localcorrelations = restrict' * couriercorrelations * restrict
+localcorrelations|>eigspech|>visualize
+localstates = getregionstates(localcorrelations=localcorrelations, grouping=[1])[1]
+localstates = m45 * localstates
+localstates = m135 * localstates
+visualize(localstates|>normalize, markersize=5, logscale=0.5)
+
+localseeds = sum(g.*localstates for g in c4|>recenter(getspace(wannierregion)*(0.5, 0.5))|>pointgroupelements)
+courierseeds = localseeds|>FockMap
+transform = fourier(blockedcrystalfock, courierseeds|>getoutspace) / (blockedcrystal|>vol|>sqrt)
+crystalcourierseeds = transform * courierseeds
+crystalcourierseeds = Dict(k=>crystalcourierseeds[k, :] for k in blockedcrystal|>brillouinzone)
+pseudoidens = (u' * u for (_, u) in crystalcourierseeds)
+lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
+@info "Courier seeds linear-dependence metric: $lineardepmetric"
+
+@info "Wannierizing courier bands..."
+wanniercourierisometry = wannierprojection(
+    crystalisometries=courierstates|>geteigenvectors, crystal=blockedcrystal, crystalseeds=crystalcourierseeds)
+visualregion = getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace)
+visualfock = quantize(visualregion, 1)
+leftrestrict = fourier(blockedcrystalfock, visualfock) / (blockedcrystal|>vol|>sqrt)
+rightrestrict = fourier(wanniercourierisometry|>getinspace, wanniercourierisometry|>getinspace|>unitcellfock|>RegionFock)
+courierlocalstates = leftrestrict' * wanniercourierisometry * rightrestrict
+visualize(courierlocalstates|>RegionState, markersize=1, logscale=0.5)
+
+wanniercourierisometry' * blockedcorrelations * wanniercourierisometry|>crystalspectrum|>visualize
+couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
+courierspectrum = couriercorrelations|>crystalspectrum
+courierspectrum|>visualize
 
 function blockdiag(fockmap::CrystalFockMap)
     @assert hassamespan(fockmap|>getoutspace, fockmap|>getinspace)
@@ -191,7 +268,7 @@ function zer(correlations)
 
     wannierregion1 = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15)
     regionfock = quantize(wannierregion1, 1)
-    remapper = spatialremapper(regionfock, offsets=scaledspace|>getorigin|>Subset, unitcell=scaledcrystal|>getunitcell)
+    remapper = spatialremapper(regionfock, stripfilledcorrelations|>getoutspace)
     wannierregionfock = remapper|>getoutspace
     restrict = fourier(stripfilledcorrelations|>getoutspace, wannierregionfock) / (scaledcrystal|>vol|>sqrt)
     localcorrelations = restrict' * stripfilledcorrelations * restrict
@@ -203,7 +280,7 @@ function zer(correlations)
     wannierregion2 = wannierregion1 .- normalvector*0.5
     regionfock = quantize(wannierregion2, 1)
     offsets = Subset(-(scaledspace*normalvector), scaledspace|>getorigin)
-    remapper = spatialremapper(regionfock, offsets=offsets, unitcell=scaledcrystal|>getunitcell)
+    remapper = spatialremapper(regionfock, stripfilledcorrelations|>getoutspace)
     wannierregionfock = remapper|>getoutspace
     restrict = fourier(stripfilledcorrelations|>getoutspace, wannierregionfock) / (scaledcrystal|>vol|>sqrt)
     localcorrelations = restrict' * stripfilledcorrelations * restrict
@@ -230,8 +307,7 @@ function zer(correlations)
     stripfilledlocalstates = wannierlocalisometry|>RegionState
 
     @info "Computing strip filled projector..."
-    remapper = spatialremapper(
-        wannierlocalisometry|>getoutspace, getsphericalregion(crystal=blockedcrystal, radius=2, metricspace=blockedcrystal|>getspace))
+    remapper = spatialremapper(wannierlocalisometry|>getoutspace, stripfilledcorrelations|>getoutspace)
     wannierlocalisometry = remapper * wannierlocalisometry
     transform = fourier(blockedcrystalfock, wannierlocalisometry|>getoutspace)
     wanniercrystalisometry = transform * wannierlocalisometry

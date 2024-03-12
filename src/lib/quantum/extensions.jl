@@ -87,7 +87,8 @@ This function remaps the modes from the `regionfock` to the home fock modes from
 function spatialremapper(regionfock::RegionFock, crystalfock::CrystalFock)
     remapped = getregionfock(crystalfock, regionfock|>getregion)
     getmatchmode(mode::Mode) = mode|>removeattr(:r, :b)|>setattr(:R=>mode|>getpos|>euclidean)
-    matched = Zipper.matchreduce(remapped, regionfock, leftmatch=getmatchmode, rightmatch=getmatchmode, reducer=(a, b)->(a, b))
+    matched = matchreduce(
+        remapped, regionfock, leftmatch=getmatchmode, rightmatch=getmatchmode, reducer=(a, b)->(a, b))
     outspace = RegionFock(m for (m, _) in matched)
     inspace = RegionFock(m for (_, m) in matched)
     return idmap(outspace, inspace)

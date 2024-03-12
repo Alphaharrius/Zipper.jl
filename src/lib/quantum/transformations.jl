@@ -78,16 +78,16 @@ function Base.:*(transformation::AffineTransform, regionfock::RegionFock)::FockM
     return FockMap(outmodes |> RegionFock, regionfock, connections)
 end
 
-function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::FockMap
+@memoize function gettransform(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap
     homefock::FockSpace = crystalfock|>unitcellfock
-    homefocktransform::FockMap = transformation * RegionFock(homefock)
+    homefocktransform::FockMap = g * RegionFock(homefock)
     ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces |> Dict
     fouriertransform::FockMap = fourier(crystalfock, homefock|>RegionFock)
     transformedfourier::FockMap = fourier(crystalfock, homefocktransform|>getoutspace|>RegionFock)
 
     function compute(data)
         k, subspace = data
-        left = transformedfourier[ksubspaces[transformation*k|>basispoint], :]
+        left = transformedfourier[ksubspaces[g*k|>basispoint], :]
         right = fouriertransform[subspace, :]
         ktransform = left * homefocktransform * right'
         outk = commonattr(ktransform|>getoutspace, :k)
@@ -104,6 +104,8 @@ function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::Foc
 
     return CrystalFockMap(crystal, crystal, blocks)
 end
+
+Base.:*(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap = gettransform(g, crystalfock)
 
 function Base.:*(symmetry::AffineTransform, state::RegionState)
     # We will first generate the inspace symmetry representation to check if there are any unitary transformation 

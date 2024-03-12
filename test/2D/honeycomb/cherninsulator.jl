@@ -2,7 +2,6 @@ using LinearAlgebra
 using Zipper, Plots
 plotlyjs()
 
-fiodir("/Users/alphaharrius/ZERData")
 setmaxthreads(Threads.nthreads())
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -17,7 +16,7 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [96, 96])
+crystal = Crystal(unitcell, [384, 384])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -60,9 +59,9 @@ function zer(correlations)
     scale = Scale([2 0; 0 2], crystalfock|>getcrystal|>getspace)
     @info("Performing blocking...")
     @info("Generating blocking transformation...")
-    blocker = @time scale * crystalfock
+    block = @time scale * crystalfock
     @info("Performing blocking on correlations...")
-    blockedcorrelations = @time blocker * correlations * blocker'
+    blockedcorrelations = @time block * correlations * block'
     blockedcrystalfock = blockedcorrelations|>getoutspace
     blockedcrystal::Crystal = blockedcrystalfock|>getcrystal
     blockedspace::RealSpace = blockedcrystal|>getspace
@@ -170,9 +169,13 @@ function zer(correlations)
     purifiedcorrelations = roundingpurification(couriercorrelationspectrum)|>CrystalFockMap
 
     return Dict(
+        :block=>block,
         :couriercorrelations=>purifiedcorrelations,
         :filledcorrelations=>filledcorrelations,
         :emptycorrelations=>emptycorrelations,
+        :wanniercourierisometry=>wanniercourierisometry,
+        :wannierfilledisometry=>wannierfilledisometry,
+        :wannieremptyisometry=>wannieremptyisometry,
         :wannierfilledstates=>wannierfilledstates|>RegionState,
         :wannieremptystates=>wannieremptystates|>RegionState,
         :wanniercourierstates=>wanniercourierstate|>RegionState,
@@ -184,5 +187,34 @@ rg2 = @time zer(rg1[:couriercorrelations])
 rg3 = @time zer(rg2[:couriercorrelations])
 rg4 = @time zer(rg3[:couriercorrelations])
 rg5 = @time zer(rg4[:couriercorrelations])
+rg6 = @time zer(rg5[:couriercorrelations])
+rg7 = @time zer(rg6[:couriercorrelations])
 
-visualize(rg4[:wannieremptystates], markersize=4, logscale=0.5)
+fiodir("/Users/alphaharrius/ZERData/chern384x384")
+fiosave(energyspectrum|>CrystalFockMap, name="hamiltonian")
+fiosave(correlations, name="correlations")
+
+function savedata(rgdata, rgname)
+    fiodir("/Users/alphaharrius/ZERData/chern384x384/$rgname")
+    fiosave(rgdata[:block], name="block")
+    fiosave(rgdata[:couriercorrelations], name="couriercorrelations")
+    fiosave(rgdata[:filledcorrelations], name="filledcorrelations")
+    fiosave(rgdata[:emptycorrelations], name="emptycorrelations")
+    fiosave(rgdata[:wannierfilledisometry], name="wannierfilledisometry")
+    fiosave(rgdata[:wannieremptyisometry], name="wannieremptyisometry")
+    fiosave(rgdata[:wanniercourierisometry], name="wanniercourierisometry")
+    fiosave(rgdata[:rawcouriercorrelations], name="rawcouriercorrelations")
+    fiosave(rgdata[:wannierfilledstates]|>FockMap, name="wannierfilledstates")
+    fiosave(rgdata[:wannieremptystates]|>FockMap, name="wannieremptystates")
+    fiosave(rgdata[:wanniercourierstates]|>FockMap, name="wanniercourierstates")
+end
+
+savedata(rg1, "rg1")
+savedata(rg2, "rg2")
+savedata(rg3, "rg3")
+savedata(rg4, "rg4")
+savedata(rg5, "rg5")
+savedata(rg6, "rg6")
+savedata(rg7, "rg7")
+
+visualize(rg6[:wanniercourierstates]|>normalize, markersize=5, logscale=0.5)

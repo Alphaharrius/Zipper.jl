@@ -107,6 +107,10 @@ end
 
 Base.:*(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap = gettransform(g, crystalfock)
 
+Base.:*(g::AffineTransform, fockmap::CrystalFockMap) = (g * getoutspace(fockmap)) * fockmap
+
+Base.:*(fockmap::CrystalFockMap, g::AffineTransform) = fockmap * (g * getinspace(fockmap))'
+
 function Base.:*(symmetry::AffineTransform, state::RegionState)
     # We will first generate the inspace symmetry representation to check if there are any unitary transformation 
     # to bring the set of modes to the symmetry eigenbasis.

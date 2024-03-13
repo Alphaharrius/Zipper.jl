@@ -1,13 +1,13 @@
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆  Global settings definition ◆
-mutable struct ParallelSettings
+mutable struct ParallelState
     showmeter::Bool
     maxthreads::Integer
     mainthreadmeter::Union{UndefInitializer, ProgressUnknown}
     divideconquermeter::Union{UndefInitializer, ProgressUnknown}
 end
 
-global parallelsettings = ParallelSettings(
+global parallelstate = ParallelState(
     true, # Show meter by default.
     1, # Zipper.jl will use 1 thread by default.
     # I have to set this value to 128 since Threads.nthreads() at initialization of Julia env 
@@ -29,17 +29,17 @@ end
 # ◆ Parallel computing configuration APIs ◆
 function showtaskmeter(bool::Bool)
     @warn("Task meter visibility is set to $bool")
-    parallelsettings.showmeter = bool
+    parallelstate.showmeter = bool
 end
 export showtaskmeter
 
 function setmaxthreads(count::Integer)
     @warn("Max thread count is set to $count")
-    parallelsettings.maxthreads = count
+    parallelstate.maxthreads = count
 end
 export setmaxthreads
 
-getmaxthreads() = parallelsettings.maxthreads
+getmaxthreads() = parallelstate.maxthreads
 export getmaxthreads
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
@@ -98,10 +98,10 @@ end
 export parallel
 
 function updatedivideconquer()
-    if parallelsettings.divideconquermeter == undef || !parallelsettings.showmeter
+    if parallelstate.divideconquermeter == undef || !parallelstate.showmeter
         return
     end
-    next!(parallelsettings.divideconquermeter)
+    next!(parallelstate.divideconquermeter)
 end
 export updatedivideconquer
 
@@ -116,23 +116,7 @@ end
 export getconquerer
 
 function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
-    actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
-    countmetric::Integer = count/actualcorecount|>ceil
-    batchsize::Integer = countmetric > 1 ? count/actualcorecount|>ceil : 2
-    itembatches = Iterators.partition(iter, batchsize)
-    batchcount::Integer = count/batchsize|>ceil
-    @debug "divideconquer batchsize: $batchsize, batchcount: $batchcount, count: $count"
-    tasks = paralleltasks(
-        name="",
-        tasks=(()->f(batch) for batch in itembatches),
-        # Encountered issue of segmentation fault here...
-        # Possible cause: Its unknown but it only happens after we include 
-        # this method here. Yet it might also be a bug in Julia's threading 
-        # implementation.
-        count=batchcount,
-        showmeter=false)
-    # Add the progress meter to the global accessible variable.
-    parallelsettings.divideconquermeter = (
+    parallelstate.divideconquermeter = (
         ProgressUnknown(desc="divideconquer $desc count=$count batch=$batchsize", spinner=true))
     result = tasks|>parallel|>collect
     ProgressMeter.finish!(parallelsettings.divideconquermeter)
@@ -143,10 +127,10 @@ function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
     if batchcount > 3
         return paralleldivideconquer(f, result, batchcount, desc)
     end
-    parallelsettings.divideconquermeter = ProgressUnknown(
+    parallelstate.divideconquermeter = ProgressUnknown(
         desc="divideconquer $desc merge", spinner=true)
     result = f(result)
-    ProgressMeter.finish!(parallelsettings.divideconquermeter)
+    ProgressMeter.finish!(parallelstate.divideconquermeter)
     return result
 end
 
@@ -159,20 +143,20 @@ export paralleldivideconquer
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ Progress meter APIs ◆
 function watchprogress(; desc::String)
-    if Threads.threadid() != 1 || !parallelsettings.showmeter
+    if Threads.threadid() != 1 || !parallelstate.showmeter
         return
     end
-    parallelsettings.mainthreadmeter = ProgressUnknown(desc=desc, spinner=true)
+    parallelstate.mainthreadmeter = ProgressUnknown(desc=desc, spinner=true)
     return
 end
 export watchprogress
 
 function updateprogress()
-    if Threads.threadid() != 1 || !parallelsettings.showmeter
+    if Threads.threadid() != 1 || !parallelstate.showmeter
         return
     end
     try
-        progress = parallelsettings.mainthreadmeter
+        progress = parallelstate.mainthreadmeter
         if typeof(progress) == UndefInitializer
             # This branch is for the case where the current 
             # thread have called watchprogress before.
@@ -188,11 +172,11 @@ end
 export updateprogress
 
 function unwatchprogress()
-    if Threads.threadid() != 1 || !parallelsettings.showmeter
+    if Threads.threadid() != 1 || !parallelstate.showmeter
         return
     end
     try
-        progress = parallelsettings.mainthreadmeter
+        progress = parallelstate.mainthreadmeter
         if typeof(progress) == UndefInitializer
             # This branch is for the case where the current thread 
             # have called watchprogress before.

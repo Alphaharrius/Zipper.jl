@@ -225,7 +225,6 @@ Permute the columns and rows of the representation of the `source` `FockMap` by 
 - `inspace`  A `FockSpace` with the same span as the `inspace` of the `source` `FockMap`.
 """
 function permute(source::FockMap; outspace::FockSpace=source|>getoutspace, inspace::FockSpace=source|>getinspace)::FockMap
-
     rowrule::Vector{Int64} = orderingrule(source|>getoutspace, outspace)
     colrule::Vector{Int64} = orderingrule(source|>getinspace, inspace)
     return FockMap(outspace, inspace, SparseArrays.permute(rep(source), rowrule, colrule))

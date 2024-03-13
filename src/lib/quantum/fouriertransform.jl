@@ -230,7 +230,7 @@ function Base.:*(left::InvFourierMap, right::FourierMap)
         tasks=(()->block*right.data[k] for (k, block) in left.data),
         count=left.data|>length)|>parallel
     return paralleldivideconquer(
-        sumwithprogress, multiplied, count=left.data|>length, desc="InvFourierMap * FourierMap")
+        getconquerer(.+), multiplied, count=left.data|>length, desc="InvFourierMap * FourierMap")
 end
 
 Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)

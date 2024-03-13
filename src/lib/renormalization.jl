@@ -272,7 +272,6 @@ function wannierprojection(;
 
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
-    overlaps = ((k, isometry, isometry' * crystalseeds[k]) for (k, isometry) in crystalisometries)
     precarioussvdvalues::Vector = []
     function approximateisometry(k::Momentum, isometry::FockMap, overlap::FockMap)::FockMap
         U, Σ, Vt = overlap |> svd
@@ -292,7 +291,9 @@ function wannierprojection(;
 
     blocks = paralleltasks(
         name="wannierprojection",
-        tasks=(()->((k, k)=>approximateisometry(k, isometry, overlap)) for (k, isometry, overlap) in overlaps),
+        tasks=(()->(
+            (k, k)=>approximateisometry(k, isometry, isometry' * crystalseeds[k])) 
+            for (k, isometry) in crystalisometries),
         count=crystalisometries|>length)|>parallel|>Dict
     
     return CrystalFockMap(crystal, wanniercrystal, blocks)

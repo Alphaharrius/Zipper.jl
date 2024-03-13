@@ -274,7 +274,7 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
         count=getmaxthreads())|>parallel
 
     spdata = paralleldivideconquer(
-        sumwithprogress, datas, count=getmaxthreads(), desc="FockMap(::CrystalFockMap)")
+        getconquerer(+), datas, count=getmaxthreads(), desc="FockMap(::CrystalFockMap)")
 
     return FockMap(outspace, inspace, spdata)
 end

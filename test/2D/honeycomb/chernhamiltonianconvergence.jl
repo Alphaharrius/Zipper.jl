@@ -58,15 +58,30 @@ rg6zipper = fioload("wanniercourierisometry")' * rg6block
 @info "Computing physical data..."
 region = getsphericalregion(crystal=crystal, radius=6, metricspace=euclidean(RealSpace, 2))
 ref = getspace(crystal)*(2/3, 1/3)
-centerregion = Subset(r for r in region if ((ref-r)|>euclidean|>norm) <= 3.5)
+centerregion = Subset(r for r in region if ((ref-r)|>euclidean|>norm) <= 2.5)
 regionfock = getregionfock(hamiltonian|>getoutspace, centerregion)
-transform = fourier(hamiltonian|>getoutspace, regionfock) / (crystal|>vol|>sqrt)
-restricted = transform' * hamiltonian * transform
+transform = fourier(hamiltonian|>getoutspace, regionfock)
+restricted = transform' * hamiltonian * transform / (crystal|>vol)
 visualmode = getregionfock(hamiltonian|>getoutspace, ref|>Subset)|>first
-visualhamiltonian = restricted[:, visualmode]
-physspread = [
-    ((getpos(visualmode)-getpos(m)|>euclidean|>norm), (visualhamiltonian[m, :]|>rep)[1, 1]|>abs) 
-    for m in visualhamiltonian|>getoutspace]
+r1 = getspace(crystal)*(1/3, 2/3)
+m1 = getregionfock(hamiltonian|>getoutspace, r1|>Subset)|>first
+h1 = restricted[visualmode, m1]|>rep
+r2 = getspace(crystal)*(2/3, 1 + 1/3)
+m2 = getregionfock(hamiltonian|>getoutspace, r2|>Subset)|>first
+h2 = restricted[visualmode, m2]|>rep
+r3 = getspace(crystal)*(1 + 1/3, 1 + 2/3)
+m3 = getregionfock(hamiltonian|>getoutspace, r3|>Subset)|>first
+h3 = restricted[visualmode, m3]|>rep
+r4 = getspace(crystal)*(1 + 2/3, 2 + 1/3)
+m4 = getregionfock(hamiltonian|>getoutspace, r4|>Subset)|>first
+h4 = restricted[visualmode, m4]|>rep
+r5 = getspace(crystal)*(2 + 1/3, 1 + 2/3)
+m5 = getregionfock(hamiltonian|>getoutspace, r5|>Subset)|>first
+h5 = restricted[visualmode, m5]|>rep
+r6 = getspace(crystal)*(2 + 2/3, 2 + 1/3)
+m6 = getregionfock(hamiltonian|>getoutspace, r6|>Subset)|>first
+h6 = restricted[visualmode, m6]|>rep
+visualize(centerregion, ref|>Subset, r1|>Subset, r2|>Subset, r3|>Subset, r4|>Subset, r5|>Subset, r6|>Subset)
 
 @info "Computing renormalization group data..."
 function computergspread(rghamiltonian)
@@ -81,10 +96,25 @@ function computergspread(rghamiltonian)
     transform = fourier(rghamiltonian|>getoutspace, regionfock) / (rgcrystal|>vol|>sqrt)
     restricted = transform' * rghamiltonian * transform
     visualmode = getregionfock(rghamiltonian|>getoutspace, ref|>Subset)|>first
-    visualhamiltonian = restricted[:, visualmode]
-    return [
-        ((getpos(visualmode)-getpos(m)|>euclidean|>norm), (visualhamiltonian[m, :]|>rep)[1, 1]|>abs) 
-        for m in visualhamiltonian|>getoutspace]
+    r1 = rgspace*(1/3, 2/3)
+    m1 = getregionfock(rghamiltonian|>getoutspace, r1|>Subset)|>first
+    h1 = restricted[visualmode, m1]|>rep
+    r2 = rgspace*(2/3, 1 + 1/3)
+    m2 = getregionfock(rghamiltonian|>getoutspace, r2|>Subset)|>first
+    h2 = restricted[visualmode, m2]|>rep
+    r3 = rgspace*(1 + 1/3, 1 + 2/3)
+    m3 = getregionfock(rghamiltonian|>getoutspace, r3|>Subset)|>first
+    h3 = restricted[visualmode, m3]|>rep
+    r4 = rgspace*(1 + 2/3, 2 + 1/3)
+    m4 = getregionfock(rghamiltonian|>getoutspace, r4|>Subset)|>first
+    h4 = restricted[visualmode, m4]|>rep
+    r5 = rgspace*(2 + 1/3, 1 + 2/3)
+    m5 = getregionfock(rghamiltonian|>getoutspace, r5|>Subset)|>first
+    h5 = restricted[visualmode, m5]|>rep
+    r6 = rgspace*(2 + 2/3, 2 + 1/3)
+    m6 = getregionfock(rghamiltonian|>getoutspace, r6|>Subset)|>first
+    h6 = restricted[visualmode, m6]|>rep
+    return Dict(:h1=>h1[1, 1], :h2=>h2[1, 1], :h3=>h3[1, 1], :h4=>h4[1, 1], :h5=>h5[1, 1], :h6=>h6[1, 1])
 end
 
 rg1hamiltonian = rg1zipper * hamiltonian * rg1zipper'
@@ -105,76 +135,42 @@ rg5spread = computergspread(rg5hamiltonian)
 rg6hamiltonian = rg6zipper * rg5hamiltonian * rg6zipper'
 rg6spread = computergspread(rg6hamiltonian)
 
-@info "Removing first data point..."
-physspread = physspread[2:end]
-rg1spread = rg1spread[2:end]
-rg2spread = rg2spread[2:end]
-rg3spread = rg3spread[2:end]
-rg4spread = rg4spread[2:end]
-rg5spread = rg5spread[2:end]
-rg6spread = rg6spread[2:end]
+band1 = [h1[1, 1], rg1spread[:h1], rg2spread[:h1], rg3spread[:h1], rg4spread[:h1], rg5spread[:h1], rg6spread[:h1]]
+band2 = [h2[1, 1], rg1spread[:h2], rg2spread[:h2], rg3spread[:h2], rg4spread[:h2], rg5spread[:h2], rg6spread[:h2]]
+band3 = [h3[1, 1], rg1spread[:h3], rg2spread[:h3], rg3spread[:h3], rg4spread[:h3], rg5spread[:h3], rg6spread[:h3]]
+band4 = [h4[1, 1], rg1spread[:h4], rg2spread[:h4], rg3spread[:h4], rg4spread[:h4], rg5spread[:h4], rg6spread[:h4]]
+band5 = [h5[1, 1], rg1spread[:h5], rg2spread[:h5], rg3spread[:h5], rg4spread[:h5], rg5spread[:h5], rg6spread[:h5]]
+band6 = [h6[1, 1], rg1spread[:h6], rg2spread[:h6], rg3spread[:h6], rg4spread[:h6], rg5spread[:h6], rg6spread[:h6]]
 
-@info "Plotting linear-scale..."
-scatter(
-    [x for (x, _) in physspread], [y for (_, y) in physspread], 
-    label="Physical", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="Blue", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x for (x, _) in physspread], [y for (_, y) in rg1spread], 
-    label="RG1",
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="DeepSkyBlue", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x for (x, _) in physspread], [y for (_, y) in rg2spread], 
-    label="RG2", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="LimeGreen", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x for (x, _) in physspread], [y for (_, y) in rg3spread], 
-    label="RG3",
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="Gold", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x for (x, _) in physspread], [y for (_, y) in rg4spread], 
-    label="RG4", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="OrangeRed", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x for (x, _) in physspread], [y for (_, y) in rg5spread], 
-    label="RG5", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="Red", markerstrokewidth=2, markerstrokeopacity=0.5)
+@info "Plotting linear-scale (Re)..."
+scatter(1:length(band1), band1|>real, label="$r1", legend=:bottomright)
+scatter!(1:length(band2), band2|>real, label="$r2", legend=:bottomright)
+scatter!(1:length(band3), band3|>real, label="$r3", legend=:bottomright)
+scatter!(1:length(band4), band4|>real, label="$r4", legend=:bottomright)
+scatter!(1:length(band5), band5|>real, label="$r5", legend=:bottomright)
+scatter!(1:length(band6), band6|>real, label="$r6", legend=:bottomright)
 
-@info "Plotting log-scale..."
-scatter(
-    [x|>log for (x, _) in physspread], [y|>log for (_, y) in physspread], 
-    label="Physical", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="Blue", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x|>log for (x, _) in physspread], [y|>log for (_, y) in rg1spread], 
-    label="RG1",
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="DeepSkyBlue", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x|>log for (x, _) in physspread], [y|>log for (_, y) in rg2spread], 
-    label="RG2", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="LimeGreen", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x|>log for (x, _) in physspread], [y|>log for (_, y) in rg3spread], 
-    label="RG3",
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="Gold", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x|>log for (x, _) in physspread], [y|>log for (_, y) in rg4spread], 
-    label="RG4", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="OrangeRed", markerstrokewidth=2, markerstrokeopacity=0.5)
-scatter!(
-    [x|>log for (x, _) in physspread], [y|>log for (_, y) in rg5spread], 
-    label="RG5", 
-    markercolor=RGBA(1, 1, 1, 0), xlabel="Distance", ylabel="Energy", legend=:topright,
-    markerstrokecolor="Red", markerstrokewidth=2, markerstrokeopacity=0.5)
-plot!(xlimits=(-1, 1.5), ylimits=(-10,1))
+@info "Plotting log-scale (Re)..."
+scatter(1:length(band1), [log(v|>real|>abs) for v in band1], label="$r1", legend=:bottomright)
+scatter!(1:length(band2), [log(v|>real|>abs) for v in band2], label="$r2", legend=:bottomright)
+scatter!(1:length(band3), [log(v|>real|>abs) for v in band3], label="$r3", legend=:bottomright)
+scatter!(1:length(band4), [log(v|>real|>abs) for v in band4], label="$r4", legend=:bottomright)
+scatter!(1:length(band5), [log(v|>real|>abs) for v in band5], label="$r5", legend=:bottomright)
+scatter!(1:length(band6), [log(v|>real|>abs) for v in band6], label="$r6", legend=:bottomright)
+
+@info "Plotting linear-scale (Im)..."
+scatter(1:length(band1), band1|>imag, label="$r1", legend=:bottomright)
+scatter!(1:length(band2), band2|>imag, label="$r2", legend=:bottomright)
+scatter!(1:length(band3), band3|>imag, label="$r3", legend=:bottomright)
+scatter!(1:length(band4), band4|>imag, label="$r4", legend=:bottomright)
+scatter!(1:length(band5), band5|>imag, label="$r5", legend=:bottomright)
+scatter!(1:length(band6), band6|>imag, label="$r6", legend=:bottomright)
+plot!(legend=false)
+
+@info "Plotting log-scale (Im)..."
+scatter(1:length(band1), [log(v|>imag|>abs) for v in band1], label="$r1", legend=:bottomright)
+scatter!(1:length(band2), [log(v|>imag|>abs) for v in band2], label="$r2", legend=:bottomright)
+scatter!(1:length(band3), [log(v|>imag|>abs) for v in band3], label="$r3", legend=:bottomright)
+scatter!(1:length(band4), [log(v|>imag|>abs) for v in band4], label="$r4", legend=:bottomright)
+scatter!(1:length(band5), [log(v|>imag|>abs) for v in band5], label="$r5", legend=:bottomright)
+scatter!(1:length(band6), [log(v|>imag|>abs) for v in band6], label="$r6", legend=:bottomright)

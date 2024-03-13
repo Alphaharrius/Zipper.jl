@@ -121,22 +121,33 @@ end
 export getconquerer
 
 function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
+    usablecores::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
+    countmetric::Integer = count/usablecores|>ceil
+    batchsize::Integer = countmetric > 1 ? count/usablecores|>ceil : 2
+    corecount::Integer = count/batchsize|>ceil
+
+    iterchannel = (function (ch::Channel)
+        for el in iter
+            put!(ch, el)
+        end
+    end)|>Channel
+
+    conquer() = [v for v in iterchannel]|>f
+    
     parallelstate.divideconquermeter = (
         ProgressUnknown(desc="divideconquer $desc count=$count batch=$batchsize", spinner=true))
-    result = tasks|>parallel|>collect
-    ProgressMeter.finish!(parallelsettings.divideconquermeter)
-    # Since the issue is still unknown after checking, we suspect that some variables 
-    # passing through the iterative approach might be marked as garbage while it should 
-    # not be. Therefore we will take a more functional approach (since Julia is functional) 
-    # in hopes that the vm will lift this issue automatically.
-    if batchcount > 3
-        return paralleldivideconquer(f, result, batchcount, desc)
+    threads = [Threads.@spawn conquer() for _ in 1:corecount]
+    results = fetch.(threads)
+    ProgressMeter.finish!(parallelstate.divideconquermeter)
+    if corecount > 3
+        return paralleldivideconquer(f, results, corecount, desc)
     end
+
     parallelstate.divideconquermeter = ProgressUnknown(
         desc="divideconquer $desc merge", spinner=true)
-    result = f(result)
+    results = f(results)
     ProgressMeter.finish!(parallelstate.divideconquermeter)
-    return result
+    return results
 end
 
 paralleldivideconquer(f::Function, iter; count::Integer=iter|>length, desc::String="any") = (

@@ -103,6 +103,9 @@ function updatedivideconquer()
     if parallelstate.divideconquermeter == undef || !parallelstate.showmeter
         return
     end
+    if Threads.threadid() != 1
+        return
+    end
     next!(parallelstate.divideconquermeter)
 end
 export updatedivideconquer

@@ -46,7 +46,9 @@ export getmaxthreads
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ Parallel computing APIs ◆
 function paralleltasks(;
-    name::String, tasks, count::Integer, showmeter::Bool = parallelsettings.showmeter)
+    tasks, 
+    name::String, count::Integer, 
+    showmeter::Bool = parallelstate.showmeter, corecount::Integer = getmaxthreads())
 
     function producer(ch::Channel)
         for task in tasks
@@ -56,7 +58,7 @@ function paralleltasks(;
 
     taskchannel = Channel(producer)
     resultchannel = Channel(count)
-    actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))
+    actualcorecount::Integer = max(1, min(corecount, Threads.nthreads()))
     meter = showmeter ? Progress(count, desc="#threads($actualcorecount) $name", dt=0.2) : undef
 
     return ParallelTasks(taskchannel, resultchannel, actualcorecount, meter)

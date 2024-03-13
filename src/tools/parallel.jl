@@ -105,15 +105,15 @@ function updatedivideconquer()
 end
 export updatedivideconquer
 
-function sumwithprogress(iter)
-    ret = first(iter)
+getconquerer(f::Function) = function(iter)
+    ret = iter|>first
     for item in Iterators.drop(iter, 1)
-        ret += item
+        ret = f(ret, item)
         updatedivideconquer()
     end
     return ret
 end
-export sumwithprogress
+export getconquerer
 
 function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
     actualcorecount::Integer = max(1, min(getmaxthreads(), Threads.nthreads()))

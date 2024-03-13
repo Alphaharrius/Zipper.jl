@@ -132,12 +132,18 @@ function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
         end
     end)|>Channel
 
-    conquer() = [v for v in iterchannel]|>f
+    function conquer()
+        items = [v for v in iterchannel]
+        if length(items) == 0
+            return
+        end
+        return f(items)
+    end
     
     parallelstate.divideconquermeter = (
         ProgressUnknown(desc="divideconquer $desc count=$count batch=$batchsize", spinner=true))
     threads = [Threads.@spawn conquer() for _ in 1:corecount]
-    results = fetch.(threads)
+    results = [v for v in fetch.(threads) if !isnothing(v)]
     ProgressMeter.finish!(parallelstate.divideconquermeter)
     if corecount > 3
         return paralleldivideconquer(f, results, corecount, desc)

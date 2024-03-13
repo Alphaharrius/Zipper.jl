@@ -183,6 +183,6 @@ rg4 = @time zer(rg3[:couriercorrelations])
 rg5 = @time zer(rg4[:couriercorrelations])
 rg6 = @time zer(rg5[:couriercorrelations])
 
-plot([-0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, -0], [1, 1, 2, 2, 3, 3, 3, 4, 6])
+plot([-1.3, -1.2, -1.1, -1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5], [1, 1, 1, 1, 1, 1, 1, 2, 2, 3, 3, 3, 4, 6, 6, 6, 6, 6, 6])
 
 plot!(xlabel="t_a - t_b", ylabel="RG Depth", legend=false)

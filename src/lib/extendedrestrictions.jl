@@ -28,22 +28,32 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
     bz::Subset{Momentum} = crystal|>brillouinzone
     momentummappings::Base.Generator = (basispoint(scaledkspace * k) => k for k in bz)
 
-    restrictedfourier = fourier(crystalfock, unscaledextendedhomefock)'
+    transform = fourier(crystalfock, unscaledextendedhomefock)'
     blocks::Dict = Dict()
 
     stripunitcell::Region = Subset(scaledspace * r for r in unscaledextendedunitcell)
     stripcrystal::Crystal = Crystal(stripunitcell, scaledcrystal|>size)
     volumeratio::Real = vol(crystal) / vol(stripcrystal)
 
-    scaledksubspaces::Dict{Momentum, FockSpace} = Dict()
-    for (scaledk, k) in momentummappings
-        kfourier::FockMap = restrictedfourier[:, k] / sqrt(volumeratio)
-        if !haskey(scaledksubspaces, scaledk)
-            scaledksubspaces[scaledk] = FockSpace(
-                setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
+    function compute(scaledk, k)
+        kfourier::FockMap = transform[:, k] / sqrt(volumeratio)
+        scaledksubspace = FockSpace(
+            setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) 
+            for mode in kfourier|>getoutspace)
+        block = FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
+        data = spzeros(Complex, block|>getoutspace|>length, block|>getinspace|>length)
+        extracted = ((n, m, m|>getattr(:k), m|>getattr(:b), m|>getattr(:b)|>basispoint) for (n, m) in block|>getoutspace|>enumerate)
+        extracted = ((n, m, k, b-bb) for (n, m, k, b, bb) in extracted)
+        for (n, m, k, r) in extracted
+            data[n, :] = rep(block[m, :])[:, :] * fcoef(k, r)'
         end
-        blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
+        return (scaledk, k)=>FockMap(block|>getoutspace, block|>getinspace, data)
     end
+
+    blocks = paralleltasks(
+        name="*(::ExtendedRestrict, ::CrystalFock)",
+        tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
+        count=length(momentummappings))|>parallel|>Dict
 
     return CrystalFockMap(stripcrystal, crystal, blocks)
 end

@@ -64,8 +64,11 @@ end
 export paralleltasks
 
 function parallel(tasks::ParallelTasks)
+    @info "Call parallel..."
     counter = Threads.Atomic{Int}(0)
     monitorthreadid = rand(1:tasks.corecount)
+
+    @info "Parallel parallel..."
 
     function producer()
         results = Queue{Any}()
@@ -88,14 +91,16 @@ function parallel(tasks::ParallelTasks)
         return results
     end
 
-    threads = [
+    @info "Parallel start..."
+    threads = @time [
         Threads.@spawn (tasks.meter != undef && i == monitorthreadid ? monitorproducer : producer)() 
         for i in 1:tasks.corecount]
-    resultbatches = fetch.(threads)
+    @info "Parallel fetch..."
+    resultbatches = @time fetch.(threads)
     tasks.meter == undef || ProgressMeter.finish!(tasks.meter)
-    return (v for batch in resultbatches for v in batch)
+    @info "Parallel done!"
+    return @time (v for batch in resultbatches for v in batch)
 end
-export parallel
 
 function updatedivideconquer()
     if parallelsettings.divideconquermeter == undef || !parallelsettings.showmeter

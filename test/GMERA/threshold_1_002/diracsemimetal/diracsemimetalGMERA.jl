@@ -273,6 +273,8 @@ fiosave(correlations_size12, name="correlations_size12")
 blockedcorrelationsloc2size12 = startingcorrelations(correlations_size12,2)
 fiosave(blockedcorrelationsloc2size12, name="blockedcorrelationsloc2size12")
 rgresultsloc2size12 = rg(blockedcorrelationsloc2size12,modeselectionstrategy)
+rgresultsloc2size12[:rg1][]
+fiosave(rgresultsloc2size12[:rg1], name="rgresultsloc2size12[:rg1]")
 rgresultsloc2size12[:rg1]
 noofrgsteploc2size12 = length(rgresultsloc2size12)
 fiosave(noofrgsteploc2size12, name="noofrgsteploc2size12")

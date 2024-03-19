@@ -44,32 +44,32 @@ function modeselectionbythreshold(threshold::Float64)::Function
 
         filteredfilled = filter(p -> p.second < threshold, spectrum |> geteigenvalues)
         if isempty(filteredfilled)
-            println("no filledmodes within this threshold!")
+            @info("no filledmodes within this threshold!")
         else
             filledevals = [pchosen.second for pchosen in filteredfilled]
-            println("last filled eigenvalues ", filledevals[end])
+            @info("last filled eigenvalues ", filledevals[end])
             filledmodes::Subset{Mode} = Subset(pchosen.first for pchosen in filteredfilled)
-            println("no of distillable filledmodes ", length(filledmodes))
+            @info("no of distillable filledmodes ", length(filledmodes))
             modesdict[:filled] = columns(spectrum |> geteigenvectors, FockSpace(filledmodes))
         end
 
         filteredempty = filter(p -> p.second > 1.0 - threshold, spectrum |> geteigenvalues)
         if isempty(filteredfilled)
-            println("no emptymodes within this threshold!")
+            @info("no emptymodes within this threshold!")
         else
             emptyevals = [pchosen.second for pchosen in filteredempty]
-            println("last empty eigenvalues ", emptyevals[end])
+            @info("last empty eigenvalues ", emptyevals[end])
             emptymodes::Subset{Mode} = Subset(pchosen.first for pchosen in filteredempty)
-            println("no of distillable filledmodes ", length(emptymodes))
+            @info("no of distillable filledmodes ", length(emptymodes))
             modesdict[:empty] = columns(spectrum |> geteigenvectors, FockSpace(emptymodes))
         end
 
         filteredcourier = filter(p -> threshold <= p.second <= 1.0 - threshold, spectrum |> geteigenvalues)
         if isempty(filteredcourier)
-            println("no couriermodes remain!")
+            @info("no couriermodes remain!")
         else
             couriermodes::Subset{Mode} = Subset(pchosen.first for pchosen in filteredcourier)
-            println("no of couriermodes ", length(couriermodes))
+            @info("no of couriermodes ", length(couriermodes))
             modesdict[:courier] = columns(spectrum |> geteigenvectors, FockSpace(couriermodes))
         end
         return modesdict
@@ -122,12 +122,12 @@ function modeselectionbycount(count::Integer)::Function
         sortedmodeandevalpairs = sort!(collect(evals), by = x->x.second)
         filledmodes::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[1:count])
         reffilledeval = sortedmodeandevalpairs[count][2]
-        println("ref filled eigenvalue ", reffilledeval)
+        @info("ref filled eigenvalue ", reffilledeval)
         emptymodes::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[(end - count + 1):end])
         refemptyeval = sortedmodeandevalpairs[end - count + 1][2]
-        println("ref empty eigenvalue ", refemptyeval)
+        @info("ref empty eigenvalue ", refemptyeval)
         couriermodes::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[count+1:end-count])
-        println("no of couriermodes ", length(couriermodes))
+        @info("no of couriermodes ", length(couriermodes))
         return Dict(:filled => columns(spectrum |> geteigenvectors, FockSpace(filledmodes)), :empty => columns(spectrum |> geteigenvectors, FockSpace(emptymodes)),
         :courier => columns(spectrum |> geteigenvectors, FockSpace(couriermodes)))
     end
@@ -176,24 +176,24 @@ function modeselection1stbycountthenbythreshold(count::Integer,threshold::Float6
         sortedmodeandevalpairs = sort!(collect(evals), by = x->x.second)
         filledmodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[1:count])
         reffilledeval = sortedmodeandevalpairs[count][2]
-        println("ref filled eigenvalue ", reffilledeval)
+        @info("ref filled eigenvalue ", reffilledeval)
         emptymodesbycount::Subset{Mode} = Subset(pair[1] for pair in sortedmodeandevalpairs[(end - count + 1):end])
         refemptyeval = sortedmodeandevalpairs[end - count + 1][2]
-        println("ref empty eigenvalue ", refemptyeval)
+        @info("ref empty eigenvalue ", refemptyeval)
         filledmodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> p.second-reffilledeval < threshold, spectrum |> geteigenvalues))
         emptymodesbythreshold::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> 1-threshold < p.second+1-refemptyeval, spectrum |> geteigenvalues))
         filledmodes = filledmodesbycount + filledmodesbythreshold
-        println("no of distillable filledmodes ", length(filledmodes))
+        @info("no of distillable filledmodes ", length(filledmodes))
         modesdict[:filled] = columns(spectrum |> geteigenvectors, FockSpace(filledmodes))
         emptymodes = emptymodesbycount + emptymodesbythreshold
-        println("no of distillable emptymodes ", length(emptymodes))
+        @info("no of distillable emptymodes ", length(emptymodes))
         modesdict[:empty] = columns(spectrum |> geteigenvectors, FockSpace(emptymodes))
         filteredcourier = filter(p -> threshold + reffilledeval <= p.second <= refemptyeval - threshold, spectrum |> geteigenvalues)
         if isempty(filteredcourier)
-            println("no couriermodes remain!")
+            @info("no couriermodes remain!")
         else
             couriermodes::Subset{Mode} = Subset(pchosen.first for pchosen in filteredcourier)
-            println("no of couriermodes ", length(couriermodes))
+            @info("no of couriermodes ", length(couriermodes))
             modesdict[:courier] = columns(spectrum |> geteigenvectors, FockSpace(couriermodes))
         end
         return modesdict
@@ -210,16 +210,16 @@ function modeselectiononemodeplusepilon(threshold::Float64,epsilon::Float64)::Fu
         modesdict = Dict()
         sortedmodeandevalpairs = sort!(collect(evals), by = x->x.second)
         reffilledeval = sortedmodeandevalpairs[1][2]
-        println("ref filled eigenvalue ", reffilledeval)
+        @info("ref filled eigenvalue ", reffilledeval)
         refemptyeval = sortedmodeandevalpairs[end][2]
-        println("ref empty eigenvalue ", refemptyeval)
+        @info("ref empty eigenvalue ", refemptyeval)
         if reffilledeval<threshold
             firstfilledmode::Subset{Mode} = Subset(sortedmodeandevalpairs[1][1])
             epsilonfilledmodes::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> p.second-reffilledeval < epsilon, spectrum |> geteigenvalues))
             filledchosenevals = [pchosen.second for pchosen in filter(p -> p.second-reffilledeval < epsilon, spectrum |> geteigenvalues)]
-            println("chosen empty evals", filledchosenevals)
+            @info("chosen empty evals", filledchosenevals)
             filledmodes = firstfilledmode + epsilonfilledmodes
-            println("no of distillable filledmodes ", length(filledmodes))
+            @info("no of distillable filledmodes ", length(filledmodes))
             modesdict[:filled] = columns(spectrum |> geteigenvectors, FockSpace(filledmodes))
             filledepsilon = epsilon
         else
@@ -231,9 +231,9 @@ function modeselectiononemodeplusepilon(threshold::Float64,epsilon::Float64)::Fu
             firstemptymode::Subset{Mode} = Subset(sortedmodeandevalpairs[end][1])
             epsilonemptymodes::Subset{Mode} = Subset(pchosen.first for pchosen in filter(p -> 1-epsilon < p.second+1-refemptyeval, spectrum |> geteigenvalues))
             emptychosenevals = [pchosen.second for pchosen in filter(p -> 1-epsilon < p.second+1-refemptyeval, spectrum |> geteigenvalues)]
-            println("chosen empty evals", emptychosenevals)
+            @info("chosen empty evals", emptychosenevals)
             emptymodes = firstemptymode + epsilonemptymodes
-            println("no of distillable emptymodes ", length(emptymodes))
+            @info("no of distillable emptymodes ", length(emptymodes))
             modesdict[:empty] = columns(spectrum |> geteigenvectors, FockSpace(emptymodes))
             emptyepsilon = epsilon
         else
@@ -245,10 +245,10 @@ function modeselectiononemodeplusepilon(threshold::Float64,epsilon::Float64)::Fu
         
         filteredcourier = filter(p -> reffilledeval + filledepsilon <= p.second <= refemptyeval - emptyepsilon, spectrum |> geteigenvalues)
         if isempty(filteredcourier)
-            println("no couriermodes remain!")
+            @info("no couriermodes remain!")
         else
             couriermodes::Subset{Mode} = Subset(pchosen.first for pchosen in filteredcourier)
-            println("no of couriermodes ", length(couriermodes))
+            @info("no of couriermodes ", length(couriermodes))
             modesdict[:courier] = columns(spectrum |> geteigenvectors, FockSpace(couriermodes))
         end
         return modesdict
@@ -715,7 +715,7 @@ export localwannierseedslistsfromrefwifoutcourier
 function localwannierization(localbasis::FockMap, localseeds::FockMap, svdorthothreshold::Number = 1e-1)::FockMap
     U, Σ, Vt = svd(localbasis'*localseeds)
     minsvdvalue::Number = minimum(v for (_, v) in Σ)
-    println("min svdvalue", minsvdvalue)
+    @info("min svdvalue", minsvdvalue)
     precarioussvdvalues::Vector = []
     if minsvdvalue < svdorthothreshold
         push!(precarioussvdvalues, minsvdvalue)

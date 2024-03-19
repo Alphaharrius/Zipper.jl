@@ -208,6 +208,7 @@ the file name will be in the format of `{name}.dat`.
 The path to the file saved, in the format of `{project directory}/{name}.dat
 """
 function fiosave(object; name::String)
+    @info("staring fiosave")
     storageobject = object
     type = typeof(object)
     # We would like to see if there are any storage type registered for the parametric type first, 
@@ -217,6 +218,7 @@ function fiosave(object; name::String)
     elseif haskey(STORAGE_TYPES, type.name.wrapper)
         storageobject = convert(STORAGE_TYPES[type], object)
     end
+    @info("setting up filepath")
     filepath = joinpath(fiodir(), "$name.dat")
     # Set the target name for the current thread.
     FIO_STATE.threadtargetname[Threads.threadid()] = name

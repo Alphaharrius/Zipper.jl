@@ -96,30 +96,70 @@ export outspacesubmaps
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ CrystalFockMap arithmetics ◆
-function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
-    @assert hassamespan(a|>getoutspace, b|>getoutspace)
-    @assert hassamespan(a|>getinspace, b|>getinspace)
+# function Base.:+(a::CrystalFockMap, b::CrystalFockMap)::CrystalFockMap
+#     @assert hassamespan(a|>getoutspace, b|>getoutspace)
+#     @assert hassamespan(a|>getinspace, b|>getinspace)
 
+#     function compute(data)
+#         pair, block = data
+#         return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
+#     end
+
+#     blocks::Dict{Any, Any} = paralleltasks(
+#         name="CrystalFockMap + CrystalFockMap",
+#         tasks=(()->compute(data) for data in a.blocks),
+#         count=length(a.blocks))|>parallel|>Dict
+#     @info("finish computing blocks")
+#     watchprogress(desc="CrystalFockMap + CrystalFockMap")
+#     @info("monitoring progress")
+#     println("length of b.blocks ", length(b.blocks))
+#     println("length of a.blocks ", length(a.blocks))
+#     for (pair, block) in b.blocks
+#         updateprogress()
+#         if haskey(blocks, pair) continue end
+#         blocks[pair] = block
+#     end
+#     unwatchprogress()
+
+#     @info("construct summed CrystalFockMap")
+#     return CrystalFockMap(a.outcrystal, a.incrystal, blocks)
+# end
+
+function Base.:+(input1::CrystalFockMap, input2::CrystalFockMap)::CrystalFockMap
+    @assert hassamespan(input1|>getoutspace, input2|>getoutspace)
+    @assert hassamespan(input1|>getinspace, input2|>getinspace)
+    if length(input1.blocks)<=length(input2.blocks)
+        a = input2
+        b = input1
+        @info("input 2 has more block and take as ref")
+        @info("length of b.blocks ", length(b.blocks))
+        @info("length of a.blocks ", length(a.blocks))
+    else
+        a = input1
+        b = input2
+        @info("input 1 has more block and take as ref")
+        @info("length of b.blocks ", length(b.blocks))
+        @info("length of a.blocks ", length(a.blocks))
+    end
     function compute(data)
         pair, block = data
         return pair=>(haskey(b.blocks, pair) ? block + b.blocks[pair] : block)
     end
 
-    blocks::Dict{Any, Any} = paralleltasks(
+    @info("paralleltasks")
+    parallelresult = @time paralleltasks(
         name="CrystalFockMap + CrystalFockMap",
         tasks=(()->compute(data) for data in a.blocks),
-        count=length(a.blocks))|>parallel|>Dict
+        count=length(a.blocks))|>parallel
 
-    watchprogress(desc="CrystalFockMap + CrystalFockMap")
-    for (pair, block) in b.blocks
-        updateprogress()
-        if haskey(blocks, pair) continue end
-        blocks[pair] = block
-    end
-    unwatchprogress()
+    @info("constructing block dictionary")
+    blocks::Dict{Any, Any} = @time parallelresult|>Dict
+    @info("finish computing blocks")
 
+    @info("construct summed CrystalFockMap")
     return CrystalFockMap(a.outcrystal, a.incrystal, blocks)
 end
+
 
 function Base.:-(target::CrystalFockMap)::CrystalFockMap
     blocks::Dict = Dict(mapping=>(-block) for (mapping, block) in target.blocks)

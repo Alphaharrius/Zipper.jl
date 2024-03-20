@@ -15,7 +15,7 @@ crystal = Crystal(unitcell, [4, 4, 4])
 zone::Subset{Point} = points(crystal)
 k_zone::Subset{Point} = brillouinzone(crystal)
 
-modes::Subset{Mode} = quantize("physical", :pos, unitcell, 1)
+modes::Subset{Mode} = quantize("physical", :b, unitcell, 1)
 fock::FockSpace = FockSpace(modes)
 
 m0, m1 = members(modes)
@@ -23,9 +23,9 @@ tₙ = ComplexF64(-1.)
 
 bmap::FockMap = bondmap([
     (m0, m1) => tₙ,
-    (m0, setattr(m1, :offset => Point([1, 0, 0], fcc))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 1, 0], fcc))) => tₙ,
-    (m0, setattr(m1, :offset => Point([0, 0, 1], fcc))) => tₙ])
+    (m0, setattr(m1, :r => Point([1, 0, 0], fcc))) => tₙ,
+    (m0, setattr(m1, :r => Point([0, 1, 0], fcc))) => tₙ,
+    (m0, setattr(m1, :r => Point([0, 0, 1], fcc))) => tₙ])
 
 ΓX = interpolate(Point([0, 0, 0], kspace), Point([1/2, 0, 0], kspace), 200)
 XW = interpolate(Point([1/2, 0, 0], kspace), Point([1/2, 1/4, 0], kspace), 200)

@@ -19,8 +19,8 @@ The `FockMap` object that contains the bonding information.
 tₙ = ComplexF64(-1.)
 bonds::FockMap = bondmap([
     (modeA, modeB) => tₙ,
-    (modeA, modeB |> setattr(:offset => [-1, 0] ∈ triangularspace)) => tₙ,
-    (modeA, modeB |> setattr(:offset => [0, 1] ∈ triangularspace)) => tₙ])
+    (modeA, modeB |> setattr(:r => [-1, 0] ∈ triangularspace)) => tₙ,
+    (modeA, modeB |> setattr(:r => [0, 1] ∈ triangularspace)) => tₙ])
 ```
 """
 function bondmap(bonds::Vector{Pair{Tuple{Mode, Mode}, T}})::FockMap where {T <: Complex}
@@ -37,10 +37,17 @@ export bondmap
 Compute the momentum space energy spectrum within a `Crystal` brillouin zone for a given `bonds` generated from `bondmap`.
 """
 function computeenergyspectrum(bonds::FockMap; crystal::Crystal)::CrystalSpectrum
-    bz::Subset{Momentum} = crystal |> brillouinzone
-    bondmodes::Subset{Mode} = bonds.outspace |> orderedmodes
-    fouriers::Base.Generator = (k => fourier(k |> Subset, bondmodes |> FockSpace) for k in bz)
-    momentumhamiltonians::Base.Generator = (k => fourier * bonds * fourier' for (k, fourier) in fouriers)
+    bondmodes::Subset{Mode} = bonds|>getoutspace|>orderedmodes
+    homefock::NormalFock = bonds|>getoutspace|>RegionFock|>unitcellfock
+    transform = fourier(getcrystalfock(homefock, crystal), bondmodes|>RegionFock)
+    function compute(k)
+        ktransform = transform[k, :]
+        return k=>(ktransform*bonds*ktransform')
+    end
+    momentumhamiltonians = paralleltasks(
+        name="computeenergyspectrum",
+        tasks=(()->compute(k) for k in crystal|>brillouinzone),
+        count=crystal|>vol)|>parallel
     return crystalspectrum(momentumhamiltonians, crystal=crystal)
 end
 export computeenergyspectrum
@@ -60,6 +67,7 @@ spectrum by filling all fermionic degrees of freedom below the Fermi energy.
 ### Output
 The `CrystalSpectrum` object that contains the ground state energy spectrum.
 """
+# TODO: This function requires revisit as the performance is bad, but the results are correct.
 function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-7)::CrystalSpectrum
     perunitcellfillings > 0 || error("Filling must be positive!")
     
@@ -74,7 +82,7 @@ function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfilling
     groundstatemodesets::Base.Generator = (modeset for (_, modeset) in contributions)
     groundstatemodes::Subset{Mode} = groundstatemodesets |> subsetunion
 
-    decoratedmodes::Base.Generator = ((m |> getattr(:offset)) => m for m in groundstatemodes)
+    decoratedmodes::Base.Generator = ((m |> getattr(:k)) => m for m in groundstatemodes)
     momentummodes::Dict = foldl(decoratedmodes; init=Dict()) do d, (k, v)
         mergewith!(append!, d, LittleDict(k => [v]))
     end
@@ -93,12 +101,12 @@ export groundstatespectrum
 Round the correlation eigenvalues of the `correlationspectrum` to `0` or `1`, this is
 useful when the eigenvalues in the pure state are close to `0` or `1` but not exactly.
 """
-function roundingpurification(correlationspectrum::CrystalSpectrum)::CrystalSpectrum
+function roundingpurification(correlationspectrum::CrystalSpectrum; tolerance::Real=1e-1)::CrystalSpectrum
     function fixeigenvalues(eigenvalue::Number)
-        if isapprox(eigenvalue, 1, atol=1e-1)
+        if isapprox(eigenvalue, 1, atol=tolerance)
             return 1
         end
-        if isapprox(eigenvalue, 0, atol=1e-1)
+        if isapprox(eigenvalue, 0, atol=tolerance)
             return 0
         end
         @warn("Eigenvalue $(eigenvalue) is not close to 0 or 1!")
@@ -107,3 +115,34 @@ function roundingpurification(correlationspectrum::CrystalSpectrum)::CrystalSpec
     return CrystalSpectrum(correlationspectrum.crystal, correlationspectrum.eigenmodes, eigenvalues, correlationspectrum.eigenvectors)
 end
 export roundingpurification
+
+function entanglemententropy(correlationspectrum::CrystalSpectrum)
+    sumresult = 0
+    for (_, v) in correlationspectrum |> geteigenvalues
+        if isapprox(v, 0, atol=1e-7) || isapprox(v, 1, atol=1e-7)
+            continue
+        end
+        
+        sumresult += v * log(v) + (1 - v) * log(1 - v)
+    end
+    return -sumresult
+end
+export entanglemententropy
+
+function momentumoccupations(correlations::FockMap)::FockMap
+    kcorrelations::Base.Generator = correlations |> crystalsubmaps
+    crystal::Crystal = correlations |> getoutspace |> getcrystal
+    center::Offset = crystal |> getspace |> getorigin
+    tracecrystal::Crystal = Crystal(center |> Subset, crystal |> size)
+    mode::Mode = Mode(:b => center)
+
+    function tracing(k::Momentum, corr::FockMap)::FockMap
+        space::FockSpace = mode |> setattr(:k => k) |> FockSpace
+        return FockMap(space, space, [corr |> tr][:, :] |> SparseMatrixCSC) / dimension(corr |> getoutspace)
+    end
+
+    occupations::FockMap = directsum(tracing(k, corr) for (k, corr) in kcorrelations)
+    fockspace::FockSpace = FockSpace(occupations |> getoutspace, reflected=tracecrystal)
+    return FockMap(occupations, inspace=fockspace, outspace=fockspace)
+end
+export momentumoccupations

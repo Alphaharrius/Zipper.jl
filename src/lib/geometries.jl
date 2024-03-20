@@ -34,7 +34,18 @@ Zipper.:getregion(crystal::Crystal) = sitepoints(crystal)
 getunitcell(crystal::Crystal) = crystal.unitcell
 export getunitcell
 
+"""
+    getbarecrystal(crystal::Crystal)::Crystal
+
+A bare crystal defines a crystal that have a singlar zero offset position as the unit-cell, and the provided 
+argument `crystal` is used to supply the `RealSpace` and the size information to the bare crystal.
+"""
+getbarecrystal(crystal::Crystal)::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, crystal|>size)
+return getbarecrystal
+
 Base.:size(crystal::Crystal) = crystal.sizes
+
+Base.:(==)(a::Crystal, b::Crystal)::Bool = a.sizes == b.sizes && a.unitcell == b.unitcell
 
 """
     pbc(crystal::Crystal, point::Point)::Point
@@ -55,6 +66,13 @@ pbc(crystal::Crystal)::Function = p -> pbc(crystal, p)
 latticeoff(point::Point)::Point = Point([trunc(v) for v in point |> vec], getspace(point))
 export latticeoff
 
+getorigin(crystal::Crystal)::Offset = crystal|>getspace|>getorigin
+
+"""
+    basispoint(point::Point)::Point
+
+Convert a point back to the corresponding basis point within the unitcell.
+"""
 function basispoint(point::Point)::Point
     rationalized::Vector = [hashablereal(v) for v in point |> vec]
     return Point([mod(v |> numerator, v |> denominator) / denominator(v) for v in rationalized], point |> getspace)
@@ -72,20 +90,18 @@ mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collec
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 export vol
 
-function latticepoints(crystal::Crystal)::Subset{Offset}
-    real_space::RealSpace = getspace(crystal.unitcell)
-    crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
-    tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
-    recentered_mesh::Matrix{Float64} = (crystal_mesh - tiled_sizes / 2)
-    return Subset(Point(pos, real_space) for pos in eachcol(recentered_mesh))
+@memoize function latticepoints(crystal::Crystal)::Subset{Offset}
+    realspace::RealSpace = getspace(crystal.unitcell)
+    crystalmesh::Matrix{Int64} = mesh(crystal.sizes)
+    return Subset(Point(pos, realspace) for pos in eachcol(crystalmesh))
 end
 export latticepoints
 
-sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
+@memoize sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
     latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
 export sitepoints
 
-function brillouinzone(crystal::Crystal)::Subset{Momentum}
+@memoize function brillouinzone(crystal::Crystal)::Subset{Momentum}
     momentum_space::MomentumSpace = convert(MomentumSpace, getspace(crystal.unitcell))
     crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
     tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
@@ -100,25 +116,72 @@ function brillouinmesh(crystal::Crystal)::Array{Point}
 end
 export brillouinmesh
 
-function getsphericalregion(;from::Offset, generators::Subset{Offset}, symmetries, radius::Real, metricspace::RealSpace)
-    from |> latticeoff == from || error("`from` must be a lattice offset!")
-
-    getspancount(generator::Offset)::Integer = radius / (generator |> euclidean |> norm) |> ceil |> Integer
-
-    generated::Region = Subset(from |> getspace |> getorigin)
-    println(generated |> collect)
-    for vec in generators
-        expanded::Region = Subset(p + vec * n for p in generated for n in 0:getspancount(vec))
-        generated = filter(p -> lineartransform(metricspace, p) |> norm <= radius, expanded)
+@memoize function computemomentummatrix(crystal::Crystal)
+    function computekmatrix(batch)
+        matrix::SparseMatrixCSC = spzeros(crystal|>dimension, crystal|>vol)
+        for (n, k) in batch
+            matrix[:, n] = k|>euclidean|>vec
+        end
+        return matrix
     end
 
-    for symmetry in symmetries, transform in symmetry |> pointgroupelements
-        generated += transform * generated
-    end
+    batchsize::Integer = ((crystal|>vol) / getmaxthreads())|>ceil
+    batches = Iterators.partition((el for el in crystal|>brillouinzone|>enumerate), batchsize)
+    matrixparts = paralleltasks(
+        name="computemomentummatrix",
+        tasks=(()->computekmatrix(batch) for batch in batches),
+        count=getmaxthreads())|>parallel
 
-    return generated + from
+    momentummatrix::SparseMatrixCSC = spzeros(crystal|>dimension, crystal|>vol)
+    watchprogress(desc="computemomentummatrix")
+    for part in matrixparts
+        momentummatrix[:, :] += part
+        updateprogress()
+    end
+    unwatchprogress()
+
+    return momentummatrix
+end
+
+function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
+    generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
+    generatinglength::Integer = generatingradius * 2
+    generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
+    crystalregion::Region = generatingcrystal|>sitepoints
+    centeredregion::Region = crystalregion .- (crystalregion|>getcenter)
+    return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
 end
 export getsphericalregion
 
 geometricfilter(f, metricspace::AffineSpace) = p -> (metricspace * p) |> f
 export geometricfilter
+
+linearscale(space::AffineSpace) = log.([v|>norm for v in space|>getbasisvectors])|>mean|>exp
+export linearscale
+
+function orthodirections(vector::Point)
+    Q, _ = vector|>vec|>qr
+    space::RealSpace = vector|>getspace
+    return Iterators.drop((Q[:, n] ∈ space for n in axes(Q, 2)), 1)
+end
+export orthodirections
+
+function getcrosssection(; crystal::Crystal, normalvector::Offset, radius::Real, metricspace::RealSpace = crystal|>getspace|>orthospace, minbottomheight::Real = 0)
+    height::Real = (*(metricspace, normalvector)|>norm)
+    sphericalregion::Region = getsphericalregion(crystal=crystal, radius=sqrt(height^2 + radius^2)*2, metricspace=metricspace)
+
+    normaldirection::Offset = *(metricspace, normalvector)|>normalize
+    function crosssectionfilter(point::Point)::Bool
+        metricpoint::Point = metricspace * point
+        iswithinheight::Bool = minbottomheight <= dot(metricpoint, normaldirection) <= height
+        orthoreminder::Point = metricpoint - dot(metricpoint, normaldirection) * normaldirection
+        iswithinradius::Bool = norm(orthoreminder) < radius
+        return iswithinheight && iswithinradius
+    end
+
+    rawregion::Region = sphericalregion|>filter(crosssectionfilter)
+    proximityregion::Region = rawregion .- normalvector
+
+    return rawregion - intersect(rawregion, proximityregion)
+end
+export getcrosssection

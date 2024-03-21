@@ -41,13 +41,14 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
             setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) 
             for mode in kfourier|>getoutspace)
         block = FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
-        data = spzeros(Complex, block|>getoutspace|>length, block|>getinspace|>length)
-        extracted = ((n, m, m|>getattr(:k), m|>getattr(:b), m|>getattr(:b)|>basispoint) for (n, m) in block|>getoutspace|>enumerate)
-        extracted = ((n, m, k, b-bb) for (n, m, k, b, bb) in extracted)
-        for (n, m, k, r) in extracted
-            data[n, :] = rep(block[m, :])[:, :] * fcoef(k, r)'
-        end
-        return (scaledk, k)=>FockMap(block|>getoutspace, block|>getinspace, data)
+        # data = spzeros(Complex, block|>getoutspace|>length, block|>getinspace|>length)
+        # extracted = ((n, m, m|>getattr(:k), m|>getattr(:b), m|>getattr(:b)|>basispoint) for (n, m) in block|>getoutspace|>enumerate)
+        # extracted = ((n, m, k, b-bb) for (n, m, k, b, bb) in extracted)
+        # for (n, m, k, r) in extracted
+        #     data[n, :] = rep(block[m, :])[:, :] * fcoef(k, r)'
+        # end
+        # return (scaledk, k)=>FockMap(block|>getoutspace, block|>getinspace, data)
+        return (scaledk, k)=>block
     end
 
     blocks = paralleltasks(

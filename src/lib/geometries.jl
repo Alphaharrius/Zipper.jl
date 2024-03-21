@@ -68,6 +68,19 @@ export latticeoff
 
 getorigin(crystal::Crystal)::Offset = crystal|>getspace|>getorigin
 
+getkbasis(crystal::Crystal, k::Momentum) = vec(k) .* size(crystal)
+export getkbasis
+
+kindexoperator(crystal::Crystal) = [1, (size(crystal)[1:end-1]|>cumprod)...]
+export kindexoperator
+
+Base.getindex(crystal::Crystal, k::Momentum)::Integer = kindexoperator(crystal)' * getkbasis(crystal, k) + 1
+
+Base.getindex(crystal::Crystal, i::Integer) = brillouinzone(crystal)[i]
+
+Base.:in(k::Momentum, crystal::Crystal) = (
+    getspace(k) == convert(MomentumSpace, getspace(crystal)) && getkbasis(crystal, k)|>sum|>isinteger)
+
 """
     basispoint(point::Point)::Point
 

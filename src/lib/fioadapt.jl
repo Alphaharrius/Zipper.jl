@@ -97,3 +97,119 @@ function Base.:convert(::Type{CrystalFockMap}, blob::CrystalFockMapBlob)
 end
 
 fiostoragetype(CrystalFockMap, CrystalFockMapBlob)
+
+struct CrystalDense <: Element{Any}
+    outspace::CrystalFock
+    inspace::CrystalFock
+    chunkcount::Integer
+    chunksize::Integer
+    dataframe::DataFrame
+    nonzeroids::Vector{Tuple}
+end
+
+function dense2dataframe(dense::Vector)
+    function process(cno, data::SparseVector)
+        cids, blocks = findnz(data)
+        CI = []
+        I = []
+        J = []
+        Vr = []
+        Vi = []
+        @debug "$cno have $(length(cids)) blocks..."
+        for (cid, block) in zip(cids, blocks)
+            bI, bJ, bV = findnz(block|>rep)
+            length(bI) == 0 && (bI = [1]; bJ = [1]; bV = [0im])
+            append!(CI, [cid for _ in eachindex(bI)])
+            append!(I, bI)
+            append!(J, bJ)
+            append!(Vr, [v|>real for v in bV])
+            append!(Vi, [v|>imag for v in bV])
+        end
+        CN = [cno for _ in eachindex(I)]
+        return DataFrame(CN=CN, CI=CI, I=I, J=J, Vr=Vr, Vi=Vi)
+    end
+
+    dataframes = paralleltasks(
+        name="dense2dataframe",
+        tasks=(()->process(cno, data) for (cno, data) in enumerate(dense)),
+        count=length(dense))|>parallel
+
+    return paralleldivideconquer(getconquerer(vcat), dataframes, length(dense), "dense2dataframe")
+end
+
+function dataframe2dense(
+    dataframe::DataFrame; 
+    outcrystal::Crystal, incrystal::Crystal, outhomefock::NormalFock, inhomefock::NormalFock, chunksize::Integer)
+
+    grouped = groupby(dataframe, :CN)
+
+    function process(cno::Integer, group::SubDataFrame)
+        blockframes = groupby(group, :CI)
+        chunk = spzeros(SparseFockMap, chunksize)
+        for frame in blockframes
+            I = frame.I|>Vector
+            J = frame.J|>Vector
+            V = [Complex(vr, vi) for (vr, vi) in zip(frame.Vr, frame.Vi)]
+            data = sparse(I, J, V, outhomefock|>dimension, inhomefock|>dimension)
+            cid = frame.CI[1]
+            denseindex = getdenseindex(cno, cid, chunksize)
+            outk, ink = getdensemomentums(outcrystal, incrystal, denseindex)
+            outspace = outhomefock|>setattr(:k=>outk)|>FockSpace
+            inspace = inhomefock|>setattr(:k=>ink)|>FockSpace
+            chunk[cid] = SparseFockMap(outspace, inspace, data)
+        end
+        return cno, chunk
+    end
+
+    results = paralleltasks(
+        name="dataframe2dense",
+        tasks=(()->process(group.CN[1], group) for group in grouped),
+        count=length(grouped))|>parallel|>collect
+
+    return [v for (_, v) in sort(results, by=first)]
+end
+
+function Base.:convert(::Type{CrystalDense}, fockmap::CrystalDenseMap)
+    dataframe::DataFrame = dense2dataframe(fockmap.data)
+    return CrystalDense(
+        fockmap|>getoutspace, fockmap|>getinspace, 
+        fockmap.chunkcount, fockmap.chunksize, dataframe, fockmap.nonzeroids)
+end
+
+function Base.:convert(::Type{CrystalDenseMap}, dense::CrystalDense)
+    data = dataframe2dense(
+        dense.dataframe, 
+        outcrystal=dense.outspace|>getcrystal, 
+        incrystal=dense.inspace|>getcrystal, 
+        outhomefock=dense.outspace|>unitcellfock, 
+        inhomefock=dense.inspace|>unitcellfock, 
+        chunksize=dense.chunksize)
+    return CrystalDenseMap(
+        dense.outspace, dense.inspace, 
+        dense.chunkcount, dense.chunksize, 
+        data, dense.nonzeroids)
+end
+
+fiostoragetype(CrystalDenseMap, CrystalDense)
+
+fiolower((CrystalDense, :dataframe), function (dataframe::DataFrame)
+    filename = "$(fiotargetname()).csv"
+    filepath = joinpath(fiodir(), filename)
+    CSV.write(filepath, dataframe)
+    @debug "dataframe -> $filepath"
+    return Dict(:filename=>filename)
+end)
+
+# The dataframe is stored in a CSV file.
+fioparser((CrystalDense, :dataframe), function (d::Dict)
+    filename = d["filename"]
+    filepath = joinpath(fiodir(), filename)
+    dataframe = CSV.read(filepath, DataFrame)
+    @debug "$filepath -> dataframe"
+    return dataframe
+end)
+
+# The dataframe is stored in a CSV file.
+fioparser((CrystalDense, :nonzeroids), function (vec::Vector)
+    return Set(tuple(el...) for el in vec)
+end)

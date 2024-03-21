@@ -191,6 +191,9 @@ Given a Hermitian `FockMap` with `inspace` and `outspace` of type
 crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(
     fockmap|>crystalsubmaps, crystal=fockmap|>getinspace|>getcrystal)
 
+crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(
+    fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
+
 """
     linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
 

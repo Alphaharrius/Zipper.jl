@@ -85,21 +85,48 @@ function Base.:*(left::CrystalDenseMap, right::CrystalDenseMap)
     data = preparedense(chunkcount, chunksize)
     locks = preparedenselocks(chunkcount)
 
+    function computeindextable(chunkno, chunkid)
+        denseindex = getdenseindex(chunkno, chunkid, right.chunksize)
+        outkr, inkr = getdensemomentums(routspace|>getcrystal, rinspace|>getcrystal, denseindex)
+        return outkr=>(inkr, right.data[chunkno][chunkid])
+    end
+
+    function postprocessor(results)
+        ret = Dict()
+        for (k, v) in results
+            !haskey(ret, k) && (ret[k] = [])
+            push!(ret[k], v)
+        end
+        return ret
+    end
+
+    rindexentries = paralleltasks(
+        name="*(::CrystalDenseMap, ::CrystalDenseMap) indextable",
+        tasks=(()->computeindextable(chunkno, chunkid) for (chunkno, chunkid) in right.nonzeroids),
+        count=length(right.nonzeroids),
+        postprocessor=postprocessor)|>parallel|>collect
+
+    function merge(iter)
+        ret = Dict()
+        for tbl in iter, (k, v) in tbl
+            !haskey(ret, k) && (ret[k] = [])
+            append!(ret[k], v)
+        end
+        return ret
+    end
+
+    rindextable = paralleldivideconquer(
+        merge, rindexentries, length(rindexentries), "*(::CrystalDenseMap, ::CrystalDenseMap) indextable")
+
     function process(chunkno, chunkid)
         # Get all the non-zero blocks from the right for this block on the left.
         denseindex = getdenseindex(chunkno, chunkid, left.chunksize)
         outkl, inkl = getdensemomentums(loutspace|>getcrystal, linspace|>getcrystal, denseindex)
-        rdenseindices = getdenseindices(routspace|>getcrystal, rinspace|>getcrystal, inkl)
-        rchunkindices = Iterators.filter(
-            v->last(v)∈right.nonzeroids, 
-            (did, getchunkindices(did, right.chunksize)) for did in rdenseindices)
-        rchunks = (
-            (getdensemomentums(routspace|>getcrystal, rinspace|>getcrystal, did)|>last, cno, cid) 
-            for (did, (cno, cid)) in rchunkindices)
+        rblocks = rindextable[inkl]
         lblock = left.data[chunkno][chunkid]
         products = (
-            (getdenseindex(loutspace|>getcrystal, rinspace|>getcrystal, outkl, inkr), lblock*right.data[cno][cid]) 
-            for (inkr, cno, cid) in rchunks)
+            (getdenseindex(loutspace|>getcrystal, rinspace|>getcrystal, outkl, inkr), lblock*rblock) 
+            for (inkr, rblock) in rblocks)
         nzids = []
         for (did, block) in products
             cno, cid = getchunkindices(did, chunksize)

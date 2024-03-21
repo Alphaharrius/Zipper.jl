@@ -63,7 +63,6 @@ fioparser((CrystalFock, :korderings), v -> Dict((fioparse(k), i) for (k, i) in v
 # The rep of SparseFockMap is stored in a CSV file, we have to read it back.
 fioparser((SparseFockMap, :rep), function (d::Dict)
     filename = d["filename"]
-    readsparse(filename)
     @debug "$filepath -> sparse"
     return readsparse(filename)
 end)

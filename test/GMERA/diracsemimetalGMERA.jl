@@ -14,7 +14,7 @@ function _crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
             return localisometry
         end
         inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:k => k) |> removeattr(:r) |> FockSpace
-        return FockMap(localisometry, inspace=inspace, performpermute=false)
+        return FockMap(localisometry, inspace=inspace, permute=false)
     end
 
     return Dict(k => kfourier * preprocesslocalisometry(k) for (k, kfourier) in zip(bz, momentumfouriers))

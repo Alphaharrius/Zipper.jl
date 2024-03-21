@@ -191,6 +191,9 @@ Given a Hermitian `FockMap` with `inspace` and `outspace` of type
 crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(
     fockmap|>crystalsubmaps, crystal=fockmap|>getinspace|>getcrystal)
 
+crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(
+    fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
+
 """
     linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
 
@@ -397,7 +400,27 @@ function FockMap(crystalspectrum::CrystalSpectrum)::FockMap
     end
     fockmap::FockMap = directsum(k |> momentumfockmap for (k, _) in crystalspectrum.eigenmodes)
     crystalfock::FockSpace = FockSpace(fockmap|>getinspace, reflected=crystalspectrum.crystal)
-    return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
+    return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, permute=false)
+end
+
+function CrystalFockMap(crystalspectrum::CrystalSpectrum)::CrystalFockMap
+    eigenvectors = crystalspectrum|>geteigenvectors
+
+    function compute(k::Momentum)
+        modes::Subset{Mode} = crystalspectrum.eigenmodes[k]
+        eigenfock::FockSpace = modes |> FockSpace
+        diagonal::FockMap = FockMap(
+            eigenfock, eigenfock,
+            Dict((m, m) => crystalspectrum.eigenvalues[m]|>ComplexF64 for m in modes))
+        return (k, k)=>(eigenvectors[k] * diagonal * eigenvectors[k]')
+    end
+
+    blocks::Dict = paralleltasks(
+        name="CrystalFockMap from CrystalSpectrum",
+        tasks=(()->compute(k) for (k, _) in crystalspectrum.eigenmodes),
+        count=crystalspectrum|>getcrystal|>vol)|>parallel|>Dict
+
+    return CrystalFockMap(crystalspectrum|>getcrystal, crystalspectrum|>getcrystal, blocks)
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 

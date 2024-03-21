@@ -168,26 +168,6 @@ stripspace = stripcrystal|>getspace
 stripspectrum = stripcorrelations|>crystalspectrum
 stripspectrum|>linespectrum|>visualize
 
-function truncatetoregion(crystalmap::CrystalFockMap, region::Region)
-    crystalfock = crystalmap|>getoutspace
-    crystal = crystalfock|>getcrystal
-    truncatefock = getregionfock(crystalfock, region)
-    transform = fourier(crystalfock, truncatefock)
-
-    localcorrelations = transform' * crystalmap * transform / (crystal|>vol)
-    modecombinations = Iterators.product(localcorrelations|>getoutspace, localcorrelations|>getoutspace)
-
-    getconn(from::Mode, to::Mode) = (
-        getattr(to, :r) - getattr(from, :r), from|>removeattr(:r), to|>removeattr(:r))
-    # Using a Dict to filter out unique (:r, :b) -> (:r', :b') connections and get the corresponding indices 
-    # that we wish to kept.
-    modebonds = Dict(
-        getconn(frommode, tomode)=>(frommode, tomode) for (frommode, tomode) in modecombinations)
-    pruningindices = (index for (_, index) in modebonds)
-    crystalpruned = transform * extractindices(localcorrelations, pruningindices)
-    return crystalpruned .* crystalpruned'
-end
-
 truncationregion = sum((stripspectrum|>getcrystal|>getunitcell).+normalvector*n for n in 0:2)
 truncatedstripcorrelations = truncatetoregion(stripcorrelations, truncationregion)
 truncatedstripspectrum = truncatedstripcorrelations|>crystalspectrum
@@ -205,16 +185,9 @@ restrict = fourier(seedingcorrelations|>getoutspace, wannierfock)
 localcorrelations = restrict'*seedingcorrelations*restrict/(stripcrystal|>vol)
 localcorrelations|>eigspech|>visualize
 localstates1 = getregionstates(localcorrelations=localcorrelations, grouping=[4])[1]
+localstates1 = m135 * localstates1
 localstates1 = m45 * localstates1
-
-function snap2unitcell(regionfock::RegionFock)
-    spatials = ((mode|>getpos, mode) for mode in regionfock)
-    spatials = ((r, r|>basispoint, mode) for (r, mode) in spatials)
-    spatials = ((r-b, b, mode) for (r, b, mode) in spatials)
-    return (m|>setattr(:r=>r, :b=>b) for (r, b, m) in spatials)|>mapmodes(m->m)|>RegionFock
-end
-
-localstates1|>getoutspace|>snap2unitcell|>showmodes
+visualize(localstates1, markersize=5, logscale=0.5)
 
 wannierregion = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15) .- normalvector*0.5
 wannierfock = getregionfock(seedingcorrelations|>getoutspace, wannierregion)

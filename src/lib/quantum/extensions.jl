@@ -78,4 +78,19 @@ function spatialremapper(regionfock::RegionFock, region::Region)
     remappedfock::RegionFock = RegionFock(mode|>setattr(:r=>r, :b=>b) for ((r, b), mode) in remappingdata)
     return idmap(remappedfock, regionfock)
 end
+
+"""
+    spatialremapper(regionfock::RegionFock, crystalfock::CrystalFock)
+
+This function remaps the modes from the `regionfock` to the home fock modes from the `crystalfock`.
+"""
+function spatialremapper(regionfock::RegionFock, crystalfock::CrystalFock)
+    remapped = getregionfock(crystalfock, regionfock|>getregion)
+    getmatchmode(mode::Mode) = mode|>removeattr(:r, :b)|>setattr(:R=>mode|>getpos|>euclidean)
+    matched = matchreduce(
+        remapped, regionfock, leftmatch=getmatchmode, rightmatch=getmatchmode, reducer=(a, b)->(a, b))
+    outspace = RegionFock(m for (m, _) in matched)
+    inspace = RegionFock(m for (_, m) in matched)
+    return idmap(outspace, inspace)
+end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

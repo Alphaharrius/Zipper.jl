@@ -1,5 +1,8 @@
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ Fourier transform APIs ◆
+fcoef(k::Momentum, r::Offset) = exp(-1im*vec(k|>euclidean)'*vec(r|>euclidean))
+export fcoef
+
 function mapunitcellfock(to::FockSpace, from::FockSpace)
     tohomefock::FockSpace = to|>unitcellfock
     fromhomefock::FockSpace = from|>unitcellfock

@@ -77,7 +77,7 @@ function zer(correlations)
 
     wannierregion1 = getcrosssection(crystal=blockedcrystal, normalvector=normalvector*0.875, radius=0.5, minbottomheight=0.15)
     regionfock = quantize(wannierregion1, 1)
-    remapper = spatialremapper(regionfock, offsets=scaledspace|>getorigin|>Subset, unitcell=scaledcrystal|>getunitcell)
+    remapper = spatialremapper(regionfock, stripfilledcorrelations|>getoutspace)
     wannierregionfock = remapper|>getoutspace
     restrict = fourier(stripfilledcorrelations|>getoutspace, wannierregionfock) / (scaledcrystal|>vol|>sqrt)
     localcorrelations = restrict' * stripfilledcorrelations * restrict
@@ -88,8 +88,7 @@ function zer(correlations)
 
     wannierregion2 = wannierregion1 .- normalvector*0.5
     regionfock = quantize(wannierregion2, 1)
-    offsets = Subset(-(scaledspace*normalvector), scaledspace|>getorigin)
-    remapper = spatialremapper(regionfock, offsets=offsets, unitcell=scaledcrystal|>getunitcell)
+    remapper = spatialremapper(regionfock, stripfilledcorrelations|>getoutspace)
     wannierregionfock = remapper|>getoutspace
     restrict = fourier(stripfilledcorrelations|>getoutspace, wannierregionfock) / (scaledcrystal|>vol|>sqrt)
     localcorrelations = restrict' * stripfilledcorrelations * restrict

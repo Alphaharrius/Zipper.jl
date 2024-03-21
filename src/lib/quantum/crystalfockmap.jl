@@ -278,33 +278,10 @@ function Zipper.FockMap(fockmap::CrystalFockMap)::SparseFockMap{CrystalFock, Cry
 
     return FockMap(outspace, inspace, spdata)
 end
-
-function CrystalFockMap(crystalspectrum::CrystalSpectrum)::CrystalFockMap
-    eigenvectors = crystalspectrum|>geteigenvectors
-
-    function compute(k::Momentum)
-        modes::Subset{Mode} = crystalspectrum.eigenmodes[k]
-        eigenfock::FockSpace = modes |> FockSpace
-        diagonal::FockMap = FockMap(
-            eigenfock, eigenfock,
-            Dict((m, m) => crystalspectrum.eigenvalues[m]|>ComplexF64 for m in modes))
-        return (k, k)=>(eigenvectors[k] * diagonal * eigenvectors[k]')
-    end
-
-    blocks::Dict = paralleltasks(
-        name="CrystalFockMap from CrystalSpectrum",
-        tasks=(()->compute(k) for (k, _) in crystalspectrum.eigenmodes),
-        count=crystalspectrum|>getcrystal|>vol)|>parallel|>Dict
-
-    return CrystalFockMap(crystalspectrum|>getcrystal, crystalspectrum|>getcrystal, blocks)
-end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ CrystalFockMap extension to other APIs ◆
-Zipper.:crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(
-    fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
-
 function idmap(fockspace::CrystalFock)
     blocks::Dict = paralleltasks(
         name="idmap",

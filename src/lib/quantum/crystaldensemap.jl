@@ -73,7 +73,6 @@ function Base.:+(left::Zipper.CrystalDenseMap, right::Zipper.CrystalDenseMap)
         left|>getoutspace, left|>getinspace, left.chunkcount, left.chunksize, data, nonzeroids)
 end
 
-# TODO: This is really bad in performance...
 function Base.:*(left::CrystalDenseMap, right::CrystalDenseMap)
     loutspace = left|>getoutspace
     linspace = left|>getinspace

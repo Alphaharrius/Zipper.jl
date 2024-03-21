@@ -18,7 +18,7 @@ Zipper.getinspace(fockmap::CrystalDenseMap) = fockmap.inspace
 
 #\begin:CrystalDenseMap internal support utilities
 function getchunkinfo(outcrystal::Crystal, incrystal::Crystal)
-    chunkcount::Integer = maximum((size(outcrystal)..., size(incrystal)...))*4
+    chunkcount::Integer = maximum((size(outcrystal)..., size(incrystal)...))
     datalength::Integer = vol(outcrystal) * vol(incrystal)
     chunksize::Integer = datalength/chunkcount|>round
     return datalength, chunkcount, chunksize

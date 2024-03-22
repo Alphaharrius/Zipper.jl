@@ -73,6 +73,30 @@ function Base.:+(left::Zipper.CrystalDenseMap, right::Zipper.CrystalDenseMap)
         left|>getoutspace, left|>getinspace, left.chunkcount, left.chunksize, data, nonzeroids)
 end
 
+function Base.:-(fockmap::CrystalDenseMap)
+    results = paralleltasks(
+        name="-(::CrystalDenseMap, ::CrystalDenseMap)",
+        tasks=(()->(n, -v) for (n, v) in fockmap.data|>enumerate),
+        count=fockmap.chunkcount)|>parallel|>collect
+    data = [el for (_, el) in sort(results, by=first)]
+    return CrystalDenseMap(
+        fockmap|>getoutspace, fockmap|>getinspace, fockmap.chunkcount, fockmap.chunksize, data, fockmap.nonzeroids)
+end
+
+function Base.:*(fockmap::CrystalDenseMap, val::Number)
+    results = paralleltasks(
+        name="*(::CrystalDenseMap, ::CrystalDenseMap)",
+        tasks=(()->(n, v*val) for (n, v) in fockmap.data|>enumerate),
+        count=fockmap.chunkcount)|>parallel|>collect
+    data = [el for (_, el) in sort(results, by=first)]
+    return CrystalDenseMap(
+        fockmap|>getoutspace, fockmap|>getinspace, fockmap.chunkcount, fockmap.chunksize, data, fockmap.nonzeroids)
+end
+
+Base.:*(val::Number, fockmap::CrystalDenseMap) = fockmap * val
+
+Base.:/(fockmap::CrystalDenseMap, val::Number) = fockmap * (1/val)
+
 function Base.:*(left::CrystalDenseMap, right::CrystalDenseMap)
     loutspace = left|>getoutspace
     linspace = left|>getinspace

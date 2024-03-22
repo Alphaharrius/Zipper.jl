@@ -138,42 +138,35 @@ function stripdistillation(couriercorrelations, scaledspace, normalvector)
     stripfrozenprojector = stripfrozenstates|>crystalprojector
     stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
 
-    @info "Computing strip truncation restricted Fourier transform..."
-    stripregion = getcrosssection(crystal=couriercrystal, normalvector=normalvector*5, radius=0.5)
-    striphomefock = stripfrozencorrelations|>getoutspace|>unitcellfock
-    basistohomemodes = ((mode|>getattr(:b)|>basispoint)=>mode for mode in striphomefock)
-    conversionmappings = Dict(mode=>(mode|>setattr(:r=>getattr(mode, :b)-b)|>setattr(:b=>b)) for (b, mode) in basistohomemodes)
-    actualstriphomefock = conversionmappings|>values|>RegionFock
-    truncationregionfock = RegionFock(mode|>setattr(:r=>getattr(mode, :r)+normalvector*n) for mode in actualstriphomefock for n in 0:2)
-    homemappings = Dict(tomode=>frommode|>removeattr(:r) for (tomode, frommode) in conversionmappings)
-    truncator = fourier(stripfrozencorrelations|>getoutspace, truncationregionfock, homemappings) / sqrt(stripfrozencorrelations|>getoutspace|>getcrystal|>vol)
+    # @info "Computing strip truncation restricted Fourier transform..."
+    # stripregion = getcrosssection(crystal=couriercrystal, normalvector=normalvector*5, radius=0.5)
+    # striphomefock = stripfrozencorrelations|>getoutspace|>unitcellfock
+    # basistohomemodes = ((mode|>getattr(:b)|>basispoint)=>mode for mode in striphomefock)
+    # conversionmappings = Dict(mode=>(mode|>setattr(:r=>getattr(mode, :b)-b)|>setattr(:b=>b)) for (b, mode) in basistohomemodes)
+    # actualstriphomefock = conversionmappings|>values|>RegionFock
+    # truncationregionfock = RegionFock(mode|>setattr(:r=>getattr(mode, :r)+normalvector*n) for mode in actualstriphomefock for n in 0:2)
+    # homemappings = Dict(tomode=>frommode|>removeattr(:r) for (tomode, frommode) in conversionmappings)
+    # truncator = fourier(stripfrozencorrelations|>getoutspace, truncationregionfock, homemappings) / sqrt(stripfrozencorrelations|>getoutspace|>getcrystal|>vol)
 
-    truncationregioncorrelations = truncator' * stripfrozencorrelations * truncator
-    offsets = Subset(normalvector * n for n in 0:2)
-    remapper = spatialremapper(truncationregionfock; offsets=offsets, unitcell=stripregion)
-    truncationregioncorrelations = remapper * truncationregioncorrelations * remapper'
+    # truncationregioncorrelations = truncator' * stripfrozencorrelations * truncator
+    # offsets = Subset(normalvector * n for n in 0:2)
+    # remapper = spatialremapper(truncationregionfock; offsets=offsets, unitcell=stripregion)
+    # truncationregioncorrelations = remapper * truncationregioncorrelations * remapper'
 
-    truncationregionindices = Iterators.product(truncationregioncorrelations|>getoutspace, truncationregioncorrelations|>getoutspace)
-    truncationregionbonds = Dict((getattr(tomode, :r) - getattr(frommode, :r), frommode|>removeattr(:r), tomode|>removeattr(:r)) => (frommode, tomode) for (frommode, tomode) in truncationregionindices)
-    pruningindices = (index for (_, index) in truncationregionbonds)
-    prunedcorrelations = extractindices(truncationregioncorrelations, pruningindices)
-    prunedcorrelations = remapper' * prunedcorrelations * remapper
-    stripfouriers = (truncator[subspace, :] for (_, subspace) in truncator|>getoutspace|>crystalsubspaces)
-    stripcrystal = truncator|>getoutspace|>getcrystal
-    truncatedstripfrozencorrelations = crystaldirectsum((transform * prunedcorrelations * transform' for transform in stripfouriers), outcrystal=stripcrystal, incrystal=stripcrystal)
-    truncatedspectrum = truncatedstripfrozencorrelations|>crystalspectrum
-
-    # stripunitcell = stripspectrum|>getcrystal|>getunitcell
-    # truncateregion = sum(stripunitcell.+normalvector*n for n in 0:2)
-    # truncatefock = getregionfock(stripfrozencorrelations|>getoutspace, truncateregion)
-    # restrict = fourier(stripfrozencorrelations|>getoutspace, truncatefock)
-    # localcorrelations = restrict'*stripfrozencorrelations*restrict/(stripfrozencorrelations|>getoutspace|>getcrystal|>vol)
-    # localindices = Iterators.product(localcorrelations|>getoutspace, localcorrelations|>getoutspace)
-    # pruningindices = Dict((getattr(to, :r) - getattr(from, :r), from|>removeattr(:r), to|>removeattr(:r))=>(from, to) for (from, to) in localindices)
-    # pruningindices = (index for (_, index) in pruningindices)
-    # prunedcorrelations = extractindices(localcorrelations, pruningindices)
-    # truncatedstripfrozencorrelations = restrict * prunedcorrelations .* restrict'
+    # truncationregionindices = Iterators.product(truncationregioncorrelations|>getoutspace, truncationregioncorrelations|>getoutspace)
+    # truncationregionbonds = Dict((getattr(tomode, :r) - getattr(frommode, :r), frommode|>removeattr(:r), tomode|>removeattr(:r)) => (frommode, tomode) for (frommode, tomode) in truncationregionindices)
+    # pruningindices = (index for (_, index) in truncationregionbonds)
+    # prunedcorrelations = extractindices(truncationregioncorrelations, pruningindices)
+    # prunedcorrelations = remapper' * prunedcorrelations * remapper
+    # stripfouriers = (truncator[subspace, :] for (_, subspace) in truncator|>getoutspace|>crystalsubspaces)
+    # stripcrystal = truncator|>getoutspace|>getcrystal
+    # truncatedstripfrozencorrelations = crystaldirectsum((transform * prunedcorrelations * transform' for transform in stripfouriers), outcrystal=stripcrystal, incrystal=stripcrystal)
     # truncatedspectrum = truncatedstripfrozencorrelations|>crystalspectrum
+
+    stripunitcell = stripspectrum|>getcrystal|>getunitcell
+    truncateregion = sum(stripunitcell.+normalvector*n for n in 0:2)
+    truncatedcorrelations = truncatetoregion(stripfrozencorrelations, truncateregion)
+    truncatedspectrum = truncatedcorrelations|>crystalspectrum
 
     @info "Extracting strip filled states..."
     stripfilledstates = groundstatespectrum(truncatedspectrum, perunitcellfillings=4)
@@ -237,8 +230,6 @@ end
 
 rg0d = zer0d(inputcorrelations)
 rg0d[:couriercorrelations]|>crystalspectrum|>visualize
-visualize(rg0d[:courierlocalstates]|>RegionState|>normalize, markersize=5, logscale=0.9)
-visualize(rg0d[:wanniermetalprojector]|>crystalspectrum)
 
 metalcorrelations = rg0d[:couriercorrelations]
 metalcorrelations|>crystalspectrum|>visualize

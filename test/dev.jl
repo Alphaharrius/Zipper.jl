@@ -11,7 +11,7 @@ spatialsnappingcalibration([point])
 kspace = convert(MomentumSpace, square)
 
 unitcell = Subset(point)
-crystal = Crystal(unitcell, [256, 256])
+crystal = Crystal(unitcell, [128, 128])
 reciprocalhashcalibration(crystal.sizes)
 
 m = quantize(unitcell, 1)|>first
@@ -124,6 +124,7 @@ H = energyspectrum|>CrystalFockMap
 
 # @time H+H
 dH = @time CrystalDenseMap(H)
+dH*3|>CrystalFockMap|>crystalspectrum|>visualize
 
 # function getdenseindices(outcrystal::Crystal, incrystal::Crystal, outk::Momentum)
 #     start = (outcrystal[outk]-1) * vol(incrystal)
@@ -179,13 +180,20 @@ dH = @time CrystalDenseMap(H)
 did = Zipper.getdenseindex(16, 10658, dH.chunksize)
 Zipper.getdensemomentums(crystal, crystal, did)
 
+@time H*H
+@time dH*dH
+dH*dH|>CrystalFockMap|>crystalspectrum|>visualize
+dH-dH|>CrystalFockMap|>crystalspectrum|>visualize
+
 @time H+H
 @time dH+dH
 @time CrystalDenseMap(H)
 
 H*H|>crystalspectrum|>visualize
 showtaskmeter(true)
-ret = dH*dH
+ret = @time dH*dH
+ret|>first|>first|>last
+ret[900]|>typeof
 ret
 ret|>CrystalFockMap|>crystalspectrum|>visualize
 ret.nonzeroids

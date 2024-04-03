@@ -15,10 +15,10 @@ function visualize(fockmap::FockMap)
 end
 
 struct PlotRegion{D}
-    region::Region
+    region::Subset{<:Point}
 end
 
-PlotRegion(region::Region) = PlotRegion{region|>getspace|>dimension}(region)
+PlotRegion(region::Subset{<:Point}) = PlotRegion{region|>getspace|>dimension}(region)
 
 """
     visualize(region::Region)
@@ -28,7 +28,7 @@ Visualize the region as a scatter plot.
 ### Keyword Arguments
 - `visualspace` The `AffineSpace` to visualize the region.
 """
-function visualize(region::Region, regions::Region...; kwargs...)
+function visualize(region::Subset{<:Point}, regions::Subset{<:Point}...; kwargs...)
     plotregion = PlotRegion(region)
     p = visualize(plotregion, kwargs...)
     for region in regions

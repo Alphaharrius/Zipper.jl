@@ -391,6 +391,14 @@ Zipper.:getspace(scale::Scale)::RealSpace = scale.localspace
 
 Base.:convert(::Type{Matrix{Float64}}, source::Scale) = source.rep
 
+function Base.:hash(scale::Scale)::UInt
+    matrixhash = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, scale|>rep))
+    spacehash = hash(scale|>getspace)
+    return hash((matrixhash, spacehash))
+end
+
+Base.:(==)(a::Scale, b::Scale)::Bool = isapprox(a|>rep, b|>rep) && (a|>getspace) == (b|>getspace)
+
 Base.:inv(scale::Scale)::Scale = Scale(scale |> rep |> inv, scale |> getspace)
 
 Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * ((a |> getspace) * b |> rep), a |> getspace)

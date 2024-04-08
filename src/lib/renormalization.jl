@@ -253,7 +253,7 @@ function wannierprojection(;
     crystalisometries::Dict{Momentum, <:FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:FockMap}, svdorthothreshold::Number = 1e-1)
 
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
-    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
+    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal|>getbc)
     precarioussvdvalues::Vector = []
     function approximateisometry(k::Momentum, isometry::FockMap, overlap::FockMap)::FockMap
         U, Σ, Vt = overlap |> svd

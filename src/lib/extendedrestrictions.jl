@@ -32,7 +32,7 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
     blocks::Dict = Dict()
 
     stripunitcell::Region = Subset(scaledspace * r for r in unscaledextendedunitcell)
-    stripcrystal::Crystal = Crystal(stripunitcell, scaledcrystal|>size)
+    stripcrystal::Crystal = Crystal(stripunitcell, scaledcrystal|>getbc)
     volumeratio::Real = vol(crystal) / vol(stripcrystal)
 
     function compute(scaledk, k)

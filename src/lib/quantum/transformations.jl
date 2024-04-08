@@ -1,35 +1,24 @@
-function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
-    watchprogress(desc="Scale * CrystalFock")
-    crystal::Crystal = crystalfock |> getcrystal
-    scaledcrystal::Crystal = scale * crystal
-    unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
-    bz::Subset{Momentum} = crystal |> brillouinzone
-    basismodes::Subset{Mode} = crystalfock|>unitcellfock|>orderedmodes
-    momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
-    unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
-    unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
-    volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
-    crystalfocksubspaces::Dict{Momentum, FockSpace} = Dict()
-    for (k, subspace) in crystalfock|>crystalsubspaces
-        crystalfocksubspaces[k] = subspace
-        updateprogress()
-    end
-    unwatchprogress()
-
-    restrictedfourier = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
+function Base.:*(scale::Scale, crystalfock::CrystalFock)
+    crystal = crystalfock|>getcrystal
+    scaledcrystal = scale*crystal
+    scaledunitcell = scaledcrystal|>getunitcell
+    unscaledunitcell = inv(scale)*scaledunitcell
+    unscaledhomefock = getregionfock(crystalfock, unscaledunitcell)
+    kmappings = ((scale*k|>basispoint)=>k for k in crystal|>brillouinzone)
+    vratio = (crystal|>vol) / (scaledcrystal|>vol)
+    transform = fourier(crystalfock, unscaledhomefock)'
 
     function compute(scaledk, k)
-        kfourier::FockMap = restrictedfourier[:, k] / sqrt(volumeratio)
-        scaledksubspace::FockSpace =  FockSpace(
-            setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
-        return (scaledk, k)=>FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
+        ktransform::FockMap = transform[:, k] / sqrt(vratio)
+        scaledoutspace = ktransform|>getoutspace|>mapmodes(
+            mode->setattr(mode, :k=>scaledk, :b=>(scale*getpos(mode)))|>removeattr(:r))|>FockSpace
+        return (scaledk, k)=>FockMap(scaledoutspace, ktransform|>getinspace, ktransform|>rep)
     end
 
     blocks::Dict = paralleltasks(
-        name="Scale * CrystalFock",
-        tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
-        count=length(momentummappings))|>parallel|>Dict
-
+        name="*(::Scale, ::CrystalFock)",
+        tasks=(()->compute(scaledk, k) for (scaledk, k) in kmappings),
+        count=length(kmappings))|>parallel|>Dict
     return CrystalFockMap(scaledcrystal, crystal, blocks)
 end
 

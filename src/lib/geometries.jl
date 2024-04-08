@@ -45,6 +45,8 @@ Base.:(==)(a::BoundaryCondition, b::BoundaryCondition)::Bool = (
 getbounds(bc::BoundaryCondition) = bc.bounds
 export getbounds
 
+Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal|>typeof)"))
+
 getunitcell(crystal::Crystal) = crystal.unitcell
 export getunitcell
 

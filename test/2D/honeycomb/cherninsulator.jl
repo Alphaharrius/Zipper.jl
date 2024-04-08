@@ -171,6 +171,7 @@ function zer(correlations)
 
     return Dict(
         :block=>block,
+        :globaldistiller=>globaldistiller,
         :couriercorrelations=>purifiedcorrelations,
         :filledcorrelations=>filledcorrelations,
         :emptycorrelations=>emptycorrelations,
@@ -184,7 +185,9 @@ function zer(correlations)
 end
 
 rg1 = @time zer(correlations)
+rg1[:globaldistiller]|>crystalspectrum|>visualize
 rg2 = @time zer(rg1[:couriercorrelations])
+rg2[:globaldistiller]|>crystalspectrum|>visualize
 rg3 = @time zer(rg2[:couriercorrelations])
 rg4 = @time zer(rg3[:couriercorrelations])
 rg5 = @time zer(rg4[:couriercorrelations])

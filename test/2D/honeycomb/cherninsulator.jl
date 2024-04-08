@@ -16,8 +16,9 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [384, 384])
-reciprocalhashcalibration(crystal.sizes)
+bc = BoundaryCondition(triangular, 96, 96)
+crystal = Crystal(unitcell, bc)
+reciprocalhashcalibration(bc.bounds)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
 m0, m1 = members(modes)

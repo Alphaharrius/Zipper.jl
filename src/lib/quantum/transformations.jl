@@ -144,7 +144,7 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
             end
             symmetricalmap = remap * (symmetricalmap|>normalize)
         else
-            @warn "Manually symmetrizing asymmetric state..."
+            @warn "Manually symmetrizing asymmetric state with phase $eigenvalue..."
             basisfunction = swave
             elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
             eigenvector = remap' * eigenvector

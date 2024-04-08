@@ -104,12 +104,6 @@ export getboundsize
 end
 export brillouinzone
 
-function brillouinmesh(crystal::Crystal)::Array{Point}
-    kspace::MomentumSpace = getspace(crystal)
-    return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
-end
-export brillouinmesh
-
 @memoize function computemomentummatrix(crystal::Crystal)
     function computekmatrix(batch)
         matrix::SparseMatrixCSC = spzeros(crystal|>dimension, crystal|>vol)

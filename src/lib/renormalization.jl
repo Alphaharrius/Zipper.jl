@@ -114,24 +114,6 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
 end
 export crystalisometries
 
-"""
-    crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-
-Given a `localisometry` that is defined within a `RegionFock`, perform fourier transform to obtain the k-space representation of the isometry.
-The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `inspace` of the input `localisometry` as the unitcell fockspace and
-the brillouin zone of the `crystalfock`.
-"""
-function crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-    isometries = crystalisometries(
-        localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
-    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
-    isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
-    isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
-    isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
-    return FockMap(isometry, inspace=isometrycrystalfock, outspace=crystalfock)
-end
-export crystalisometry
-
 function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
     momentumisometries = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
     crystal::Crystal = getcrystal(crystalfock)

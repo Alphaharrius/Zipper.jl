@@ -131,11 +131,14 @@ export brillouinzone
     return momentummatrix
 end
 
+buildregion(space::AffineSpace, sizes::Integer...) = Subset(
+    space*collect(v) for v in Base.product((0:d-1 for d in sizes)...))
+
 function buildregion(crystal::Crystal, sizes::Integer...)
     @assert dimension(crystal) == length(sizes)
 
     space = crystal|>getspace
-    offsets = Subset(space*collect(v) for v in Base.product((0:d-1 for d in sizes)...))
+    offsets = buildregion(space, sizes...)
     return Subset(r+b for (r, b) in Base.product(offsets, crystal|>getunitcell))
 end
 export buildregion
@@ -143,8 +146,9 @@ export buildregion
 function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
     genradius = ceil(Int, radius * 1.5)
     genlengths = (genradius*2/norm(metricspace*bv)|>ceil|>Integer for bv in crystal|>getspace|>getbasisvectors)
-    seedregion = buildregion(crystal, genlengths...)
-    seedregion = seedregion .- getcenter(seedregion)
+    seedoffsets = buildregion(crystal|>getspace, genlengths...)
+    seedoffsets = seedoffsets .- getcenter(seedoffsets)
+    seedregion = Subset(r+b for (r, b) in Base.product(seedoffsets, crystal|>getunitcell))
     return Subset(r for r in seedregion if norm(metricspace*r) <= radius)
 end
 export getsphericalregion

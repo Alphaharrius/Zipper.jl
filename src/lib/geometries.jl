@@ -80,7 +80,7 @@ function basispoint(point::Point)::Point
 end
 export basispoint
 
-Zipper.:getspace(crystal::Crystal) = crystal|>getbc|>getspace
+Zipper.:getspace(crystal::Crystal) = crystal|>getunitcell|>getspace
 Zipper.:dimension(crystal::Crystal) = crystal|>getspace|>dimension
 
 mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collect(Iterators.product([0:(d - 1) for d in sizes]...))[:]]...)

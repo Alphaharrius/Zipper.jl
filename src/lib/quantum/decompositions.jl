@@ -183,6 +183,19 @@ end
 export crystalspectrum
 
 """
+    getbandcount(spectrum::CrystalSpectrum)
+
+Get the band count of the spectrum, if the band count is not uniform 
+over the brillouin zone, an error will be thrown.
+"""
+function getbandcount(spectrum::CrystalSpectrum)
+    if first(spectrum.bandcount) != last(spectrum.bandcount)
+        error("Band count is not uniform over the brillouin zone!")
+    end
+    return first(spectrum.bandcount)
+end
+
+"""
     crystalspectrum(fockmap::FockMap)::CrystalSpectrum
 
 Given a Hermitian `FockMap` with `inspace` and `outspace` of type 

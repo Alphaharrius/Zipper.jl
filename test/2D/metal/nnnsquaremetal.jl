@@ -145,30 +145,6 @@ function stripdistillation(couriercorrelations, scaledspace, normalvector, froze
     stripfrozencorrelations = idmap(stripfrozenprojector|>getoutspace) - stripfrozenprojector
 
     @info "Computing strip truncation restricted Fourier transform..."
-    # stripregion = getcrosssection(crystal=couriercrystal, normalvector=normalvector*5, radius=0.5)
-    # striphomefock = stripfrozencorrelations|>getoutspace|>unitcellfock
-    # basistohomemodes = ((mode|>getattr(:b)|>basispoint)=>mode for mode in striphomefock)
-    # conversionmappings = Dict(mode=>(mode|>setattr(:r=>getattr(mode, :b)-b)|>setattr(:b=>b)) for (b, mode) in basistohomemodes)
-    # actualstriphomefock = conversionmappings|>values|>RegionFock
-    # truncationregionfock = RegionFock(mode|>setattr(:r=>getattr(mode, :r)+normalvector*n) for mode in actualstriphomefock for n in 0:2)
-    # homemappings = Dict(tomode=>frommode|>removeattr(:r) for (tomode, frommode) in conversionmappings)
-    # truncator = fourier(stripfrozencorrelations|>getoutspace, truncationregionfock, homemappings) / sqrt(stripfrozencorrelations|>getoutspace|>getcrystal|>vol)
-
-    # truncationregioncorrelations = truncator' * stripfrozencorrelations * truncator
-    # offsets = Subset(normalvector * n for n in 0:2)
-    # remapper = spatialremapper(truncationregionfock; offsets=offsets, unitcell=stripregion)
-    # truncationregioncorrelations = remapper * truncationregioncorrelations * remapper'
-
-    # truncationregionindices = Iterators.product(truncationregioncorrelations|>getoutspace, truncationregioncorrelations|>getoutspace)
-    # truncationregionbonds = Dict((getattr(tomode, :r) - getattr(frommode, :r), frommode|>removeattr(:r), tomode|>removeattr(:r)) => (frommode, tomode) for (frommode, tomode) in truncationregionindices)
-    # pruningindices = (index for (_, index) in truncationregionbonds)
-    # prunedcorrelations = extractindices(truncationregioncorrelations, pruningindices)
-    # prunedcorrelations = remapper' * prunedcorrelations * remapper
-    # stripfouriers = (truncator[subspace, :] for (_, subspace) in truncator|>getoutspace|>crystalsubspaces)
-    # stripcrystal = truncator|>getoutspace|>getcrystal
-    # truncatedstripfrozencorrelations = crystaldirectsum((transform * prunedcorrelations * transform' for transform in stripfouriers), outcrystal=stripcrystal, incrystal=stripcrystal)
-    # truncatedspectrum = truncatedstripfrozencorrelations|>crystalspectrum
-
     stripunitcell = stripspectrum|>getcrystal|>getunitcell
     truncateregion = sum(stripunitcell.+normalvector*n for n in 0:2)
     truncatedcorrelations = truncatetoregion(stripfrozencorrelations, truncateregion)
@@ -234,8 +210,8 @@ function stripdistillation(couriercorrelations, scaledspace, normalvector, froze
         :stripfilledlocalstates=>stripfilledlocalstates)
 end
 
-function courierwannierization(courierbands, couriercorrelations)
-    @info "Searching courier seeds..."
+function statewannierization(courierbands, couriercorrelations)
+    @info "Searching seeds..."
     couriercrystalfock = couriercorrelations|>getoutspace
     couriercrystal = couriercrystalfock|>getcrystal
     courierspace = couriercrystal|>getspace
@@ -284,7 +260,7 @@ function courierwannierization(courierbands, couriercorrelations)
     lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
     @info "Local seeds linear-dependence metric: $lineardepmetric"
 
-    @info "Wannierizing courier bands..."
+    @info "Wannierizing bands..."
     wanniercourierisometry = wannierprojection(
         crystalisometries=courierbands|>geteigenvectors, crystal=couriercrystal, crystalseeds=crystalseeds)
     visualregion = getsphericalregion(crystal=couriercrystal, radius=4, metricspace=courierspace) .+ courierspace*(0.5, 0.5)
@@ -330,22 +306,33 @@ function renormalize(correlations; frozenthreshold=0.01)
     courierprojector = courierbands|>crystalprojector
     couriercorrelations = 1 - courierprojector
 
-    courierprojector*metalcorrelations*courierprojector|>crystalspectrum|>visualize
-
-    couriers = courierwannierization(courierbands, couriercorrelations)
+    couriers = statewannierization(courierbands, couriercorrelations)
     courierisometry = couriers[:courierisometry]
     outputcorrelations = courierisometry'*metalcorrelations*courierisometry
     outputcorrelations = roundingpurification(outputcorrelations|>crystalspectrum, tolerance=0.42)|>CrystalFockMap
 
+    stripmetals = statewannierization(stripmetalbands, stripmetalcorrelations)
+    stripmetalisometry = stripmetals[:courierisometry]
+    outputstripcorrelations = stripmetalisometry'*metalcorrelations*stripmetalisometry
+    outputstripcorrelations = roundingpurification(outputstripcorrelations|>crystalspectrum, tolerance=0.4)|>CrystalFockMap
+
+    c4stripmetals = statewannierization(c4stripmetalbands, c4stripmetalcorrelations)
+    c4stripmetalisometry = c4stripmetals[:courierisometry]
+    outputc4stripcorrelations = c4stripmetalisometry'*metalcorrelations*c4stripmetalisometry
+    outputc4stripcorrelations = roundingpurification(outputc4stripcorrelations|>crystalspectrum, tolerance=0.4)|>CrystalFockMap
+
     return Dict(
         :block=>rg0d[:block],
+        :metalcorrelations=>metalcorrelations,
         :metallicstates=>rg0d[:courierlocalstates],
         :metallicisometry=>rg0d[:wanniermetalisometry],
         :stripdistiller=>stripdistiller,
-        :stripmetalcorrelations=>stripmetalcorrelations,
+        :stripmetalprojector=>stripmetalprojector,
+        :stripmetalcorrelations=>outputstripcorrelations,
         :stripmetalstates=>stripdistilled[:stripfilledlocalstates],
         :c4stripdistiller=>c4stripdistiller,
-        :c4stripmetalcorrelations=>c4stripmetalcorrelations,
+        :c4stripmetalprojector=>c4stripmetalprojector,
+        :c4stripmetalcorrelations=>outputc4stripcorrelations,
         :globaldistiller=>combineddistiller,
         :couriercorrelations=>outputcorrelations, 
         :courierlocalstates=>couriers[:localstates],
@@ -361,6 +348,7 @@ fioload("inputcorrelations")|>crystalspectrum|>visualize
 
 rg1 = renormalize(inputcorrelations, frozenthreshold=0.01)
 rg1[:couriercorrelations]|>crystalspectrum|>visualize
+rg1[:c4stripmetalcorrelations]|>crystalspectrum|>visualize
 rg1[:globaldistiller]|>crystalspectrum|>visualize
 roundingpurification(rg1[:stripmetalcorrelations]|>crystalspectrum, tolerance=0.4)|>visualize
 visualize(rg1[:courierlocalstates], markersize=5, logscale=1)

@@ -43,7 +43,8 @@ Check between two `<: AffineSpace`, returns `true` if they have same dimension.
 """
 Zipper.:hassamespan(a::T, b::T) where {T <: AffineSpace} = dimension(a::T) == dimension(b::T)
 
-Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = typeof(a) == typeof(b) && isapprox(getbasis(a), getbasis(b))
+Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = (
+    typeof(a) == typeof(b) && size(getbasis(a)) == size(getbasis(b)) && isapprox(getbasis(a), getbasis(b)))
 
 Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 

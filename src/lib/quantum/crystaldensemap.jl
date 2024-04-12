@@ -198,6 +198,10 @@ function CrystalDenseMap(outcrystal::Crystal, incrystal::Crystal, blocks)
     return CrystalDenseMap(outspace, inspace, chunkcount, chunksize, data, nonzeroids)
 end
 
+CrystalDenseMap(fockmap::CrystalFockMap) = CrystalDenseMap(
+    fockmap.outcrystal, fockmap.incrystal, fockmap.blocks)
+#\end
+
 #\begin:Extension to CrystalFockMap APIs
 function outspacesubmaps(fockmap::CrystalDenseMap)
     outspace = fockmap|>getoutspace

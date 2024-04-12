@@ -169,6 +169,62 @@ function Base.:*(left::CrystalDenseMap, right::CrystalDenseMap)
     
     return CrystalDenseMap(loutspace, rinspace, chunkcount, chunksize, data, nonzeroids)
 end
+
+function Base.:adjoint(fockmap::CrystalDenseMap)
+    outspace = fockmap|>getoutspace
+    inspace = fockmap|>getinspace
+    _, chunkcount, chunksize = getchunkinfo(inspace|>getcrystal, outspace|>getcrystal)
+    data = preparedense(chunkcount, chunksize)
+    locks = preparedenselocks(chunkcount)
+
+    function compute(chunkno, chunkid)
+        denseindex = getdenseindex(chunkno, chunkid, fockmap.chunksize)
+        outk, ink = getdensemomentums(outspace|>getcrystal, inspace|>getcrystal, denseindex)
+        block = fockmap.data[chunkno][chunkid]'
+        did = getdenseindex(inspace|>getcrystal, outspace|>getcrystal, ink, outk)
+        cno, cid = getchunkindices(did, chunksize)
+        locks[cno]|>lock
+        data[cno][cid] += block
+        locks[cno]|>unlock
+        return cno, cid
+    end
+
+    nzids = paralleltasks(
+        name="adjoint(::CrystalDenseMap)",
+        tasks=(()->compute(cno, cid) for (cno, cid) in fockmap.nonzeroids),
+        count=fockmap.chunkcount)|>parallel|>Set
+
+    return CrystalDenseMap(
+        inspace, outspace, chunkcount, chunksize, data, nzids)
+end
+
+function Base.:transpose(fockmap::CrystalDenseMap)
+    outspace = fockmap|>getoutspace
+    inspace = fockmap|>getinspace
+    _, chunkcount, chunksize = getchunkinfo(inspace|>getcrystal, outspace|>getcrystal)
+    data = preparedense(chunkcount, chunksize)
+    locks = preparedenselocks(chunkcount)
+
+    function compute(chunkno, chunkid)
+        denseindex = getdenseindex(chunkno, chunkid, fockmap.chunksize)
+        outk, ink = getdensemomentums(outspace|>getcrystal, inspace|>getcrystal, denseindex)
+        block = fockmap.data[chunkno][chunkid]|>transpose
+        did = getdenseindex(inspace|>getcrystal, outspace|>getcrystal, ink, outk)
+        cno, cid = getchunkindices(did, chunksize)
+        locks[cno]|>lock
+        data[cno][cid] += block
+        locks[cno]|>unlock
+        return cno, cid
+    end
+
+    nzids = paralleltasks(
+        name="adjoint(::CrystalDenseMap)",
+        tasks=(()->compute(cno, cid) for (cno, cid) in fockmap.nonzeroids),
+        count=fockmap.chunkcount)|>parallel|>Set
+
+    return CrystalDenseMap(
+        inspace, outspace, chunkcount, chunksize, data, nzids)
+end
 #\end
 
 #\begin:CrystalDenseMap APIs

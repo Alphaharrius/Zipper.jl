@@ -108,38 +108,7 @@ function Base.:*(left::CrystalDenseMap, right::CrystalDenseMap)
     data = preparedense(chunkcount, chunksize)
     locks = preparedenselocks(chunkcount)
 
-    function computeindextable(chunkno, chunkid)
-        denseindex = getdenseindex(chunkno, chunkid, right.chunksize)
-        outkr, inkr = getdensemomentums(routspace|>getcrystal, rinspace|>getcrystal, denseindex)
-        return outkr=>(inkr, right.data[chunkno][chunkid])
-    end
-
-    function postprocessor(results)
-        ret = Dict()
-        for (k, v) in results
-            !haskey(ret, k) && (ret[k] = [])
-            push!(ret[k], v)
-        end
-        return ret
-    end
-
-    rindexentries = paralleltasks(
-        name="*(::CrystalDenseMap, ::CrystalDenseMap) indextable",
-        tasks=(()->computeindextable(chunkno, chunkid) for (chunkno, chunkid) in right.nonzeroids),
-        count=length(right.nonzeroids),
-        postprocessor=postprocessor)|>parallel|>collect
-
-    function merge(iter)
-        ret = Dict()
-        for tbl in iter, (k, v) in tbl
-            !haskey(ret, k) && (ret[k] = [])
-            append!(ret[k], v)
-        end
-        return ret
-    end
-
-    rindextable = paralleldivideconquer(
-        merge, rindexentries, length(rindexentries), "*(::CrystalDenseMap, ::CrystalDenseMap) indextable")
+    rindextable = outspacesubmaps(right)
 
     function process(chunkno, chunkid)
         # Get all the non-zero blocks from the right for this block on the left.

@@ -172,6 +172,12 @@ end
 #\end
 
 #\begin:CrystalDenseMap APIs
+function usecrystaldensemap()
+    @warn "Using CrystalDenseMap inplace of CrystalFockMap!"
+    global crystalfockmapimpl = CrystalDenseMap
+end
+export usecrystaldensemap
+
 function CrystalDenseMap(outcrystal::Crystal, incrystal::Crystal, blocks)
     _, chunkcount, chunksize = getchunkinfo(outcrystal, incrystal)
     data::Vector{SparseVector} = preparedense(chunkcount, chunksize)

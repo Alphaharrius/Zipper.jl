@@ -198,7 +198,44 @@ function CrystalDenseMap(outcrystal::Crystal, incrystal::Crystal, blocks)
     return CrystalDenseMap(outspace, inspace, chunkcount, chunksize, data, nonzeroids)
 end
 
-CrystalDenseMap(fockmap::CrystalFockMap) = CrystalDenseMap(fockmap.outcrystal, fockmap.incrystal, fockmap.blocks)
+#\begin:Extension to CrystalFockMap APIs
+function outspacesubmaps(fockmap::CrystalDenseMap)
+    outspace = fockmap|>getoutspace
+    inspace = fockmap|>getinspace
+
+    function computeindextable(chunkno, chunkid)
+        denseindex = getdenseindex(chunkno, chunkid, fockmap.chunksize)
+        outkr, inkr = getdensemomentums(outspace|>getcrystal, inspace|>getcrystal, denseindex)
+        return outkr=>(inkr, fockmap.data[chunkno][chunkid])
+    end
+
+    function postprocessor(results)
+        ret = Dict()
+        for (k, v) in results
+            !haskey(ret, k) && (ret[k] = [])
+            push!(ret[k], v)
+        end
+        return ret
+    end
+
+    entries = paralleltasks(
+        name="denseoutspacesubmaps(::CrystalDenseMap, ...)",
+        tasks=(()->computeindextable(chunkno, chunkid) for (chunkno, chunkid) in fockmap.nonzeroids),
+        count=length(fockmap.nonzeroids),
+        postprocessor=postprocessor)|>parallel|>collect
+
+    function merge(iter)
+        ret = Dict()
+        for tbl in iter, (k, v) in tbl
+            !haskey(ret, k) && (ret[k] = [])
+            append!(ret[k], v)
+        end
+        return ret
+    end
+
+    return paralleldivideconquer(
+        merge, entries, length(entries), "*(::CrystalDenseMap, ::CrystalDenseMap) indextable")
+end
 #\end
 
 #\begin:CrystalDenseMap conversions

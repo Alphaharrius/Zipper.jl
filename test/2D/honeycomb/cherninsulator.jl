@@ -2,6 +2,7 @@ using LinearAlgebra
 using Zipper, Plots
 plotlyjs()
 
+usecrystaldensemap()
 setmaxthreads(Threads.nthreads())
 
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
@@ -16,7 +17,7 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [384, 384])
+crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -50,7 +51,7 @@ bonds::FockMap = bondmap([onsite..., nearestneighbor..., haldane...])
 energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstateprojector = groundstates|>crystalprojector
-correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
+correlations = 1 - groundstateprojector
 
 function zer(correlations)
     @info("Starting RG...")
@@ -166,10 +167,11 @@ function zer(correlations)
     couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
     couriercorrelationspectrum = couriercorrelations|>crystalspectrum
     @info "Purifiying courier correlations..."
-    purifiedcorrelations = roundingpurification(couriercorrelationspectrum)|>CrystalFockMap
+    purifiedcorrelations = roundingpurification(couriercorrelationspectrum)|>crystalfockmap
 
     return Dict(
         :block=>block,
+        :globaldistiller=>globaldistiller,
         :couriercorrelations=>purifiedcorrelations,
         :filledcorrelations=>filledcorrelations,
         :emptycorrelations=>emptycorrelations,
@@ -183,6 +185,10 @@ function zer(correlations)
 end
 
 rg1 = @time zer(correlations)
+
+rg1[:globaldistiller]|>crystalspectrum|>visualize
+visualize(rg1[:wanniercourierstates]|>normalize, markersize=5, logscale=0.5)
+
 rg2 = @time zer(rg1[:couriercorrelations])
 rg3 = @time zer(rg2[:couriercorrelations])
 rg4 = @time zer(rg3[:couriercorrelations])

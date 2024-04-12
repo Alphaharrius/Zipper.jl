@@ -242,7 +242,7 @@ function blockdiag(fockmap::CrystalFockMap)
     @assert hassamespan(fockmap|>getoutspace, fockmap|>getinspace)
     blocks = Dict((ok, ik)=>block for ((ok, ik), block) in fockmap.blocks if ok == ik)
     crystal = fockmap|>getoutspace|>getcrystal
-    return CrystalFockMap(crystal, crystal, blocks)
+    return crystalfockmap(crystal, crystal, blocks)
 end
 
 courierprojector = striprestrict' * wanniercourierisometry * wanniercourierisometry' * striprestrict
@@ -253,7 +253,7 @@ courierprojector * blockedcorrelations * courierprojector |>crystalspectrum|>vis
 1-blockedcorrelations|>crystalspectrum|>visualize
 FockMap(courierprojector)[1:24, 1:24]|>visualize
 A = FockMap(courierprojector) * FockMap(1 - blockedcorrelations) * FockMap(courierprojector)
-A = CrystalFockMap(A|>getoutspace|>getcrystal, A|>getoutspace|>getcrystal, Dict((k, k)=>A[subspace, subspace] for (k, subspace) in A|>getoutspace|>crystalsubspaces))
+A = crystalfockmap(A|>getoutspace|>getcrystal, A|>getoutspace|>getcrystal, Dict((k, k)=>A[subspace, subspace] for (k, subspace) in A|>getoutspace|>crystalsubspaces))
 A|>crystalspectrum|>visualize
 
 righttransform = fourier(wanniercourierisometry|>getinspace, wanniercourierisometry|>getinspace|>unitcellfock|>RegionFock)

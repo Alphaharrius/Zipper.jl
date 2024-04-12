@@ -65,7 +65,7 @@ function H_trivial(systemsize::Number,tₙ::Number,t_a::Number,t_b::Number)
     groundstateprojector = groundstates|>crystalprojector
     correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 
-    H = CrystalFockMap(energyspectrum)
+    H = crystalfockmap(energyspectrum)
     return H, correlations
 end
 

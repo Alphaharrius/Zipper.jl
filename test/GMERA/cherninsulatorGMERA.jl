@@ -66,7 +66,7 @@ function H_haldane(systemsize::Number,tₙ::Number,tₕ::Number)
     groundstateprojector = groundstates|>crystalprojector
     correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
     
-    H = CrystalFockMap(energyspectrum)
+    H = crystalfockmap(energyspectrum)
     return H, correlations
 end
 

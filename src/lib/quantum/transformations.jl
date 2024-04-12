@@ -102,7 +102,7 @@ function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::Foc
         tasks=(()->compute(data) for data in ksubspaces),
         count=ksubspaces|>length)|>parallel|>Dict
 
-    return CrystalFockMap(crystal, crystal, blocks)
+    return crystalfockmap(crystal, crystal, blocks)
 end
 
 function Base.:*(symmetry::AffineTransform, state::RegionState)

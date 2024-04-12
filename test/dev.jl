@@ -299,7 +299,7 @@ V = [ret.data[cno][cid] for (cno, cid) in ret.nonzeroids]
 Set(id for ids in (ret.nonzeroids, ret.nonzeroids) for id in ids)|>collect
 [v for v in V if v isa NullFockMap]
 
-# function CrystalFockMap(fockmap::CrystalDenseMap)
+# function crystalfockmap(fockmap::CrystalDenseMap)
 #     outcrystal::Crystal = fockmap|>getoutspace|>getcrystal
 #     incrystal::Crystal = fockmap|>getinspace|>getcrystal
 
@@ -311,16 +311,16 @@ Set(id for ids in (ret.nonzeroids, ret.nonzeroids) for id in ids)|>collect
 #     end
 
 #     blocks = paralleltasks(
-#         name="CrystalFockMap(::CrystalDenseMap)",
+#         name="crystalfockmap(::CrystalDenseMap)",
 #         tasks=(()->getblock(chunkno, chunkid) for (chunkno, chunkid) in fockmap.nonzeroids),
 #         count=length(fockmap.nonzeroids))|>parallel|>Dict
 
-#     return CrystalFockMap(outcrystal, incrystal, blocks)
+#     return crystalfockmap(outcrystal, incrystal, blocks)
 # end
 
-(H - CrystalFockMap(dH))|>crystalspectrum|>visualize
-CrystalFockMap(dH)|>crystalspectrum|>visualize
-H - CrystalFockMap(dH) |>crystalspectrum|>visualize
+(H - crystalfockmap(dH))|>crystalspectrum|>visualize
+crystalfockmap(dH)|>crystalspectrum|>visualize
+H - crystalfockmap(dH) |>crystalspectrum|>visualize
 
 cno, cid = getchunkindices(84049920, dH.chunksize)
 getdensemomentums(crystal, crystal, 84049920)

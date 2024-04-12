@@ -45,5 +45,5 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
         blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
     end
 
-    return CrystalFockMap(stripcrystal, crystal, blocks)
+    return crystalfockmap(stripcrystal, crystal, blocks)
 end

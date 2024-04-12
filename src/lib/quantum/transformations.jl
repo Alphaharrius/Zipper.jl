@@ -30,7 +30,7 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
         tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
         count=length(momentummappings))|>parallel|>Dict
 
-    return CrystalFockMap(scaledcrystal, crystal, blocks)
+    return crystalfockmap(scaledcrystal, crystal, blocks)
 end
 
 function Base.:*(transformation::AffineTransform, regionfock::RegionFock)::FockMap

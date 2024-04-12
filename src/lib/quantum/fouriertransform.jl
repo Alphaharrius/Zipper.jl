@@ -183,7 +183,7 @@ Base.:getindex(fockmap::InvFourierMap, ::Colon, subspace::MomentumFock) = fockma
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ FourierMap arithmetics ◆
 """ Perform multiplication of `F' * M`. """
-function Base.:*(fouriermap::InvFourierMap, fockmap::CrystalFockMap)::InvFourierMap
+function Base.:*(fouriermap::InvFourierMap, fockmap::Union{CrystalFockMap, CrystalDenseMap})::InvFourierMap
     rightblocks::Dict = outspacesubmaps(fockmap)
 
     compute(k::Momentum, block::SparseFockMap) = Dict(rk=>block*rblock for (rk, rblock) in rightblocks[k])

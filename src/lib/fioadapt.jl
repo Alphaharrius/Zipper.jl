@@ -104,7 +104,7 @@ struct CrystalDense <: Element{Any}
     chunkcount::Integer
     chunksize::Integer
     dataframe::DataFrame
-    nonzeroids::Vector{Tuple}
+    nonzeroids::Set{Tuple}
 end
 
 function dense2dataframe(dense::Vector)

@@ -74,7 +74,7 @@ export getkbasis
 kindexoperator(crystal::Crystal) = [1, (size(crystal)[1:end-1]|>cumprod)...]
 export kindexoperator
 
-Base.getindex(crystal::Crystal, k::Momentum)::Integer = kindexoperator(crystal)' * getkbasis(crystal, k) + 1
+Base.getindex(crystal::Crystal, k::Momentum)::Integer = round(kindexoperator(crystal)' * getkbasis(crystal, k) + 1)
 
 Base.getindex(crystal::Crystal, i::Integer) = brillouinzone(crystal)[i]
 

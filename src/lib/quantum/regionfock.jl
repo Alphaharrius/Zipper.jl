@@ -43,23 +43,6 @@ function Base.:+(regionfock::RegionFock, offset::Offset)::RegionFock
 end
 
 Base.:-(regionfock::RegionFock, offset::Offset)::RegionFock = regionfock + (-offset)
-
-"""
-    snap2unitcell(regionfock::RegionFock)
-
-Snap the `RegionFock` to the unit cell by forcing all `:b` to the positive 
-parallelogram spanned by the spatial basis vectors, and relocate the differences 
-to the `:r` attribute.
-"""
-function snap2unitcell(regionfock::RegionFock)
-    spatials = ((mode|>getpos, mode) for mode in regionfock)
-    spatials = ((r, r|>basispoint, mode) for (r, mode) in spatials)
-    spatials = ((r-b, b, mode) for (r, b, mode) in spatials)
-    return (
-        m|>setattr(:r=>r, :b=>b) 
-        for (r, b, m) in spatials)|>mapmodes(m->m)|>RegionFock
-end
-export snap2unitcell
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

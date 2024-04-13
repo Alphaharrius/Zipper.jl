@@ -27,7 +27,7 @@ function Base.:+(a::RegionState, b::RegionState)
     # This step ensures that any duplicated modes from a and b will be mapped to different :flavor.
     mergedmodes::Subset{Mode} = combinedinmodes|>mapmodes(m -> m)
     mappedstates = Dict(
-        mode=>FockMap(state, inspace=mode|>FockSpace, permute=false) 
+        mode=>FockMap(state, inspace=mode|>FockSpace, performpermute=false) 
         for (mode, (_, state)) in zip(mergedmodes, combinedstates))
     return RegionState{a|>dimension}(mergedmodes|>FockSpace, mappedstates)
 end

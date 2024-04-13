@@ -1,25 +1,35 @@
-function Base.:*(scale::Scale, crystalfock::CrystalFock)
-    crystal = crystalfock|>getcrystal
-    scaledcrystal = scale*crystal
-    scaledunitcell = scaledcrystal|>getunitcell
-    unscaledunitcell = inv(scale)*scaledunitcell
-    unscaledhomefock = getregionfock(crystalfock, unscaledunitcell)
-    kmappings = ((scale*k|>basispoint)=>k for k in crystal|>brillouinzone)
-    vratio = (crystal|>vol) / (scaledcrystal|>vol)
-    transform = fourier(crystalfock, unscaledhomefock)'
+function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
+    watchprogress(desc="Scale * CrystalFock")
+    crystal::Crystal = crystalfock |> getcrystal
+    scaledcrystal::Crystal = scale * crystal
+    unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
+    bz::Subset{Momentum} = crystal |> brillouinzone
+    basismodes::Subset{Mode} = crystalfock|>unitcellfock|>orderedmodes
+    momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
+    unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
+    unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
+    volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
+    crystalfocksubspaces::Dict{Momentum, FockSpace} = Dict()
+    for (k, subspace) in crystalfock|>crystalsubspaces
+        crystalfocksubspaces[k] = subspace
+        updateprogress()
+    end
+    unwatchprogress()
+
+    restrictedfourier = fourier(crystalfock, unscaledblockedunitcellfock|>RegionFock)'
 
     function compute(scaledk, k)
-        ktransform::FockMap = transform[:, k] / sqrt(vratio)
-        scaledoutspace = ktransform|>getoutspace|>mapmodes(
-            mode->setattr(mode, :k=>scaledk, :b=>(scale*getpos(mode)))|>removeattr(:r))|>FockSpace
-        return (scaledk, k)=>FockMap(scaledoutspace, ktransform|>getinspace, ktransform|>rep)
+        kfourier::FockMap = restrictedfourier[:, k] / sqrt(volumeratio)
+        scaledksubspace::FockSpace =  FockSpace(
+            setattr(mode, :k=>scaledk, :b=>(scale * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
+        return (scaledk, k)=>FockMap(scaledksubspace, kfourier|>getinspace, kfourier|>rep)
     end
 
     blocks::Dict = paralleltasks(
-        name="*(::Scale, ::CrystalFock)",
-        tasks=(()->compute(scaledk, k) for (scaledk, k) in kmappings),
-        count=length(kmappings))|>parallel|>Dict
-  
+        name="Scale * CrystalFock",
+        tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
+        count=length(momentummappings))|>parallel|>Dict
+
     return crystalfockmap(scaledcrystal, crystal, blocks)
 end
 
@@ -68,16 +78,16 @@ function Base.:*(transformation::AffineTransform, regionfock::RegionFock)::FockM
     return FockMap(outmodes |> RegionFock, regionfock, connections)
 end
 
-@memoize function gettransform(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap
+function Base.:*(transformation::AffineTransform, crystalfock::CrystalFock)::FockMap
     homefock::FockSpace = crystalfock|>unitcellfock
-    homefocktransform::FockMap = g * RegionFock(homefock)
+    homefocktransform::FockMap = transformation * RegionFock(homefock)
     ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces |> Dict
     fouriertransform::FockMap = fourier(crystalfock, homefock|>RegionFock)
     transformedfourier::FockMap = fourier(crystalfock, homefocktransform|>getoutspace|>RegionFock)
 
     function compute(data)
         k, subspace = data
-        left = transformedfourier[ksubspaces[g*k|>basispoint], :]
+        left = transformedfourier[ksubspaces[transformation*k|>basispoint], :]
         right = fouriertransform[subspace, :]
         ktransform = left * homefocktransform * right'
         outk = commonattr(ktransform|>getoutspace, :k)
@@ -95,26 +105,16 @@ end
     return crystalfockmap(crystal, crystal, blocks)
 end
 
-Base.:*(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap = gettransform(g, crystalfock)
-
-Base.:*(g::AffineTransform, fockmap::CrystalFockMap) = (g * getoutspace(fockmap)) * fockmap
-
-Base.:*(fockmap::CrystalFockMap, g::AffineTransform) = fockmap * (g * getinspace(fockmap))'
-
 function Base.:*(symmetry::AffineTransform, state::RegionState)
     # We will first generate the inspace symmetry representation to check if there are any unitary transformation 
     # to bring the set of modes to the symmetry eigenbasis.
     statemap::FockMap = state|>FockMap
     stateregionfock::RegionFock = statemap|>getoutspace
-    # Support RegionState with unusual regionfock.
-    snapregionfock = stateregionfock|>snap2unitcell
-    localsymmetry::AffineTransform = symmetry|>recenter(snapregionfock|>getregion|>getcenter)
-    outspacerep::FockMap = localsymmetry * snapregionfock
+    localsymmetry::AffineTransform = symmetry|>recenter(stateregionfock|>getregion|>getcenter)
+    outspacerep::FockMap = localsymmetry * stateregionfock
     # We requires the the RegionFock of the state to be closed under symmetry.
-    hassamespan(outspacerep|>getoutspace, snapregionfock) || error(
+    hassamespan(outspacerep|>getoutspace, stateregionfock) || error(
         "The symmetry action on the state region fockspace in not closed!")
-    remap = idmap(stateregionfock, snapregionfock)
-    outspacerep = remap * outspacerep * remap'
     inspacerep::FockMap = statemap' * outspacerep * statemap
     phasespectrum::EigenSpectrum = inspacerep|>eigspec
     # We will then use the eigenvectors of the inspace representation to transform the state into a quasi-symmetric state.
@@ -138,26 +138,24 @@ function Base.:*(symmetry::AffineTransform, state::RegionState)
             phase, basisfunction = lowprectable[eigenvalue]
             # Performing manual symmetrization.
             elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
-            eigenvector = remap' * eigenvector
             symmetricalmap = eigenvector
             for element in elements
                 symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector*phase
             end
-            symmetricalmap = remap * (symmetricalmap|>normalize)
+            symmetricalmap = symmetricalmap|>normalize
         else
-            @warn "Manually symmetrizing asymmetric state with phase $eigenvalue..."
+            @warn "Manually symmetrizing asymmetric state..."
             basisfunction = swave
             elements = pointgroupelements(localsymmetry)[2:end] # Ignoring identity.
-            eigenvector = remap' * eigenvector
             symmetricalmap = eigenvector
             for element in elements
                 symmetricalmap += *(element, eigenvector|>getoutspace)*eigenvector
             end
-            symmetricalmap = remap * (symmetricalmap|>normalize)
+            symmetricalmap = symmetricalmap|>normalize
         end
         newmode = mode|>setattr(:orbital=>basisfunction)
         inspace = newmode|>FockSpace
-        return newmode, FockMap(symmetricalmap, inspace=inspace, permute=false)
+        return newmode, FockMap(symmetricalmap, inspace=inspace, performpermute=false)
     end
 
     symmetricstates = [symmetrize(m, quasistates[:, m]) for m in quasistates|>getinspace]
@@ -192,7 +190,7 @@ function Base.:*(symmetry::AffineTransform, fockmap::FockMap)::FockMap
         m |> setattr(:orbital => phasetable[(phasespectrum|>geteigenvalues)[m]][2])
           |> removeattr(:eigenindex) # The :orbital can subsitute the :eigenindex.
         for m in phasespectrum |> geteigenvectors |> getinspace)s
-    return FockMap(phasespectrum |> geteigenvectors, inspace=outspace, permute=false)'
+    return FockMap(phasespectrum |> geteigenvectors, inspace=outspace, performpermute=false)'
 end
 
 function Base.:*(fockmap::FockMap, symmetry::AffineTransform)
@@ -223,5 +221,5 @@ function Base.:*(fockmap::FockMap, symmetry::AffineTransform)
     end
 
     inspace::FockSpace = FockSpace(newmodes)
-    return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, permute=false)
+    return FockMap(phasespectrum |> geteigenvectors, inspace=inspace, performpermute=false)
 end

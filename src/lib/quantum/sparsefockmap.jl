@@ -40,9 +40,9 @@ end
 
 function SparseFockMap(
     fockmap::FockMap;
-    outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, permute::Bool = true)
+    outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, performpermute::Bool = true)
 
-    mat::SparseMatrixCSC = permute ? Zipper.permute(fockmap, outspace=outspace, inspace=inspace)|>rep : fockmap|>rep
+    mat::SparseMatrixCSC = performpermute ? permute(fockmap, outspace=outspace, inspace=inspace)|>rep : fockmap|>rep
     return SparseFockMap(outspace, inspace, mat)
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -58,8 +58,8 @@ FockMap(outspace::FockSpace, inspace::FockSpace, mapping::Dict{Tuple{Mode, Mode}
     SparseFockMap(outspace, inspace, mapping))
 FockMap(
     fockmap::FockMap; 
-    outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, permute::Bool = true) = (
-    SparseFockMap(fockmap, outspace=outspace, inspace=inspace, permute=permute))
+    outspace::FockSpace = fockmap|>getoutspace, inspace::FockSpace = fockmap|>getinspace, performpermute::Bool = true) = (
+    SparseFockMap(fockmap, outspace=outspace, inspace=inspace, performpermute=performpermute))
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

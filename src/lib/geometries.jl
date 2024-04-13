@@ -27,31 +27,12 @@ function getradius(region::Subset{<:Point}; metricspace::AffineSpace = region |>
 end
 export getradius
 
-BoundaryCondition(space::RealSpace, sizes::Integer...) = BoundaryCondition(
-    space, Matrix(1.0I, sizes|>length, sizes|>length), sizes|>collect)
+Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal |> typeof)(sizes=$(crystal.sizes))"))
 
-getspace(bc::BoundaryCondition)::RealSpace = bc.localspace
-
-function Base.hash(bc::BoundaryCondition)::UInt
-    spacehash = hash(bc.localspace)
-    ruleshash = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, bc.rules))
-    boundshash = hash(bc.bounds)
-    return hash((spacehash, ruleshash, boundshash))
-end
-
-Base.:(==)(a::BoundaryCondition, b::BoundaryCondition)::Bool = (
-    a.localspace == b.localspace && isapprox(a.rules, b.rules) && a.bounds == b.bounds)
-
-getbounds(bc::BoundaryCondition) = bc.bounds
-export getbounds
-
-Base.:show(io::IO, crystal::Crystal) = print(io, string("$(crystal|>typeof)"))
+Zipper.:getregion(crystal::Crystal) = sitepoints(crystal)
 
 getunitcell(crystal::Crystal) = crystal.unitcell
 export getunitcell
-
-getbc(crystal::Crystal) = crystal.bc
-export getbc
 
 """
     getbarecrystal(crystal::Crystal)::Crystal
@@ -59,10 +40,28 @@ export getbc
 A bare crystal defines a crystal that have a singlar zero offset position as the unit-cell, and the provided 
 argument `crystal` is used to supply the `RealSpace` and the size information to the bare crystal.
 """
-getbarecrystal(crystal::Crystal)::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, crystal|>getbc)
+getbarecrystal(crystal::Crystal)::Crystal = Crystal(crystal|>getspace|>getorigin|>Subset, crystal|>size)
 return getbarecrystal
 
-Base.:(==)(a::Crystal, b::Crystal)::Bool = a.bc == b.bc && a.unitcell == b.unitcell
+Base.:size(crystal::Crystal) = crystal.sizes
+
+Base.:(==)(a::Crystal, b::Crystal)::Bool = a.sizes == b.sizes && a.unitcell == b.unitcell
+
+"""
+    pbc(crystal::Crystal, point::Point)::Point
+
+Apply periodic boundary conditions to a point `point` within a `Crystal`.
+To do: fix mod in pbc
+"""
+pbc(crystal::Crystal, point::Point)::Point = Point([mod(p, s) for (p, s) in zip(point |> vec, crystal.sizes)], getspace(point))
+export pbc
+
+"""
+    pbc(crystal::Crystal)::Function
+
+Return a function that applies periodic boundary conditions to a point within a `Crystal`.
+"""
+pbc(crystal::Crystal)::Function = p -> pbc(crystal, p)
 
 latticeoff(point::Point)::Point = Point([trunc(v) for v in point |> vec], getspace(point))
 export latticeoff
@@ -93,29 +92,42 @@ function basispoint(point::Point)::Point
 end
 export basispoint
 
-Zipper.:getspace(crystal::Crystal) = crystal|>getunitcell|>getspace
-Zipper.:dimension(crystal::Crystal) = crystal|>getspace|>dimension
+Zipper.:getspace(crystal::Crystal) = getspace(crystal.unitcell)
+Zipper.:dimension(crystal::Crystal) = crystal.sizes |> length
+
+resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitcell, sizes)
+export resize
 
 mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collect(Iterators.product([0:(d - 1) for d in sizes]...))[:]]...)
 
-vol(crystal::Crystal)::Integer = crystal|>brillouinzone|>length
+vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 export vol
 
-@memoize function getboundsize(crystal::Crystal)
-    _, S, _ = crystal.bc.rules|>dosnf
-    return crystal.bc.bounds./(S|>diag)
+@memoize function latticepoints(crystal::Crystal)::Subset{Offset}
+    realspace::RealSpace = getspace(crystal.unitcell)
+    crystalmesh::Matrix{Int64} = mesh(crystal.sizes)
+    return Subset(Point(pos, realspace) for pos in eachcol(crystalmesh))
 end
-export getboundsize
+export latticepoints
+
+@memoize sitepoints(crystal::Crystal)::Subset{Offset} = Subset(
+    latticepoint + basispoint for latticepoint in latticepoints(crystal) for basispoint in crystal.unitcell)
+export sitepoints
 
 @memoize function brillouinzone(crystal::Crystal)::Subset{Momentum}
-    bc = crystal|>getbc
-    imesh = hcat((
-        transpose(bc.rules)*collect(v)./bc.bounds 
-        for v in Base.product((0:d-1 for d in bc.bounds)...)|>collect)...)
-    kspace = convert(MomentumSpace, crystal|>getspace)
-    return Subset(kspace*collect(p)|>basispoint for p in eachcol(imesh))
+    momentum_space::MomentumSpace = convert(MomentumSpace, getspace(crystal.unitcell))
+    crystal_mesh::Matrix{Int64} = mesh(crystal.sizes)
+    tiled_sizes::Matrix{Int64} = hcat([crystal.sizes for i in 1:size(crystal_mesh, 2)]...)
+    recentered_mesh::Matrix{Float64} = crystal_mesh ./ tiled_sizes
+    return Subset(Point(pos, momentum_space) for pos in eachcol(recentered_mesh))
 end
 export brillouinzone
+
+function brillouinmesh(crystal::Crystal)::Array{Point}
+    kspace::MomentumSpace = getspace(crystal)
+    return [Point(collect(p) ./ crystal.sizes, kspace) for p in Iterators.product([0:d - 1 for d in crystal.sizes]...)]
+end
+export brillouinmesh
 
 @memoize function computemomentummatrix(crystal::Crystal)
     function computekmatrix(batch)
@@ -144,25 +156,13 @@ export brillouinzone
     return momentummatrix
 end
 
-buildregion(space::AffineSpace, sizes::Integer...) = Subset(
-    space*collect(v) for v in Base.product((0:d-1 for d in sizes)...))
-
-function buildregion(crystal::Crystal, sizes::Integer...)
-    @assert dimension(crystal) == length(sizes)
-
-    space = crystal|>getspace
-    offsets = buildregion(space, sizes...)
-    return Subset(r+b for (r, b) in Base.product(offsets, crystal|>getunitcell))
-end
-export buildregion
-
 function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealSpace)
-    genradius = ceil(Int, radius * 1.5)
-    genlengths = (genradius*2/norm(metricspace*bv)|>ceil|>Integer for bv in crystal|>getspace|>getbasisvectors)
-    seedoffsets = buildregion(crystal|>getspace, genlengths...)
-    seedoffsets = seedoffsets .- getcenter(seedoffsets)
-    seedregion = Subset(r+b for (r, b) in Base.product(seedoffsets, crystal|>getunitcell))
-    return Subset(r for r in seedregion if norm(metricspace*r) <= radius)
+    generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
+    generatinglength::Integer = generatingradius * 2
+    generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
+    crystalregion::Region = generatingcrystal|>sitepoints
+    centeredregion::Region = crystalregion .- (crystalregion|>getcenter)
+    return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
 end
 export getsphericalregion
 

@@ -2,16 +2,9 @@
 Region = Subset{Offset}
 export Region
 
-struct BoundaryCondition <: Element{BoundaryCondition}
-    localspace::RealSpace
-    rules::Matrix
-    bounds::Vector{Integer}
-end
-export BoundaryCondition
-
 struct Crystal <: AbstractSubset{Crystal}
     unitcell::Subset{Offset}
-    bc::BoundaryCondition
+    sizes::Vector{Int64}
 end
 export Crystal
 

@@ -28,22 +28,25 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
     bz::Subset{Momentum} = crystal|>brillouinzone
     momentummappings::Base.Generator = (basispoint(scaledkspace * k) => k for k in bz)
 
-    restrictedfourier = fourier(crystalfock, unscaledextendedhomefock)'
+    transform = fourier(crystalfock, unscaledextendedhomefock)'
     blocks::Dict = Dict()
 
     stripunitcell::Region = Subset(scaledspace * r for r in unscaledextendedunitcell)
-    stripcrystal::Crystal = Crystal(stripunitcell, scaledcrystal|>size)
+    stripcrystal::Crystal = Crystal(stripunitcell, scaledcrystal|>getbc)
     volumeratio::Real = vol(crystal) / vol(stripcrystal)
 
-    scaledksubspaces::Dict{Momentum, FockSpace} = Dict()
-    for (scaledk, k) in momentummappings
-        kfourier::FockMap = restrictedfourier[:, k] / sqrt(volumeratio)
-        if !haskey(scaledksubspaces, scaledk)
-            scaledksubspaces[scaledk] = FockSpace(
-                setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) for mode in kfourier|>getoutspace)
-        end
-        blocks[(scaledk, k)] = FockMap(scaledksubspaces[scaledk], kfourier|>getinspace, kfourier|>rep)
+    function compute(scaledk, k)
+        kfourier::FockMap = transform[:, k] / sqrt(volumeratio)
+        scaledksubspace = FockSpace(
+            setattr(mode, :k=>scaledk, :b=>(scaledspace * getpos(mode)))|>removeattr(:r) 
+            for mode in kfourier|>getoutspace)
+        return (scaledk, k)=>scaledksubspace .* kfourier
     end
+    
+    blocks = paralleltasks(
+        name="*(::ExtendedRestrict, ::CrystalFock)",
+        tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
+        count=length(momentummappings))|>parallel|>Dict
 
     return crystalfockmap(stripcrystal, crystal, blocks)
 end

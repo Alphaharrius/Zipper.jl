@@ -42,6 +42,8 @@ end)
 # The blocks of CrystalFockMap is a Dict keyed by (::Momentum, ::Momentum), we have to lower 
 # it into a vector to make everything serializable.
 fiolower((CrystalFockMap, :blocks), d -> [[ok, ik, v] for ((ok, ik), v) in d])
+# The rules attribute is a Matrix form.
+fiolower((BoundaryCondition, :rules), m -> [v for v in eachcol(m)])
 
 # The Dict keys from deserialization are type of String, convert them back to Symbol.
 fioconstructor(Mode, d -> Dict(Symbol(k)=>v for (k, v) in d)|>Mode)
@@ -63,12 +65,13 @@ fioparser((CrystalFock, :korderings), v -> Dict((fioparse(k), i) for (k, i) in v
 # The rep of SparseFockMap is stored in a CSV file, we have to read it back.
 fioparser((SparseFockMap, :rep), function (d::Dict)
     filename = d["filename"]
-    readsparse(filename)
     @debug "$filepath -> sparse"
     return readsparse(filename)
 end)
 # The keys and values of blocks are serialized into Dict, we have to deserialize them back.
 fioparser((CrystalFockMap, :blocks), v -> Dict((fioparse(el[1]), fioparse(el[2]))=>fioparse(el[3]) for el in v))
+# Reconstruct the rules Matrix from Vector{Vector}.
+fioparser((BoundaryCondition, :rules), v -> hcat(v...))
 
 struct CrystalFockMapBlob <: Element{Any}
     storagemap::FockMap

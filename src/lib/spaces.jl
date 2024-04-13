@@ -43,7 +43,8 @@ Check between two `<: AffineSpace`, returns `true` if they have same dimension.
 """
 Zipper.:hassamespan(a::T, b::T) where {T <: AffineSpace} = dimension(a::T) == dimension(b::T)
 
-Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = typeof(a) == typeof(b) && isapprox(getbasis(a), getbasis(b))
+Base.:(==)(a::AffineSpace, b::AffineSpace)::Bool = (
+    typeof(a) == typeof(b) && size(getbasis(a)) == size(getbasis(b)) && isapprox(getbasis(a), getbasis(b)))
 
 Base.:convert(::Type{Matrix{Float64}}, source::AffineSpace) = source.rep
 
@@ -147,15 +148,15 @@ function spatialsnappingcalibration(; x::Integer = 128, y::Integer = 128, z::Int
 end
 
 """
-    reciprocalhashcalibration(crystalsizes::Vector{<:Integer})
+    reciprocalhashcalibration(bounds::Vector{<:Integer})
 
-Analyse the given `crystalsizes` to determine the reciprocal denominators for each dimension to be used for hashing.
+Analyse the given `bounds` to determine the reciprocal denominators for each dimension to be used for hashing.
 
 ### Input
-- `crystalsizes` The maximum crystal sizes.
+- `bounds` The maximum crystal sizes.
 """
-function reciprocalhashcalibration(crystalsizes::Vector{<:Integer})
-    foreach(e -> reciprocalhashdenominators[e |> first] = e |> last, crystalsizes |> enumerate)
+function reciprocalhashcalibration(bounds::Vector{<:Integer})
+    foreach(e -> reciprocalhashdenominators[e |> first] = e |> last, bounds |> enumerate)
     @warn "Updated momentum hash denominators to $reciprocalhashdenominators."
 end
 export reciprocalhashcalibration

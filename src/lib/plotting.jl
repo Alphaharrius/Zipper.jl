@@ -15,10 +15,10 @@ function visualize(fockmap::FockMap)
 end
 
 struct PlotRegion{D}
-    region::Region
+    region::Subset{<:Point}
 end
 
-PlotRegion(region::Region) = PlotRegion{region|>getspace|>dimension}(region)
+PlotRegion(region::Subset{<:Point}) = PlotRegion{region|>getspace|>dimension}(region)
 
 """
     visualize(region::Region)
@@ -28,9 +28,13 @@ Visualize the region as a scatter plot.
 ### Keyword Arguments
 - `visualspace` The `AffineSpace` to visualize the region.
 """
-function visualize(region::Region; kwargs...)
+function visualize(region::Subset{<:Point}, regions::Subset{<:Point}...; kwargs...)
     plotregion = PlotRegion(region)
-    return visualize(plotregion, kwargs...)
+    p = visualize(plotregion, kwargs...)
+    for region in regions
+        visualize!(region|>PlotRegion, kwargs...)
+    end
+    return p
 end
 
 """ The `2D` backend for plotting a region. """
@@ -39,7 +43,15 @@ function visualize(region::PlotRegion{2}; visualspace::AffineSpace = region.regi
     x = [v|>first for v in r]
     y = [v|>last for v in r]
     # aspect_ratio=:equal for scatter is not working as expected, it only works when setting to 1.1.
-    return scatter(x, y, aspect_ratio=1.1, xlims=(minimum(x)-1, maximum(x)+1), ylims=(minimum(y)-1, maximum(y)+1))
+    return scatter(x, y, aspect_ratio=1.1)
+end
+
+function visualize!(region::PlotRegion{2}; visualspace::AffineSpace = region.region|>getspace|>euclidean)
+    r = [visualspace*r|>vec for r in region.region]
+    x = [v|>first for v in r]
+    y = [v|>last for v in r]
+    # aspect_ratio=:equal for scatter is not working as expected, it only works when setting to 1.1.
+    return scatter!(x, y, aspect_ratio=1.1)
 end
 
 """

@@ -102,7 +102,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
             return localisometry
         end
         inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:k => k) |> removeattr(:r) |> FockSpace
-        return FockMap(localisometry, inspace=inspace, performpermute=false)
+        return FockMap(localisometry, inspace=inspace, permute=false)
     end
 
     isometries = paralleltasks(
@@ -113,24 +113,6 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
     return isometries
 end
 export crystalisometries
-
-"""
-    crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-
-Given a `localisometry` that is defined within a `RegionFock`, perform fourier transform to obtain the k-space representation of the isometry.
-The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `inspace` of the input `localisometry` as the unitcell fockspace and
-the brillouin zone of the `crystalfock`.
-"""
-function crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-    isometries = crystalisometries(
-        localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
-    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
-    isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
-    isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
-    isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
-    return FockMap(isometry, inspace=isometrycrystalfock, outspace=crystalfock)
-end
-export crystalisometry
 
 function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
     momentumisometries = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
@@ -271,7 +253,7 @@ function wannierprojection(;
     crystalisometries::Dict{Momentum, <:FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:FockMap}, svdorthothreshold::Number = 1e-1)
 
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
-    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
+    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal|>getbc)
     precarioussvdvalues::Vector = []
     function approximateisometry(k::Momentum, isometry::FockMap, overlap::FockMap)::FockMap
         U, Σ, Vt = overlap |> svd
@@ -283,7 +265,7 @@ function wannierprojection(;
         approximated::FockMap = isometry * unitary
 
         inspace=FockSpace(approximated|>getinspace|>mapmodes(m->m|>setattr(:k=>k)|>removeattr(:r)))
-        return FockMap(approximated, inspace=inspace, performpermute=false)
+        return FockMap(approximated, inspace=inspace, permute=false)
     end
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"

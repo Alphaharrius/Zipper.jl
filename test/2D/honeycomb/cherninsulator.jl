@@ -185,11 +185,11 @@ function zer(correlations)
 end
 
 rg1 = @time zer(correlations)
-
 rg1[:globaldistiller]|>crystalspectrum|>visualize
 visualize(rg1[:wanniercourierstates]|>normalize, markersize=5, logscale=0.5)
 
 rg2 = @time zer(rg1[:couriercorrelations])
+rg2[:globaldistiller]|>crystalspectrum|>visualize
 rg3 = @time zer(rg2[:couriercorrelations])
 rg4 = @time zer(rg3[:couriercorrelations])
 rg5 = @time zer(rg4[:couriercorrelations])

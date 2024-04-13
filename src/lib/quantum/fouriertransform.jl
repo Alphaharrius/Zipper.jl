@@ -189,7 +189,7 @@ function Base.:*(fouriermap::InvFourierMap, fockmap::Union{CrystalFockMap, Cryst
     compute(k::Momentum, block::SparseFockMap) = Dict(rk=>block*rblock for (rk, rblock) in rightblocks[k])
 
     batches = paralleltasks(
-        name="InvFourierMap * CrystalFockMap",
+        name="*(::InvFourierMap, ::$(fockmap|>typeof))",
         tasks=(()->compute(k, block) for (k, block) in fouriermap.data),
         count=length(fouriermap.data))|>parallel
     

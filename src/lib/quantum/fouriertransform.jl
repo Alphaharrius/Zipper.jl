@@ -186,7 +186,7 @@ Base.:getindex(fockmap::InvFourierMap, ::Colon, subspace::MomentumFock) = fockma
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ FourierMap arithmetics ◆
 """ Perform multiplication of `F' * M`. """
-function Base.:*(fouriermap::InvFourierMap, fockmap::CrystalFockMap)::InvFourierMap
+function Base.:*(fouriermap::InvFourierMap, fockmap::Union{CrystalFockMap, CrystalDenseMap})::InvFourierMap
     rightblocks::Dict = outspacesubmaps(fockmap)
 
     compute(k::Momentum, block::SparseFockMap) = Dict(rk=>block*rblock for (rk, rblock) in rightblocks[k])
@@ -255,7 +255,7 @@ function Base.broadcasted(::typeof(*), left::FourierMap, right::InvFourierMap)
         name="FourierMap * InvFourierMap",
         tasks=(()->(k, k)=>block*right.data[k] for (k, block) in left.data),
         count=left.data|>length)|>parallel|>Dict
-    return CrystalFockMap(left.crystal, left.crystal, multiplied)
+    return crystalfockmap(left.crystal, left.crystal, multiplied)
 end
 
 function Base.:transpose(fockmap::FourierMapType)

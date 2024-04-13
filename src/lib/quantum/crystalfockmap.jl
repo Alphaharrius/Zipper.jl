@@ -208,6 +208,10 @@ end
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ CrystalFockMap APIs ◆
+crystalfockmapimpl = CrystalFockMap
+crystalfockmap(args...) = crystalfockmapimpl(args...)
+export crystalfockmap
+
 crystalsubmaps(fockmap::CrystalFockMap)::Base.Generator = (
     outk=>block for ((outk, ink), block) in fockmap.blocks if outk == ink)
 export crystalsubmaps
@@ -280,7 +284,8 @@ function idmap(fockspace::CrystalFock)
         name="idmap",
         tasks=(()->((k, k)=>idmap(getsubspace(fockspace, k))) for k in fockspace|>getcrystal|>brillouinzone),
         count=fockspace|>getcrystal|>vol)|>parallel|>Dict
-    return CrystalFockMap(fockspace|>getcrystal, fockspace|>getcrystal, blocks)
+    # Using the current implementation of `CrystalFockMap`.
+    return crystalfockmap(fockspace|>getcrystal, fockspace|>getcrystal, blocks)
 end
 
 function idmap(outspace::CrystalFock, inspace::CrystalFock)

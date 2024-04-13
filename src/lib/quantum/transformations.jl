@@ -19,7 +19,8 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)
         name="*(::Scale, ::CrystalFock)",
         tasks=(()->compute(scaledk, k) for (scaledk, k) in kmappings),
         count=length(kmappings))|>parallel|>Dict
-    return CrystalFockMap(scaledcrystal, crystal, blocks)
+  
+    return crystalfockmap(scaledcrystal, crystal, blocks)
 end
 
 function Base.:*(transformation::AffineTransform, regionfock::RegionFock)::FockMap
@@ -91,7 +92,7 @@ end
         tasks=(()->compute(data) for data in ksubspaces),
         count=ksubspaces|>length)|>parallel|>Dict
 
-    return CrystalFockMap(crystal, crystal, blocks)
+    return crystalfockmap(crystal, crystal, blocks)
 end
 
 Base.:*(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap = gettransform(g, crystalfock)

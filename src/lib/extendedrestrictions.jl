@@ -48,5 +48,5 @@ function Base.:*(restrict::ExtendedRestrict, crystalfock::CrystalFock)
         tasks=(()->compute(scaledk, k) for (scaledk, k) in momentummappings),
         count=length(momentummappings))|>parallel|>Dict
 
-    return CrystalFockMap(stripcrystal, crystal, blocks)
+    return crystalfockmap(stripcrystal, crystal, blocks)
 end

@@ -21,6 +21,7 @@ mutable struct ParallelTasks
     taskchannel::Channel
     resultchannel::Channel
     corecount::Integer
+    postprocessor::Union{UndefInitializer, Function}
     meter
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -48,7 +49,8 @@ export getmaxthreads
 function paralleltasks(;
     tasks, 
     name::String, count::Integer, 
-    showmeter::Bool = parallelstate.showmeter, corecount::Integer = getmaxthreads())
+    showmeter::Bool = parallelstate.showmeter, corecount::Integer = getmaxthreads(),
+    postprocessor = undef)
 
     function producer(ch::Channel)
         for task in tasks
@@ -61,7 +63,7 @@ function paralleltasks(;
     actualcorecount::Integer = max(1, min(corecount, Threads.nthreads()))
     meter = showmeter ? Progress(count, desc="#threads($actualcorecount) $name", dt=0.2) : undef
 
-    return ParallelTasks(taskchannel, resultchannel, actualcorecount, meter)
+    return ParallelTasks(taskchannel, resultchannel, actualcorecount, postprocessor, meter)
 end
 export paralleltasks
 
@@ -75,6 +77,7 @@ function parallel(tasks::ParallelTasks)
             enqueue!(results, task())
             Threads.atomic_add!(counter, 1)
         end
+        tasks.postprocessor == undef || return [tasks.postprocessor(results)]
         return results
     end
 
@@ -87,6 +90,7 @@ function parallel(tasks::ParallelTasks)
             Threads.atomic_add!(counter, 1)
             ProgressMeter.update!(tasks.meter, counter[])
         end
+        tasks.postprocessor == undef || return [tasks.postprocessor(results)]
         return results
     end
 
@@ -132,12 +136,18 @@ function paralleldivideconquer(f::Function, iter, count::Integer, desc::String)
         end
     end)|>Channel
 
-    conquer() = [v for v in iterchannel]|>f
+    function conquer()
+        items = [v for v in iterchannel]
+        if length(items) == 0
+            return
+        end
+        return f(items)
+    end
     
     parallelstate.divideconquermeter = (
         ProgressUnknown(desc="divideconquer $desc count=$count batch=$batchsize", spinner=true))
     threads = [Threads.@spawn conquer() for _ in 1:corecount]
-    results = fetch.(threads)
+    results = [v for v in fetch.(threads) if !isnothing(v)]
     ProgressMeter.finish!(parallelstate.divideconquermeter)
     if corecount > 3
         return paralleldivideconquer(f, results, corecount, desc)

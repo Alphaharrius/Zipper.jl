@@ -1077,7 +1077,7 @@ function gmerastep(rgblockedcorrelations::CrystalFockMap,correlations::CrystalFo
         #     tasks=(()->((k, k)=>isometry) for (k, isometry) in wanniercrystalisos|>Dict),
         #     count=wanniercrystalisos|>Dict|>length)|>parallel|>Dict
         
-        globalwannierizedfunction::FockMap = CrystalFockMap(correlations|>getoutspace|>getcrystal, wanniercrystal, blocks)
+        globalwannierizedfunction::FockMap = crystalfockmap(correlations|>getoutspace|>getcrystal, wanniercrystal, blocks)
         # globalwannierizedfunction::FockMap = crystaldirectsum(outcrystal = correlations|>getoutspace|>getcrystal, incrystal=wanniercrystall,wanniercrystaliso for (k,wanniercrystaliso) in wanniercrystalisos)
 
         return globalwannierizedfunction

@@ -202,11 +202,11 @@ export getbandcount
 Given a Hermitian `FockMap` with `inspace` and `outspace` of type 
 `CrystalFock` of same span, pack into a `CrystalSpectrum` object.
 """
-crystalspectrum(fockmap::FockMap)::CrystalSpectrum = crystalspectrum(
+crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(
     fockmap|>crystalsubmaps, crystal=fockmap|>getinspace|>getcrystal)
 
-crystalspectrum(fockmap::CrystalFockMap)::CrystalSpectrum = crystalspectrum(
-    fockmap|>crystalsubmaps, crystal=fockmap|>getoutspace|>getcrystal)
+# TODO: Implement.
+crystalspectrum(fockmap::CrystalDenseMap)::CrystalSpectrum = fockmap|>CrystalFockMap|>crystalspectrum
 
 """
     linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
@@ -436,6 +436,32 @@ function CrystalFockMap(crystalspectrum::CrystalSpectrum)::CrystalFockMap
 
     return CrystalFockMap(crystalspectrum|>getcrystal, crystalspectrum|>getcrystal, blocks)
 end
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum conversions ◆
+function CrystalFockMap(crystalspectrum::CrystalSpectrum)::CrystalFockMap
+    eigenvectors = crystalspectrum|>geteigenvectors
+
+    function compute(k::Momentum)
+        modes::Subset{Mode} = crystalspectrum.eigenmodes[k]
+        eigenfock::FockSpace = modes |> FockSpace
+        diagonal::FockMap = FockMap(
+            eigenfock, eigenfock,
+            Dict((m, m) => crystalspectrum.eigenvalues[m]|>ComplexF64 for m in modes))
+        return (k, k)=>(eigenvectors[k] * diagonal * eigenvectors[k]')
+    end
+
+    blocks::Dict = paralleltasks(
+        name="CrystalFockMap from CrystalSpectrum",
+        tasks=(()->compute(k) for (k, _) in crystalspectrum.eigenmodes),
+        count=crystalspectrum|>getcrystal|>vol)|>parallel|>Dict
+
+    return CrystalFockMap(crystalspectrum|>getcrystal, crystalspectrum|>getcrystal, blocks)
+end
+
+# TODO: Implement.
+CrystalDenseMap(spectrum::CrystalSpectrum) = CrystalDenseMap(spectrum|>CrystalFockMap)
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃

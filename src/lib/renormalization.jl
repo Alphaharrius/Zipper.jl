@@ -123,7 +123,7 @@ function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::F
         tasks=(()->((k, k)=>isometry * isometry') for (k, isometry) in momentumisometries),
         count=crystal|>vol)|>parallel|>Dict
 
-    return CrystalFockMap(crystal, crystal, projectors)
+    return crystalfockmap(crystal, crystal, projectors)
 end
 export crystalprojector
 
@@ -132,7 +132,7 @@ function crystalprojector(spectrum::CrystalSpectrum)::FockMap
         name="crystalprojector",
         tasks=(()->((k, k)=>u*u') for (k, u) in spectrum|>geteigenvectors),
         count=spectrum|>getcrystal|>vol)|>parallel|>Dict
-    return CrystalFockMap(spectrum|>getcrystal, spectrum|>getcrystal, blocks)
+    return crystalfockmap(spectrum|>getcrystal, spectrum|>getcrystal, blocks)
 end
 
 function globaldistillerhamiltonian(;
@@ -278,6 +278,6 @@ function wannierprojection(;
             for (k, isometry) in crystalisometries),
         count=crystalisometries|>length)|>parallel|>Dict
     
-    return CrystalFockMap(crystal, wanniercrystal, blocks)
+    return crystalfockmap(crystal, wanniercrystal, blocks)
 end
 export wannierprojection

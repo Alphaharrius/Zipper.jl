@@ -28,7 +28,7 @@ metalspectrum|>visualize
 
 metalcrystal = metalspectrum|>getcrystal
 metalspace = metalcrystal|>getspace
-normalvector = metalspace*(-2, 2)
+normalvector = metalspace*(-1, 1)
 contractbasis = metalspace*(0, getboundsize(metalcrystal)|>first)
 @info "Contract basis: $contractbasis"
 scaledspace = affinespace(normalvector, contractbasis)
@@ -44,42 +44,44 @@ bands = groupbands(stripspectrum, bandgrouping=[2, getbandcount(stripspectrum)-4
 
 filledbands = bands[1]
 
-region = getcrosssection(crystal=metalspectrum|>getcrystal, normalvector=normalvector/2, radius=1.5)
-region|>visualize
-regionfock = getregionfock(stripcorrelations|>getoutspace, region)
+function _getregionfock(crystalfock::CrystalFock, region::Region)
+    crystalspace = crystalfock|>getcrystal|>getspace
+    transformed = (crystalspace*r for r in region)
+    offsets = (r-basispoint(r) for r in transformed)
+    modes = (m+r for (m, r) in Iterators.product(crystalfock|>unitcellfock|>RegionFock, offsets))
+
+    return transformed
+
+    physregion = Subset(r|>euclidean for r in region)
+    return RegionFock(m for m in modes if m|>getpos|>euclidean ∈ physregion)
+end
+
+region = getcrosssection(crystal=metalspectrum|>getcrystal, normalvector=normalvector*1.5, radius=0.5, minbottomheight=0.1)
+region = region .- metalspace*(1, 1)*0.5
+sspace = stripspectrum|>getcrystal|>getspace
+[b-basispoint(b) for b in regionfock][1]|>getspace|>rep
+visualize(stripspectrum|>getcrystal|>getunitcell, region)
+regionfock = _getregionfock(stripcorrelations|>getoutspace, region)
 transform = fourier(stripcorrelations|>getoutspace, regionfock)
 localcorrelations = transform'*stripcorrelations*transform/(stripspectrum|>getcrystal|>vol)
 localcorrelations|>eigspech|>visualize
-localstates = getregionstates(localcorrelations=localcorrelations, grouping=[1])[1]
-localstates = m135*localstates
-visualize(localstates|>normalize, markersize=5, logscale=0.5)
+localstates = getregionstates(localcorrelations=localcorrelations, grouping=[2, 17-2-2, 2])
 
-localseeds = localstates
+localfilled = localstates[1]
+visualize(localfilled|>normalize, markersize=5, logscale=0.5)
 
-region = region .+ normalvector/2
-region|>visualize
-regionfock = getregionfock(stripcorrelations|>getoutspace, region)
-transform = fourier(stripcorrelations|>getoutspace, regionfock)
-localcorrelations = transform'*stripcorrelations*transform/(stripspectrum|>getcrystal|>vol)
-localcorrelations|>eigspech|>visualize
-localstates = getregionstates(localcorrelations=localcorrelations, grouping=[1])[1]
-localstates = m135*localstates
-visualize(localstates|>normalize, markersize=5, logscale=0.5)
-
-localseeds += localstates
-
-localseeds = localseeds|>FockMap
-visualize(localseeds|>RegionState, markersize=5, logscale=0.5)
-transform = fourier(stripcorrelations|>getoutspace, localseeds|>getoutspace)/(stripspectrum|>getcrystal|>vol)
-crystalseeds = transform * localseeds
-crystalseeds = Dict(k=>crystalseeds[k, :] for k in stripspectrum|>getcrystal|>brillouinzone)
-pseudoidens = (u' * u for (_, u) in crystalseeds)
+filledseeds = localfilled|>FockMap
+visualize(filledseeds|>RegionState, markersize=5, logscale=0.5)
+transform = fourier(stripcorrelations|>getoutspace, filledseeds|>getoutspace)/(stripspectrum|>getcrystal|>vol)
+filledcrystalseeds = transform * filledseeds
+filledcrystalseeds = Dict(k=>filledcrystalseeds[k, :] for k in stripspectrum|>getcrystal|>brillouinzone)
+pseudoidens = (u' * u for (_, u) in filledcrystalseeds)
 lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
 @info "Local seeds linear-dependence metric: $lineardepmetric"
 
 @info "Wannierizing strip filled states..."
 wannierfilledisometry = wannierprojection(
-    crystalisometries=filledbands|>geteigenvectors, crystal=stripspectrum|>getcrystal, crystalseeds=crystalseeds)
+    crystalisometries=filledbands|>geteigenvectors, crystal=stripspectrum|>getcrystal, crystalseeds=filledcrystalseeds)
 wanniercrystal = wannierfilledisometry|>getinspace|>getcrystal
 rightrestrict = (
     fourier(wannierfilledisometry|>getinspace, wannierfilledisometry|>getinspace|>unitcellfock|>RegionFock) / (wanniercrystal|>vol|>sqrt))
@@ -87,11 +89,91 @@ wannierlocalisometry = transform' * wannierfilledisometry * rightrestrict
 stripfilledlocalstates = wannierlocalisometry|>RegionState|>normalize
 visualize(stripfilledlocalstates|>normalize, markersize=5, logscale=0.9)
 
-remapper = spatialremapper(wannierlocalisometry|>getoutspace, metalcorrelations|>getoutspace)
-filledisometry = remapper * wannierlocalisometry
-transform = fourier(metalcorrelations|>getoutspace, filledisometry|>getoutspace)
-wanniercrystalisometry = transform * filledisometry
-wanniermetalprojector = wanniercrystalisometry .* wanniercrystalisometry'
-wanniermetalprojector|>crystalspectrum|>visualize
+scale = Scale([1 -1; 1 1], metalspace)
+scaledoutspace = scale*(metalcorrelations|>getoutspace)|>getoutspace
 
-groupbands(wanniermetalprojector|>crystalspectrum, :filled=>(v->v<1e-5))
+remapper = spatialremapper(wannierlocalisometry|>getoutspace, scaledoutspace)
+filledisometry = remapper * wannierlocalisometry
+visualize(filledisometry|>RegionState|>normalize, markersize=5, logscale=0.9)
+transform = fourier(scaledoutspace, filledisometry|>getoutspace)
+wannierfilledisometry = transform * filledisometry
+wannierfilledprojector = wannierfilledisometry .* wannierfilledisometry'
+wannierfilledprojector|>crystalspectrum|>visualize
+
+emptybands = bands[3]
+
+localempty = localstates[3]
+visualize(localempty|>normalize, markersize=5, logscale=0.5)
+
+emptyseeds = localempty|>FockMap
+visualize(emptyseeds|>RegionState, markersize=5, logscale=0.5)
+transform = fourier(stripcorrelations|>getoutspace, emptyseeds|>getoutspace)/(stripspectrum|>getcrystal|>vol)
+emptycrystalseeds = transform * emptyseeds
+emptycrystalseeds = Dict(k=>emptycrystalseeds[k, :] for k in stripspectrum|>getcrystal|>brillouinzone)
+pseudoidens = (u' * u for (_, u) in emptycrystalseeds)
+lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
+@info "Local seeds linear-dependence metric: $lineardepmetric"
+
+@info "Wannierizing strip empty states..."
+wannieremptyisometry = wannierprojection(
+    crystalisometries=emptybands|>geteigenvectors, crystal=stripspectrum|>getcrystal, crystalseeds=emptycrystalseeds)
+wanniercrystal = wannieremptyisometry|>getinspace|>getcrystal
+rightrestrict = (
+    fourier(wannieremptyisometry|>getinspace, wannieremptyisometry|>getinspace|>unitcellfock|>RegionFock) / (wanniercrystal|>vol|>sqrt))
+wannierlocalisometry = transform' * wannieremptyisometry * rightrestrict
+stripemptylocalstates = wannierlocalisometry|>RegionState|>normalize
+visualize(stripemptylocalstates|>normalize, markersize=5, logscale=0.9)
+
+scale = Scale([1 -1; 1 1], metalspace)
+scaledoutspace = scale*(metalcorrelations|>getoutspace)|>getoutspace
+
+remapper = spatialremapper(wannierlocalisometry|>getoutspace, scaledoutspace)
+emptyisometry = remapper * wannierlocalisometry
+visualize(emptyisometry|>RegionState|>normalize, markersize=5, logscale=0.9)
+transform = fourier(scaledoutspace, emptyisometry|>getoutspace)
+wannieremptyisometry = transform * emptyisometry
+wannieremptyprojector = wannieremptyisometry .* wannieremptyisometry'
+wannieremptyprojector|>crystalspectrum|>visualize
+
+globaldistiller = wannieremptyprojector - wannierfilledprojector
+distillerspectrum = globaldistiller|>crystalspectrum
+distillerspectrum|>visualize
+
+distilledbands = groupbands(distillerspectrum, :courier=>(v -> v < 1e-5 && v > -1e-5))
+
+courierband = distilledbands[:courier]
+courierprojector = courierband|>crystalprojector
+couriercorrelations = 1 - courierprojector
+
+rotate = scale*(metalcorrelations|>getoutspace)
+rotatedcorrelations = rotate * metalcorrelations * rotate'
+courierprojector*rotatedcorrelations*courierprojector'|>crystalspectrum|>visualize
+rotatedcorrelations|>crystalspectrum|>visualize
+
+couriercrystal = couriercorrelations|>getoutspace|>getcrystal
+region = couriercrystal|>getunitcell
+regionfock = getregionfock(couriercorrelations|>getoutspace, region)
+transform = fourier(couriercorrelations|>getoutspace, regionfock)
+localcorrelations = transform'*couriercorrelations*transform/(couriercrystal|>vol)
+localcorrelations|>eigspech|>visualize
+localstate = getregionstates(localcorrelations=localcorrelations, grouping=[1])[1]
+visualize(localstate|>normalize, markersize=5, logscale=0.9)
+
+blockcenter = block|>getoutspace|>getcrystal|>getunitcell|>getcenter
+localstates = sum(g.*localstate for g in c4|>recenter(blockcenter)|>pointgroupelements)
+visualize(localstates|>normalize, markersize=5, logscale=0.9)
+
+localseeds = localstates|>FockMap
+visualize(localseeds|>RegionState, markersize=5, logscale=0.9)
+remapper = spatialremapper(localseeds|>getoutspace, block|>getoutspace)
+localseeds = remapper * localseeds
+transform = fourier(block|>getoutspace, localseeds|>getoutspace)/(block|>getoutspace|>getcrystal|>vol)
+blockseeds = transform * localseeds
+blockseeds = Dict(k=>blockseeds[k, :] for k in block|>getoutspace|>getcrystal|>brillouinzone)
+pseudoidens = (u' * u for (_, u) in blockseeds)
+lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
+@info "Local seeds linear-dependence metric: $lineardepmetric"
+
+@info "Wannierizing courier states..."
+wannierisometry = wannierprojection(
+    crystalisometries=courierband|>geteigenvectors, crystal=couriercorrelations|>getoutspace|>getcrystal, crystalseeds=blockseeds)

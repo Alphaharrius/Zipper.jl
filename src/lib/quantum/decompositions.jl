@@ -194,6 +194,7 @@ function getbandcount(spectrum::CrystalSpectrum)
     end
     return first(spectrum.bandcount)
 end
+export getbandcount
 
 """
     crystalspectrum(fockmap::FockMap)::CrystalSpectrum

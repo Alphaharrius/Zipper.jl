@@ -128,7 +128,7 @@ end
 export crystalprojector
 
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
-    blocks::Dict = paralleltasks(
+    blocks = paralleltasks(
         name="crystalprojector",
         tasks=(()->((k, k)=>u*u') for (k, u) in spectrum|>geteigenvectors),
         count=spectrum|>getcrystal|>vol)|>parallel|>Dict

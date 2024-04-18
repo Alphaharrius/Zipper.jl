@@ -203,7 +203,7 @@ function usecrystaldensemap()
 end
 export usecrystaldensemap
 
-function CrystalDenseMap(outcrystal::Crystal, incrystal::Crystal, blocks)
+function CrystalDenseMap(outcrystal::Crystal, incrystal::Crystal, blocks::Dict)
     _, chunkcount, chunksize = getchunkinfo(outcrystal, incrystal)
     data::Vector{SparseVector} = preparedense(chunkcount, chunksize)
     locks::Vector{ReentrantLock} = preparedenselocks(chunkcount)

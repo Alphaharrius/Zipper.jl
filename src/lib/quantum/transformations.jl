@@ -15,7 +15,7 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)
         return (scaledk, k)=>FockMap(scaledoutspace, ktransform|>getinspace, ktransform|>rep)
     end
 
-    blocks::Dict = paralleltasks(
+    blocks = paralleltasks(
         name="*(::Scale, ::CrystalFock)",
         tasks=(()->compute(scaledk, k) for (scaledk, k) in kmappings),
         count=length(kmappings))|>parallel|>Dict
@@ -87,7 +87,7 @@ end
 
     crystal::Crystal = crystalfock|>getcrystal
 
-    blocks::Dict = paralleltasks(
+    blocks = paralleltasks(
         name="AffineTransform * CrystalFock",
         tasks=(()->compute(data) for data in ksubspaces),
         count=ksubspaces|>length)|>parallel|>Dict

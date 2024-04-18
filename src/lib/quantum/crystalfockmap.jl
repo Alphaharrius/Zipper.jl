@@ -229,7 +229,7 @@ function crystaldirectsum(kfockmaps; outcrystal::Crystal, incrystal::Crystal)::C
 end
 export crystaldirectsum
 
-function truncatetoregion(hermitian::CrystalFockMap, region::Region)
+function truncatetoregion(hermitian, region::Region)
     regionfock = getregionfock(hermitian|>getoutspace, region)
     restrict = fourier(hermitian|>getoutspace, regionfock)
     localcorrelations = restrict'*hermitian*restrict/(hermitian|>getoutspace|>getcrystal|>vol)

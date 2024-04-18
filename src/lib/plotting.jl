@@ -112,6 +112,22 @@ function visualize(spectrum::CrystalSpectrum{1})
     return plot(K, [data[n, :] for n in axes(data, 1)])
 end
 
+import CairoMakie
+"""
+    visualize(mono::MonoBand{2})
+
+Visualize the `MonoBand` as a contour plot, the z-axis is the spectrum values, the xy-plane will be the
+identity reciprocal space, and restricted to the brillouin zone of the crystal for plotting the spectrum.
+"""
+function visualize(mono::MonoBand{2})
+    data = mono.data|>collect # Preserves the ordering information.
+    K = (k|>euclidean|>vec for (k, _) in data)
+    X = [x for (x, _) in K]
+    Y = [y for (_, y) in K]
+    Z = [v for (_, v) in data]
+    return CairoMakie.tricontourf(X, Y, Z, axis = (aspect = CairoMakie.DataAspect(),))
+end
+
 import PlotlyJS
 """
     visualize(spectrum::CrystalSpectrum{2})
@@ -119,54 +135,20 @@ import PlotlyJS
 Visualize the eigenmodes of a `CrystalSpectrum` as a 3D mesh plot, the z-axis is the spectrum values, 
 the xy-plane will be the identity reciprocal space, and restricted to the brillouin zone of the crystal 
 for plotting the spectrum. Each band will be plotted as an individual surface.
-
-### Keyword Arguments
-- `paddirection` The direction to pad the spectrum, either `:top` or `:bottom`, this is used when some bands 
-                 at a `Momentum` have different count of eigenmodes than the others, the shorter bands will 
-                 be padded with `NaN` to the direction specified, the `NaN` values will be ignored by `Plots.jl` 
-                 and therefore shown as empty.  
 """
-function visualize(spectrum::CrystalSpectrum{2}; paddirection::Symbol=:top)
-    eigenmodes = spectrum|>geteigenmodes
-    eigenvalues = spectrum|>geteigenvalues
-    crystal = spectrum|>getcrystal
-    kspectrum = Dict(
-        k=>(haskey(eigenmodes, k) ? [eigenvalues[mode] for mode in eigenmodes[k]]|>sort : []) 
-        for k in crystal|>brillouinzone)
-    bandcount = spectrum.bandcount[2]
+function visualize(spectrum::CrystalSpectrum{2})
+    bands = getbands(spectrum)
 
-    function dopadding(k, values)
-        pad = repeat([NaN], bandcount - length(values))
-        if paddirection == :bottom
-            kspectrum[k] = [pad..., values...]
-        elseif paddirection == :top
-            kspectrum[k] = [values..., pad...]
-        else
-            error("Invalid paddirection: $paddirection")
-        end
-    end
-
-    if spectrum.bandcount[1] != bandcount
-        watchprogress(desc="visualize(::$(spectrum|>typeof))")
-        for k in spectrum|>getcrystal|>brillouinzone
-            values = haskey(kspectrum, k) ? kspectrum[k] : []
-            length(values) < bandcount && dopadding(k, values)
-            updateprogress()
-        end
-        unwatchprogress()
-    end
-    
-    getband(n) = [k=>kspectrum[k][n] for k in kspectrum|>keys]
-
-    function plotband(band)
-        K = [k|>euclidean|>vec for (k, _) in band]
+    function getplot(band)
+        data = band.data|>collect
+        K = [k|>euclidean|>vec for (k, _) in data]
         X = [x for (x, _) in K]
         Y = [y for (_, y) in K]
-        V = [v for (_, v) in band]
+        V = [v for (_, v) in data]
         return PlotlyJS.mesh3d(x=X, y=Y, z=V, intensity=V, colorscale="Viridis")
     end
 
-    return PlotlyJS.plot([plotband(n|>getband) for n in 1:bandcount])
+    return PlotlyJS.plot([band|>getplot for band in bands])
 end
 
 """

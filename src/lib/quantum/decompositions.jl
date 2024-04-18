@@ -154,6 +154,15 @@ function CrystalSpectrum(crystal::Crystal, crystaleigenmodes, args...)
     unwatchprogress()
     return CrystalSpectrum{crystal|>dimension}(crystal, crystaleigenmodes, args..., (minbands, maxbands))
 end
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ MonoBand implementation ◆
+struct MonoBand{Dim}
+    data::Dict{Momentum, Number}
+end
+export MonoBand
+
+Base.:show(io::IO, band::MonoBand{Dim}) where {Dim} = print(io, "$(band|>typeof)(datacount=$(band.data|>length))")
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -195,6 +204,42 @@ function getbandcount(spectrum::CrystalSpectrum)
     return first(spectrum.bandcount)
 end
 export getbandcount
+
+function getbands(spectrum::CrystalSpectrum; paddirection::Symbol=:top)
+    eigenmodes = spectrum|>geteigenmodes
+    eigenvalues = spectrum|>geteigenvalues
+    crystal = spectrum|>getcrystal
+    kspectrum = Dict(
+        k=>(haskey(eigenmodes, k) ? [eigenvalues[mode] for mode in eigenmodes[k]]|>sort : []) 
+        for k in crystal|>brillouinzone)
+    bandcount = spectrum.bandcount[2]
+
+    function dopadding(k, values)
+        pad = repeat([NaN], bandcount - length(values))
+        if paddirection == :bottom
+            kspectrum[k] = [pad..., values...]
+        elseif paddirection == :top
+            kspectrum[k] = [values..., pad...]
+        else
+            error("Invalid paddirection: $paddirection")
+        end
+    end
+
+    if spectrum.bandcount[1] != bandcount
+        watchprogress(desc="visualize(::$(spectrum|>typeof))")
+        for k in spectrum|>getcrystal|>brillouinzone
+            values = haskey(kspectrum, k) ? kspectrum[k] : []
+            length(values) < bandcount && dopadding(k, values)
+            updateprogress()
+        end
+        unwatchprogress()
+    end
+    
+    getband(n) = MonoBand{spectrum|>getcrystal|>dimension}(Dict(k=>kspectrum[k][n] for k in kspectrum|>keys))
+
+    return [getband(n) for n in 1:bandcount]
+end
+export getbands
 
 """
     crystalspectrum(fockmap::FockMap)::CrystalSpectrum

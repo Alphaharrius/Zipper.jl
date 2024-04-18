@@ -27,6 +27,12 @@ function getradius(region::Subset{<:Point}; metricspace::AffineSpace = region |>
 end
 export getradius
 
+function getextend(region::Region, ref::Offset)
+    diffs = (getspace(ref)*r-ref|>norm for r in region)
+    return maximum(diffs)
+end
+export getextend
+
 BoundaryCondition(space::RealSpace, sizes::Integer...) = BoundaryCondition(
     space, Matrix(1.0I, sizes|>length, sizes|>length), sizes|>collect)
 

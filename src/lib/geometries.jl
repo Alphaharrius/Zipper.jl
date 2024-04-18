@@ -78,10 +78,12 @@ getorigin(crystal::Crystal)::Offset = crystal|>getspace|>getorigin
 getkbasis(crystal::Crystal, k::Momentum) = vec(k) .* size(crystal)
 export getkbasis
 
-kindexoperator(crystal::Crystal) = [1, (size(crystal)[1:end-1]|>cumprod)...]
-export kindexoperator
+@memoize function getcrystalindexings(crystal::Crystal)::Dict{Momentum, Integer}
+    bz = brillouinzone(crystal)
+    return Dict(k=>n for (n, k) in bz|>enumerate)
+end
 
-Base.getindex(crystal::Crystal, k::Momentum)::Integer = round(kindexoperator(crystal)' * getkbasis(crystal, k) + 1)
+Base.getindex(crystal::Crystal, k::Momentum)::Integer = getcrystalindexings(crystal)[k]
 
 Base.getindex(crystal::Crystal, i::Integer) = brillouinzone(crystal)[i]
 

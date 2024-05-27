@@ -48,7 +48,9 @@ The real space local correlation with `inspace` and `outspace` as the `regionfoc
 function regioncorrelations(correlations::FockMap, regionfock::RegionFock)::FockMap
     crystalfock::CrystalFock = correlations|>getinspace
     transform = fourier(crystalfock, regionfock) / (crystalfock|>subspacecount|>sqrt)
-    return transform' * correlations * transform
+    restcorr = transform' * correlations * transform
+    display(visualize(restcorr|>eigspech))
+    return restcorr
 end
 export regioncorrelations
 

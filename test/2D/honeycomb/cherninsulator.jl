@@ -16,7 +16,7 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [384, 384])
+crystal = Crystal(unitcell, [96, 96])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -48,6 +48,7 @@ haldane = [
 bonds::FockMap = bondmap([onsite..., nearestneighbor..., haldane...])
 
 energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
+visualize(energyspectrum)
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstateprojector = groundstates|>crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector

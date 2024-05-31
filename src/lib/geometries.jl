@@ -162,9 +162,32 @@ function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealS
     generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
     crystalregion::Region = generatingcrystal|>sitepoints
     centeredregion::Region = crystalregion .- (crystalregion|>getcenter)
-    return Subset(point for point in centeredregion if norm(metricspace * point) <= radius)
+    return Subset(point for point in centeredregion if norm(metricspace * point) < radius)
 end
 export getsphericalregion
+
+"""
+    gethexagonalregion(; crystal::Crystal, center::Offset, metricspace::RealSpace)
+
+Get the hexagonal region ceneter at a given origin for honeycomb lattice. Here we choose c6 as the symmetry which is 
+specific to the case of honeycomb
+"""
+
+function gethexagonalregion(; crystal::Crystal, center::Offset, metricspace::RealSpace)
+    # c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    shift1 = [-2,0]∈metricspace
+    shift2 = [0,-2]∈metricspace
+    shift3 = [-2,-2]∈metricspace
+    generatinglength::Integer = 2
+    generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
+    crystalregion::Region = generatingcrystal|>sitepoints
+    noofmodesinunitcell = length(crystal|>getunitcell)
+    wholeregion::Region = union(crystalregion,crystalregion.+shift1,crystalregion.+shift2,crystalregion.+shift3)
+    sortedptswifdist = sort([(norm(euclidean(point-center)),point) for point in wholeregion],by=first)
+    return Subset([pair[2] for pair in sortedptswifdist[1:noofmodesinunitcell]])
+    # return wholeregion
+end
+export gethexagonalregion
 
 geometricfilter(f, metricspace::AffineSpace) = p -> (metricspace * p) |> f
 export geometricfilter

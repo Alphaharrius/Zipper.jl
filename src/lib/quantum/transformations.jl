@@ -3,11 +3,16 @@ function Base.:*(scale::Scale, crystalfock::CrystalFock)::FockMap
     crystal::Crystal = crystalfock |> getcrystal
     scaledcrystal::Crystal = scale * crystal
     unscaledblockedregion::Subset{Offset} = (scale |> inv) * scaledcrystal.unitcell
+    # display(visualize(unscaledblockedregion))
     bz::Subset{Momentum} = crystal |> brillouinzone
     basismodes::Subset{Mode} = crystalfock|>unitcellfock|>orderedmodes
     momentummappings::Base.Generator = (basispoint(scale * p) => p for p in bz)
-    unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
+
+    # unscaledblockedlatticeoffsets::Subset{Offset} = Subset(pbc(crystal, p) |> latticeoff for p in unscaledblockedregion)
+    unscaledblockedlatticeoffsets::Subset{Offset} = Subset(p |> latticeoff for p in unscaledblockedregion)
+    # display(visualize(unscaledblockedlatticeoffsets))
     unscaledblockedunitcellfock::FockSpace = spanoffset(basismodes, unscaledblockedlatticeoffsets)
+    # display(visualize(Subset([(mode|>getattr(:b))+(mode|>getattr(:r)) for mode in unscaledblockedunitcellfock])))
     volumeratio::Number = (crystal |> vol) / (scaledcrystal |> vol)
     crystalfocksubspaces::Dict{Momentum, FockSpace} = Dict()
     for (k, subspace) in crystalfock|>crystalsubspaces

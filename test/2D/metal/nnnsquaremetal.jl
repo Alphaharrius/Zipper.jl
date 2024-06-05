@@ -2,6 +2,7 @@ using LinearAlgebra
 using Zipper, Plots
 plotlyjs()
 
+usecrystaldensemap()
 setmaxthreads(Threads.nthreads())
 
 square = euclidean(RealSpace, 2)
@@ -32,26 +33,25 @@ bonds::FockMap = bondmap([
 
 @info "Computing energy spectrum..."
 energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
+energyspectrum|>visualize
 @info "Resolving ground states..."
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=0.5)
 @info "Computing ground state correlations..."
-groundstateprojector = groundstates |> crystalprojector
-correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
+groundstateprojector = @time groundstates|>crystalprojector
+correlations = @time 1 - groundstateprojector
 correlations|>crystalspectrum|>visualize
 @info "Performing initial blocking..."
 initscale = Scale([2 0; 0 2], square)
-initblock = initscale * (correlations|>getoutspace)
-inputcorrelations = initblock * correlations * initblock'
+initblock = @time initscale * (correlations|>getoutspace)
+inputcorrelations = @time initblock * correlations * initblock'
 inputcorrelations|>crystalspectrum|>visualize
 
-ss = Scale([1 0; 0 2], inputcorrelations|>getoutspace|>getcrystal|>getspace)
-bl = ss * getoutspace(inputcorrelations)
-bl * inputcorrelations * bl'|>crystalspectrum|>visualize
+inputcorrelations|>getoutspace|>getcrystal|>getunitcell|>visualize
 
 function zer0d(correlations)
     @info "Starting 0D ZER..."
     @info "Performing blocking..."
-    scale = Scale([2 0; 0 2], square)
+    scale = Scale([2 0; 0 2], correlations|>getoutspace|>getcrystal|>getspace)
     block = scale * (correlations|>getoutspace)
     blockedcorrelations = block * correlations * block'
     blockedcrystalfock = blockedcorrelations|>getoutspace
@@ -60,12 +60,14 @@ function zer0d(correlations)
 
     @info "Searching for frozen states..."
     region = blockedcrystal|>getunitcell
+    frozenregions = [region]
     regionfock = getregionfock(blockedcrystalfock, region)
     transform = fourier(blockedcrystalfock, regionfock)
     localcorrelations = transform'*blockedcorrelations*transform/(blockedcrystal|>vol)
     localstates = getregionstates(localcorrelations=localcorrelations, grouping=[1, 14, 1])
     frozenlocalstates = localstates[1] + localstates[3]
     region = region .- blockedspace*(0.5, 0.5)
+    frozenregions = [frozenregions..., region]
     regionfock = getregionfock(blockedcrystalfock, region)
     transform = fourier(blockedcrystalfock, regionfock)
     localcorrelations = transform'*blockedcorrelations*transform/(blockedcrystal|>vol)
@@ -117,14 +119,25 @@ function zer0d(correlations)
     metallocalstates = leftrestrict'*wanniermetalisometry*rightrestrict|>RegionState|>normalize
 
     couriercorrelations = wanniermetalisometry'*blockedcorrelations*wanniermetalisometry
-    couriercorrelations = roundingpurification(couriercorrelations|>crystalspectrum)|>CrystalFockMap
+    couriercorrelations = roundingpurification(couriercorrelations|>crystalspectrum)|>crystalfockmap
 
     return Dict(
         :couriercorrelations=>couriercorrelations, 
         :wanniermetalisometry=>wanniermetalisometry,
         :courierlocalstates=>metallocalstates,
-        :block=>block)
+        :block=>block,
+        :frozenregions=>frozenregions,
+        :courierregion=>region,
+        :localcouriercorrelations=>localcorrelations)
 end
+
+ret = zer0d(inputcorrelations)
+
+visualize(ret[:courierregion])
+plot!(legend=false)
+
+visualize(ret[:courierlocalstates], markersize=5, logscale=1)
+ret[:localcouriercorrelations]|>eigspech|>visualize
 
 function stripdistillation(couriercorrelations, scaledspace, normalvector, frozenthreshold)
     @info "Starting strip distillation..."
@@ -207,7 +220,8 @@ function stripdistillation(couriercorrelations, scaledspace, normalvector, froze
 
     return Dict(
         :wanniermetalprojector=>wanniermetalprojector, 
-        :stripfilledlocalstates=>stripfilledlocalstates)
+        :stripfilledlocalstates=>stripfilledlocalstates,
+        :stripspectrum=>stripspectrum)
 end
 
 function statewannierization(courierbands, couriercorrelations)
@@ -309,23 +323,21 @@ function renormalize(correlations; frozenthreshold=0.01)
     couriers = statewannierization(courierbands, couriercorrelations)
     courierisometry = couriers[:courierisometry]
     outputcorrelations = courierisometry'*metalcorrelations*courierisometry
-    outputcorrelations = roundingpurification(outputcorrelations|>crystalspectrum, tolerance=0.42)|>CrystalFockMap
 
     stripmetals = statewannierization(stripmetalbands, stripmetalcorrelations)
     stripmetalisometry = stripmetals[:courierisometry]
     outputstripcorrelations = stripmetalisometry'*metalcorrelations*stripmetalisometry
-    outputstripcorrelations = roundingpurification(outputstripcorrelations|>crystalspectrum, tolerance=0.4)|>CrystalFockMap
 
     c4stripmetals = statewannierization(c4stripmetalbands, c4stripmetalcorrelations)
     c4stripmetalisometry = c4stripmetals[:courierisometry]
     outputc4stripcorrelations = c4stripmetalisometry'*metalcorrelations*c4stripmetalisometry
-    outputc4stripcorrelations = roundingpurification(outputc4stripcorrelations|>crystalspectrum, tolerance=0.4)|>CrystalFockMap
 
     return Dict(
         :block=>rg0d[:block],
         :metalcorrelations=>metalcorrelations,
         :metallicstates=>rg0d[:courierlocalstates],
         :metallicisometry=>rg0d[:wanniermetalisometry],
+        :stripspectrum=>stripdistilled[:stripspectrum],
         :stripdistiller=>stripdistiller,
         :stripmetalprojector=>stripmetalprojector,
         :stripmetalcorrelations=>outputstripcorrelations,
@@ -336,21 +348,48 @@ function renormalize(correlations; frozenthreshold=0.01)
         :globaldistiller=>combineddistiller,
         :couriercorrelations=>outputcorrelations, 
         :courierlocalstates=>couriers[:localstates],
-        :courierisometry=>courierisometry,)
+        :courierisometry=>courierisometry,
+        :wanniercourier=>couriers,
+        :wannierstrip=>stripmetals,
+        :wannierc4strip=>c4stripmetals,)
 end
 
 fiodir("/Users/alphaharrius/ZERData/squaremetal")
-fiosave(energyspectrum|>CrystalFockMap, name="hamiltonian")
+fiosave(energyspectrum|>crystalfockmap, name="hamiltonian")
 fiosave(correlations, name="groundstatecorrelations")
 fiosave(initblock, name="initblock")
 fiosave(inputcorrelations, name="inputcorrelations")
-fioload("inputcorrelations")|>crystalspectrum|>visualize
 
 rg1 = renormalize(inputcorrelations, frozenthreshold=0.01)
 rg1[:couriercorrelations]|>crystalspectrum|>visualize
 rg1[:c4stripmetalcorrelations]|>crystalspectrum|>visualize
 rg1[:globaldistiller]|>crystalspectrum|>visualize
-roundingpurification(rg1[:stripmetalcorrelations]|>crystalspectrum, tolerance=0.4)|>visualize
+rg1[:stripspectrum]|>linespectrum|>visualize
+plot!(legend=false)
+rg1[:stripdistiller]|>crystalspectrum|>visualize
+
+roundingpurification(rg1[:stripmetalcorrelations]|>crystalspectrum, tolerance=0.3)|>CrystalDenseMap|>crystalspectrum|>visualize
+rg1[:stripmetalcorrelations]|>crystalspectrum|>getcrystal|>vol
+entanglemententropy(rg1[:stripmetalcorrelations]|>crystalspectrum) / 1024
+
+metalbands = groupbands(rg1[:metalcorrelations]|>crystalspectrum, :filled=>(v->v<0.5))
+stripfilledbands = groupbands(rg1[:stripmetalcorrelations]|>crystalspectrum, :filled=>(v->v<0.5))[:filled]
+stripfilledbands|>geteigenvectors
+
+couriersource = rg1[:wanniercourier]
+courierisometry = couriersource[:courierisometry]
+(courierisometry|>CrystalFockMap).blocks
+
+inputcorrelations|>crystalspectrum|>visualize
+(groundstatespectrum(inputcorrelations|>crystalspectrum, perunitcellfillings=0.5)|>CrystalFockMap).blocks
+
+function gethomerestrict(crystalfock::CrystalFock)
+    homefock = crystalfock|>unitcellfock|>RegionFock
+    return fourier(crystalfock, homefock)
+end
+
+courierisometry.nonzeroids
+
 visualize(rg1[:courierlocalstates], markersize=5, logscale=1)
 visualize(rg1[:metallicstates], markersize=5, logscale=1)
 visualize(rg1[:stripmetalstates], markersize=5, logscale=1)
@@ -363,14 +402,25 @@ end
 rg2 = renormalize(rg1[:couriercorrelations], frozenthreshold=0.01)
 rg2[:couriercorrelations]|>crystalspectrum|>visualize
 rg2[:globaldistiller]|>crystalspectrum|>visualize
+rg2[:c4stripmetalcorrelations]|>crystalspectrum|>visualize
 visualize(rg2[:courierlocalstates], markersize=5, logscale=1)
 visualize(rg2[:metallicstates], markersize=5, logscale=1)
+
+fiodir("/Users/alphaharrius/ZERData/squaremetal/RG2")
+for (k, v) in rg2
+    fiosave(v, name=k|>String)
+end
 
 rg3 = renormalize(rg2[:couriercorrelations], frozenthreshold=0.01)
 rg3[:couriercorrelations]|>crystalspectrum|>visualize
 rg3[:globaldistiller]|>crystalspectrum|>visualize
 visualize(rg3[:metallicstates], markersize=5, logscale=1)
 visualize(rg3[:courierlocalstates], markersize=5, logscale=1)
+
+fiodir("/Users/alphaharrius/ZERData/squaremetal/RG3")
+for (k, v) in rg3
+    fiosave(v, name=k|>String)
+end
 
 rg4 = renormalize(rg3[:couriercorrelations], frozenthreshold=0.01)
 rg4[:couriercorrelations]|>crystalspectrum|>visualize

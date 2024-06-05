@@ -118,7 +118,7 @@ function FockMap(fockmap::FourierMap)::SparseFockMap{CrystalFock, RegionFock}
         tasks=(()->compute(batch) for batch in batches),
         count=getmaxthreads())|>parallel
 
-    spdata = paralleldivideconquer(sumwithprogress, datas, count=getmaxthreads(), desc="FockMap(::FourierMap)")
+    spdata = paralleldivideconquer(getconquerer(+), datas, count=getmaxthreads(), desc="FockMap(::FourierMap)")
 
     return FockMap(outspace, inspace, spdata)
 end
@@ -144,7 +144,7 @@ function FockMap(fockmap::InvFourierMap)
         tasks=(()->compute(batch) for batch in batches),
         count=getmaxthreads())|>parallel
 
-    spdata = paralleldivideconquer(sumwithprogress, datas, count=getmaxthreads(), desc="FockMap(::InvFourierMap)")
+    spdata = paralleldivideconquer(getconquerer(+), datas, count=getmaxthreads(), desc="FockMap(::InvFourierMap)")
 
     return FockMap(outspace, inspace, spdata)
 end

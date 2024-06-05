@@ -128,16 +128,10 @@ end
 
 Retrieve the `RegionFock` which contain all the modes within the specified `region` from the `crystalfock`.
 """
+# TODO: Fix
 function getregionfock(crystalfock::CrystalFock, region::Region)
-    gcenter = region|>getcenter|>latticeoff|>euclidean
-    gradius = getextend(region, gcenter)|>ceil
-    gregion = getsphericalregion(
-        crystal=crystalfock|>getcrystal, 
-        radius=gradius, 
-        metricspace=region|>getspace|>euclidean) .+ gcenter
-
     crystalspace = crystalfock|>getcrystal|>getspace
-    transformed = (crystalspace*r for r in gregion)
+    transformed = (crystalspace*r for r in region)
     offsets = (r-basispoint(r) for r in transformed)
     modes = (m+r for (m, r) in Iterators.product(crystalfock|>unitcellfock|>RegionFock, offsets))
 

@@ -55,6 +55,8 @@ Base.:getindex(fockmap::FockMap, rowspace::FockSpace, ::Colon) = rows(fockmap, r
 # ◆ FockMap arithmetics ◆
 Base.:+(v::Number, fockmap::FockMap) = idmap(fockmap|>getoutspace, fockmap|>getinspace)*v + fockmap
 Base.:-(v::Number, fockmap::FockMap) = v + (-fockmap)
+Base.:+(fockmap::FockMap, v::Number) = fockmap + idmap(fockmap|>getoutspace, fockmap|>getinspace)*v
+Base.:-(fockmap::FockMap, v::Number) = fockmap + (-v)
 
 """ Shorthand to update the `outspace` of the `FockMap`. """
 Base.:*(fockspace::FockSpace, fockmap::FockMap)::FockMap = FockMap(fockmap, outspace=fockspace)

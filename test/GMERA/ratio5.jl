@@ -1,6 +1,141 @@
 using Zipper
 using LinearAlgebra
 
+function calculateavgoverlapofmodes(modes,spectrum::EigenSpectrum,rsmodes::Subset{Mode})
+    overlaps = [(norm(rows(columns(spectrum |> geteigenvectors, FockSpace(mode)),FockSpace(rsmodes))))^2 for mode in modes]
+    avgoverlap = sum(overlaps)/length(overlaps)
+    return tuple(avgoverlap,modes)
+end
+
+function calculateoverlapofmode(evalwifmode,spectrum::EigenSpectrum,rsmodes::Subset{Mode})
+    overlap = (norm(rows(columns(spectrum |> geteigenvectors, FockSpace(evalwifmode[2])),FockSpace(rsmodes))))^2
+    return tuple(evalwifmode[2],evalwifmode[1],overlap)
+end
+
+function sortdictwifvaluefirst(dict::Dict{Mode, Float64},rev::Bool)
+    sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
+    return sortedtupledata
+end
+
+function sortgroupdictwifvalue(dict::Dict{Mode, Float64},rev::Bool)
+    sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
+    refvalue = sortedtupledata[1][2]|>getattr(:eigenindex)
+    result = []
+    evals = []
+    subresult = Subset(sortedtupledata[1][2])
+    for pair in sortedtupledata
+        if pair[2]|>getattr(:eigenindex)==refvalue
+            subresult = subresult + Subset(pair[2])
+            append!(evals,pair[1])
+        else
+            append!(result,[subresult])
+            refvalue = pair[2]|>getattr(:eigenindex)
+            evals = []
+            subresult = Subset(pair[2])
+        end
+    end
+    append!(result,[subresult])
+
+    return result
+end
+
+# function sortgroupdictwifvalue(dict::Dict{Mode, Float64},rev::Bool)
+#     sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
+#     refvalue = sortedtupledata[1][1]
+#     result = []
+#     subresult = Subset(sortedtupledata[1][2])
+#     for pair in sortedtupledata
+#         if pair[1]==refvalue
+#             subresult = subresult+Subset(pair[2])
+#         else
+#             append!(result,[subresult])
+#             refvalue = pair[1]
+#             subresult = Subset(pair[2])
+#         end
+#     end
+#     append!(result,[subresult])
+
+#     return result
+# end
+
+function sortgroupdictwifdist(dict::Dict{Mode, Float64},rev::Bool)
+    sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
+    refvalue = round(sortedtupledata[1][1],digits=8)
+    result = []
+    subresult = Subset(sortedtupledata[1][2])
+    for pair in sortedtupledata
+        if round(pair[1],digits=8)==refvalue
+            subresult = subresult+Subset(pair[2])
+        else
+            append!(result,tuple([refvalue,subresult]))
+            refvalue = round(pair[1],digits=8)
+            subresult = Subset(pair[2])
+        end
+    end
+    append!(result,tuple([refvalue,subresult]))
+
+    return result
+end
+
+function sortgroupdictwifvaluefirst(dict::Dict{Mode, Float64},rev::Bool)
+    sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
+    # return sortedtupledata
+    refvalue = round(sortedtupledata[1][1],digits=8)
+    result = []
+    subresult = Subset(sortedtupledata[1][2])+Subset(sortedtupledata[2][2])
+    for pair in sortedtupledata
+        if round(pair[1],digits=8)==refvalue
+            subresult = subresult+Subset(pair[2])
+        else
+            append!(result,tuple([refvalue,subresult]))
+            refvalue = round(pair[1],digits=8)
+            subresult = Subset(pair[2])
+        end
+    end
+    append!(result,tuple([refvalue,subresult]))
+
+    return result
+end
+
+function sortgroupdictwifvaluesec(dict::Dict{Mode, Float64},rev::Bool)
+    sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
+    # return sortedtupledata
+    refvalue = sortedtupledata[1][1]
+    result = []
+    subresult = Subset(sortedtupledata[1][2])+Subset(sortedtupledata[2][2])
+    for pair in sortedtupledata
+        if pair[1]==refvalue
+            subresult = subresult+Subset(pair[2])
+        else
+            append!(result,tuple([refvalue,subresult]))
+            refvalue = pair[1]
+            subresult = Subset(pair[2])
+        end
+    end
+    append!(result,tuple([refvalue,subresult]))
+
+    return result
+end
+
+function findmodeswiftotalno(sortedgroup,totalno::Number)
+    ref = totalno 
+    result = [] 
+    for data in sortedgroup
+        condition = ref-length(data[2])
+        if condition>0
+            ref = condition
+            append!(result,tuple([data[1],data[2]]))
+        elseif condition<0
+            ref = ref
+            @info("more than the number of modes we need")
+        else
+            ref = condition
+            append!(result,tuple([data[1],data[2]]))
+            return result
+        end
+    end
+end
+
 triangular = RealSpace([1 0; 1/2 sqrt(3)/2]')
 kspace = convert(MomentumSpace, triangular)
 
@@ -15,7 +150,7 @@ pg = (pa + pb + pc + pd + pe + pf) / 6
 spatialsnappingcalibration((pa, pb, pc, pd, pe, pf, pg))
 
 unitcell = Subset(pa, pb, pc, pd, pe, pf)
-crystal = Crystal(unitcell, [40, 40])
+crystal = Crystal(unitcell, [20, 20])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -99,86 +234,141 @@ end
 
 
 localcorrelations = regioncorrelations(blockedcorrelations,firsthexagonalregionfock)
-# (regioncorrelations(blockedcorrelations,firsthexagonalregionfock)|> rep |> Matrix |> Hermitian |> eigvals)[1:32]
 localspectrum = localcorrelations|>eigspech
 display(visualize(localspectrum))
-localiso = localcorrelations|>modeselectionbycount(27)
+filleddict,emptydict = separatefilledandemptymodes(localspectrum)
 
-localwannierseeds = localwannierseedslists(localiso)
+sortedgroupfilledwifeval = sortgroupdictwifvalue(filleddict,false)
+sortedgroupemptywifeval = sortgroupdictwifvalue(emptydict,true)
 
-emptyseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:empty])] 
-filledseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:filled])] 
-courierseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:courier])]
 
-wannierempty = localwannierization(localiso[:empty], emptyseeds)
-wannierfilled = localwannierization(localiso[:filled], filledseeds)
-wanniercourier = localwannierization(localiso[:courier], courierseeds)
+rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-firstcenter)) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
+sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
+frozenrsmodes = sum([pair[2] for pair in sortedrsmode[1:6]])
+frozenrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in frozenrsmodes)
+visualize(frozenrsmodesoffset)
+courierrsmodes = sum([pair[2] for pair in sortedrsmode[7:end]])
+courierrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in courierrsmodes)
+visualize(courierrsmodesoffset)
 
-localwannierresults =  Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
-                :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
-                :bempty=>localwannierseeds[:bempty],:bfilled=>localwannierseeds[:bfilled],:bcourier=>localwannierseeds[:bcourier])
+sortedgroupfilledwifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupfilledwifeval],rev=true,by=x->x[1])
+sortedgroupemptywifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupemptywifeval],rev=true,by=x->x[1])
+
+chosensortedgroupfilledwifoverlap = findmodeswiftotalno(sortedgroupfilledwifoverlap,div(length(frozenrsmodes),2))
+chosensortedgroupemptywifoverlap = findmodeswiftotalno(sortedgroupemptywifoverlap,div(length(frozenrsmodes),2))
+chosensortedgroupfilledwifoverlap
+chosensortedgroupemptywifoverlap
+
+chosenfilledmodes = sum([data[2] for data in chosensortedgroupfilledwifoverlap])
+chosenemptymodes = sum([data[2] for data in chosensortedgroupemptywifoverlap])
+chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
+chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
+
+courierseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
+localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+wanniercourier = localwannierization(localisocourier, courierseeds)
+
+frozenseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
+localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
+wannierfrozen = localwannierization(localisoforzen, frozenseeds)
+
+(wanniercourier'*localcorrelations*wanniercourier)|>eigspech|>visualize
+(wannierfrozen'*localcorrelations*wannierfrozen)|>eigspech|>visualize
+
+
+localwannierresults =  Dict(:wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
+                    :frozenseeds => frozenseeds,:courierseeds => courierseeds)
 
 wannierinfos =  Dict(firsthexagonalregionfock=>localwannierresults)
 
-firstshiftedhexagonalregionfocklist = [shiftedfirsthexagonalregion1fock, shiftedfirsthexagonalregion2fock, shiftedfirsthexagonalregion3fock]
+firstshiftedhexagonalregionfocklist = [(shiftedfirstcenter1,shiftedfirsthexagonalregion1fock), (shiftedfirstcenter2,shiftedfirsthexagonalregion2fock), (shiftedfirstcenter3,shiftedfirsthexagonalregion3fock)]
 
-for hexagonalregionfock in firstshiftedhexagonalregionfocklist
+for (shifted,hexagonalregionfock) in firstshiftedhexagonalregionfocklist
     localcorrelations = regioncorrelations(blockedcorrelations,hexagonalregionfock)
     localspectrum = localcorrelations|>eigspech
-    localspectrum|>visualize
-    localiso = localcorrelations|>modeselectionbycount(27)
+    filleddict,emptydict = separatefilledandemptymodes(localspectrum)
+    
+    sortedgroupfilledwifeval = sortgroupdictwifvalue(filleddict,false)
+    sortedgroupemptywifeval = sortgroupdictwifvalue(emptydict,true)
 
-    localwannierresults = localwannierseedslists(localiso)
+    rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-(firstcenter+shifted))) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
+    sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
+    frozenrsmodes = sum([pair[2] for pair in sortedrsmode[1:6]])
+    frozenrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in frozenrsmodes)
+    courierrsmodes = sum([pair[2] for pair in sortedrsmode[7:end]])
+    courierrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in courierrsmodes)
 
-    emptyseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:empty])] 
-    filledseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:filled])] 
-    courierseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:courier])]
+    sortedgroupfilledwifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupfilledwifeval],rev=true,by=x->x[1])
+    sortedgroupemptywifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupemptywifeval],rev=true,by=x->x[1])
 
-    wannierempty = localwannierization(localiso[:empty], emptyseeds)
-    wannierfilled = localwannierization(localiso[:filled], filledseeds)
-    wanniercourier = localwannierization(localiso[:courier], courierseeds)
+    chosensortedgroupfilledwifoverlap = findmodeswiftotalno(sortedgroupfilledwifoverlap,div(length(frozenrsmodes),2))
+    chosensortedgroupemptywifoverlap = findmodeswiftotalno(sortedgroupemptywifoverlap,div(length(frozenrsmodes),2))
 
-    shiftedlocalwannierresults =  Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
-                :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
-                :bempty=>localwannierresults[:bempty],:bfilled=>localwannierresults[:bfilled],:bcourier=>localwannierresults[:bcourier])
+    chosenfilledmodes = sum([data[2] for data in chosensortedgroupfilledwifoverlap])
+    chosenemptymodes = sum([data[2] for data in chosensortedgroupemptywifoverlap])
+    chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
+    chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
 
-    wannierinfos[hexagonalregionfock] = shiftedlocalwannierresults
+    courierseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
+    localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+    wanniercourier = localwannierization(localisocourier, courierseeds)
+
+    frozenseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
+    localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
+    wannierfrozen = localwannierization(localisoforzen, frozenseeds)
+    
+    shiftedlocalwannierresults =  Dict(:wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
+                    :frozenseeds => frozenseeds,:courierseeds => courierseeds)
+
+    wannierinfos[hexagonalregionfock] =  shiftedlocalwannierresults
 end 
 
 firsthexagonalregionfocklist = [firsthexagonalregionfock, shiftedfirsthexagonalregion1fock, shiftedfirsthexagonalregion2fock, shiftedfirsthexagonalregion3fock]
 
-extendedwannierizedempty =  sum(wannierinfos[regionfock][:wannierempty] for regionfock in firsthexagonalregionfocklist)
-extendedwannierizedfilled =  sum(wannierinfos[regionfock][:wannierfilled] for regionfock in firsthexagonalregionfocklist)
+extendedwannierizedfrozen =  sum(wannierinfos[regionfock][:wannierfrozen] for regionfock in firsthexagonalregionfocklist)
 extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in firsthexagonalregionfocklist)
-        
+            
 origin = [0, 0] ∈ blockedspace
-refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+refunictcellfockfrozen = FockSpace(Subset(mode for mode in extendedwannierizedfrozen |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
 refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
 
-
-wannieremptyisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedempty[:,refunictcellfockempty])
-wannierfilledisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
+wannierforzenisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedfrozen[:,refunictcellfockfrozen])
 wanniercourierisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
+# wannierisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedfrozen[:,refunictcellfockfrozen]+extendedwannierizedcourier[:,refunictcellfockcourier])
 
 couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
+couriercorrelations|>eigspech|>visualize
 couriercorrelationspectrum = couriercorrelations |> crystalspectrum
 purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
 purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
-visualize(purifiedcouriercorrelations|>getinspace|>getcrystal|>getunitcell)
+# refcorrelations = wannierisometry' * blockedcorrelations * wannierisometry
+
+frozencorrelations = wannierforzenisometry' * blockedcorrelations * wannierforzenisometry
+frozencorrelations|>eigspech|>visualize
 
 firstrgedcorrelations = purifiedcouriercorrelations
 firstrgedcrystalfock = purifiedcouriercorrelations|>getoutspace
 firstrgedcrystal::Crystal = firstrgedcrystalfock|>getcrystal
 firstrgedspace::RealSpace = firstrgedcrystal|>getspace
 
+refrgedcrystalfock = refcorrelations|>getoutspace
+refrgedcrystal::Crystal = refrgedcrystalfock|>getcrystal
+refrgedspace::RealSpace = refrgedcrystal|>getspace
 
 @info("Computing local correlations...")
 secondcenter = [2/3,-1/3] ∈ firstrgedspace
 secondhexagonalregion = gethexagonalregion(crystal=firstrgedcrystal, center=secondcenter, metricspace=firstrgedspace)
 visualize(secondhexagonalregion)
 secondhexagonalregionfock = quantize(secondhexagonalregion,1)
+
+# secondcenter = [2/3,-1/3] ∈ firstrgedspace
+# secondhexagonalregion = gethexagonalregion(crystal=refrgedcrystal, center=secondcenter, metricspace=refrgedspace)
+# visualize(secondhexagonalregion)
+# secondhexagonalregionfock = quantize(secondhexagonalregion,1)
+
+# localcorrelations = regioncorrelations(refcorrelations,secondhexagonalregionfock)
+# localspectrum = localcorrelations|>eigspech|>visualize
 
 shiftedsecondcenter1 = [0,1] ∈ firstrgedspace
 shiftedsecondhexagonalregion1 = secondhexagonalregion.+shiftedsecondcenter1
@@ -189,181 +379,280 @@ shiftedsecondhexagonalregion2 = secondhexagonalregion.+shiftedsecondcenter2
 shiftedsecondhexagonalregion2fock = quantize(shiftedsecondhexagonalregion2,1)
 
 
-allregion2 = secondhexagonalregion+shiftedsecondhexagonalregion1+shiftedsecondhexagonalregion2
-visualize(allregion2)
-if intersect(allregion2,firstrgedcrystal|>getunitcell) == firstrgedcrystal|>getunitcell
-    @info("cover the whole unitcell")
-else
-    @error("the allregion cannot cover the whole unitcell ")
-end
+    allregion2 = secondhexagonalregion+shiftedsecondhexagonalregion1+shiftedsecondhexagonalregion2
+    visualize(allregion2)
+    if intersect(allregion2,firstrgedcrystal|>getunitcell) == firstrgedcrystal|>getunitcell
+        @info("cover the whole unitcell")
+    else
+        @error("the allregion cannot cover the whole unitcell ")
+    end
 
-localcorrelations = regioncorrelations(firstrgedcorrelations,secondhexagonalregionfock)
-localspectrum = localcorrelations|>eigspech
-display(visualize(localspectrum))
-# regioncorrelations(firstrgedcorrelations,quantize(firstrgedcorrelations|>getinspace|>getcrystal|>getunitcell,1))|>eigspech|>visualize
-localiso = localcorrelations|>modeselectionbycount(6)
-
-localwannierseeds = localwannierseedslists(localiso)
-
-emptyseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:empty])] 
-filledseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:filled])] 
-courierseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:courier])]
-
-wannierempty = localwannierization(localiso[:empty], emptyseeds)
-wannierfilled = localwannierization(localiso[:filled], filledseeds)
-wanniercourier = localwannierization(localiso[:courier], courierseeds)
-
-localwannierresults =  Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
-                :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
-                :bempty=>localwannierseeds[:bempty],:bfilled=>localwannierseeds[:bfilled],:bcourier=>localwannierseeds[:bcourier])
-
-wannierinfos =  Dict(secondhexagonalregionfock =>localwannierresults)
-
-secondshiftedhexagonalregionfocklist = [shiftedsecondhexagonalregion1fock, shiftedsecondhexagonalregion2fock]
-
-for hexagonalregionfock in secondshiftedhexagonalregionfocklist
-    localcorrelations = regioncorrelations(purifiedcouriercorrelations,hexagonalregionfock)
+    localcorrelations = regioncorrelations(firstrgedcorrelations,secondhexagonalregionfock)
     localspectrum = localcorrelations|>eigspech
-    localspectrum|>visualize
-    localiso = localcorrelations|>modeselectionbycount(24)
+    display(visualize(localspectrum))
 
-    localwannierresults = localwannierseedslists(localiso)
+    filleddict,emptydict = separatefilledandemptymodes(localspectrum)
 
-    emptyseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:empty])] 
-    filledseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:filled])] 
-    courierseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:courier])]
+    sortedgroupfilledwifeval = sortgroupdictwifvalue(filleddict,false)
 
-    wannierempty = localwannierization(localiso[:empty], emptyseeds)
-    wannierfilled = localwannierization(localiso[:filled], filledseeds)
-    wanniercourier = localwannierization(localiso[:courier], courierseeds)
+    sortedgroupemptywifeval = sortgroupdictwifvalue(emptydict,true)
 
-    shiftedlocalwannierresults =  Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
-                :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
-                :bempty=>localwannierseeds[:bempty],:bfilled=>localwannierseeds[:bfilled],:bcourier=>localwannierseeds[:bcourier])
+    # for modes in sortedgroupfilledwifeval
+    #     for (ind,m) in enumerate(modes)
+    #         println((ind,(localspectrum|>geteigenvalues)[m]))
+    #     end
+    # end
 
-    wannierinfos[hexagonalregionfock] = shiftedlocalwannierresults
-end 
+    # for modes in sortedgroupemptywifeval
+    #     for (ind,m) in enumerate(modes)
+    #         println((ind,(localspectrum|>geteigenvalues)[m]))
+    #     end
+    # end
+    
+    rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-secondcenter)) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
+    sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
+    frozenrsmodes = sum([pair[2] for pair in sortedrsmode[1:8]])
+    frozenrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in frozenrsmodes)
+    visualize(frozenrsmodesoffset)
+    courierrsmodes = sum([pair[2] for pair in sortedrsmode[9:end]])
+    courierrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in courierrsmodes)
+    visualize(courierrsmodesoffset)
 
-secondhexagonalregionfocklist = [secondhexagonalregionfock, shiftedsecondhexagonalregion1fock, shiftedsecondhexagonalregion2fock]
+    sortedgroupfilledwifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupfilledwifeval],rev=true,by=x->x[1])
+    sortedgroupemptywifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupemptywifeval],rev=true,by=x->x[1])
 
-extendedwannierizedempty =  sum(wannierinfos[regionfock][:wannierempty] for regionfock in secondhexagonalregionfocklist)
-extendedwannierizedfilled =  sum(wannierinfos[regionfock][:wannierfilled] for regionfock in secondhexagonalregionfocklist)
-extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in secondhexagonalregionfocklist)
+    # chosensortedgroupfilledwifoverlap = findmodeswiftotalno(sortedgroupfilledwifoverlap,div(length(frozenrsmodes),2))
+    # chosensortedgroupemptywifoverlap = findmodeswiftotalno(sortedgroupemptywifoverlap,div(length(frozenrsmodes),2))
+
+    # chosenfilledmodes = sum([data[2] for data in chosensortedgroupfilledwifoverlap])
+    # chosenemptymodes = sum([data[2] for data in chosensortedgroupemptywifoverlap])
+    # chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
+    # chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
+
+    chosenfilledmodes = sum([data[2] for data in sortedgroupfilledwifoverlap[1:21]])
+    chosenemptymodes = sum([data[2] for data in sortedgroupemptywifoverlap[1:20]])
+    chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
+    chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
+    
+
+    sortedgroupfilledwifoverlap
+    for pair in sortedgroupfilledwifoverlap
+        for (ind,m) in enumerate(pair[2])
+            println((ind,(localspectrum|>geteigenvalues)[m]))
+        end
+    end
+
+    for pair in sortedgroupemptywifoverlap
+        for (ind,m) in enumerate(pair[2])
+            println((ind,(localspectrum|>geteigenvalues)[m]))
+        end
+    end
+
+    for pair in sortedgroupemptywifoverlap
+        println((pair))
+    end
+
+    for m in sortedgroupemptywifoverlap[3][2]
+        println((localspectrum|>geteigenvalues)[m])
+    end
+    
+    courierseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
+    # localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+    # wanniercourier = localwannierization(localisocourier, courierseeds)
+
+    frozenseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
+    # localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
+    # wannierfrozen = localwannierization(localisoforzen, frozenseeds)
+
+    wanniercourierref = localwannierization(localspectrum |> geteigenvectors, courierseeds)
+    wannierfrozenref = localwannierization(localspectrum |> geteigenvectors, frozenseeds)
+
+    sortedfrozen = sort([(norm(rows((localspectrum |> geteigenvectors)'*wannierfrozenref,FockSpace(mode)))^2,mode,(localspectrum |> geteigenvalues)[mode]) for mode in ((localspectrum |> geteigenvectors)'*wannierfrozenref)|>getoutspace],rev=true,by=first)
+    sortedcourier =  sort([(norm(rows((localspectrum |> geteigenvectors)'*wanniercourierref,FockSpace(mode)))^2,mode,(localspectrum |> geteigenvalues)[mode]) for mode in ((localspectrum |> geteigenvectors)'*wanniercourierref)|>getoutspace],rev=true,by=first)
+
+    sortedfilled = [data for data in sortedfrozen if data[3]<0.5]
+    sortedempty = [data for data in sortedfrozen if data[3]>0.5]
+
+    for data in sortedfilled
+        println(data)
+    end
+
+    for data in sortedempty
+        println(data)
+    end
+
+    chosenfrozenmodes = sum(Subset(pair[2]) for pair in sortedfilled[1:20])+sum(Subset(pair[2]) for pair in sortedempty[1:22])
+    chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
+
+    
+
+    localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
+    localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+    wannierfrozen = localwannierization(localisoforzen, frozenseeds)
+    wanniercourier = localwannierization(localisocourier, courierseeds)
+
+
+    visualize(wanniercourier'*localcorrelations*wanniercourier|>eigspech)
+    visualize(wannierfrozen'*localcorrelations*wannierfrozen|>eigspech)
+
+    localwannierresults =  Dict(:wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
+                    :frozenseeds => frozenseeds,:courierseeds => courierseeds)
+
+    wannierinfos =  Dict(secondhexagonalregionfock=>localwannierresults)
+
+    secondshiftedhexagonalregionfocklist = [(shiftedsecondcenter1,shiftedsecondhexagonalregion1fock), (shiftedsecondcenter2,shiftedsecondhexagonalregion2fock)]
+
+    for (shifted,hexagonalregionfock) in secondshiftedhexagonalregionfocklist
+        localcorrelations = regioncorrelations(firstrgedcorrelations,hexagonalregionfock)
+        localspectrum = localcorrelations|>eigspech
+        filleddict,emptydict = separatefilledandemptymodes(localspectrum)
+
+        sortedgroupfilledwifeval = sortgroupdictwifvalue(filleddict,false)
+        sortedgroupemptywifeval = sortgroupdictwifvalue(emptydict,true)
         
-origin = [0, 0] ∈ firstrgedspace
-refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+        rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-(secondcenter+shifted))) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
+        sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
+        frozenrsmodes = sum([pair[2] for pair in sortedrsmode[1:8]])
+        frozenrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in frozenrsmodes)
+        visualize(frozenrsmodesoffset)
+        courierrsmodes = sum([pair[2] for pair in sortedrsmode[9:end]])
+        courierrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in courierrsmodes)
+        visualize(courierrsmodesoffset)
 
-wannieremptyisometry = globalwannierfunction(firstrgedcorrelations,extendedwannierizedempty[:,refunictcellfockempty])
-wannierfilledisometry = globalwannierfunction(firstrgedcorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
-wanniercourierisometry = globalwannierfunction(firstrgedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
+        sortedgroupfilledwifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupfilledwifeval],rev=true,by=x->x[1])
+        sortedgroupemptywifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupemptywifeval],rev=true,by=x->x[1])
 
-couriercorrelations2 = wanniercourierisometry' * firstrgedcorrelations * wanniercourierisometry
-couriercorrelationspectrum2 = couriercorrelations2 |> crystalspectrum
-purifiedcorrelationspectrum2 = couriercorrelationspectrum2 |> roundingpurification
-purifiedcouriercorrelations2 = purifiedcorrelationspectrum2 |> CrystalFockMap
 
-secondrgedcorrelations = purifiedcouriercorrelations2
-secondrgedcrystalfock = purifiedcouriercorrelations2|>getoutspace
-secondrgedcrystal::Crystal = secondrgedcrystalfock|>getcrystal
-secondrgedspace::RealSpace = secondrgedcrystal|>getspace
-secondrgedcrystal|>getunitcell|>visualize
+        chosensortedgroupfilledwifoverlap = findmodeswiftotalno(sortedgroupfilledwifoverlap,div(length(frozenrsmodes),2))
+        chosensortedgroupemptywifoverlap = findmodeswiftotalno(sortedgroupemptywifoverlap,div(length(frozenrsmodes),2))
 
-@info("Computing local correlations...")
-thirdcenter = [1/3,1/3] ∈ blockedspace
-thirdhexagonalregion = gethexagonalregion(crystal=secondrgedcrystal, center=thirdcenter, metricspace=secondrgedspace)
-thirdhexagonalregionfock = quantize(thirdhexagonalregion,1)
-visualize(thirdhexagonalregion)
+        chosenfilledmodes = sum([data[2] for data in chosensortedgroupfilledwifoverlap])
+        chosenemptymodes = sum([data[2] for data in chosensortedgroupemptywifoverlap])
+        chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
+        chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
 
-shiftedthirdcenter1 = [0,1] ∈ secondrgedspace
-shiftedthirdhexagonalregion1 = thirdhexagonalregion.+shiftedthirdcenter1
-shiftedthirdhexagonalregion1fock = quantize(shiftedthirdhexagonalregion1,1)
+        courierseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
+        localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+        wanniercourier = localwannierization(localisocourier, courierseeds)
 
-shiftedthirdcenter2 = [1,0] ∈ secondrgedspace
-shiftedthirdhexagonalregion2 = thirdhexagonalregion.+shiftedthirdcenter2
-shiftedthirdhexagonalregion2fock = quantize(shiftedthirdhexagonalregion2,1)
+        display(visualize(wanniercourier'*localcorrelations*wanniercourier|>eigspech))
 
-allregion3 = thirdhexagonalregion+shiftedthirdhexagonalregion1+shiftedthirdhexagonalregion2
-visualize(allregion3)
-visualize(secondrgedcrystal|>getunitcell)
-visualize(intersect(allregion3,firstrgedcrystal|>getunitcell))
-if intersect(allregion3,firstrgedcrystal|>getunitcell) == secondrgedcrystal|>getunitcell
-    @info("cover the whole unitcell")
-else
-    @error("the allregion cannot cover the whole unitcell ")
-end
+        frozenseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
+        localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
+        wannierfrozen = localwannierization(localisoforzen, frozenseeds)
 
-localcorrelations = regioncorrelations(secondrgedcorrelations,thirdhexagonalregionfock)
-localspectrum = localcorrelations|>eigspech
-display(visualize(localspectrum))
-localiso = localcorrelations|>modeselectionbycount(21)
+        display(visualize(wannierfrozen'*localcorrelations*wannierfrozen|>eigspech))
 
-localwannierseeds = localwannierseedslists(localiso)
+        shiftedlocalwannierresults =  Dict(:wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
+                        :frozenseeds => frozenseeds,:courierseeds => courierseeds)
 
-emptyseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:empty])] 
-filledseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:filled])] 
-courierseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in localwannierseeds[:courier])]
+        wannierinfos[hexagonalregionfock] =  shiftedlocalwannierresults
+    end 
 
-wannierempty = localwannierization(localiso[:empty], emptyseeds)
-wannierfilled = localwannierization(localiso[:filled], filledseeds)
-wanniercourier = localwannierization(localiso[:courier], courierseeds)
+    secondhexagonalregionfocklist = [secondhexagonalregionfock, shiftedsecondhexagonalregion1fock, shiftedsecondhexagonalregion2fock]
 
-localwannierresults =  Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
-                :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
-                :bempty=>localwannierresults[:bempty],:bfilled=>localwannierresults[:bfilled],:bcourier=>localwannierresults[:bcourier])
+    extendedwannierizedfrozen =  sum(wannierinfos[regionfock][:wannierfrozen] for regionfock in secondhexagonalregionfocklist)
+    extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in secondhexagonalregionfocklist)
+            
+    origin = [0, 0] ∈ blockedspace
+    refunictcellfockfrozen = FockSpace(Subset(mode for mode in extendedwannierizedfrozen |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
 
-wannierinfos =  Dict(thirdhexagonalregionfock =>localwannierresults)
 
-thirdshiftedhexagonalregionfocklist = [shiftedthirdhexagonalregion1fock, shiftedthirdhexagonalregion2fock]
+    wannierforzenisometry = globalwannierfunction(firstrgedcorrelations,extendedwannierizedfrozen[:,refunictcellfockfrozen])
+    wanniercourierisometry = globalwannierfunction(firstrgedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
 
-for hexagonalregionfock in thirdshiftedhexagonalregionfocklist
-    localcorrelations = regioncorrelations(purifiedcouriercorrelations,hexagonalregionfock)
+    frozencorrelations = wannierforzenisometry' * firstrgedcorrelations * wannierforzenisometry
+    frozencorrelations|>eigspech|>visualize
+
+
+
+    couriercorrelations2 = wanniercourierisometry' * firstrgedcorrelations * wanniercourierisometry
+    couriercorrelations2|>eigspech|>visualize
+
+    couriercorrelationspectrum2 = couriercorrelations2 |> crystalspectrum
+    purifiedcorrelationspectrum2 = couriercorrelationspectrum2 |> roundingpurification
+    purifiedcouriercorrelations2 = purifiedcorrelationspectrum2 |> CrystalFockMap
+
+    secondrgedcorrelations = purifiedcouriercorrelations2
+    secondrgedcrystalfock = purifiedcouriercorrelations2|>getoutspace
+    secondrgedcrystal::Crystal = secondrgedcrystalfock|>getcrystal
+    secondrgedspace::RealSpace = secondrgedcrystal|>getspace
+    secondrgedcrystal|>getunitcell|>visualize
+
+    @info("Computing local correlations...")
+    thirdcenter = [1/3,1/3] ∈ blockedspace
+    thirdhexagonalregion = gethexagonalregion(crystal=secondrgedcrystal, center=thirdcenter, metricspace=secondrgedspace)
+    thirdhexagonalregionfock = quantize(thirdhexagonalregion,1)
+    visualize(thirdhexagonalregion)
+
+    allregion3 = thirdhexagonalregion
+    visualize(allregion3)
+    visualize(secondrgedcrystal|>getunitcell)
+    if intersect(allregion3,firstrgedcrystal|>getunitcell) == secondrgedcrystal|>getunitcell
+        @info("cover the whole unitcell")
+    else
+        @error("the allregion cannot cover the whole unitcell ")
+    end
+
+    localcorrelations = regioncorrelations(secondrgedcorrelations,thirdhexagonalregionfock)
     localspectrum = localcorrelations|>eigspech
-    localspectrum|>visualize
-    localiso = localcorrelations|>modeselectionbycount(12)
+    display(visualize(localspectrum))
 
-    localwannierresults = localwannierseedslists(localiso)
+    filleddict,emptydict = separatefilledandemptymodes(localspectrum)
 
-    emptyseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:empty])] 
-    filledseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:filled])] 
-    courierseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in localwannierresults[:courier])]
+    sortedgroupfilledwifeval = sortgroupdictwifvalue(filleddict,false)
+    sortedgroupemptywifeval = sortgroupdictwifvalue(emptydict,true)
 
-    wannierempty = localwannierization(localiso[:empty], emptyseeds)
-    wannierfilled = localwannierization(localiso[:filled], filledseeds)
-    wanniercourier = localwannierization(localiso[:courier], courierseeds)
+    rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-thirdcenter)) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
+    sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
+    frozenrsmodes = sum([pair[2] for pair in sortedrsmode[1:7]])
+    frozenrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in frozenrsmodes)
+    visualize(frozenrsmodesoffset)
+    courierrsmodes = sum([pair[2] for pair in sortedrsmode[8:end]])
+    courierrsmodesoffset = Subset((mode|>getattr(:b))+(mode|>getattr(:r)) for mode in courierrsmodes)
+    visualize(courierrsmodesoffset)
 
-    shiftedlocalwannierresults =  Dict(:wannierempty => wannierempty, :wannierfilled => wannierfilled, :wanniercourier => wanniercourier,
-                :emptyseeds => emptyseeds, :filledseeds => filledseeds, :courierseeds => courierseeds,
-                :bempty=>localwannierseeds[:bempty],:bfilled=>localwannierseeds[:bfilled],:bcourier=>localwannierseeds[:bcourier])
+    sortedgroupfilledwifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupfilledwifeval],rev=true,by=x->x[1])
+    sortedgroupemptywifoverlap = sort([calculateavgoverlapofmodes(evalwifmodes,localspectrum,frozenrsmodes) for evalwifmodes in sortedgroupemptywifeval],rev=true,by=x->x[1])
 
-    wannierinfos[hexagonalregionfock] = shiftedlocalwannierresults
-end 
+    chosensortedgroupfilledwifoverlap = findmodeswiftotalno(sortedgroupfilledwifoverlap,div(length(frozenrsmodes),2))
+    chosensortedgroupemptywifoverlap = findmodeswiftotalno(sortedgroupemptywifoverlap,div(length(frozenrsmodes),2))
 
-thirdhexagonalregionfocklist = [thirdhexagonalregionfock, shiftedthirdhexagonalregion1fock, shiftedthirdhexagonalregion2fock]
+    chosenfilledmodes = sum([data[2] for data in chosensortedgroupfilledwifoverlap])
+    chosenemptymodes = sum([data[2] for data in chosensortedgroupemptywifoverlap])
+    chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
+    chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
 
-extendedwannierizedempty =  sum(wannierinfos[regionfock][:wannierempty] for regionfock in thirdhexagonalregionfocklist)
-extendedwannierizedfilled =  sum(wannierinfos[regionfock][:wannierfilled] for regionfock in thirdhexagonalregionfocklist)
-extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in thirdhexagonalregionfocklist)
-        
-origin = [0, 0] ∈ secondrgedspace
-refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    courierseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
+    localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+    wanniercourier = localwannierization(localisocourier, courierseeds)
 
-wannieremptyisometry = globalwannierfunction(secondrgedcorrelations,extendedwannierizedempty[:,refunictcellfockempty])
-wannierfilledisometry = globalwannierfunction(secondrgedcorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
-wanniercourierisometry = globalwannierfunction(secondrgedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
+    frozenseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
+    localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
+    wannierfrozen = localwannierization(localisoforzen, frozenseeds)
 
-couriercorrelations3 = wanniercourierisometry' * secondrgedcorrelations * wanniercourierisometry
-couriercorrelationspectrum3 = couriercorrelations3 |> crystalspectrum
-purifiedcorrelationspectrum3 = couriercorrelationspectrum3 |> roundingpurification
-purifiedcouriercorrelations3 = purifiedcorrelationspectrum3 |> CrystalFockMap
+    visualize(wanniercourier'*localcorrelations*wanniercourier|>eigspech)
 
-thirdrgedcorrelations = purifiedcouriercorrelations3
-thirdrgedcrystalfock = purifiedcouriercorrelations3|>getoutspace
-thirdrgedcrystal::Crystal = thirdrgedcrystalfock|>getcrystal
-thirdrgedspace::RealSpace = thirdrgedcrystal|>getspace
+    frozenseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
+    localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
+    wannierfrozen = localwannierization(localisoforzen, frozenseeds)
 
+    visualize(wannierfrozen'*localcorrelations*wannierfrozen|>eigspech)
 
-thirdrgedcrystal|>getunitcell|>visualize
+    localwannierresults =  Dict(:wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
+                    :frozenseeds => frozenseeds,:courierseeds => courierseeds)
+
+    wannierinfos =  Dict(thirdhexagonalregionfock=>localwannierresults)
+
+    wannierforzenisometry = globalwannierfunction(secondrgedcorrelations,wannierinfos[thirdhexagonalregionfock][:wannierfrozen])
+    wanniercourierisometry = globalwannierfunction(secondrgedcorrelations,wannierinfos[thirdhexagonalregionfock][:wanniercourier])
+
+    frozencorrelations = wannierforzenisometry' * secondrgedcorrelations * wannierforzenisometry
+    frozencorrelations|>eigspech|>visualize
+
+    couriercorrelations = wanniercourierisometry' * secondrgedcorrelations * wanniercourierisometry
+    couriercorrelations|>eigspech|>visualize
+
+    visualize(couriercorrelations|>getinspace|>getcrystal|>getunitcell)
+

@@ -58,6 +58,26 @@ groundstateprojector = groundstates|>crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
 H = CrystalFockMap(energyspectrum)
 
+function sortgroupdictwifvalue(dict::Dict{Mode, Float64},rev::Bool)
+    sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
+    # return sortedtupledata
+    refvalue = round(sortedtupledata[1][1],digits=10)
+    result = []
+    subresult = Subset(sortedtupledata[1][2])+Subset(sortedtupledata[2][2])
+    for pair in sortedtupledata
+        if round(pair[1],digits=10)==refvalue
+            subresult = subresult+Subset(pair[2])
+        else
+            append!(result,tuple([refvalue,subresult]))
+            refvalue = round(pair[1],digits=10)
+            subresult = Subset(pair[2])
+        end
+    end
+    append!(result,tuple([refvalue,subresult]))
+
+    return result
+end
+
 function sortgroupdictwifvaluethird(dict::Dict{Mode, Float64},rev::Bool)
     sortedtupledata = sort([(value,key) for (key,value) in dict],rev=rev,by=first)
     # return sortedtupledata
@@ -200,7 +220,7 @@ end
     # sortedemptymodeswifoverlap = sort(emptymodeswifoverlap,by=x->x[2],rev=true)
     # sortedemptymodeswifoverlap
     # rankedfilledandemptymodes = [pair[1][1]+pair[2][1] for pair in zip(sortedfilledmodeswifoverlap,sortedemptymodeswifoverlap) if length(pair[1][1]) == length(pair[2][1])]
-    chosenfrozenmodes = sum([data[1] for data in sortedfrozenmodeswifoverlap[1:8]])
+    chosenfrozenmodes = sum([data[1] for data in sortedfrozenmodeswifoverlap[1:5]])
     chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
     
 
@@ -553,4 +573,3 @@ end
     couriercorrelations|>eigspech|>visualize
 
     visualize(couriercorrelations|>getinspace|>getcrystal|>getunitcell)
-

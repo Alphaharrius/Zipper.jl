@@ -1,18 +1,61 @@
 using Zipper
 using LinearAlgebra
+
 triangular = RealSpace([sqrt(3)/2 -1/2; 0. 1.]')
 kspace = convert(MomentumSpace, triangular)
+[sqrt(3)/2 -1/2; 0. 1.]'*[2/(3*sqrt(3)), 1/(3*sqrt(3))]
+[sqrt(3)/2 -1/2; 0. 1.]'*[1/(3*sqrt(3)), 4/(6*sqrt(3))]
+[1 0; 1/2 sqrt(3)/2]'*[1/3, 0]
+[1 0; 1/2 sqrt(3)/2]'*[0, 1/3]
 
-pa = [1/3, 2/3] ∈ triangular
-pb = [2/3, 1/3] ∈ triangular
+pa = [2/(3*sqrt(3)), 1/(3*sqrt(3))] ∈ triangular
+pb = [1/(3*sqrt(3)), 2/(3*sqrt(3))] ∈ triangular
 pc = (pa + pb) / 2
 spatialsnappingcalibration((pa, pb, pc))
+
+pa|>euclidean
+pb|>euclidean
 
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
+visualize(unitcell)
+
+triangular = RealSpace([1 0; 1/2 sqrt(3)/2]')
+kspace = convert(MomentumSpace, triangular)
+
+    pa = [1/3, 0] ∈ triangular
+    pb = [0, 1/3] ∈ triangular
+    pc = [0, 2/3] ∈ triangular
+    pd = [1/3, 2/3] ∈ triangular
+    pe = [2/3, 1/3] ∈ triangular
+    pf = [2/3, 0] ∈ triangular
+
+    pg = (pa + pb + pc + pd + pe + pf) / 6
+    spatialsnappingcalibration((pa, pb, pc, pd, pe, pf, pg))
+
+    pa|>euclidean
+
+    unitcell = Subset(pa, pb, pc, pd, pe, pf)
+
+
 crystal = Crystal(unitcell, [24, 24])
+# collect(crystal|>getspace|>getbasisvectors)
+# new1 = [2/3, -1/3] ∈ triangular
+# new2 = [-1/3, 2/3] ∈ triangular
+# new3 = [0, 0] ∈ triangular
+# new4 = [1/3, 1/3] ∈ triangular
+# parallelogramref = Subset(new1,new2,new3,new4)
+# new1.pos-new1.pos
+# new1.pos
+# [sqrt(3)/2 -1/2; 0. 1.]'*new1.pos
+c3
+inv([2/3 -1/3; -1/3 2/3]')
+
+res = gethexagonalregion(rot = inv([2/3 -1/3; -1/3 2/3]'),crystal=crystal, center=new3, metricspace=crystal|>getspace)
+visualize(res)
+
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes

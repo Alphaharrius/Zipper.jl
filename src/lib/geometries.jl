@@ -166,6 +166,30 @@ function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealS
 end
 export getsphericalregion
 
+# function checkwithinparallelogram(shifted,vector:: Vector{Float64})
+#     result = []
+#     for (ind,ele) in enumerate(vector)
+#         if shifted[ind]+0<ele<shifted[ind]+1
+#             append!(result,true)
+#         else
+#             append!(result,false)
+#         end
+#     end
+#     return all(result)
+# end
+
+function checkwithinparallelogram(vector:: Vector{Float64})
+    result = []
+    for ele in vector
+        if 0<ele<1
+            append!(result,true)
+        else
+            append!(result,false)
+        end
+    end
+    return all(result)
+end
+
 """
     gethexagonalregion(; crystal::Crystal, center::Offset, metricspace::RealSpace)
 
@@ -173,19 +197,25 @@ Get the hexagonal region ceneter at a given origin for honeycomb lattice. Here w
 specific to the case of honeycomb
 """
 
-function gethexagonalregion(; crystal::Crystal, center::Offset, metricspace::RealSpace)
-    # c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+function gethexagonalregion(; rot,crystal::Crystal, center::Offset, metricspace::RealSpace)
+    c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    c3 = c6^2
+
     shift1 = [-2,0]∈metricspace
     shift2 = [0,-2]∈metricspace
     shift3 = [-2,-2]∈metricspace
     generatinglength::Integer = 2
     generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
-    crystalregion::Region = generatingcrystal|>sitepoints
-    noofmodesinunitcell = length(crystal|>getunitcell)
-    wholeregion::Region = union(crystalregion,crystalregion.+shift1,crystalregion.+shift2,crystalregion.+shift3)
-    sortedptswifdist = sort([(norm(euclidean(point-center)),point) for point in wholeregion],by=first)
-    return Subset([pair[2] for pair in sortedptswifdist[1:noofmodesinunitcell]])
-    # return wholeregion
+    refregion = generatingcrystal|>sitepoints
+    # unitcell::Region = crystal|>getunitcell
+    # noofmodesinunitcell = length(crystal|>getunitcell)
+    wholeregionatorig::Region = union(refregion,refregion.+shift1,refregion.+shift2,refregion.+shift3)
+    shiftedwholeregion::Region = wholeregionatorig.-center
+    offsetswifrotpos = [(offset,rot*offset.pos) for offset in shiftedwholeregion]
+    parallelogramregion::Region =  Subset([pair[1] for pair in offsetswifrotpos if checkwithinparallelogram(pair[2])])
+    centerregion = parallelogramregion+c3*parallelogramregion+(c3)^2*parallelogramregion
+
+    return  centerregion.+center
 end
 export gethexagonalregion
 

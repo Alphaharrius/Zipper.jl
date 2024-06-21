@@ -191,10 +191,9 @@ function checkwithinparallelogram(vector:: Vector{Float64})
 end
 
 """
-    gethexagonalregion(; crystal::Crystal, center::Offset, metricspace::RealSpace)
+    gethexagonalregion(; rot,crystal::Crystal, center::Offset, metricspace::RealSpace)
 
-Get the hexagonal region ceneter at a given origin for honeycomb lattice. Here we choose c6 as the symmetry which is 
-specific to the case of honeycomb
+Get the hexagonal region ceneter at a given origin for honeycomb lattice. 
 """
 
 function gethexagonalregion(; rot,crystal::Crystal, center::Offset, metricspace::RealSpace)

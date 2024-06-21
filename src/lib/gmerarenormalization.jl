@@ -253,36 +253,6 @@ function choosemodesforwannierization(rankedandgroupedmodes,truncatedeigenvec,th
 end
 export choosemodesforwannierization
 
-# function findmaxofoverlap(truncatedeigenvec, chosenmodes,modes)
-#     return maximum(abs.((columns(truncatedeigenvec,FockSpace(chosenmodes))'*columns(truncatedeigenvec,FockSpace(modes))).rep)) 
-# end 
-
-# function choosemodesforwannierization(rankedandgroupedmodes,truncatedeigenvec,threshold::Float64,noofmodes::Number)
-#     chosenmodes = rankedandgroupedmodes[1]
-#     for modes in rankedandgroupedmodes[2:end]
-#         if length(chosenmodes)<noofmodes
-#             if length(chosenmodes)+length(modes)>noofmodes
-#                 @info("more than need")
-#             else
-#                 max = findmaxofoverlap(truncatedeigenvec, chosenmodes,modes)
-#                 if max<threshold
-#                     chosenmodes = chosenmodes+modes
-#                     chosencolumns = columns(truncatedeigenvec, FockSpace(chosenmodes))
-#                     U, Σ, Vt = svd(chosencolumns)
-#                     minsvdvalue::Number = minimum(v for (_, v) in Σ)
-#                     @info("min svdvalue during checking after", minsvdvalue)
-#                 else
-#                     @info("reject this candidate due to small max", max)
-#                 end
-#             end
-#         else
-#             return chosenmodes
-#         end
-#     end
-#     @error("threshold too large")
-# end
-# export choosemodesforwannierization
-
 function findfrozenandcourierrsmode(sortedrsmode,noofmodes)
     allrsmodes = sum([pair[2] for pair in sortedrsmode])
     frozenrsmodes = sortedrsmode[1][2]
@@ -431,377 +401,1171 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
 end
 export gmeracrystalisometries
 
-function firstgmerastep(correlations,threshold::Float64,nooffrozenrsmodes::Number,Asublatticeunitcellmodes::Subset{Mode},Bsublatticeunitcellmodes::Subset{Mode})
-    crystalfock = correlations|>getoutspace
-    crystal::Crystal = crystalfock|>getcrystal
-    space::RealSpace = crystal|>getspace
-
-    @info("Computing local correlations...")
-    firstcenter = [0,0] ∈ space
-    firsthexagonalregion = gethexagonalregion(crystal=crystal, center=firstcenter, metricspace=space)
-    firsthexagonalregionfock = quantize(firsthexagonalregion,1)
-    
-    shiftedfirstcenter1 = [1,0] ∈ space
-    shiftedfirsthexagonalregion1 = firsthexagonalregion.+shiftedfirstcenter1
-    shiftedfirsthexagonalregion1fock = quantize(shiftedfirsthexagonalregion1,1)
-    
-    shiftedfirstcenter2 = [0,1] ∈ space
-    shiftedfirsthexagonalregion2 = firsthexagonalregion.+shiftedfirstcenter2
-    shiftedfirsthexagonalregion2fock = quantize(shiftedfirsthexagonalregion2,1)
-    
-    shiftedfirstcenter3 = [1,1] ∈ space
-    shiftedfirsthexagonalregion3 = firsthexagonalregion.+shiftedfirstcenter3
-    shiftedfirsthexagonalregion3fock = quantize(shiftedfirsthexagonalregion3,1)
-    
-    allregion = firsthexagonalregion+shiftedfirsthexagonalregion1+shiftedfirsthexagonalregion2+shiftedfirsthexagonalregion3
-    if intersect(allregion,crystal|>getunitcell) == crystal|>getunitcell
-        @info("cover the whole unitcell")
-    else
-        @error("the allregion cannot cover the whole unitcell ")
+function rankedandgroupoffsets(hexagonalregion::Subset{Offset},chosen::Number)
+    center = hexagonalregion|>getcenter
+    offsetswifdist = sort([(offset,norm((offset|>euclidean)-(center|>euclidean))) for offset in hexagonalregion],by=x->x[2])
+    ref = round(offsetswifdist[1][2],digits=5)
+    result = []
+    samedist = []
+    for offsetwifdist in offsetswifdist
+        if round(offsetwifdist[2],digits=5) == ref
+            push!(samedist,offsetwifdist[1])
+        else
+            ref = round(offsetwifdist[2],digits=5)
+            push!(result,samedist)
+            samedist = []
+            push!(samedist,offsetwifdist[1])
+        end
     end
+    return Subset([offset for offsets in result[1:chosen] for offset in offsets])
+end
+export rankedandgroupoffsets
 
-    localcorrelations = regioncorrelations(correlations,firsthexagonalregionfock)
-    localspectrum = localcorrelations|>eigspech
+
+function firstgmerastepbycount(blockedcorrelations,noofcouriermodes::Number)
+    blockedcrystal = blockedcorrelations|>getoutspace|>getcrystal
+    blockedcrystalfock = blockedcorrelations|>getoutspace
+    blockedspace::RealSpace = blockedcrystal|>getspace
+    
+    refrot = inv([2/3 -1/3; -1/3 2/3]')
+    c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    c3 = c6^2
+
+    firstcenter = [0,0] ∈ blockedspace
+    firsthexagonalregion = gethexagonalregion(rot = refrot,crystal=blockedcrystal, center=firstcenter, metricspace=blockedspace)
+    firsthexagonalregionfock = quantize(firsthexagonalregion,1)
+    rgshiftedcenter1 = [2/3,-1/3] ∈ blockedspace
+    firstrgshiftedhexagonalregion1 = firsthexagonalregion.+rgshiftedcenter1
+    rgshiftedcenter2 = [1/3,1/3] ∈ blockedspace
+    firstrgshiftedhexagonalregion2 = firsthexagonalregion.+rgshiftedcenter2
+
+    siteAregion1 = intersect(intersect(firsthexagonalregion,firstrgshiftedhexagonalregion1 ),firstrgshiftedhexagonalregion2)
+    siteAregionfock1 = quantize(siteAregion1,1)
+    siteAregion2 = c3*siteAregion1
+    siteAregionfock2 = quantize(siteAregion2,1)
+    siteAregion3 = (c3)*siteAregion2
+    siteAregionfock3 = quantize(siteAregion3,1)
+
+    siteBregion1 = (c6)*siteAregion1
+    siteBregionfock1 = quantize(siteBregion1,1)
+    siteBregion2 = (c3)*siteBregion1
+    siteBregionfock2 = quantize(siteBregion2,1)
+    siteBregion3 = (c3)*siteBregion2
+    siteBregionfock3 = quantize(siteBregion3,1)
+
+    nooffrozenmodes = length(firsthexagonalregionfock|>orderedmodes)-noofcouriermodes
+    nooffilledmodes = div(nooffrozenmodes,2)
+    noofemptymodes = nooffilledmodes
+    @info("no of filled modes = ",nooffilledmodes)
+    @info("no of courier modes = ",noofcouriermodes)
+    @info("no of empty modes = ",noofemptymodes)
+
+    localcorrelations = regioncorrelations(blockedcorrelations,firsthexagonalregionfock)
+    localspectrum = localcorrelations|>eigspec
     display(localspectrum|>visualize)
-    filleddict,emptydict = separatefilledandemptymodes(localspectrum)
-    rankedandgroupedfilledmodes = sortgroupdictwifvalue(filleddict,false)
-    rankedandgroupedemptymodes = sortgroupdictwifvalue(emptydict,true)
+    localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+    localcourierisometry = localstates[2]|>FockMap
+    localfilledisometry = localstates[1]|>FockMap
+    localemptyisometry = localstates[3]|>FockMap
+    courierproj = localcourierisometry*localcourierisometry'
 
-    rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-firstcenter)) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
-    sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
-    frozenrsmodes, courierrsmodes = findfrozenandcourierrsmode(sortedrsmode,nooffrozenrsmodes)
-    filledrsmodes,emptyrsmodes = distinguishABsublatticemodesforhexagon(frozenrsmodes,Asublatticeunitcellmodes,Bsublatticeunitcellmodes)
+    nooflocalcourierseeds = div(noofcouriermodes,6)
+    reduandancy = length((siteAregionfock1|>orderedmodes))-nooflocalcourierseeds
 
-    filledseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in filledrsmodes)]
-    emptyseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in emptyrsmodes)]
-    frozenseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
-    courierseeds = idmap(firsthexagonalregionfock, firsthexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
+    localAcorrelations1 = columns(rows(courierproj,siteAregionfock1),siteAregionfock1)
+    localAstates1 = getregionstates(localcorrelations=localAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds1 = localAstates1[2]
 
-    truncatedeigenvectofilled = rows((localspectrum|>geteigenvectors),FockSpace(filledrsmodes))
-    truncatedeigenvectoempty = rows((localspectrum|>geteigenvectors),FockSpace(emptyrsmodes))
+    localAcorrelations2 = columns(rows(courierproj,siteAregionfock2),siteAregionfock2)
+    localAstates2 = getregionstates(localcorrelations=localAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds2 = localAstates2[2]
 
-    # rankedandgroupedfilledmodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectofilled,modes) for modes in rankedandgroupedfilledmodes],by=first,rev=true)]
-    # rankedandgroupedemptymodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectoempty,modes) for modes in rankedandgroupedemptymodes],by=first,rev=true)]
 
-    chosenfilledmodes = choosemodesforwannierization(rankedandgroupedfilledmodes,truncatedeigenvectofilled,threshold,div(nooffrozenrsmodes,2))
-    chosenemptymodes = choosemodesforwannierization(rankedandgroupedemptymodes,truncatedeigenvectoempty,threshold,div(nooffrozenrsmodes,2))
-    chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
-    chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
+    localAcorrelations3 = columns(rows(courierproj,siteAregionfock3),siteAregionfock3)
+    localAstates3 = getregionstates(localcorrelations=localAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds3 = localAstates3[2]
 
-    localisofilled = columns(localspectrum |> geteigenvectors, FockSpace(chosenfilledmodes))
-    localisoempty = columns(localspectrum |> geteigenvectors, FockSpace(chosenemptymodes))
-    localisofrozen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
-    localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+    allAseedsstate = localAseeds1+localAseeds2+localAseeds3
 
-    wannierfilled = localwannierization(localisofilled, filledseeds)
-    wannierempty = localwannierization(localisoempty, emptyseeds)
-    wannierfrozen = localwannierization(localisofrozen, frozenseeds)
-    wanniercourier = localwannierization(localisocourier, courierseeds)
+    localBcorrelations1 = columns(rows(courierproj,siteBregionfock1),siteBregionfock1)
+    localBstates1 = getregionstates(localcorrelations=localBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds1 = localBstates1[2]
 
-    (wannierfrozen'*localcorrelations*wannierfrozen)|>eigspec|>visualize|>display
+    localBcorrelations2 = columns(rows(courierproj,siteBregionfock2),siteBregionfock2)
+    localBstates2 = getregionstates(localcorrelations=localBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds2 = localBstates2[2]
 
-    localwannierresults =  Dict(:wannierfilled => wannierfilled, :wannierempty => wannierempty,
-                                :wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
-                                :filledseeds => filledseeds,:emptyseeds => emptyseeds,
-                                :frozenseeds => frozenseeds,:courierseeds => courierseeds)
+    localBcorrelations3 = columns(rows(courierproj,siteBregionfock3),siteBregionfock3)
+    localBstates3 = getregionstates(localcorrelations=localBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds3 = localBstates3[2]
+
+    allBseedsstate = localBseeds1+localBseeds2+localBseeds3
+
+    allseedsstates = (allAseedsstate+allBseedsstate)
+    courierseeds = allseedsstates|>FockMap
+
+    wanniercourier = localwannierization(localcourierisometry, courierseeds)
+    display((wanniercourier'*localcorrelations*wanniercourier)|>eigspec|>visualize)
+
+    localwannierresults =  Dict(:wanniercourier => wanniercourier,:localfilledisometry => localfilledisometry,
+                            :localemptyisometry => localemptyisometry, :courierseeds => courierseeds)
 
     wannierinfos =  Dict(firsthexagonalregionfock=>localwannierresults)
 
-    firstshiftedhexagonalregionfocklist = [(shiftedfirstcenter1,shiftedfirsthexagonalregion1fock), (shiftedfirstcenter2,shiftedfirsthexagonalregion2fock), (shiftedfirstcenter3,shiftedfirsthexagonalregion3fock)]
-
-    for (shifted,hexagonalregionfock) in firstshiftedhexagonalregionfocklist
-        localcorrelations = regioncorrelations(correlations,hexagonalregionfock)
-        localspectrum = localcorrelations|>eigspech
-        filleddict,emptydict = separatefilledandemptymodes(localspectrum)
-        rankedandgroupedfilledmodes = sortgroupdictwifvalue(filleddict,false)
-        rankedandgroupedemptymodes = sortgroupdictwifvalue(emptydict,true)
+    shiftedfirstcenter1 = [1,0] ∈ blockedspace
+    shiftedfirstcenter2 = [0,1] ∈ blockedspace
+    shiftedfirstcenter3 = [1,1] ∈ blockedspace
+    
+    firstshiftedhexagonalcenters = [shiftedfirstcenter1, shiftedfirstcenter2, shiftedfirstcenter3]
+    
+    for hexagonalcenter in firstshiftedhexagonalcenters
+        shiftedfirsthexagonalregion = firsthexagonalregion.+hexagonalcenter
+        shiftedfirsthexagonalregionfock = quantize(shiftedfirsthexagonalregion,1)
+        c6recenter = recenter(c6,hexagonalcenter)
+        c3recenter = recenter(c3,hexagonalcenter)
         
-        rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-(firstcenter+shifted))) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
-        sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
-        frozenrsmodes, courierrsmodes = findfrozenandcourierrsmode(sortedrsmode,nooffrozenrsmodes)
-        filledrsmodes,emptyrsmodes = distinguishABsublatticemodesforhexagon(frozenrsmodes,Asublatticeunitcellmodes,Bsublatticeunitcellmodes)
-    
-        filledseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in filledrsmodes)]
-        emptyseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in emptyrsmodes)]
-        courierseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
-        frozenseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
-    
-        truncatedeigenvectofilled = rows((localspectrum|>geteigenvectors),FockSpace(filledrsmodes))
-        truncatedeigenvectoempty = rows((localspectrum|>geteigenvectors),FockSpace(emptyrsmodes))
+        shiftedsiteAregion1 = siteAregion1.+hexagonalcenter
+        shiftedsiteAregionfock1 = quantize(shiftedsiteAregion1,1)
+        shiftedsiteAregion2 = (c3recenter)*shiftedsiteAregion1
+        shiftedsiteAregionfock2 = quantize(shiftedsiteAregion2,1)
+        shiftedsiteAregion3 = (c3recenter)*shiftedsiteAregion2
+        shiftedsiteAregionfock3 = quantize(shiftedsiteAregion3,1)
 
-        # rankedandgroupedfilledmodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectofilled,modes) for modes in rankedandgroupedfilledmodes],by=first,rev=true)]
-        # rankedandgroupedemptymodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectoempty,modes) for modes in rankedandgroupedemptymodes],by=first,rev=true)]
+        shiftedsiteBregion1 = (c6recenter)*shiftedsiteAregion1
+        shiftedsiteBregionfock1 = quantize(shiftedsiteBregion1,1)
+        shiftedsiteBregion2 = (c3recenter)*shiftedsiteBregion1
+        shiftedsiteBregionfock2 = quantize(shiftedsiteBregion2,1)
+        shiftedsiteBregion3 = (c3recenter)*shiftedsiteBregion2
+        shiftedsiteBregionfock3 = quantize(shiftedsiteBregion3,1)
 
-        chosenfilledmodes = choosemodesforwannierization(rankedandgroupedfilledmodes,truncatedeigenvectofilled,threshold,div(nooffrozenrsmodes,2))
-        chosenemptymodes = choosemodesforwannierization(rankedandgroupedemptymodes,truncatedeigenvectoempty,threshold,div(nooffrozenrsmodes,2))
-        chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
-        chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
-    
-        localisofilled = columns(localspectrum |> geteigenvectors, FockSpace(chosenfilledmodes))
-        localisoempty = columns(localspectrum |> geteigenvectors, FockSpace(chosenemptymodes))
-        localisoforzen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
-        localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
-    
-        wannierfilled = localwannierization(localisofilled, filledseeds)
-        wannierempty = localwannierization(localisoempty, emptyseeds)
-        wannierfrozen = localwannierization(localisoforzen, frozenseeds)
-        wanniercourier = localwannierization(localisocourier, courierseeds)
-        
-        shiftedlocalwannierresults =  Dict(:wannierfilled => wannierfilled, :wannierempty => wannierempty,
-                                    :wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
-                                    :filledseeds => filledseeds,:emptyseeds => emptyseeds,
-                                    :frozenseeds => frozenseeds,:courierseeds => courierseeds)
-    
-        wannierinfos[hexagonalregionfock] =  shiftedlocalwannierresults
-    end 
+        shiftedlocalcorrelations = regioncorrelations(blockedcorrelations,shiftedfirsthexagonalregionfock)
+        shiftedlocalstates = getregionstates(localcorrelations=shiftedlocalcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+        shiftedlocalcourierisometry = shiftedlocalstates[2]|>FockMap
+        shiftedlocalfilledisometry = shiftedlocalstates[1]|>FockMap
+        shiftedlocalemptyisometry = shiftedlocalstates[3]|>FockMap
+        shiftedcourierproj = shiftedlocalcourierisometry*shiftedlocalcourierisometry'
 
-    firsthexagonalregionfocklist = [firsthexagonalregionfock, shiftedfirsthexagonalregion1fock, shiftedfirsthexagonalregion2fock, shiftedfirsthexagonalregion3fock]
+        shiftedlocalAcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock1),shiftedsiteAregionfock1)
+        shiftedlocalAstates1 = getregionstates(localcorrelations=shiftedlocalAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds1 = shiftedlocalAstates1[2]
 
-    extendedwannierizedfrozen =  sum(wannierinfos[regionfock][:wannierfrozen] for regionfock in firsthexagonalregionfocklist)
+        shiftedlocalAcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock2),shiftedsiteAregionfock2)
+        shiftedlocalAstates2 = getregionstates(localcorrelations=shiftedlocalAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds2 = shiftedlocalAstates2[2]
+
+        shiftedlocalAcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock3),shiftedsiteAregionfock3)
+        shiftedlocalAstates3 = getregionstates(localcorrelations=shiftedlocalAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds3 = shiftedlocalAstates3[2]
+
+        shiftedallAseedsstate = shiftedlocalAseeds1+shiftedlocalAseeds2+shiftedlocalAseeds3
+
+        shiftedlocalBcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock1),shiftedsiteBregionfock1)
+        shiftedlocalBstates1 = getregionstates(localcorrelations=shiftedlocalBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds1 = shiftedlocalBstates1[2]
+
+        shiftedlocalBcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock2),shiftedsiteBregionfock2)
+        shiftedlocalBstates2 = getregionstates(localcorrelations=shiftedlocalBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds2 = shiftedlocalBstates2[2]
+
+        shiftedlocalBcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock3),shiftedsiteBregionfock3)
+        shiftedlocalBstates3 = getregionstates(localcorrelations=shiftedlocalBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds3 = shiftedlocalBstates3[2]
+
+        shiftedallBseedsstate = shiftedlocalBseeds1+shiftedlocalBseeds2+shiftedlocalBseeds3
+
+        shiftedallseedsstates = (shiftedallAseedsstate+shiftedallBseedsstate)
+        shiftedcourierseeds = shiftedallseedsstates|>FockMap
+
+        shiftedwanniercourier = localwannierization(shiftedlocalcourierisometry, shiftedcourierseeds)
+
+        shiftedlocalwannierresults =  Dict(:wanniercourier => shiftedwanniercourier, :localfilledisometry => shiftedlocalfilledisometry,
+                                        :localemptyisometry => shiftedlocalemptyisometry, :courierseeds => shiftedcourierseeds)
+        wannierinfos[shiftedfirsthexagonalregionfock] =  shiftedlocalwannierresults
+    end
+
+    ref = [quantize(firsthexagonalregion.+hexagonalcenter,1) for hexagonalcenter in firstshiftedhexagonalcenters]
+    firsthexagonalregionfocklist = [firsthexagonalregionfock,ref...]
+
     extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in firsthexagonalregionfocklist)
+    extendedwannierizedfilled =  sum(wannierinfos[regionfock][:localfilledisometry] for regionfock in firsthexagonalregionfocklist)
+    extendedwannierizedempty =  sum(wannierinfos[regionfock][:localemptyisometry] for regionfock in firsthexagonalregionfocklist)
+ 
                 
-    origin = [0, 0] ∈ space
-    refunictcellfockfrozen = FockSpace(Subset(mode for mode in extendedwannierizedfrozen |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    origin = [0, 0] ∈ blockedspace
     refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
 
-    wannierforzenisometry = globalwannierfunction(correlations,extendedwannierizedfrozen[:,refunictcellfockfrozen])
-    wanniercourierisometry = globalwannierfunction(correlations,extendedwannierizedcourier[:,refunictcellfockcourier])
+    wanniercourierisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
+    globalisometryfilled = globalwannierfunction(blockedcorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
+    globalisometryempty = globalwannierfunction(blockedcorrelations,extendedwannierizedempty[:,refunictcellfockempty])
 
-    couriercorrelations = wanniercourierisometry' * correlations * wanniercourierisometry
-    couriercorrelations|>eigspech|>visualize|>display
+    couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
+    # display(couriercorrelations|>eigspech|>visualize)
+
+    filledcorrelations = globalisometryfilled' * blockedcorrelations * globalisometryfilled
+    # display(filledcorrelations|>eigspech|>visualize)
+
+    couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+
+    purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+    purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
+
+    firstgmeracorrelations = purifiedcouriercorrelations
+    return firstgmeracorrelations,globalisometryfilled,globalisometryempty,wanniercourierisometry
+end
+export firstgmerastepbycount
+
+function firstgmerastepbythreshold(blockedcorrelations,threshold::Float64)
+    blockedcrystal = blockedcorrelations|>getoutspace|>getcrystal
+    blockedcrystalfock = blockedcorrelations|>getoutspace
+    blockedspace::RealSpace = blockedcrystal|>getspace
+    
+    refrot = inv([2/3 -1/3; -1/3 2/3]')
+    c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    c3 = c6^2
+
+    firstcenter = [0,0] ∈ blockedspace
+    firsthexagonalregion = gethexagonalregion(rot = refrot,crystal=blockedcrystal, center=firstcenter, metricspace=blockedspace)
+    firsthexagonalregionfock = quantize(firsthexagonalregion,1)
+    rgshiftedcenter1 = [2/3,-1/3] ∈ blockedspace
+    firstrgshiftedhexagonalregion1 = firsthexagonalregion.+rgshiftedcenter1
+    rgshiftedcenter2 = [1/3,1/3] ∈ blockedspace
+    firstrgshiftedhexagonalregion2 = firsthexagonalregion.+rgshiftedcenter2
+
+    siteAregion1 = intersect(intersect(firsthexagonalregion,firstrgshiftedhexagonalregion1 ),firstrgshiftedhexagonalregion2)
+    siteAregionfock1 = quantize(siteAregion1,1)
+    siteAregion2 = c3*siteAregion1
+    siteAregionfock2 = quantize(siteAregion2,1)
+    siteAregion3 = (c3)*siteAregion2
+    siteAregionfock3 = quantize(siteAregion3,1)
+
+    siteBregion1 = (c6)*siteAregion1
+    siteBregionfock1 = quantize(siteBregion1,1)
+    siteBregion2 = (c3)*siteBregion1
+    siteBregionfock2 = quantize(siteBregion2,1)
+    siteBregion3 = (c3)*siteBregion2
+    siteBregionfock3 = quantize(siteBregion3,1)
+
+    localcorrelations = regioncorrelations(blockedcorrelations,firsthexagonalregionfock)
+    localspectrum = localcorrelations|>eigspec
+    display(localspectrum|>visualize)
+
+    reffilledmodes = Subset([m for (m, v) in localspectrum|>geteigenvalues if norm(v) < threshold])
+    refemptymodes = Subset([m for (m, v) in localspectrum|>geteigenvalues if norm(v) > 1-threshold])
+
+    if length(reffilledmodes)%3==0
+        nooffilledmodes = length(reffilledmodes)
+    else
+        nooffilledmodes = length(reffilledmodes)-(length(reffilledmodes)%3)
+    end
+    # if length(refemptymodes)%3==0
+    #     noofemptymodes = length(refemptymodes)
+    # else
+    #     noofemptymodes = length(refemptymodes)-(length(refemptymodes)%3)
+    # end    
+    noofemptymodes = nooffilledmodes
+    nooffrozenmodes = nooffilledmodes + noofemptymodes
+    noofcouriermodes = length(firsthexagonalregionfock|>orderedmodes)-nooffrozenmodes
+    @info("no of filled modes = ",nooffilledmodes)
+    @info("no of courier modes = ",noofcouriermodes)
+    @info("no of empty modes = ",noofemptymodes)
+
+    rankedmodeswifeval = sort([(m,norm(v)) for (m, v) in localspectrum|>geteigenvalues],by=x->x[2])
+    pickedfilledeval = rankedmodeswifeval[nooffilledmodes][2]
+    pickedemptyeval = rankedmodeswifeval[end-noofemptymodes+1][2]
+        
+    localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+    localcourierisometry = localstates[2]|>FockMap
+    localfilledisometry = localstates[1]|>FockMap
+    localemptyisometry = localstates[3]|>FockMap
+    courierproj = localcourierisometry*localcourierisometry'
+
+    nooflocalcourierseeds = div(noofcouriermodes,6)
+    reduandancy = length((siteAregionfock1|>orderedmodes))-nooflocalcourierseeds
+
+    localAcorrelations1 = columns(rows(courierproj,siteAregionfock1),siteAregionfock1)
+    localAstates1 = getregionstates(localcorrelations=localAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds1 = localAstates1[2]
+
+    localAcorrelations2 = columns(rows(courierproj,siteAregionfock2),siteAregionfock2)
+    localAstates2 = getregionstates(localcorrelations=localAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds2 = localAstates2[2]
+
+
+    localAcorrelations3 = columns(rows(courierproj,siteAregionfock3),siteAregionfock3)
+    localAstates3 = getregionstates(localcorrelations=localAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds3 = localAstates3[2]
+
+    allAseedsstate = localAseeds1+localAseeds2+localAseeds3
+
+    localBcorrelations1 = columns(rows(courierproj,siteBregionfock1),siteBregionfock1)
+    localBstates1 = getregionstates(localcorrelations=localBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds1 = localBstates1[2]
+
+    localBcorrelations2 = columns(rows(courierproj,siteBregionfock2),siteBregionfock2)
+    localBstates2 = getregionstates(localcorrelations=localBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds2 = localBstates2[2]
+
+    localBcorrelations3 = columns(rows(courierproj,siteBregionfock3),siteBregionfock3)
+    localBstates3 = getregionstates(localcorrelations=localBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds3 = localBstates3[2]
+
+    allBseedsstate = localBseeds1+localBseeds2+localBseeds3
+
+    allseedsstates = (allAseedsstate+allBseedsstate)
+    courierseeds = allseedsstates|>FockMap
+
+    @info("wannierizing local courier state")
+    wanniercourier = localwannierization(localcourierisometry, courierseeds)
+    display((wanniercourier'*localcorrelations*wanniercourier)|>eigspec|>visualize)
+
+    localwannierresults =  Dict(:wanniercourier => wanniercourier,:localfilledisometry => localfilledisometry,
+                            :localemptyisometry => localemptyisometry, :courierseeds => courierseeds)
+
+    wannierinfos =  Dict(firsthexagonalregionfock=>localwannierresults)
+
+    shiftedfirstcenter1 = [1,0] ∈ blockedspace
+    shiftedfirstcenter2 = [0,1] ∈ blockedspace
+    shiftedfirstcenter3 = [1,1] ∈ blockedspace
+    
+    firstshiftedhexagonalcenters = [shiftedfirstcenter1, shiftedfirstcenter2, shiftedfirstcenter3]
+    
+    for hexagonalcenter in firstshiftedhexagonalcenters
+        shiftedfirsthexagonalregion = firsthexagonalregion.+hexagonalcenter
+        shiftedfirsthexagonalregionfock = quantize(shiftedfirsthexagonalregion,1)
+        c6recenter = recenter(c6,hexagonalcenter)
+        c3recenter = recenter(c3,hexagonalcenter)
+        
+        shiftedsiteAregion1 = siteAregion1.+hexagonalcenter
+        shiftedsiteAregionfock1 = quantize(shiftedsiteAregion1,1)
+        shiftedsiteAregion2 = (c3recenter)*shiftedsiteAregion1
+        shiftedsiteAregionfock2 = quantize(shiftedsiteAregion2,1)
+        shiftedsiteAregion3 = (c3recenter)*shiftedsiteAregion2
+        shiftedsiteAregionfock3 = quantize(shiftedsiteAregion3,1)
+
+        shiftedsiteBregion1 = (c6recenter)*shiftedsiteAregion1
+        shiftedsiteBregionfock1 = quantize(shiftedsiteBregion1,1)
+        shiftedsiteBregion2 = (c3recenter)*shiftedsiteBregion1
+        shiftedsiteBregionfock2 = quantize(shiftedsiteBregion2,1)
+        shiftedsiteBregion3 = (c3recenter)*shiftedsiteBregion2
+        shiftedsiteBregionfock3 = quantize(shiftedsiteBregion3,1)
+
+        shiftedlocalcorrelations = regioncorrelations(blockedcorrelations,shiftedfirsthexagonalregionfock)
+        shiftedlocalstates = getregionstates(localcorrelations=shiftedlocalcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+        shiftedlocalcourierisometry = shiftedlocalstates[2]|>FockMap
+        shiftedlocalfilledisometry = shiftedlocalstates[1]|>FockMap
+        shiftedlocalemptyisometry = shiftedlocalstates[3]|>FockMap
+        shiftedcourierproj = shiftedlocalcourierisometry*shiftedlocalcourierisometry'
+
+        shiftedlocalAcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock1),shiftedsiteAregionfock1)
+        shiftedlocalAstates1 = getregionstates(localcorrelations=shiftedlocalAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds1 = shiftedlocalAstates1[2]
+
+        shiftedlocalAcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock2),shiftedsiteAregionfock2)
+        shiftedlocalAstates2 = getregionstates(localcorrelations=shiftedlocalAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds2 = shiftedlocalAstates2[2]
+
+        shiftedlocalAcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock3),shiftedsiteAregionfock3)
+        shiftedlocalAstates3 = getregionstates(localcorrelations=shiftedlocalAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds3 = shiftedlocalAstates3[2]
+
+        shiftedallAseedsstate = shiftedlocalAseeds1+shiftedlocalAseeds2+shiftedlocalAseeds3
+
+        shiftedlocalBcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock1),shiftedsiteBregionfock1)
+        shiftedlocalBstates1 = getregionstates(localcorrelations=shiftedlocalBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds1 = shiftedlocalBstates1[2]
+
+        shiftedlocalBcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock2),shiftedsiteBregionfock2)
+        shiftedlocalBstates2 = getregionstates(localcorrelations=shiftedlocalBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds2 = shiftedlocalBstates2[2]
+
+        shiftedlocalBcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock3),shiftedsiteBregionfock3)
+        shiftedlocalBstates3 = getregionstates(localcorrelations=shiftedlocalBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds3 = shiftedlocalBstates3[2]
+
+        shiftedallBseedsstate = shiftedlocalBseeds1+shiftedlocalBseeds2+shiftedlocalBseeds3
+
+        shiftedallseedsstates = (shiftedallAseedsstate+shiftedallBseedsstate)
+        shiftedcourierseeds = shiftedallseedsstates|>FockMap
+
+        @info("wannierizing local courier state")
+        shiftedwanniercourier = localwannierization(shiftedlocalcourierisometry, shiftedcourierseeds)
+
+        shiftedlocalwannierresults =  Dict(:wanniercourier => shiftedwanniercourier, :localfilledisometry => shiftedlocalfilledisometry,
+                                        :localemptyisometry => shiftedlocalemptyisometry, :courierseeds => shiftedcourierseeds)
+        wannierinfos[shiftedfirsthexagonalregionfock] =  shiftedlocalwannierresults
+    end
+
+    ref = [quantize(firsthexagonalregion.+hexagonalcenter,1) for hexagonalcenter in firstshiftedhexagonalcenters]
+    firsthexagonalregionfocklist = [firsthexagonalregionfock,ref...]
+
+    extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in firsthexagonalregionfocklist)
+    extendedwannierizedfilled =  sum(wannierinfos[regionfock][:localfilledisometry] for regionfock in firsthexagonalregionfocklist)
+    extendedwannierizedempty =  sum(wannierinfos[regionfock][:localemptyisometry] for regionfock in firsthexagonalregionfocklist)
+ 
+                
+    origin = [0, 0] ∈ blockedspace
+    refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+
+    wanniercourierisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
+    globalfilledisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
+    globalemptyisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedempty[:,refunictcellfockempty])
+
+
+    @info "Computing local courier states..."
+    leftrestrict = fourier(wanniercourierisometry|>getoutspace, firsthexagonalregionfock) / (blockedcrystal|>vol|>sqrt)
+    rightrestrict = fourier(wanniercourierisometry|>getinspace, wanniercourierisometry|>getinspace|>unitcellfock|>RegionFock)
+    wanniercourierstate = leftrestrict' * wanniercourierisometry * rightrestrict
+
+    couriercorrelations = wanniercourierisometry' * blockedcorrelations * wanniercourierisometry
+    # display(couriercorrelations|>eigspech|>visualize)
+
+    filledcorrelations = globalfilledisometry' * blockedcorrelations * globalfilledisometry
+    # display(filledcorrelations|>eigspech|>visualize)
+
+    emptycorrelations = globalemptyisometry' * blockedcorrelations * globalemptyisometry
+
+    couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+
+    purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+    purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
+
+    return Dict(
+        :couriercorrelations=>purifiedcouriercorrelations,
+        :filledcorrelations=>filledcorrelations,
+        :emptycorrelations=>emptycorrelations,
+        :wanniercourierisometry=>wanniercourierisometry,
+        :globalfilledisometry=>globalfilledisometry,
+        :globalemptyisometry=>globalemptyisometry,
+        :pickedfilledeval=>pickedfilledeval,
+        :pickedemptyeval=>pickedemptyeval,
+        :nooflocalcouriermodes=>noofcouriermodes,
+        :wanniercourierstates=>wanniercourierstate|>RegionState,
+        :rawcouriercorrelations=>couriercorrelations)
+end
+export firstgmerastepbythreshold
+
+
+function secondgmerastepbycount(firstgmeracorrelations,noofcouriermodes::Number,noofflavourpermode::Number)
+    firstgmeracrystalfock = firstgmeracorrelations|>getoutspace
+    firstgmeracrystal::Crystal = firstgmeracrystalfock|>getcrystal
+    firstgmeraspace::RealSpace = firstgmeracrystal|>getspace
+
+    refrot = inv([2/3 -1/3; -1/3 2/3]')
+    c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    c3 = c6^2
+
+    secondcenter = [2/3,-1/3] ∈ firstgmeraspace
+    secondhexagonalregion = gethexagonalregion(rot=refrot,crystal=firstgmeracrystal, center=secondcenter, metricspace=firstgmeraspace)
+    secondhexagonalregionfock = quantize(secondhexagonalregion,noofflavourpermode)
+    rgshiftedcenter1 = [2/3,-1/3] ∈ firstgmeraspace
+    secondrgshiftedhexagonalregion1 = secondhexagonalregion.+rgshiftedcenter1
+    rgshiftedcenter2 = [1/3,1/3] ∈ firstgmeraspace
+    secondrgshiftedhexagonalregion2 = secondhexagonalregion.+rgshiftedcenter2
+
+    c6recenter = recenter(c6,secondcenter)
+    c3recenter = recenter(c3,secondcenter)
+
+    siteAregion1 = intersect(intersect(secondhexagonalregion,secondrgshiftedhexagonalregion1 ),secondrgshiftedhexagonalregion2)
+    siteAregionfock1 = quantize(siteAregion1,noofflavourpermode)
+    siteAregion2 = (c3recenter)*siteAregion1
+    siteAregionfock2 = quantize(siteAregion2,noofflavourpermode)
+    siteAregion3 = (c3recenter)*siteAregion2
+    siteAregionfock3 = quantize(siteAregion3,noofflavourpermode)
+
+    siteBregion1 = (c6recenter)*siteAregion1
+    siteBregionfock1 = quantize(siteBregion1,noofflavourpermode)
+    siteBregion2 = (c3recenter)*siteBregion1
+    siteBregionfock2 = quantize(siteBregion2,noofflavourpermode)
+    siteBregion3 = (c3recenter)*siteBregion2
+    siteBregionfock3 = quantize(siteBregion3,noofflavourpermode)
+
+    nooffrozenmodes = length(secondhexagonalregionfock|>orderedmodes)-noofcouriermodes
+    nooffilledmodes = div(nooffrozenmodes,2)
+    noofemptymodes = nooffilledmodes
+    @info("no of filled modes = ",nooffilledmodes)
+    @info("no of courier modes = ",noofcouriermodes)
+    @info("no of empty modes = ",noofemptymodes)
+
+    localcorrelations = regioncorrelations(firstgmeracorrelations,secondhexagonalregionfock)
+    localspectrum = localcorrelations|>eigspech
+    display(localspectrum|>visualize)
+    localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+    localcourierisometry = localstates[2]|>FockMap
+    localfilledisometry = localstates[1]|>FockMap
+    localemptyisometry = localstates[3]|>FockMap
+    courierproj = localcourierisometry*localcourierisometry'
+    nooflocalcourierseeds = div(noofcouriermodes,6)
+    reduandancy = length((siteAregionfock1|>orderedmodes))-nooflocalcourierseeds
+
+    localAcorrelations1 = columns(rows(courierproj,siteAregionfock1),siteAregionfock1)
+    localAstates1 = getregionstates(localcorrelations=localAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds1 = localAstates1[2]
+
+    localAcorrelations2 = columns(rows(courierproj,siteAregionfock2),siteAregionfock2)
+    localAstates2 = getregionstates(localcorrelations=localAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds2 = localAstates2[2]
+
+
+    localAcorrelations3 = columns(rows(courierproj,siteAregionfock3),siteAregionfock3)
+    localAstates3 = getregionstates(localcorrelations=localAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds3 = localAstates3[2]
+
+    allAseedsstate = localAseeds1+localAseeds2+localAseeds3
+
+    localBcorrelations1 = columns(rows(courierproj,siteBregionfock1),siteBregionfock1)
+    localBstates1 = getregionstates(localcorrelations=localBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds1 = localBstates1[2]
+
+    localBcorrelations2 = columns(rows(courierproj,siteBregionfock2),siteBregionfock2)
+    localBstates2 = getregionstates(localcorrelations=localBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds2 = localBstates2[2]
+
+    localBcorrelations3 = columns(rows(courierproj,siteBregionfock3),siteBregionfock3)
+    localBstates3 = getregionstates(localcorrelations=localBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds3 = localBstates3[2]
+
+    allBseedsstate = localBseeds1+localBseeds2+localBseeds3
+
+    allseedsstates = (allAseedsstate+allBseedsstate)
+    courierseeds = allseedsstates|>FockMap
+    localcourierisometry
+
+    wanniercourier = localwannierization(localcourierisometry, courierseeds)
+    display((wanniercourier'*localcorrelations*wanniercourier)|>eigspec|>visualize)
+
+    localwannierresults =  Dict(:wanniercourier => wanniercourier, :localfilledisometry => localfilledisometry,
+                                :localemptyisometry => localemptyisometry, :courierseeds => courierseeds)
+
+    wannierinfos =  Dict(secondhexagonalregionfock=>localwannierresults)
+
+    shiftedsecondcenter1 = [0,1] ∈ firstgmeraspace
+    shiftedsecondcenter2 = [-1,1] ∈ firstgmeraspace
+
+    secondshiftedhexagonalcenterlist = [shiftedsecondcenter1, shiftedsecondcenter2]
+
+    for hexagonalcenter in secondshiftedhexagonalcenterlist
+        shiftedsecondhexagonalregion = secondhexagonalregion.+hexagonalcenter
+        shiftedsecondhexagonalregionfock = quantize(shiftedsecondhexagonalregion,noofflavourpermode)
+        c6recenter = recenter(c6,secondcenter+hexagonalcenter)
+        c3recenter = recenter(c3,secondcenter+hexagonalcenter)
+    
+        shiftedsiteAregion1 = siteAregion1.+hexagonalcenter
+        shiftedsiteAregionfock1 = quantize(shiftedsiteAregion1,noofflavourpermode)
+        shiftedsiteAregion2 = (c3recenter)*shiftedsiteAregion1
+        shiftedsiteAregionfock2 = quantize(shiftedsiteAregion2,noofflavourpermode)
+        shiftedsiteAregion3 = (c3recenter)*shiftedsiteAregion2
+        shiftedsiteAregionfock3 = quantize(shiftedsiteAregion3,noofflavourpermode)
+    
+        shiftedsiteBregion1 = (c6recenter)*shiftedsiteAregion1
+        shiftedsiteBregionfock1 = quantize(shiftedsiteBregion1,noofflavourpermode)
+        shiftedsiteBregion2 = (c3recenter)*shiftedsiteBregion1
+        shiftedsiteBregionfock2 = quantize(shiftedsiteBregion2,noofflavourpermode)
+        shiftedsiteBregion3 = (c3recenter)*shiftedsiteBregion2
+        shiftedsiteBregionfock3 = quantize(shiftedsiteBregion3,noofflavourpermode)
+    
+        shiftedlocalcorrelations = regioncorrelations(firstgmeracorrelations,shiftedsecondhexagonalregionfock)
+        shiftedlocalstates = getregionstates(localcorrelations=shiftedlocalcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+        shiftedlocalcourierisometry = shiftedlocalstates[2]|>FockMap
+        shiftedlocalfilledisometry = shiftedlocalstates[1]|>FockMap
+        shiftedlocalemptyisometry = shiftedlocalstates[3]|>FockMap
+        shiftedcourierproj = shiftedlocalcourierisometry*shiftedlocalcourierisometry'
+    
+        shiftedlocalAcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock1),shiftedsiteAregionfock1)
+        shiftedlocalAstates1 = getregionstates(localcorrelations=shiftedlocalAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds1 = shiftedlocalAstates1[2]
+    
+        shiftedlocalAcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock2),shiftedsiteAregionfock2)
+        shiftedlocalAstates2 = getregionstates(localcorrelations=shiftedlocalAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds2 = shiftedlocalAstates2[2]
+    
+        shiftedlocalAcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock3),shiftedsiteAregionfock3)
+        shiftedlocalAstates3 = getregionstates(localcorrelations=shiftedlocalAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds3 = shiftedlocalAstates3[2]
+    
+        shiftedallAseedsstate = shiftedlocalAseeds1+shiftedlocalAseeds2+shiftedlocalAseeds3
+    
+        shiftedlocalBcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock1),shiftedsiteBregionfock1)
+        shiftedlocalBstates1 = getregionstates(localcorrelations=shiftedlocalBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds1 = shiftedlocalBstates1[2]
+    
+        shiftedlocalBcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock2),shiftedsiteBregionfock2)
+        shiftedlocalBstates2 = getregionstates(localcorrelations=shiftedlocalBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds2 = shiftedlocalBstates2[2]
+    
+        shiftedlocalBcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock3),shiftedsiteBregionfock3)
+        shiftedlocalBstates3 = getregionstates(localcorrelations=shiftedlocalBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds3 = shiftedlocalBstates3[2]
+    
+        shiftedallBseedsstate = shiftedlocalBseeds1+shiftedlocalBseeds2+shiftedlocalBseeds3
+    
+        shiftedallseedsstates = (shiftedallAseedsstate+shiftedallBseedsstate)
+        shiftedcourierseeds = shiftedallseedsstates|>FockMap
+    
+        shiftedwanniercourier = localwannierization(shiftedlocalcourierisometry, shiftedcourierseeds)
+    
+        shiftedlocalwannierresults = Dict(:wanniercourier => shiftedwanniercourier, :localfilledisometry => shiftedlocalfilledisometry,
+                                        :localemptyisometry => shiftedlocalemptyisometry, :courierseeds => shiftedcourierseeds)
+        wannierinfos[shiftedsecondhexagonalregionfock] =  shiftedlocalwannierresults
+    end
+
+    ref = [quantize(secondhexagonalregion.+hexagonalcenter,noofflavourpermode) for hexagonalcenter in secondshiftedhexagonalcenterlist]
+    secondhexagonalregionfocklist = [secondhexagonalregionfock,ref...]
+
+    extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in secondhexagonalregionfocklist)
+    extendedwannierizedfilled =  sum(wannierinfos[regionfock][:localfilledisometry] for regionfock in secondhexagonalregionfocklist)
+    extendedwannierizedempty =  sum(wannierinfos[regionfock][:localemptyisometry] for regionfock in secondhexagonalregionfocklist) 
+
+    origin = [0, 0] ∈ firstgmeraspace
+    refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+
+    wanniercourierisometry = globalwannierfunction(firstgmeracorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
+    globalisometryfilled = globalwannierfunction(firstgmeracorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
+    globalisometryempty = globalwannierfunction(firstgmeracorrelations,extendedwannierizedempty[:,refunictcellfockempty])
+
+    couriercorrelations = wanniercourierisometry' * firstgmeracorrelations * wanniercourierisometry
+    # display(couriercorrelations|>eigspech|>visualize)
+
+    filledcorrelations = globalisometryfilled' * firstgmeracorrelations * globalisometryfilled
+    # display(filledcorrelations|>eigspech|>visualize)
+
     couriercorrelationspectrum = couriercorrelations |> crystalspectrum
     purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
     purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
 
-    firstrgedcorrelations = purifiedcouriercorrelations
-    return firstrgedcorrelations
+    secondgmeracorrelations = purifiedcouriercorrelations
+    return secondgmeracorrelations,globalisometryfilled,globalisometryempty,wanniercourierisometry
 end
-export firstgmerastep
+export secondgmerastepbycount
 
-function secondgmerastep(correlations,threshold::Float64,nooffrozenrsmodes::Number,Asublatticeunitcellmodes::Subset{Mode},Bsublatticeunitcellmodes::Subset{Mode})
-    firstrgedcorrelations = correlations
-    firstrgedcrystalfock = correlations|>getoutspace
-    firstrgedcrystal::Crystal = firstrgedcrystalfock|>getcrystal
-    firstrgedspace::RealSpace = firstrgedcrystal|>getspace
+function secondgmerastepbythreshold(firstgmeracorrelations,threshold::Float64,noofflavourpermode::Number)
+    firstgmeracrystalfock = firstgmeracorrelations|>getoutspace
+    firstgmeracrystal::Crystal = firstgmeracrystalfock|>getcrystal
+    firstgmeraspace::RealSpace = firstgmeracrystal|>getspace
 
-    @info("Computing local correlations...")
-    secondcenter = [2/3,-1/3] ∈ firstrgedspace
-    secondhexagonalregion = gethexagonalregion(crystal=firstrgedcrystal, center=secondcenter, metricspace=firstrgedspace)
-    secondhexagonalregionfock = quantize(secondhexagonalregion,1)
+    refrot = inv([2/3 -1/3; -1/3 2/3]')
+    c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    c3 = c6^2
 
-    shiftedsecondcenter1 = [0,1] ∈ firstrgedspace
-    shiftedsecondhexagonalregion1 = secondhexagonalregion.+shiftedsecondcenter1
-    shiftedsecondhexagonalregion1fock = quantize(shiftedsecondhexagonalregion1,1)
+    secondcenter = [2/3,-1/3] ∈ firstgmeraspace
+    secondhexagonalregion = gethexagonalregion(rot=refrot,crystal=firstgmeracrystal, center=secondcenter, metricspace=firstgmeraspace)
+    secondhexagonalregionfock = quantize(secondhexagonalregion,noofflavourpermode)
+    rgshiftedcenter1 = [2/3,-1/3] ∈ firstgmeraspace
+    secondrgshiftedhexagonalregion1 = secondhexagonalregion.+rgshiftedcenter1
+    rgshiftedcenter2 = [1/3,1/3] ∈ firstgmeraspace
+    secondrgshiftedhexagonalregion2 = secondhexagonalregion.+rgshiftedcenter2
 
-    shiftedsecondcenter2 = [-1,1] ∈ firstrgedspace
-    shiftedsecondhexagonalregion2 = secondhexagonalregion.+shiftedsecondcenter2
-    shiftedsecondhexagonalregion2fock = quantize(shiftedsecondhexagonalregion2,1)
+    c6recenter = recenter(c6,secondcenter)
+    c3recenter = recenter(c3,secondcenter)
 
-    allregion2 = secondhexagonalregion+shiftedsecondhexagonalregion1+shiftedsecondhexagonalregion2
-    if intersect(allregion2,firstrgedcrystal|>getunitcell) == firstrgedcrystal|>getunitcell
-        @info("cover the whole unitcell")
-    else
-        @error("the allregion cannot cover the whole unitcell ")
-    end
+    siteAregion1 = intersect(intersect(secondhexagonalregion,secondrgshiftedhexagonalregion1 ),secondrgshiftedhexagonalregion2)
+    siteAregionfock1 = quantize(siteAregion1,noofflavourpermode)
+    siteAregion2 = (c3recenter)*siteAregion1
+    siteAregionfock2 = quantize(siteAregion2,noofflavourpermode)
+    siteAregion3 = (c3recenter)*siteAregion2
+    siteAregionfock3 = quantize(siteAregion3,noofflavourpermode)
 
-    localcorrelations = regioncorrelations(firstrgedcorrelations,secondhexagonalregionfock)
-    localspectrum = localcorrelations|>eigspech
+    siteBregion1 = (c6recenter)*siteAregion1
+    siteBregionfock1 = quantize(siteBregion1,noofflavourpermode)
+    siteBregion2 = (c3recenter)*siteBregion1
+    siteBregionfock2 = quantize(siteBregion2,noofflavourpermode)
+    siteBregion3 = (c3recenter)*siteBregion2
+    siteBregionfock3 = quantize(siteBregion3,noofflavourpermode)
+
+    localcorrelations = regioncorrelations(firstgmeracorrelations,secondhexagonalregionfock)
+    localspectrum = localcorrelations|>eigspec
     display(localspectrum|>visualize)
-    filleddict,emptydict = separatefilledandemptymodes(localspectrum)
-    rankedandgroupedfilledmodes = sortgroupdictwifvalue(filleddict,false)
-    rankedandgroupedemptymodes = sortgroupdictwifvalue(emptydict,true)
 
-    rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-secondcenter)) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
-    sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
-    frozenrsmodes, courierrsmodes = findfrozenandcourierrsmode(sortedrsmode,nooffrozenrsmodes)
-    filledrsmodes,emptyrsmodes = distinguishABsublatticemodesforhexagon(frozenrsmodes,Asublatticeunitcellmodes,Bsublatticeunitcellmodes)
+    reffilledmodes = Subset([m for (m, v) in localspectrum|>geteigenvalues if norm(v) < threshold])
+    refemptymodes = Subset([m for (m, v) in localspectrum|>geteigenvalues if norm(v) > 1-threshold])
 
-    filledseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in filledrsmodes)]
-    emptyseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in emptyrsmodes)]
-    frozenseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
-    courierseeds = idmap(secondhexagonalregionfock, secondhexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
+    if length(reffilledmodes)%3==0
+        nooffilledmodes = length(reffilledmodes)
+    else
+        nooffilledmodes = length(reffilledmodes)-(length(reffilledmodes)%3)
+    end
+    # if length(refemptymodes)%3==0
+    #     noofemptymodes = length(refemptymodes)
+    # else
+    #     noofemptymodes = length(refemptymodes)-(length(refemptymodes)%3)
+    # end    
+    noofemptymodes = nooffilledmodes
+    nooffrozenmodes = nooffilledmodes + noofemptymodes
+    noofcouriermodes = length(secondhexagonalregionfock|>orderedmodes)-nooffrozenmodes
+    @info("no of filled modes = ",nooffilledmodes)
+    @info("no of courier modes = ",noofcouriermodes)
+    @info("no of empty modes = ",noofemptymodes)
 
-    truncatedeigenvectofilled = rows((localspectrum|>geteigenvectors),FockSpace(filledrsmodes))
-    truncatedeigenvectoempty = rows((localspectrum|>geteigenvectors),FockSpace(emptyrsmodes))
+    rankedmodeswifeval = sort([(m,norm(v)) for (m, v) in localspectrum|>geteigenvalues],by=x->x[2])
+    pickedfilledeval = rankedmodeswifeval[nooffilledmodes][2]
+    pickedemptyeval = rankedmodeswifeval[end-noofemptymodes+1][2]
 
-    rankedandgroupedfilledmodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectofilled,modes) for modes in rankedandgroupedfilledmodes],by=first,rev=true)]
-    rankedandgroupedemptymodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectoempty,modes) for modes in rankedandgroupedemptymodes],by=first,rev=true)]
+    localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+    localcourierisometry = localstates[2]|>FockMap
+    localfilledisometry = localstates[1]|>FockMap
+    localemptyisometry = localstates[3]|>FockMap
+    courierproj = localcourierisometry*localcourierisometry'
+    nooflocalcourierseeds = div(noofcouriermodes,6)
+    reduandancy = length((siteAregionfock1|>orderedmodes))-nooflocalcourierseeds
 
-    chosenfilledmodes = choosemodesforwannierization(rankedandgroupedfilledmodeswifoverlap,truncatedeigenvectofilled,threshold,div(nooffrozenrsmodes,2))
-    chosenemptymodes = choosemodesforwannierization(rankedandgroupedemptymodeswifoverlap,truncatedeigenvectoempty,threshold,div(nooffrozenrsmodes,2))
-    chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
-    chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
+    localAcorrelations1 = columns(rows(courierproj,siteAregionfock1),siteAregionfock1)
+    localAstates1 = getregionstates(localcorrelations=localAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds1 = localAstates1[2]
 
-    localisofilled = columns(localspectrum |> geteigenvectors, FockSpace(chosenfilledmodes))
-    localisoempty = columns(localspectrum |> geteigenvectors, FockSpace(chosenemptymodes))
-    localisofrozen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
-    localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+    localAcorrelations2 = columns(rows(courierproj,siteAregionfock2),siteAregionfock2)
+    localAstates2 = getregionstates(localcorrelations=localAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds2 = localAstates2[2]
 
-    wannierfilled = localwannierization(localisofilled, filledseeds)
-    wannierempty = localwannierization(localisoempty, emptyseeds)
-    wannierfrozen = localwannierization(localisofrozen, frozenseeds)
-    wanniercourier = localwannierization(localisocourier, courierseeds)
 
-    (wannierfrozen'*localcorrelations*wannierfrozen)|>eigspec|>visualize|>display
+    localAcorrelations3 = columns(rows(courierproj,siteAregionfock3),siteAregionfock3)
+    localAstates3 = getregionstates(localcorrelations=localAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localAseeds3 = localAstates3[2]
 
-    localwannierresults =  Dict(:wannierfilled => wannierfilled, :wannierempty => wannierempty,
-                                :wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
-                                :filledseeds => filledseeds,:emptyseeds => emptyseeds,
-                                :frozenseeds => frozenseeds,:courierseeds => courierseeds)
+    allAseedsstate = localAseeds1+localAseeds2+localAseeds3
+
+    localBcorrelations1 = columns(rows(courierproj,siteBregionfock1),siteBregionfock1)
+    localBstates1 = getregionstates(localcorrelations=localBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds1 = localBstates1[2]
+
+    localBcorrelations2 = columns(rows(courierproj,siteBregionfock2),siteBregionfock2)
+    localBstates2 = getregionstates(localcorrelations=localBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds2 = localBstates2[2]
+
+    localBcorrelations3 = columns(rows(courierproj,siteBregionfock3),siteBregionfock3)
+    localBstates3 = getregionstates(localcorrelations=localBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+    localBseeds3 = localBstates3[2]
+
+    allBseedsstate = localBseeds1+localBseeds2+localBseeds3
+
+    allseedsstates = (allAseedsstate+allBseedsstate)
+    courierseeds = allseedsstates|>FockMap
+    localcourierisometry
+
+    wanniercourier = localwannierization(localcourierisometry, courierseeds)
+    display((wanniercourier'*localcorrelations*wanniercourier)|>eigspec|>visualize)
+
+    localwannierresults =  Dict(:wanniercourier => wanniercourier, :localfilledisometry => localfilledisometry,
+                                :localemptyisometry => localemptyisometry, :courierseeds => courierseeds)
 
     wannierinfos =  Dict(secondhexagonalregionfock=>localwannierresults)
 
-    secondshiftedhexagonalregionfocklist = [(shiftedsecondcenter1,shiftedsecondhexagonalregion1fock), (shiftedsecondcenter2,shiftedsecondhexagonalregion2fock)]
-                    
-    for (shifted,hexagonalregionfock) in secondshiftedhexagonalregionfocklist
-        localcorrelations = regioncorrelations(firstrgedcorrelations,hexagonalregionfock)
-        localspectrum = localcorrelations|>eigspech
-        filleddict,emptydict = separatefilledandemptymodes(localspectrum)
-        rankedandgroupedfilledmodes = sortgroupdictwifvalue(filleddict,false)
-        rankedandgroupedemptymodes = sortgroupdictwifvalue(emptydict,true)
-                        
-        rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-(secondcenter+shifted))) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
-        sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
-        frozenrsmodes, courierrsmodes = findfrozenandcourierrsmode(sortedrsmode,nooffrozenrsmodes)
-        filledrsmodes,emptyrsmodes = distinguishABsublatticemodesforhexagon(frozenrsmodes,Asublatticeunitcellmodes,Bsublatticeunitcellmodes)
+    shiftedsecondcenter1 = [0,1] ∈ firstgmeraspace
+    shiftedsecondcenter2 = [-1,1] ∈ firstgmeraspace
 
-        filledseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in filledrsmodes)]
-        emptyseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in emptyrsmodes)]
-        courierseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
-        frozenseeds = idmap(hexagonalregionfock, hexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
-                    
-        truncatedeigenvectofilled = rows((localspectrum|>geteigenvectors),FockSpace(filledrsmodes))
-        truncatedeigenvectoempty = rows((localspectrum|>geteigenvectors),FockSpace(emptyrsmodes))
+    secondshiftedhexagonalcenterlist = [shiftedsecondcenter1, shiftedsecondcenter2]
 
-        rankedandgroupedfilledmodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectofilled,modes) for modes in rankedandgroupedfilledmodes],by=first,rev=true)]
-        rankedandgroupedemptymodeswifoverlap = [pair[2] for pair in sort([calculateavgoverlapofmodes(truncatedeigenvectoempty,modes) for modes in rankedandgroupedemptymodes],by=first,rev=true)]
-
-        chosenfilledmodes = choosemodesforwannierization(rankedandgroupedfilledmodeswifoverlap,truncatedeigenvectofilled,threshold,div(nooffrozenrsmodes,2))
-        chosenemptymodes = choosemodesforwannierization(rankedandgroupedemptymodeswifoverlap,truncatedeigenvectoempty,threshold,div(nooffrozenrsmodes,2))
-        chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
-        chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
-                        
-        localisofilled = columns(localspectrum |> geteigenvectors, FockSpace(chosenfilledmodes))
-        localisoempty = columns(localspectrum |> geteigenvectors, FockSpace(chosenemptymodes))
-        localisofrozen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
-        localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
-
-        wannierfilled = localwannierization(localisofilled, filledseeds)
-        wannierempty = localwannierization(localisoempty, emptyseeds)
-        wannierfrozen = localwannierization(localisofrozen, frozenseeds)
-        wanniercourier = localwannierization(localisocourier, courierseeds)
-
-        localwannierresults =  Dict(:wannierfilled => wannierfilled, :wannierempty => wannierempty,
-                                    :wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
-                                    :filledseeds => filledseeds,:emptyseeds => emptyseeds,
-                                    :frozenseeds => frozenseeds,:courierseeds => courierseeds)
-                            
-        shiftedlocalwannierresults =  Dict(:wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
-                                    :frozenseeds => frozenseeds,:courierseeds => courierseeds)
-                    
-        wannierinfos[hexagonalregionfock] =  shiftedlocalwannierresults
-    end 
-                    
-    secondhexagonalregionfocklist = [secondhexagonalregionfock, shiftedsecondhexagonalregion1fock, shiftedsecondhexagonalregion2fock]
-                    
-    extendedwannierizedfrozen =  sum(wannierinfos[regionfock][:wannierfrozen] for regionfock in secondhexagonalregionfocklist)
-    extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in secondhexagonalregionfocklist)
-                                
-    origin = [0, 0] ∈ firstrgedspace
-    refunictcellfockfrozen = FockSpace(Subset(mode for mode in extendedwannierizedfrozen |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-    refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
-                    
-    wannierforzenisometry = globalwannierfunction(firstrgedcorrelations,extendedwannierizedfrozen[:,refunictcellfockfrozen])
-    wanniercourierisometry = globalwannierfunction(firstrgedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
-                    
-    frozencorrelations = wannierforzenisometry' * firstrgedcorrelations * wannierforzenisometry              
-    couriercorrelations2 = wanniercourierisometry' * firstrgedcorrelations * wanniercourierisometry
-                    
-    display(couriercorrelations2|>eigspech|>visualize)
-    couriercorrelationspectrum2 = couriercorrelations2 |> crystalspectrum
-    purifiedcorrelationspectrum2 = couriercorrelationspectrum2 |> roundingpurification
-    purifiedcouriercorrelations2 = purifiedcorrelationspectrum2 |> CrystalFockMap
-                    
-    secondrgedcorrelations = purifiedcouriercorrelations2
-    return secondrgedcorrelations
-end 
-export secondgmerastep
-
-function thirdgmerastep(correlations,threshold::Float64,nooffrozenrsmodes::Number,Asublatticeunitcellmodes::Subset{Mode},Bsublatticeunitcellmodes::Subset{Mode})
-    secondrgedcorrelations = correlations
-    secondrgedcrystalfock = secondrgedcorrelations|>getoutspace
-    secondrgedcrystal::Crystal = secondrgedcrystalfock|>getcrystal
-    secondrgedspace::RealSpace = secondrgedcrystal|>getspace
+    for hexagonalcenter in secondshiftedhexagonalcenterlist
+        shiftedsecondhexagonalregion = secondhexagonalregion.+hexagonalcenter
+        shiftedsecondhexagonalregionfock = quantize(shiftedsecondhexagonalregion,noofflavourpermode)
+        c6recenter = recenter(c6,secondcenter+hexagonalcenter)
+        c3recenter = recenter(c3,secondcenter+hexagonalcenter)
     
-    @info("Computing local correlations...")
-    thirdcenter = [1/3,1/3] ∈ secondrgedspace
-    thirdhexagonalregion = gethexagonalregion(crystal=secondrgedcrystal, center=thirdcenter, metricspace=secondrgedspace)
-    thirdhexagonalregionfock = quantize(thirdhexagonalregion,1)
-
-    allregion3 = thirdhexagonalregion
-
-    if intersect(allregion3,secondrgedcrystal|>getunitcell) == secondrgedcrystal|>getunitcell
-        @info("cover the whole unitcell")
-    else
-        @error("the allregion cannot cover the whole unitcell ")
+        shiftedsiteAregion1 = siteAregion1.+hexagonalcenter
+        shiftedsiteAregionfock1 = quantize(shiftedsiteAregion1,noofflavourpermode)
+        shiftedsiteAregion2 = (c3recenter)*shiftedsiteAregion1
+        shiftedsiteAregionfock2 = quantize(shiftedsiteAregion2,noofflavourpermode)
+        shiftedsiteAregion3 = (c3recenter)*shiftedsiteAregion2
+        shiftedsiteAregionfock3 = quantize(shiftedsiteAregion3,noofflavourpermode)
+    
+        shiftedsiteBregion1 = (c6recenter)*shiftedsiteAregion1
+        shiftedsiteBregionfock1 = quantize(shiftedsiteBregion1,noofflavourpermode)
+        shiftedsiteBregion2 = (c3recenter)*shiftedsiteBregion1
+        shiftedsiteBregionfock2 = quantize(shiftedsiteBregion2,noofflavourpermode)
+        shiftedsiteBregion3 = (c3recenter)*shiftedsiteBregion2
+        shiftedsiteBregionfock3 = quantize(shiftedsiteBregion3,noofflavourpermode)
+    
+        shiftedlocalcorrelations = regioncorrelations(firstgmeracorrelations,shiftedsecondhexagonalregionfock)
+        shiftedlocalstates = getregionstates(localcorrelations=shiftedlocalcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+        shiftedlocalcourierisometry = shiftedlocalstates[2]|>FockMap
+        shiftedlocalfilledisometry = shiftedlocalstates[1]|>FockMap
+        shiftedlocalemptyisometry = shiftedlocalstates[3]|>FockMap
+        shiftedcourierproj = shiftedlocalcourierisometry*shiftedlocalcourierisometry'
+    
+        shiftedlocalAcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock1),shiftedsiteAregionfock1)
+        shiftedlocalAstates1 = getregionstates(localcorrelations=shiftedlocalAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds1 = shiftedlocalAstates1[2]
+    
+        shiftedlocalAcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock2),shiftedsiteAregionfock2)
+        shiftedlocalAstates2 = getregionstates(localcorrelations=shiftedlocalAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds2 = shiftedlocalAstates2[2]
+    
+        shiftedlocalAcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteAregionfock3),shiftedsiteAregionfock3)
+        shiftedlocalAstates3 = getregionstates(localcorrelations=shiftedlocalAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalAseeds3 = shiftedlocalAstates3[2]
+    
+        shiftedallAseedsstate = shiftedlocalAseeds1+shiftedlocalAseeds2+shiftedlocalAseeds3
+    
+        shiftedlocalBcorrelations1 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock1),shiftedsiteBregionfock1)
+        shiftedlocalBstates1 = getregionstates(localcorrelations=shiftedlocalBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds1 = shiftedlocalBstates1[2]
+    
+        shiftedlocalBcorrelations2 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock2),shiftedsiteBregionfock2)
+        shiftedlocalBstates2 = getregionstates(localcorrelations=shiftedlocalBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds2 = shiftedlocalBstates2[2]
+    
+        shiftedlocalBcorrelations3 = columns(rows(shiftedcourierproj,shiftedsiteBregionfock3),shiftedsiteBregionfock3)
+        shiftedlocalBstates3 = getregionstates(localcorrelations=shiftedlocalBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        shiftedlocalBseeds3 = shiftedlocalBstates3[2]
+    
+        shiftedallBseedsstate = shiftedlocalBseeds1+shiftedlocalBseeds2+shiftedlocalBseeds3
+    
+        shiftedallseedsstates = (shiftedallAseedsstate+shiftedallBseedsstate)
+        shiftedcourierseeds = shiftedallseedsstates|>FockMap
+    
+        shiftedwanniercourier = localwannierization(shiftedlocalcourierisometry, shiftedcourierseeds)
+    
+        shiftedlocalwannierresults = Dict(:wanniercourier => shiftedwanniercourier, :localfilledisometry => shiftedlocalfilledisometry,
+                                        :localemptyisometry => shiftedlocalemptyisometry, :courierseeds => shiftedcourierseeds)
+        wannierinfos[shiftedsecondhexagonalregionfock] =  shiftedlocalwannierresults
     end
 
-    localcorrelations = regioncorrelations(secondrgedcorrelations,thirdhexagonalregionfock)
+    ref = [quantize(secondhexagonalregion.+hexagonalcenter,noofflavourpermode) for hexagonalcenter in secondshiftedhexagonalcenterlist]
+    secondhexagonalregionfocklist = [secondhexagonalregionfock,ref...]
+
+    extendedwannierizedcourier =  sum(wannierinfos[regionfock][:wanniercourier] for regionfock in secondhexagonalregionfocklist)
+    extendedwannierizedfilled =  sum(wannierinfos[regionfock][:localfilledisometry] for regionfock in secondhexagonalregionfocklist)
+    extendedwannierizedempty =  sum(wannierinfos[regionfock][:localemptyisometry] for regionfock in secondhexagonalregionfocklist) 
+
+    origin = [0, 0] ∈ firstgmeraspace
+    refunictcellfockcourier = FockSpace(Subset(mode for mode in extendedwannierizedcourier |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockfilled = FockSpace(Subset(mode for mode in extendedwannierizedfilled |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+    refunictcellfockempty = FockSpace(Subset(mode for mode in extendedwannierizedempty |> getinspace |> orderedmodes if (mode|>getattr(:r) == origin)))
+
+    wanniercourierisometry = globalwannierfunction(firstgmeracorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
+    globalfilledisometry = globalwannierfunction(firstgmeracorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
+    globalemptyisometry = globalwannierfunction(firstgmeracorrelations,extendedwannierizedempty[:,refunictcellfockempty])
+
+    @info "Computing local courier states..."
+    leftrestrict = fourier(wanniercourierisometry|>getoutspace,secondhexagonalregionfock) / (firstgmeracrystal|>vol|>sqrt)
+    rightrestrict = fourier(wanniercourierisometry|>getinspace, wanniercourierisometry|>getinspace|>unitcellfock|>RegionFock)
+    wanniercourierstate = leftrestrict' * wanniercourierisometry * rightrestrict
+
+    couriercorrelations = wanniercourierisometry' * firstgmeracorrelations * wanniercourierisometry
+    # display(couriercorrelations|>eigspech|>visualize)
+
+    filledcorrelations = globalfilledisometry' * firstgmeracorrelations * globalfilledisometry
+    # display(filledcorrelations|>eigspech|>visualize)
+
+    emptycorrelations = globalemptyisometry' * firstgmeracorrelations * globalemptyisometry
+
+    couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+    purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+    purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
+
+    return Dict(
+        :couriercorrelations=>purifiedcouriercorrelations,
+        :filledcorrelations=>filledcorrelations,
+        :emptycorrelations=>emptycorrelations,
+        :wanniercourierisometry=>wanniercourierisometry,
+        :globalfilledisometry=>globalfilledisometry,
+        :globalemptyisometry=>globalemptyisometry,
+        :pickedfilledeval=>pickedfilledeval,
+        :pickedemptyeval=>pickedemptyeval,
+        :nooflocalcouriermodes=>noofcouriermodes,
+        :wanniercourierstates=>wanniercourierstate|>RegionState,
+        :rawcouriercorrelations=>couriercorrelations)
+end
+export secondgmerastepbythreshold
+
+function thirdgmerastepbycount(secondgmeracorrelations,noofcouriermodes::Number,noofflavourpermode::Number)
+    secondgmeracrystalfock = secondgmeracorrelations|>getoutspace
+    secondgmeracrystal::Crystal = secondgmeracrystalfock|>getcrystal
+    secondgmeraspace::RealSpace = secondgmeracrystal|>getspace
+
+    refrot = inv([2/3 -1/3; -1/3 2/3]')
+    c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    c3 = c6^2
+
+    thirdcenter = [1/3,1/3] ∈ secondgmeraspace
+    thirdhexagonalregion = gethexagonalregion(rot = refrot,crystal=secondgmeracrystal, center=thirdcenter, metricspace=secondgmeraspace)
+    thirdhexagonalregionfock = quantize(thirdhexagonalregion,noofflavourpermode)
+    rgshiftedcenter1 = [2/3,-1/3] ∈ secondgmeraspace
+    thirdrgshiftedhexagonalregion1 = thirdhexagonalregion.+rgshiftedcenter1
+    rgshiftedcenter2 = [1/3,1/3] ∈ secondgmeraspace
+    thirdrgshiftedhexagonalregion2 = thirdhexagonalregion.+rgshiftedcenter2
+
+    c6recenter = recenter(c6,thirdcenter)
+    c3recenter = recenter(c3,thirdcenter)
+
+    siteAregion1 = intersect(intersect(thirdhexagonalregion,thirdrgshiftedhexagonalregion1),thirdrgshiftedhexagonalregion2)
+    siteAregionfock1 = quantize(siteAregion1,noofflavourpermode)
+    siteAregion2 = (c3recenter)*siteAregion1
+    siteAregionfock2 = quantize(siteAregion2,noofflavourpermode)
+    siteAregion3 = (c3recenter)*siteAregion2
+    siteAregionfock3 = quantize(siteAregion3,noofflavourpermode)
+
+    siteBregion1 = (c6recenter)*siteAregion1
+    siteBregionfock1 = quantize(siteBregion1,noofflavourpermode)
+    siteBregion2 = (c3recenter)*siteBregion1
+    siteBregionfock2 = quantize(siteBregion2,noofflavourpermode)
+    siteBregion3 = (c3recenter)*siteBregion2
+    siteBregionfock3 = quantize(siteBregion3,noofflavourpermode)
+
+    nooffrozenmodes = length(thirdhexagonalregionfock|>orderedmodes)-noofcouriermodes
+    nooffilledmodes = div(nooffrozenmodes,2)
+    noofemptymodes = nooffilledmodes
+    @info("no of filled modes = ",nooffilledmodes)
+    @info("no of courier modes = ",noofcouriermodes)
+    @info("no of empty modes = ",noofemptymodes)
+
+    localcorrelations = regioncorrelations(secondgmeracorrelations,thirdhexagonalregionfock)
     localspectrum = localcorrelations|>eigspech
-    display(visualize(localspectrum))
-    filleddict,emptydict = separatefilledandemptymodes(localspectrum)
-    rankedandgroupedfilledmodes = sortgroupdictwifvalue(filleddict,false)
-    rankedandgroupedemptymodes = sortgroupdictwifvalue(emptydict,true)
+    display(localspectrum|>visualize)
 
-    rsmodedict = Dict(mode=>norm(euclidean((mode|>getattr(:b))+(mode|>getattr(:r))-thirdcenter)) for mode in localspectrum |> geteigenvectors|>getoutspace|>orderedmodes)
-    sortedrsmode = sortgroupdictwifdist(rsmodedict,false)
-    frozenrsmodes, courierrsmodes = findfrozenandcourierrsmode(sortedrsmode,nooffrozenrsmodes)
-    filledrsmodes,emptyrsmodes = distinguishABsublatticemodesforhexagon(frozenrsmodes,Asublatticeunitcellmodes,Bsublatticeunitcellmodes)
-    
-    filledseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in filledrsmodes)]
-    emptyseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in emptyrsmodes)]
-    courierseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in courierrsmodes)]
-    frozenseeds = idmap(thirdhexagonalregionfock, thirdhexagonalregionfock)[:,FockSpace(mode for mode in frozenrsmodes)]
+    if noofcouriermodes ==0 
+        localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofemptymodes])
+        localfilledisometry = localstates[1]|>FockMap
+        localemptyisometry = localstates[2]|>FockMap
 
-    truncatedeigenvectofilled = rows((localspectrum|>geteigenvectors),FockSpace(filledrsmodes))
-    truncatedeigenvectoempty = rows((localspectrum|>geteigenvectors),FockSpace(emptyrsmodes))
-                    
-    chosenfilledmodes = choosemodesforwannierization(rankedandgroupedfilledmodes,truncatedeigenvectofilled,threshold,div(nooffrozenrsmodes,2))
-    chosenemptymodes = choosemodesforwannierization(rankedandgroupedemptymodes,truncatedeigenvectoempty,threshold,div(nooffrozenrsmodes,2))
-    chosenfrozenmodes = chosenfilledmodes+chosenemptymodes
-    chosencouriermodes = (localspectrum |> geteigenmodes)-chosenfrozenmodes
+        localwannierresults =  Dict(:localfilledisometry => localfilledisometry,
+                                    :localemptyisometry => localemptyisometry)
 
-    localisofilled = columns(localspectrum |> geteigenvectors, FockSpace(chosenfilledmodes))
-    localisoempty = columns(localspectrum |> geteigenvectors, FockSpace(chosenemptymodes))
-    localisofrozen = columns(localspectrum |> geteigenvectors, FockSpace(chosenfrozenmodes))
-    localisocourier = columns(localspectrum |> geteigenvectors, FockSpace(chosencouriermodes))
+        wannierinfos =  Dict(thirdhexagonalregionfock=>localwannierresults)
+        globalisometryfilled = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localfilledisometry ])
+        globalisometryempty = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localemptyisometry])
+        filledcorrelations = globalisometryfilled' * secondgmeracorrelations * globalisometryfilled
+        display(filledcorrelations|>eigspec|>visualize)
+        return globalisometryfilled,globalisometryempty
+    else
+        localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+        localcourierisometry = localstates[2]|>FockMap
+        localfilledisometry = localstates[1]|>FockMap
+        localemptyisometry = localstates[3]|>FockMap
+        courierproj = localcourierisometry*localcourierisometry'
+        nooflocalcourierseeds = div(noofcouriermodes,6)
+        reduandancy = length((siteAregionfock1|>orderedmodes))-nooflocalcourierseeds
 
-    wannierfilled = localwannierization(localisofilled, filledseeds)
-    wannierempty = localwannierization(localisoempty, emptyseeds)
-    wannierfrozen = localwannierization(localisofrozen, frozenseeds)
-    wanniercourier = localwannierization(localisocourier, courierseeds)
+        localAcorrelations1 = columns(rows(courierproj,siteAregionfock1),siteAregionfock1)
+        localAstates1 = getregionstates(localcorrelations=localAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        localAseeds1 = localAstates1[2]
 
-    (wannierfrozen'*localcorrelations*wannierfrozen)|>eigspec|>visualize|>display
+        localAcorrelations2 = columns(rows(courierproj,siteAregionfock2),siteAregionfock2)
+        localAstates2 = getregionstates(localcorrelations=localAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        localAseeds2 = localAstates2[2]
 
-    localwannierresults =  Dict(:wannierfilled => wannierfilled, :wannierempty => wannierempty,
-                                :wannierfrozen => wannierfrozen, :wanniercourier => wanniercourier,
-                                :filledseeds => filledseeds,:emptyseeds => emptyseeds,
-                                :frozenseeds => frozenseeds,:courierseeds => courierseeds)
 
-    wannierinfos =  Dict(thirdhexagonalregionfock=>localwannierresults)
+        localAcorrelations3 = columns(rows(courierproj,siteAregionfock3),siteAregionfock3)
+        localAstates3 = getregionstates(localcorrelations=localAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        localAseeds3 = localAstates3[2]
 
-    wannierforzenisometry = globalwannierfunction(secondrgedcorrelations,wannierinfos[thirdhexagonalregionfock][:wannierfrozen])
-    wanniercourierisometry = globalwannierfunction(secondrgedcorrelations,wannierinfos[thirdhexagonalregionfock][:wanniercourier])
+        allAseedsstate = localAseeds1+localAseeds2+localAseeds3
 
-    frozencorrelations = wannierforzenisometry' * secondrgedcorrelations * wannierforzenisometry
-    couriercorrelations3 = wanniercourierisometry' * secondrgedcorrelations * wanniercourierisometry
+        localBcorrelations1 = columns(rows(courierproj,siteBregionfock1),siteBregionfock1)
+        localBstates1 = getregionstates(localcorrelations=localBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        localBseeds1 = localBstates1[2]
 
-    couriercorrelationspectrum3 = couriercorrelations3 |> crystalspectrum
-    display(couriercorrelations3|>eigspech|>visualize)
-    purifiedcorrelationspectrum3 = couriercorrelationspectrum3 |> roundingpurification
-    purifiedcouriercorrelations3 = purifiedcorrelationspectrum3 |> CrystalFockMap
+        localBcorrelations2 = columns(rows(courierproj,siteBregionfock2),siteBregionfock2)
+        localBstates2 = getregionstates(localcorrelations=localBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        localBseeds2 = localBstates2[2]
 
-    thirdrgedcorrelations = purifiedcouriercorrelations3
-    return thirdrgedcorrelations
-end 
-export thirdgmerastep
+        localBcorrelations3 = columns(rows(courierproj,siteBregionfock3),siteBregionfock3)
+        localBstates3 = getregionstates(localcorrelations=localBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        localBseeds3 = localBstates3[2]
+
+        allBseedsstate = localBseeds1+localBseeds2+localBseeds3
+
+        allseedsstates = (allAseedsstate+allBseedsstate)
+        courierseeds = allseedsstates|>FockMap
+        localcourierisometry
+
+        wanniercourier = localwannierization(localcourierisometry, courierseeds)
+        display((wanniercourier'*localcorrelations*wanniercourier)|>eigspec|>visualize)
+
+        localwannierresults =  Dict(:wanniercourier => wanniercourier,:localfilledisometry => localfilledisometry,
+                                    :localemptyisometry => localemptyisometry, :courierseeds => courierseeds)
+
+        wannierinfos =  Dict(thirdhexagonalregionfock=>localwannierresults)
+
+        wanniercourierisometry = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:wanniercourier])
+        globalisometryfilled = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localfilledisometry ])
+        globalisometryempty = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localemptyisometry])
+
+        couriercorrelations = wanniercourierisometry' * secondgmeracorrelations * wanniercourierisometry
+
+        couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+        purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+        purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
+
+        display(couriercorrelations|>eigspech|>visualize)
+
+        thirdgmeracorrelations = purifiedcouriercorrelations
+        return thirdgmeracorrelations,globalisometryfilled,globalisometryempty,wanniercourierisometry
+    end
+end
+export thirdgmerastepbycount
+
+function thirdgmerastepbythreshold(secondgmeracorrelations,threshold::Float64,noofflavourpermode::Number)
+    secondgmeracrystalfock = secondgmeracorrelations|>getoutspace
+    secondgmeracrystal::Crystal = secondgmeracrystalfock|>getcrystal
+    secondgmeraspace::RealSpace = secondgmeracrystal|>getspace
+
+    refrot = inv([2/3 -1/3; -1/3 2/3]')
+    c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+    c3 = c6^2
+
+    thirdcenter = [1/3,1/3] ∈ secondgmeraspace
+    thirdhexagonalregion = gethexagonalregion(rot = refrot,crystal=secondgmeracrystal, center=thirdcenter, metricspace=secondgmeraspace)
+    thirdhexagonalregionfock = quantize(thirdhexagonalregion,noofflavourpermode)
+    rgshiftedcenter1 = [2/3,-1/3] ∈ secondgmeraspace
+    thirdrgshiftedhexagonalregion1 = thirdhexagonalregion.+rgshiftedcenter1
+    rgshiftedcenter2 = [1/3,1/3] ∈ secondgmeraspace
+    thirdrgshiftedhexagonalregion2 = thirdhexagonalregion.+rgshiftedcenter2
+
+    c6recenter = recenter(c6,thirdcenter)
+    c3recenter = recenter(c3,thirdcenter)
+
+    siteAregion1 = intersect(intersect(thirdhexagonalregion,thirdrgshiftedhexagonalregion1),thirdrgshiftedhexagonalregion2)
+    siteAregionfock1 = quantize(siteAregion1,noofflavourpermode)
+    siteAregion2 = (c3recenter)*siteAregion1
+    siteAregionfock2 = quantize(siteAregion2,noofflavourpermode)
+    siteAregion3 = (c3recenter)*siteAregion2
+    siteAregionfock3 = quantize(siteAregion3,noofflavourpermode)
+
+    siteBregion1 = (c6recenter)*siteAregion1
+    siteBregionfock1 = quantize(siteBregion1,noofflavourpermode)
+    siteBregion2 = (c3recenter)*siteBregion1
+    siteBregionfock2 = quantize(siteBregion2,noofflavourpermode)
+    siteBregion3 = (c3recenter)*siteBregion2
+    siteBregionfock3 = quantize(siteBregion3,noofflavourpermode)
+
+    localcorrelations = regioncorrelations(secondgmeracorrelations,thirdhexagonalregionfock)
+    localspectrum = localcorrelations|>eigspech
+    display(localspectrum|>visualize)
+
+    reffilledmodes = Subset([m for (m, v) in localspectrum|>geteigenvalues if norm(v) < threshold])
+    refemptymodes = Subset([m for (m, v) in localspectrum|>geteigenvalues if norm(v) > 1-threshold])
+
+    if length(reffilledmodes)%3==0
+        nooffilledmodes = length(reffilledmodes)
+    else
+        nooffilledmodes = length(reffilledmodes)-(length(reffilledmodes)%3)
+    end
+    # if length(refemptymodes)%3==0
+    #     noofemptymodes = length(refemptymodes)
+    # else
+    #     noofemptymodes = length(refemptymodes)-(length(refemptymodes)%3)
+    # end    
+    noofemptymodes = nooffilledmodes
+    nooffrozenmodes = nooffilledmodes + noofemptymodes
+    noofcouriermodes = length(thirdhexagonalregionfock|>orderedmodes)-nooffrozenmodes
+    @info("no of filled modes = ",nooffilledmodes)
+    @info("no of courier modes = ",noofcouriermodes)
+    @info("no of empty modes = ",noofemptymodes)
+
+    rankedmodeswifeval = sort([(m,norm(v)) for (m, v) in localspectrum|>geteigenvalues],by=x->x[2])
+    pickedfilledeval = rankedmodeswifeval[nooffilledmodes][2]
+    pickedemptyeval = rankedmodeswifeval[end-noofemptymodes+1][2]
+
+
+    if noofcouriermodes ==0 
+        localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofemptymodes])
+        localfilledisometry = localstates[1]|>FockMap
+        localemptyisometry = localstates[2]|>FockMap
+
+        localwannierresults =  Dict(:localfilledisometry => localfilledisometry,
+                                    :localemptyisometry => localemptyisometry)
+
+        wannierinfos =  Dict(thirdhexagonalregionfock=>localwannierresults)
+        globalfilledisometry = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localfilledisometry ])
+        globalemptyisometry = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localemptyisometry])
+        filledcorrelations = globalfilledisometry' * secondgmeracorrelations * globalfilledisometry
+        emptycorrelations = globalemptyisometry' * secondgmeracorrelations * globalemptyisometry
+
+        display(filledcorrelations|>eigspec|>visualize)
+        return Dict(
+            :filledcorrelations=>filledcorrelations,
+            :emptycorrelations=>emptycorrelations,
+            :globalfilledisometry=>globalfilledisometry,
+            :globalemptyisometry=>globalemptyisometry,
+            :pickedfilledeval=>pickedfilledeval,
+            :pickedemptyeval=>pickedemptyeval)
+    else
+        localstates = getregionstates(localcorrelations=localcorrelations, grouping=[nooffilledmodes, noofcouriermodes, noofemptymodes])
+        localcourierisometry = localstates[2]|>FockMap
+        localfilledisometry = localstates[1]|>FockMap
+        localemptyisometry = localstates[3]|>FockMap
+        courierproj = localcourierisometry*localcourierisometry'
+        nooflocalcourierseeds = div(noofcouriermodes,6)
+        reduandancy = length((siteAregionfock1|>orderedmodes))-nooflocalcourierseeds
+
+        localAcorrelations1 = columns(rows(courierproj,siteAregionfock1),siteAregionfock1)
+        localAstates1 = getregionstates(localcorrelations=localAcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        localAseeds1 = localAstates1[2]
+
+        localAcorrelations2 = columns(rows(courierproj,siteAregionfock2),siteAregionfock2)
+        localAstates2 = getregionstates(localcorrelations=localAcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        localAseeds2 = localAstates2[2]
+
+
+        localAcorrelations3 = columns(rows(courierproj,siteAregionfock3),siteAregionfock3)
+        localAstates3 = getregionstates(localcorrelations=localAcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        localAseeds3 = localAstates3[2]
+
+        allAseedsstate = localAseeds1+localAseeds2+localAseeds3
+
+        localBcorrelations1 = columns(rows(courierproj,siteBregionfock1),siteBregionfock1)
+        localBstates1 = getregionstates(localcorrelations=localBcorrelations1, grouping=[reduandancy, nooflocalcourierseeds])
+        localBseeds1 = localBstates1[2]
+
+        localBcorrelations2 = columns(rows(courierproj,siteBregionfock2),siteBregionfock2)
+        localBstates2 = getregionstates(localcorrelations=localBcorrelations2, grouping=[reduandancy, nooflocalcourierseeds])
+        localBseeds2 = localBstates2[2]
+
+        localBcorrelations3 = columns(rows(courierproj,siteBregionfock3),siteBregionfock3)
+        localBstates3 = getregionstates(localcorrelations=localBcorrelations3, grouping=[reduandancy, nooflocalcourierseeds])
+        localBseeds3 = localBstates3[2]
+
+        allBseedsstate = localBseeds1+localBseeds2+localBseeds3
+
+        allseedsstates = (allAseedsstate+allBseedsstate)
+        courierseeds = allseedsstates|>FockMap
+        localcourierisometry
+
+        wanniercourier = localwannierization(localcourierisometry, courierseeds)
+        display((wanniercourier'*localcorrelations*wanniercourier)|>eigspec|>visualize)
+
+        localwannierresults =  Dict(:wanniercourier => wanniercourier,:localfilledisometry => localfilledisometry,
+                                    :localemptyisometry => localemptyisometry, :courierseeds => courierseeds)
+
+        wannierinfos =  Dict(thirdhexagonalregionfock=>localwannierresults)
+
+        wanniercourierisometry = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:wanniercourier])
+        globalfilledisometry = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localfilledisometry ])
+        globalemptyisometry = globalwannierfunction(secondgmeracorrelations,wannierinfos[thirdhexagonalregionfock][:localemptyisometry])
+
+        @info "Computing local courier states..."
+        leftrestrict = fourier(wanniercourierisometry|>getoutspace,thirdhexagonalregionfock) / (secondgmeracrystal|>vol|>sqrt)
+        rightrestrict = fourier(wanniercourierisometry|>getinspace, wanniercourierisometry|>getinspace|>unitcellfock|>RegionFock)
+        wanniercourierstate = leftrestrict' * wanniercourierisometry * rightrestrict
+
+        couriercorrelations = wanniercourierisometry' * secondgmeracorrelations * wanniercourierisometry
+
+        filledcorrelations = globalfilledisometry' * secondgmeracorrelations * globalfilledisometry
+        emptycorrelations = globalemptyisometry' * secondgmeracorrelations * globalemptyisometry
+
+        couriercorrelationspectrum = couriercorrelations |> crystalspectrum
+        purifiedcorrelationspectrum = couriercorrelationspectrum |> roundingpurification
+        purifiedcouriercorrelations = purifiedcorrelationspectrum |> CrystalFockMap
+
+        display(couriercorrelations|>eigspech|>visualize)
+
+        return Dict(
+            :couriercorrelations=>purifiedcouriercorrelations,
+            :filledcorrelations=>filledcorrelations,
+            :emptycorrelations=>emptycorrelations,
+            :wanniercourierisometry=>wanniercourierisometry,
+            :globalfilledisometry=>globalfilledisometry,
+            :globalemptyisometry=>globalemptyisometry,
+            :pickedfilledeval=>pickedfilledeval,
+            :pickedemptyeval=>pickedemptyeval,
+            :nooflocalcouriermodes=>noofcouriermodes,
+            :wanniercourierstates=>wanniercourierstate|>RegionState,
+            :rawcouriercorrelations=>couriercorrelations)
+    end
+end
+export thirdgmerastepbythreshold

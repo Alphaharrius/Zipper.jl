@@ -21,8 +21,8 @@ reciprocalhashcalibration(crystal.sizes)
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
 m0, m1 = members(modes)
 
-t_a = 0.3
-t_b = -0.3
+t_a = 1
+t_b = -1
 tₙ = -1 + 0im
 
 onsite = [
@@ -69,8 +69,8 @@ localrestrict = fourier(blockedcrystalfock, frozenseedingfock) / (blockedcrystal
 localcorrelations = localrestrict' * blockedcorrelations * localrestrict
 localspectrum = localcorrelations|>eigspech
 visualize(localspectrum)
-filledfock = FockSpace(m for (m, v) in localspectrum|>geteigenvalues if v < 0.0001)
-emptyfock = FockSpace(m for (m, v) in localspectrum|>geteigenvalues if v > (1-0.0001))
+filledfock = FockSpace(m for (m, v) in localspectrum|>geteigenvalues if v < 0.000007)
+emptyfock = FockSpace(m for (m, v) in localspectrum|>geteigenvalues if v > (1-0.000007))
 
 @info "Computing frozen projectors..."
 localfilledisometry = geteigenvectors(localspectrum)[:, filledfock]
@@ -95,7 +95,7 @@ filledprojector = crystalprojector(filledbands)
 filledcorrelations = idmap(filledprojector|>getoutspace) - filledprojector
 filledlocalcorrelations = localrestrict' * filledcorrelations * localrestrict
 filledlocalcorrelations|>eigspech|>visualize
-filledseeds = getregionstates(localcorrelations=filledlocalcorrelations, grouping=[15])[1]
+filledseeds = getregionstates(localcorrelations=filledlocalcorrelations, grouping=[3])[1]
 filledseeds = c3 * filledseeds
 
 @info "Searching seed for empty bands..."
@@ -104,7 +104,7 @@ emptyprojector = crystalprojector(emptybands)
 emptycorrelations = idmap(emptyprojector|>getoutspace) - emptyprojector
 emptylocalcorrelations = localrestrict' * emptycorrelations * localrestrict
 emptylocalcorrelations|>eigspech|>visualize
-emptyseeds = getregionstates(localcorrelations=emptylocalcorrelations, grouping=[15])[1]
+emptyseeds = getregionstates(localcorrelations=emptylocalcorrelations, grouping=[3])[1]
 emptyseeds = c3 * emptyseeds
 
 @info "Wannierizing filled bands..."

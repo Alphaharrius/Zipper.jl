@@ -45,6 +45,28 @@ function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold:
 end
 export eigspech
 
+function eigspechforenergy(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-14)::EigenSpectrum
+    vals, U = hermitian |> rep |> Matrix |> Hermitian |> eigen
+    valsdict = Dict(ind=>val for (ind,val) in enumerate(vals))
+    zerovalsdict = Dict(key=>val for (key,val) in valsdict if round(val,digits=14)==0)
+    if length(zerovalsdict)%2==0
+        @info("got eval degenerated at zero with even number trying to resolve them manually")
+        half = div(length(zerovalsdict),2)
+    else
+        @error("got eval degenerated at zero but with odd number")
+    end
+    chosenkey = [key for (key,zeroval) in zerovalsdict][1:half]
+    for key in chosenkey
+        valsdict[key]=-valsdict[key]
+    end
+    newvals = [val for (key,val) in valsdict]
+    return digesteigenvalues(Rational, Real, newvals, groupingthreshold, attrs...)
+    eigenvalues::Base.Iterators.Flatten = digesteigenvalues(Rational, Real, newvals, groupingthreshold, attrs...)
+    eigenvectors::FockMap = FockMap(hermitian |> getoutspace, FockSpace(m for (m, _) in eigenvalues), U)
+    return EigenSpectrum(eigenvalues |> Dict, eigenvectors)
+end
+export eigspechforenergy
+
 """
     eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
 
@@ -59,7 +81,7 @@ with the attributes supplied by `attrs`.
 - `groupingthreshold`   The threshold for grouping degenerated eigenvalues, since the eigenvalues are complex 
                         numbers, this threshold will be applied to the real and imaginary parts separately.
 """
-function eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-7)::EigenSpectrum
+function eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-10)::EigenSpectrum
     vals, U = fockmap |> rep |> Matrix |> eigen
     eigenvalues::Base.Iterators.Flatten = digesteigenvalues(Tuple, Complex, vals, groupingthreshold, attrs...)
     eigenvectors::FockMap = FockMap(fockmap |> getoutspace, FockSpace(m for (m, _) in eigenvalues), U)
@@ -77,7 +99,7 @@ eigenvalue grouping threshold.
 A generator yielding `Pair{Number, Subset{Mode}}` objects, with the eigenvalues as keys and the 
 corresponding eigenmodes as values.
 """
-function groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-7)::Base.Generator
+function groupbyeigenvalues(spectrum; groupingthreshold::Number = 1e-13)::Base.Generator
     denominator::Integer = (1 / groupingthreshold)|>round|>Integer
     actualvalues::Dict{Rational, Number} = Dict(
         hashablereal(v, denominator)=>v for (_, v) in spectrum|>geteigenvalues)

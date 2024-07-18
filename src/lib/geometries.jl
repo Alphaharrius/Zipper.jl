@@ -99,6 +99,7 @@ resize(crystal::Crystal, sizes::Vector{Int64})::Crystal = Crystal(crystal.unitce
 export resize
 
 mesh(sizes::Vector{Int64})::Matrix{Int64} = hcat([collect(tup) for tup in collect(Iterators.product([0:(d - 1) for d in sizes]...))[:]]...)
+export mesh
 
 vol(crystal::Crystal)::Integer = prod(crystal.sizes)
 export vol
@@ -165,6 +166,17 @@ function getsphericalregion(; crystal::Crystal, radius::Real, metricspace::RealS
     return Subset(point for point in centeredregion if norm(metricspace * point) < radius)
 end
 export getsphericalregion
+
+function getsphericalregionrecenter(;center::Offset, crystal::Crystal, radius::Real, metricspace::RealSpace)
+    generatingradius::Integer = ceil(Int, radius * 1.5) # Multiply by 1.5 to ensure all unitcell points fits.
+    generatinglength::Integer = generatingradius * 2
+    generatingcrystal::Crystal = Crystal(crystal|>getunitcell, [generatinglength, generatinglength])
+    crystalregion::Region = generatingcrystal|>sitepoints
+    centeredregion::Region = crystalregion .- (center)
+    return Subset(point+center for point in centeredregion if norm(metricspace * point) < radius)
+end
+export getsphericalregionrecenter
+
 
 # function checkwithinparallelogram(shifted,vector:: Vector{Float64})
 #     result = []

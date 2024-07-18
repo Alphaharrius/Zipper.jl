@@ -9,7 +9,12 @@ function focktraceL1norm(fockmap,systemsize)
     return(sum([abs(modeevalpair[2]) for modeevalpair in modeevalpairs])/systemsize)
 end
 
-systemsize=40
+function focktraceL2norm(fockmap,volume)
+    @info("Calculating L2norm...")
+    return (real(sqrt(tr(fockmap*fockmap'|>rep)/volume)))
+end
+
+systemsize=32
 correlations,H = generatesystem( -0.3+0im, 0.3+0im,-1 + 0im,0im,systemsize)
 crystalfock = correlations|>getoutspace
 
@@ -28,12 +33,12 @@ firstapproximation = rg1firstgmerastepdata[:globalemptyisometry]*rg1firstgmerast
 secondapproximation = (rg1firstgmerastepdata[:wanniercourierisometry]*rg1secondgmerastepdata[:globalemptyisometry])*(rg1firstgmerastepdata[:wanniercourierisometry]*rg1secondgmerastepdata[:globalemptyisometry])'
 thirdapproximation = (rg1firstgmerastepdata[:wanniercourierisometry]*rg1secondgmerastepdata[:wanniercourierisometry]*rg1thirdgmerastepdata[:globalemptyisometry])*(rg1firstgmerastepdata[:wanniercourierisometry]*rg1secondgmerastepdata[:wanniercourierisometry]*rg1thirdgmerastepdata[:globalemptyisometry])'
 
-arrpoximatecorrelationeight = firstapproximation + secondapproximation + thirdapproximation
+arrpoximatecorrelationeightprime = firstapproximation + secondapproximation + thirdapproximation
 
-diffeight = blockedcorrelations-arrpoximatecorrelationeight
-diffeightnorm = focktraceL1norm(diffeight,9600)
-
-diffeightnorm
+diffeightprime = blockedcorrelations-arrpoximatecorrelationeightprime
+diffeightnormprime = focktraceL1norm(diffeightprime,6144)
+focktraceL2norm(diffeightprime,6144)
+diffeightnormprime
 
 errorlist = log.([difftwonorm,difffournorm,difffivenorm,diffeightnorm])
 

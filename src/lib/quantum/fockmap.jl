@@ -187,6 +187,17 @@ zerosmap(outspace::FockSpace, inspace::FockSpace)::FockMap = FockMap(
     outspace, inspace, spzeros(dimension(outspace), dimension(inspace)))
 export zerosmap
 
+function extensionmap(outspace::FockSpace, inspace::FockSpace)
+    data::SparseMatrixCSC{ComplexF64, Int64} = spzeros(dimension(outspace), dimension(inspace))
+    indlistwrtoutmodes = [inspace[mode] for mode in (outspace|>orderedmodes)]
+    for (outind,inind) in enumerate(indlistwrtoutmodes)
+        data[outind,inind] += 1
+    end
+    extensionfmap = FockMap(outspace, inspace, data)
+    return extensionfmap
+end
+export extensionmap
+
 """
     columns(fockmap::FockMap, restrictspace::FockSpace)::FockMap
 

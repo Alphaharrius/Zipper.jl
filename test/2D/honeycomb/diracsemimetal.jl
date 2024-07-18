@@ -1,6 +1,7 @@
 using LinearAlgebra
 using Zipper, Plots
 
+plotlyjs()
 # usecrystaldensemap()
 setmaxthreads(Threads.nthreads())
 
@@ -10,14 +11,16 @@ kspace = convert(MomentumSpace, triangular)
 pa = [1/3, 2/3] ∈ triangular
 pb = [2/3, 1/3] ∈ triangular
 pc = (pa + pb) / 2
-spatialsnappingcalibration((pa, pb, pc))
+# spatialsnappingcalibration((pa, pb, pc))
 
 c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [48, 48])
-reciprocalhashcalibration(crystal.sizes)
+visualize(unitcell)
+crystal = Crystal(unitcell, [32, 32])
+space = crystal|>getspace
+# reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
 m0, m1 = members(modes)
@@ -39,6 +42,8 @@ nearestneighbor = [
 bonds::FockMap = bondmap([onsite..., nearestneighbor...])
 
 energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
+sort([(mode,abs(eval)) for (mode,eval) in energyspectrum|>geteigenvalues],by=x->x[2])
+
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstateprojector = groundstates|>crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
@@ -176,4 +181,45 @@ function zer(correlations)
         :rawcouriercorrelations=>couriercorrelations)
 end
 
+region::Region = getsphericalregion(crystal=crystal, radius=2, metricspace=space|>orthospace)
+seedingfock::RegionFock = quantize(region, 1)
+rscorrelations = regioncorrelations(correlations,seedingfock)
+rscorrelations|>eigspec|>visualize
+
 rg1 = @time zer(correlations)
+
+rg1correlations = rg1[:couriercorrelations]
+rg1correlations|>getoutspace|>getcrystal
+rgedcrystal = rg1correlations|>getoutspace|>getcrystal
+rgedspace = rgedcrystal|>getspace
+
+rg1region::Region = getsphericalregion(crystal=rgedcrystal, radius=2, metricspace=rgedspace|>orthospace)
+rg1seedingfock::RegionFock = quantize(rg1region, 1)
+rg1rscorrelations = regioncorrelations(rg1correlations,rg1seedingfock)
+rg1rscorrelations|>eigspec|>visualize
+
+rg2 = @time zer(rg1correlations)
+
+rg2correlations = rg2[:couriercorrelations]
+rg2correlations|>getoutspace|>getcrystal
+rg2edcrystal = rg2correlations|>getoutspace|>getcrystal
+rg2edspace = rg2edcrystal|>getspace
+
+rg2region::Region = getsphericalregion(crystal=rg2edcrystal, radius=2, metricspace=rg2edspace|>orthospace)
+rg2seedingfock::RegionFock = quantize(rg2region, 1)
+rg2rscorrelations = regioncorrelations(rg2correlations,rg2seedingfock)
+rg2rscorrelations|>eigspec|>visualize
+
+rg3 = @time zer(rg2correlations)
+
+rg3correlations = rg3[:couriercorrelations]
+rg3correlations|>getoutspace|>getcrystal
+rg3edcrystal = rg3correlations|>getoutspace|>getcrystal
+rg3edspace = rg3edcrystal|>getspace
+
+rg3region::Region = getsphericalregion(crystal=rg3edcrystal, radius=2, metricspace=rg3edspace|>orthospace)
+rg3seedingfock::RegionFock = quantize(rg3region, 1)
+rg3rscorrelations = regioncorrelations(rg3correlations,rg3seedingfock)
+rg3rscorrelations|>eigspec|>visualize
+
+rg4 = @time zer(rg3correlations)

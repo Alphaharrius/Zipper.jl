@@ -17,7 +17,7 @@ c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
 c3 = c6^2
 
 unitcell = Subset(pa, pb)
-crystal = Crystal(unitcell, [96, 96])
+crystal = Crystal(unitcell, [48, 48])
 reciprocalhashcalibration(crystal.sizes)
 
 modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
@@ -26,7 +26,7 @@ m0, m1 = members(modes)
 t_a = 0 + 0im
 t_b = 0 + 0im
 tₙ = -1 + 0im
-tₕ = 0.4im
+tₕ = 0.2im
 
 onsite = [
     (m1, m1) => t_b,
@@ -183,6 +183,11 @@ function zer(correlations)
         :wanniercourierstates=>wanniercourierstate|>RegionState,
         :rawcouriercorrelations=>couriercorrelations)
 end
+
+region::Region = getsphericalregion(crystal=crystal, radius=2, metricspace=space|>orthospace)
+seedingfock::RegionFock = quantize(region, 1)
+rscorrelations = regioncorrelations(correlations,seedingfock)
+rscorrelations|>eigspec|>visualize
 
 rg1 = @time zer(correlations)
 

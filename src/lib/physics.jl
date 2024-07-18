@@ -37,6 +37,7 @@ export bondmap
 Compute the momentum space energy spectrum within a `Crystal` brillouin zone for a given `bonds` generated from `bondmap`.
 """
 function computeenergyspectrum(bonds::FockMap; crystal::Crystal)::CrystalSpectrum
+# function computeenergyspectrum(bonds::FockMap; crystal::Crystal)
     bondmodes::Subset{Mode} = bonds|>getoutspace|>orderedmodes
     homefock::NormalFock = bonds|>getoutspace|>RegionFock|>unitcellfock
     transform = fourier(getcrystalfock(homefock, crystal), bondmodes|>RegionFock)
@@ -70,6 +71,7 @@ The `CrystalSpectrum` object that contains the ground state energy spectrum.
 # TODO: This function requires revisit as the performance is bad, but the results are correct.
 function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-7)::CrystalSpectrum
     perunitcellfillings > 0 || error("Filling must be positive!")
+    println((energyspectrum|>geteigenvalues|>length))
     
     unitcellvacancies::Integer = energyspectrum |> geteigenvectors |> values |> first |> getinspace |> dimension
     perunitcellfillings <= unitcellvacancies || error("Unable to fill more than $unitcellvacancies per unit cell!")
@@ -77,6 +79,8 @@ function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfilling
 
     groupedeigenvalues::Base.Generator = groupbyeigenvalues(energyspectrum, groupingthreshold=energyresolution)
     cumfillings::Vector = cumsum(modeset |> length for (_, modeset) in groupedeigenvalues)
+    println(cumfillings)
+    println(totalfillings)
     groupcollectcount::Integer = findfirst(v -> v >= totalfillings, cumfillings)
     contributions = Iterators.take(groupedeigenvalues, groupcollectcount)
     groundstatemodesets::Base.Generator = (modeset for (_, modeset) in contributions)

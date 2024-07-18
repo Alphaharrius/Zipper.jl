@@ -285,9 +285,6 @@ function wannierprojection(;
         inspace=FockSpace(approximated|>getinspace|>mapmodes(m->m|>setattr(:k=>k)|>removeattr(:r)))
         return FockMap(approximated, inspace=inspace, performpermute=false)
     end
-    if (precarioussvdvalues |> length) > 0
-        @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
-    end
 
     blocks = paralleltasks(
         name="wannierprojection",
@@ -295,6 +292,13 @@ function wannierprojection(;
             (k, k)=>approximateisometry(k, isometry, isometry' * crystalseeds[k])) 
             for (k, isometry) in crystalisometries),
         count=crystalisometries|>length)|>parallel|>Dict
+    if (precarioussvdvalues |> length) > 0
+        # println(precarioussvdvalues)
+        # minsvd = minimum(precarioussvdvalues)
+        # @warn("Precarious wannier projection with minimum svdvalue of",minsvd)
+        @warn("Precarious wannier projection with minimum svdvalue")
+    end
+    
     
     return crystalfockmap(crystal, wanniercrystal, blocks)
 end

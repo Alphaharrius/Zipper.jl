@@ -71,19 +71,35 @@ The `CrystalSpectrum` object that contains the ground state energy spectrum.
 # TODO: This function requires revisit as the performance is bad, but the results are correct.
 function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-7)::CrystalSpectrum
     perunitcellfillings > 0 || error("Filling must be positive!")
-    println((energyspectrum|>geteigenvalues|>length))
     
     unitcellvacancies::Integer = energyspectrum |> geteigenvectors |> values |> first |> getinspace |> dimension
     perunitcellfillings <= unitcellvacancies || error("Unable to fill more than $unitcellvacancies per unit cell!")
     totalfillings::Integer = (perunitcellfillings * (energyspectrum |> getcrystal |> vol)) |> round |> Int
 
     groupedeigenvalues::Base.Generator = groupbyeigenvalues(energyspectrum, groupingthreshold=energyresolution)
-    cumfillings::Vector = cumsum(modeset |> length for (_, modeset) in groupedeigenvalues)
-    println(cumfillings)
-    println(totalfillings)
+    if div(unitcellvacancies,2)==perunitcellfillings
+        @info("half filled case, may need to resolve the degeneracy")
+        modesets = []
+        for (eval, modeset) in groupedeigenvalues
+            if round(eval,digits=10)==0
+                mlist = [m for m in modeset]
+                push!(modesets,Subset(mlist[1:div(length(mlist),2)]))
+                push!(modesets,Subset(mlist[div(length(mlist),2)+1:end]))
+            else
+                push!(modesets,modeset)
+            end
+        end
+    else
+        modesets = [modeset for (_, modeset) in groupedeigenvalues]
+    end
+    cumfillings::Vector = cumsum(modeset |> length for modeset in modesets)
     groupcollectcount::Integer = findfirst(v -> v >= totalfillings, cumfillings)
-    contributions = Iterators.take(groupedeigenvalues, groupcollectcount)
-    groundstatemodesets::Base.Generator = (modeset for (_, modeset) in contributions)
+    # contributions = Iterators.take(groupedeigenvalues, groupcollectcount)
+    # groundstatemodesets::Base.Generator = (modeset for (_, modeset) in contributions)
+    # groundstatemodes::Subset{Mode} = groundstatemodesets |> subsetunion
+
+    contributions = Iterators.take(modesets, groupcollectcount)
+    groundstatemodesets::Base.Generator = (modeset for modeset in contributions)
     groundstatemodes::Subset{Mode} = groundstatemodesets |> subsetunion
 
     decoratedmodes::Base.Generator = ((m |> getattr(:k)) => m for m in groundstatemodes)

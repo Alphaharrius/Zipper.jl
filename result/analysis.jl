@@ -1,0 +1,228 @@
+using Zipper
+using LinearAlgebra,Plots
+plotlyjs()
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.1-localsize2")
+gmeraalldiffL1normtriviallocal2onsite01 = fioload("gmeraalldiffL1norm")
+gmera1triviallocal2onsite01firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1triviallocal2onsite01secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1triviallocal2onsite01thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2triviallocal2onsite01firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2triviallocal2onsite01secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2triviallocal2onsite01thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3triviallocal2onsite01firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3triviallocal2onsite01secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3triviallocal2onsite01thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera4triviallocal2onsite01firstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
+gmera4triviallocal2onsite01secondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
+gmera4triviallocal2onsite01thirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
+gmera4triviallocal2onsite01thirdlocalcorrelations|>eigspech|>visualize
+
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.1-localsize4")
+gmeraalldiffL1normtriviallocal4onsite01 = fioload("gmeraalldiffL1norm")
+gmera1triviallocal4onsite01firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1triviallocal4onsite01secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1triviallocal4onsite01thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2triviallocal4onsite01firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2triviallocal4onsite01secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2triviallocal4onsite01thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3triviallocal4onsite01firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3triviallocal4onsite01secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3triviallocal4onsite01thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera3triviallocal4onsite01secondlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.1-localsize8")
+gmeraalldiffL1normtriviallocal8onsite01 = fioload("gmeraalldiffL1norm")
+gmera1triviallocal8onsite01firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1triviallocal8onsite01secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1triviallocal8onsite01thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2triviallocal8onsite01firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2triviallocal8onsite01secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2triviallocal8onsite01thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera2triviallocal8onsite01thirdlocalcorrelations|>eigspech|>visualize
+
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.2-localsize2")
+gmeraalldiffL1normtriviallocal2onsite02 = fioload("gmeraalldiffL1norm")
+gmera1triviallocal2onsite02firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1triviallocal2onsite02secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1triviallocal2onsite02thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2triviallocal2onsite02firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2triviallocal2onsite02secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2triviallocal2onsite02thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3triviallocal2onsite02firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3triviallocal2onsite02secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3triviallocal2onsite02thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera4triviallocal2onsite02firstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
+gmera4triviallocal2onsite02secondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
+gmera4triviallocal2onsite02thirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
+gmera4triviallocal2onsite02thirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.2-localsize4")
+gmeraalldiffL1normtriviallocal4onsite02 = fioload("gmeraalldiffL1norm")
+gmera1triviallocal4onsite02firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1triviallocal4onsite02secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1triviallocal4onsite02thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2triviallocal4onsite02firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2triviallocal4onsite02secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2triviallocal4onsite02thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3triviallocal4onsite02firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3triviallocal4onsite02secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3triviallocal4onsite02thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera3triviallocal4onsite02secondlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.2-localsize8")
+gmeraalldiffL1normtriviallocal8onsite02 = fioload("gmeraalldiffL1norm")
+gmera1triviallocal8onsite02firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1triviallocal8onsite02secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1triviallocal8onsite02thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2triviallocal8onsite02firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2triviallocal8onsite02secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2triviallocal8onsite02thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera2triviallocal8onsite02thirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.2im-localsize2")
+gmeraalldiffL1normchernlocal2nnhopping02im = fioload("gmeraalldiffL1norm")
+gmera1chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1chernlocal2nnhopping02imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2chernlocal2nnhopping02imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
+gmera2chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3chernlocal2nnhopping02imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera4chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
+gmera4chernlocal2nnhopping02imsecondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
+gmera4chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
+gmera4chernlocal2nnhopping02imthirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.2im-localsize4")
+gmeraalldiffL1normchernlocal4nnhopping02im = fioload("gmeraalldiffL1norm")
+gmera1chernlocal4nnhopping02imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1chernlocal4nnhopping02imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1chernlocal4nnhopping02imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2chernlocal4nnhopping02imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2chernlocal4nnhopping02imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
+gmera2chernlocal4nnhopping02imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3chernlocal4nnhopping02imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3chernlocal4nnhopping02imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3chernlocal4nnhopping02imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera3chernlocal4nnhopping02imthirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.2im-localsize8")
+gmeraalldiffL1normchernlocal8nnhopping02im = fioload("gmeraalldiffL1norm")
+gmera1chernlocal8nnhopping02imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1chernlocal8nnhopping02imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1chernlocal8nnhopping02imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2chernlocal8nnhopping02imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2chernlocal8nnhopping02imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
+gmera2chernlocal8nnhopping02imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera2chernlocal8nnhopping02imthirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.4im-localsize2")
+gmeraalldiffL1normchernlocal2nnhopping04im = fioload("gmeraalldiffL1norm")
+gmera1chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1chernlocal2nnhopping04imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2chernlocal2nnhopping04imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
+gmera2chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3chernlocal2nnhopping04imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera4chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
+gmera4chernlocal2nnhopping04imsecondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
+gmera4chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
+gmera4chernlocal2nnhopping04imthirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.4im-localsize4")
+gmeraalldiffL1normchernlocal4nnhopping04im = fioload("gmeraalldiffL1norm")
+gmera1chernlocal4nnhopping04imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1chernlocal4nnhopping04imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1chernlocal4nnhopping04imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2chernlocal4nnhopping04imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2chernlocal4nnhopping04imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
+gmera2chernlocal4nnhopping04imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3chernlocal4nnhopping04imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
+gmera3chernlocal4nnhopping04imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3chernlocal4nnhopping04imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera1chernlocal4nnhopping04imthirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.4im-localsize8")
+gmeraalldiffL1normchernlocal8nnhopping04im = fioload("gmeraalldiffL1norm")
+gmera1chernlocal8nnhopping04imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1chernlocal8nnhopping04imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1chernlocal8nnhopping04imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
+gmera2chernlocal8nnhopping04imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2chernlocal8nnhopping04imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
+gmera2chernlocal8nnhopping04imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera2chernlocal8nnhopping04imthirdlocalcorrelations|>eigspech|>visualize
+
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/localsize2")
+gmeraalldiffL1normdiraclocal2 = fioload("gmeraalldiffL1norm")
+gmera1diraclocal2firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1diraclocal2secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1diraclocal2thirdlocalcorrelations= fioload("gmera1thirdlocalcorrelations")
+gmera2diraclocal2firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2diraclocal2secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2diraclocal2thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3diraclocal2firstlocalcorrelations= fioload("gmera3firstlocalcorrelations")
+gmera3diraclocal2secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3diraclocal2thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera4diraclocal2firstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
+gmera4diraclocal2secondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
+gmera4diraclocal2thirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
+gmera4diraclocal2thirdlocalcorrelations|>eigspech|>visualize
+
+diraclocal2blockedH = fioload("blockedH")
+diraclocal2blockedH|>crystalspectrum|>visualize
+gmera1diraclocal2firstcourierH = fioload("gmera1firstcourierH")
+gmera1diraclocal2firstcourierH|>crystalspectrum|>visualize
+gmera1diraclocal2secondcourierH = fioload("gmera1secondcourierH")
+gmera1diraclocal2secondcourierH|>crystalspectrum|>visualize
+
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/localsize4")
+gmeraalldiffL1normdiraclocal4 = fioload("gmeraalldiffL1norm")
+gmera1diraclocal4firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1diraclocal4secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1diraclocal4thirdlocalcorrelations= fioload("gmera1thirdlocalcorrelations")
+gmera2diraclocal4firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2diraclocal4secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2diraclocal4thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera3diraclocal4firstlocalcorrelations= fioload("gmera3firstlocalcorrelations")
+gmera3diraclocal4secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
+gmera3diraclocal4thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
+gmera3diraclocal4thirdlocalcorrelations|>eigspech|>visualize
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/localsize8")
+gmeraalldiffL1normdiraclocal8 = fioload("gmeraalldiffL1norm")
+gmera1diraclocal8firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
+gmera1diraclocal8secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1diraclocal8thirdlocalcorrelations= fioload("gmera1thirdlocalcorrelations")
+gmera2diraclocal8firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
+gmera2diraclocal8secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
+gmera2diraclocal8thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
+gmera2diraclocal8thirdlocalcorrelations|>eigspech|>visualize
+
+radius = [2,4,8]
+logradius = log.(radius)
+erroracrossradiustrivialonsite01 = log.([gmeraalldiffL1normtriviallocal2onsite01,gmeraalldiffL1normtriviallocal4onsite01,gmeraalldiffL1normtriviallocal8onsite01])
+erroracrossradiustrivialonsite02 = log.([gmeraalldiffL1normtriviallocal2onsite02,gmeraalldiffL1normtriviallocal4onsite02,gmeraalldiffL1normtriviallocal8onsite02])
+erroracrossradiusdirac = log.([gmeraalldiffL1normdiraclocal2,gmeraalldiffL1normdiraclocal4,gmeraalldiffL1normdiraclocal8])
+erroracrossradiuschernnnhopping02im = log.([gmeraalldiffL1normchernlocal2nnhopping02im,gmeraalldiffL1normchernlocal4nnhopping02im,gmeraalldiffL1normchernlocal8nnhopping02im])
+erroracrossradiuschernnnhopping04im = log.([gmeraalldiffL1normchernlocal2nnhopping04im,gmeraalldiffL1normchernlocal4nnhopping04im,gmeraalldiffL1normchernlocal8nnhopping04im])
+
+
+scatter(radius,erroracrossradiusdirac,label="Dirac: t/V=1/0=inf",xlabel="radius",ylabel = "log of L1 norm of diff",title = "log(error) of all rg vs radius")
+scatter!(radius,erroracrossradiustrivialonsite01,label="Trivial: t/V=1/0.1=10")
+scatter!(radius,erroracrossradiustrivialonsite02,label="Trivial: t/V=1/0.2=5")
+scatter!(radius,erroracrossradiuschernnnhopping02im,label="Chern: t=1,tt=0.2im")
+scatter!(radius,erroracrossradiuschernnnhopping04im,label="Chern: t=1,tt=0.4im")
+
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/testing")
+gmera1secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
+gmera1secondlocalcorrelations|>eigspech|>visualize

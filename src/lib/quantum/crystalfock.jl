@@ -73,7 +73,8 @@ Zipper.:getcrystal(crystalfock::CrystalFock)::Crystal = crystalfock.crystal
 A short hand to build the crystal fockspace, which is the fockspace containing all modes spanned from 
 `homefock` by the brillouin zone of the `crystal`.
 """
-@memoize function getcrystalfock(homefock::NormalFock, crystal::Crystal)
+# @memoize function getcrystalfock(homefock::NormalFock, crystal::Crystal)
+function getcrystalfock(homefock::NormalFock, crystal::Crystal)
     korderings::Dict{Momentum, Integer} = Dict(k=>n for (n, k) in crystal|>brillouinzone|>enumerate)
     return CrystalFock(crystal, korderings, homefock)
 end

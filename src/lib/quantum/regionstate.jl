@@ -70,6 +70,7 @@ function getregionstates(;
     localcorrelations::FockMap{RegionFock, RegionFock}, grouping::Vector{<:Integer})
 
     localspectrum::EigenSpectrum = localcorrelations|>eigspech
+    # display(localspectrum|>visualize)
     current = 1
     states = []
     for group in grouping

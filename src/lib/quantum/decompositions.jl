@@ -37,7 +37,7 @@ the individual degrees of freedom within the degenerate group; along with the at
 ### Output
 An `EigenSpectrum` object containing all the computed information.
 """
-function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-10)::EigenSpectrum
+function eigspech(hermitian::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-15)::EigenSpectrum
     vals, U = hermitian |> rep |> Matrix |> Hermitian |> eigen
     eigenvalues::Base.Iterators.Flatten = digesteigenvalues(Rational, Real, vals, groupingthreshold, attrs...)
     eigenvectors::FockMap = FockMap(hermitian |> getoutspace, FockSpace(m for (m, _) in eigenvalues), U)

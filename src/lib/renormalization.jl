@@ -122,6 +122,7 @@ The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `
 the brillouin zone of the `crystalfock`.
 """
 function crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
+    crystal = crystalfock|>getcrystal
     isometries = crystalisometries(
         localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
     isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)

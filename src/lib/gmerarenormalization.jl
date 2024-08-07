@@ -78,7 +78,7 @@ nearestneighbor = [
     correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
     H = CrystalFockMap(energyspectrum) |> CrystalDenseMap
 
-    return correlations,H
+    return bonds,correlations,H
 end
 export generatesystem
 
@@ -199,7 +199,7 @@ export localwannierization
 function globalwannierfunction(correlations::FockMap, localisometry::FockMap)
     wanniercrystalisos = gmeracrystalisometries(localisometry=localisometry, crystalfock=correlations|>getoutspace,addinspacemomentuminfo=true)
 
-    wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b)) for mode in localisometry|>getinspace |> orderedmodes)
+    wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b))+(mode |> getattr(:r)) for mode in localisometry|>getinspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, (correlations|>getoutspace|> getcrystal).sizes)
 
     blocks = Dict(((k, k)=>isometry) for (k, isometry) in wanniercrystalisos|>Dict)
@@ -265,6 +265,8 @@ function checkintersectbyeculidean(region::Subset{Offset},blockedregion::Subset{
 end
 export checkintersectbyeculidean
 
+# function eecontrour()
+
 function gmerafirststepbycount(blockedcorrelations,blockedH,noofcouriermodes::Number,noofflavourpermode::Number)
     blockedcrystal = blockedcorrelations|>getoutspace|>getcrystal
     blockedspace::RealSpace = blockedcrystal|>getspace
@@ -311,6 +313,10 @@ function gmerafirststepbycount(blockedcorrelations,blockedH,noofcouriermodes::Nu
     localemptyisometry = localstates[3]|>FockMap
     courierproj = localcourierisometry*localcourierisometry'
 
+    fiosave(localcourierisometry, name="localcourierisometry")
+    fiosave(localfilledisometry, name="localfilledisometry")
+    fiosave(localemptyisometry, name="localemptyisometry")
+
     nooflocalcourierseeds = div(noofcouriermodes,6)
     reduandancy = length((siteAregionfock1|>orderedmodes))-nooflocalcourierseeds
 
@@ -347,6 +353,7 @@ function gmerafirststepbycount(blockedcorrelations,blockedH,noofcouriermodes::Nu
     courierseeds = allseedsstates|>FockMap
 
     localwanniercourier,minsvd = localwannierization(localcourierisometry, courierseeds)
+    fiosave(localwanniercourier, name="localwanniercourier")
     # display((wanniercourier'*localcorrelations*wanniercourier)|>eigspec|>visualize)
 
     localwannierresults =  Dict(:localwanniercourier => localwanniercourier,:localfilledisometry => localfilledisometry,
@@ -441,6 +448,10 @@ function gmerafirststepbycount(blockedcorrelations,blockedH,noofcouriermodes::Nu
     wanniercourierisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedcourier[:,refunictcellfockcourier])
     globalfilledisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedfilled[:,refunictcellfockfilled])
     globalemptyisometry = globalwannierfunction(blockedcorrelations,extendedwannierizedempty[:,refunictcellfockempty])
+
+    fiosave(wanniercourierisometry, name="wanniercourierisometry")
+    fiosave(globalfilledisometry, name="globalfilledisometry")
+    fiosave(globalfilledisometry, name="globalemptyisometry")
 
     @info "Computing local courier states..."
     leftrestrict = fourier(wanniercourierisometry|>getoutspace, firsthexagonalregionfock) / (blockedcrystal|>vol|>sqrt)
@@ -921,7 +932,7 @@ function firstgmerastep(correlations,H,scaling)
     gmera1secondstepdata = gmerasecondstepbycount(gmera1firststepdata[:couriercorrelations],gmera1firststepdata[:courierH],noofcouriermodesinsecondstep,(noofcouriermodesinfirststep/6)|>Int)
     gmera1thirdstepdata = gmerathirdstepbycount(gmera1secondstepdata[:couriercorrelations],gmera1secondstepdata[:courierH],noofcouriermodesinthirdstep,(noofcouriermodesinsecondstep/6)|>Int)
 
-    noofflavourpermodeforintermediate = (noofcouriermodesinthirdstep/6)|>Int
+    noofflavourpermodeforlaterrg = (noofcouriermodesinthirdstep/6)|>Int
 
     gmera1firstapproximation = gmera1firststepdata[:globalemptyisometry]*gmera1firststepdata[:globalemptyisometry]'
     gmera1secondapproximation = (gmera1firststepdata[:wanniercourierisometry]*gmera1secondstepdata[:globalemptyisometry])*(gmera1firststepdata[:wanniercourierisometry]*gmera1secondstepdata[:globalemptyisometry])'
@@ -976,7 +987,7 @@ function firstgmerastep(correlations,H,scaling)
     rg1correlations = gmera1thirdstepdata[:couriercorrelations]
 
     rg1H = gmera1thirdstepdata[:courierH]   
-    return  rg1H,rg1correlations,couriercomposemapgmera1,gmera1approximatecorrelation,blockedcorrelations,noofflavourpermodeforintermediate
+    return  rg1H,rg1correlations,couriercomposemapgmera1,gmera1approximatecorrelation,blockedcorrelations,noofflavourpermodeforlaterrg
 end
 export firstgmerastep
 
@@ -998,6 +1009,8 @@ function intermediategmerastep(rgcorrelations,rgH,couriercomposemap,gmerprevsuma
     gmerathirdapproximation = (couriercomposemap*gmerafirststepdata[:wanniercourierisometry]*gmerasecondstepdata[:wanniercourierisometry]*gmerathirdstepdata[:globalemptyisometry])*(couriercomposemap*gmerafirststepdata[:wanniercourierisometry]*gmerasecondstepdata[:wanniercourierisometry]*gmerathirdstepdata[:globalemptyisometry])'
     
     couriercomposemapgmera = couriercomposemap*(gmerafirststepdata[:wanniercourierisometry]*gmerasecondstepdata[:wanniercourierisometry]*gmerathirdstepdata[:wanniercourierisometry])
+    rgsteps = prod([string(i) for i in rgstep])
+    fiosave(couriercomposemapgmera, name="gmera$rgsteps"*"couriercomposemapgmera")
 
     gmeraapproximatecorrelation = gmerafirstapproximation + gmerasecondapproximation  + gmerathirdapproximation
     fiosave(gmeraapproximatecorrelation, name="gmera$rgstep"*"approximatecorrelation")
@@ -1046,8 +1059,9 @@ function intermediategmerastep(rgcorrelations,rgH,couriercomposemap,gmerprevsuma
 
     rgcorrelations = gmerathirdstepdata[:couriercorrelations]
     rgH = gmerathirdstepdata[:courierH]   
-    gmerasumapproximatecorrelation = gmerprevsumapproximatecorrelation+gmeraapproximatecorrelation
-    return  rgH,rgcorrelations,couriercomposemapgmera,gmerasumapproximatecorrelation
+    gmerasumapproximatecorrelationsofar = gmerprevsumapproximatecorrelation+gmeraapproximatecorrelation
+    fiosave(gmerasumapproximatecorrelationsofar, name="gmera$rgsteps"*"approximatecorrelationsofar")
+    return  rgH,rgcorrelations,couriercomposemapgmera,gmerasumapproximatecorrelationsofar
 end
 export intermediategmerastep
 
@@ -1074,14 +1088,14 @@ function finalgmerastep(rgcorrelations,rgH,couriercomposemap,gmerprevsumapproxim
     fiosave(gmeraallapproximatecorrelation, name="gmeraallapproximatecorrelation")
 
     gmeraalldiff = blockedcorrelations - gmeraallapproximatecorrelation
-    gmeraalldiff = gmeraalldiff
+    fiosave(gmeraalldiff, name="gmeraalldiff")
 
     @info("calculating L1 norm of the difference between the blocked correlations and the approximate correlation")
     gmeraalldiffL1norm = focktraceL1norm(gmeraalldiff,systemsize^2*6)
     fiosave(gmeraalldiffL1norm, name="gmeraalldiffL1norm")
 
-    @info("calculating L2 norm of the difference between the blocked correlations and the approximate correlation")
-    gmeraalldiffL2norm = focktraceL2norm(gmeraalldiff,systemsize^2*6)
-    fiosave(gmeraalldiffL2norm, name="gmeraalldiffL2norm")
+    # @info("calculating L2 norm of the difference between the blocked correlations and the approximate correlation")
+    # gmeraalldiffL2norm = focktraceL2norm(gmeraalldiff,systemsize^2*6)
+    # fiosave(gmeraalldiffL2norm, name="gmeraalldiffL2norm")
 end
 export finalgmerastep

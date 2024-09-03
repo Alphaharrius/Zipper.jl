@@ -28,17 +28,6 @@ function generatesystem(t_a,t_b,tₙ,tₕ,systemsize::Number)
     (m5, m5) => t_b
 ]
 
-# nearestneighbor = [
-#         (m1, m0) => tₙ,
-#         (m2, m5|> setattr(:r => [-1, 1] ∈ triangular)) => -tₙ,
-#         (m1, m2) => tₙ,
-#         (m3, m2) => tₙ,
-#         (m4, m1|> setattr(:r => [1, 0] ∈ triangular)) => -tₙ,
-#         (m3, m4) => tₙ,
-#         (m5, m4) => tₙ,
-#         (m0, m3|> setattr(:r => [0, -1] ∈ triangular)) => -tₙ,
-#         (m5, m0) => tₙ]
-
 nearestneighbor = [
         (m1, m0) => tₙ,
         (m1, m4|> setattr(:r => [-1, 0] ∈ triangular)) => tₙ,
@@ -82,6 +71,13 @@ nearestneighbor = [
 end
 export generatesystem
 
+function ee(eval::Number)
+    if 0<round(eval,digits=10)<1
+        return (-eval*log(eval)-(1-eval)*log((1-eval)))
+    end
+end
+export ee
+
 function focktraceL1norm(fockmap,systemsize)
     fockmap = fockmap|>CrystalFockMap
     modeevalpairs = fockmap|>eigspech|>geteigenvalues
@@ -113,22 +109,21 @@ localisometries(
     regioncorrelations(correlations, regionfock) |> selectionstrategy)
 export localisometries
 
-function sortgroupdictwifdist(dict::Dict{Mode, Number},rev::Bool)
+function sortgroupdictwifdist(dict::Dict{Mode, Number},rev::Bool,roundingdigit::Int64=8)
     sortedtupledata = sort([(abs(value),key) for (key,value) in dict],rev=rev,by=first)
-    refvalue = round(sortedtupledata[1][1],digits=8)
+    refvalue = round(sortedtupledata[1][1],digits=roundingdigit)
     result = []
     subresult = Subset(sortedtupledata[1][2])
     for pair in sortedtupledata
-        if round(pair[1],digits=8)==refvalue
+        if round(pair[1],digits=roundingdigit)==refvalue
             subresult = subresult+Subset(pair[2])
         else
             append!(result,tuple([refvalue,subresult]))
-            refvalue = round(pair[1],digits=8)
+            refvalue = round(pair[1],digits=roundingdigit)
             subresult = Subset(pair[2])
         end
     end
     append!(result,tuple([refvalue,subresult]))
-
     return result
 end
 export sortgroupdictwifdist
@@ -199,7 +194,7 @@ export localwannierization
 function globalwannierfunction(correlations::FockMap, localisometry::FockMap)
     wanniercrystalisos = gmeracrystalisometries(localisometry=localisometry, crystalfock=correlations|>getoutspace,addinspacemomentuminfo=true)
 
-    wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b))+(mode |> getattr(:r)) for mode in localisometry|>getinspace |> orderedmodes)
+    wannierunitcell::Subset{Offset} = Subset((mode |> getattr(:b)) for mode in localisometry|>getinspace |> orderedmodes)
     wanniercrystal::Crystal = Crystal(wannierunitcell, (correlations|>getoutspace|> getcrystal).sizes)
 
     blocks = Dict(((k, k)=>isometry) for (k, isometry) in wanniercrystalisos|>Dict)
@@ -214,9 +209,7 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
     addinspacemomentuminfo::Bool = false)
 
     crystal::Crystal = getcrystal(crystalfock)
-    fouriermap::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) 
-    # momentumfouriers::Base.Generator = rowsubmaps(fouriermap)
-    bz::Subset{Momentum} = brillouinzone(crystal)
+    transform::FockMap = fourier(crystalfock, localisometry|>getoutspace|>RegionFock) 
 
     function preprocesslocalisometry(k::Momentum)::FockMap
         if !addinspacemomentuminfo
@@ -228,7 +221,7 @@ function gmeracrystalisometries(; localisometry::FockMap, crystalfock::CrystalFo
 
     isometries = paralleltasks(
         name="crystalisometries",
-        tasks=(()->(k=>fouriermap[getsubspace(crystalfock, k), :]*preprocesslocalisometry(k)) for k in crystal|>brillouinzone),
+        tasks=(()->(k=>transform[getsubspace(crystalfock, k), :]*preprocesslocalisometry(k)) for k in crystal|>brillouinzone),
         count=crystal|>vol)|>parallel
 
     return isometries

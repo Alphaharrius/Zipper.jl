@@ -234,6 +234,17 @@ function Base.:*(left::InvFourierMap, right::FourierMap)
         getconquerer(.+), multiplied, count=left.data|>length, desc="InvFourierMap * FourierMap")
 end
 
+# function Base.:*(left::FourierMap, right::InvFourierMap)
+#     multiplied = paralleltasks(
+#         name="FourierMap * InvFourierMap",
+#         tasks=(()->left.data[k]*block for (k, block) in right.data),
+#         count=right.data|>length)|>parallel
+#     return paralleldivideconquer(
+#         getconquerer(.+), multiplied, count=right.data|>length, desc="FourierMap * InvFourierMap")
+# end
+
+Base.:*(::FourierMap, ::InvFourierMap) = notimplemented()
+
 Base.:/(fockmap::FourierMapType, v::Number) = fockmap * (1/v)
 
 function Base.:*(left::FourierMap{T}, right::SparseFockMap{T, O}) where {T, O}
@@ -244,7 +255,6 @@ function Base.:*(left::FourierMap{T}, right::SparseFockMap{T, O}) where {T, O}
     return FourierMap(left.crystal, right|>getinspace, multiplied)
 end
 
-Base.:*(::FourierMap, ::InvFourierMap) = notimplemented()
 
 """ Diagonal composition. """
 function Base.broadcasted(::typeof(*), left::FourierMap, right::InvFourierMap)

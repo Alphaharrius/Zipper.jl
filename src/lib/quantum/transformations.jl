@@ -68,7 +68,7 @@ function Base.:*(transformation::AffineTransform, regionfock::RegionFock)::FockM
     return FockMap(outmodes |> RegionFock, regionfock, connections)
 end
 
-@memoize function gettransform(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap
+@memoize function gettransform(g::AffineTransform, crystalfock::CrystalFock)
     homefock::FockSpace = crystalfock|>unitcellfock
     homefocktransform::FockMap = g * RegionFock(homefock)
     ksubspaces::Dict{Momentum, FockSpace} = crystalfock |> crystalsubspaces |> Dict

@@ -95,7 +95,7 @@ end
     return crystalfockmap(crystal, crystal, blocks)
 end
 
-Base.:*(g::AffineTransform, crystalfock::CrystalFock)::CrystalFockMap = gettransform(g, crystalfock)
+Base.:*(g::AffineTransform, crystalfock::CrystalFock) = gettransform(g, crystalfock)
 
 Base.:*(g::AffineTransform, fockmap::CrystalFockMap) = (g * getoutspace(fockmap)) * fockmap
 

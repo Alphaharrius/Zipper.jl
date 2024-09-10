@@ -281,3 +281,34 @@ function wannierprojection(;
     return crystalfockmap(crystal, wanniercrystal, blocks)
 end
 export wannierprojection
+
+"""
+    svdrebase(inputbands::CrystalSpectrum, targetbands::CrystalSpectrum)
+
+Map the `inputbands` to the basis spanning the `targetbands` using the SVD projection.
+
+### Output
+The purified `CrystalSpectrum` object with the same span of the input bands.
+"""
+function svdrebase(inputbands::CrystalSpectrum, targetbands::CrystalSpectrum)
+    function rebase(k, ψ, Φ)
+        ϕ = Φ[k]
+        p = ϕ'ψ
+        u, s, vd = p|>svd
+        @assert all([v for (_, v) in s].>0.9)
+        m = u*vd
+        return k=>ϕ*m
+    end
+
+    purified = paralleltasks(
+        name="svdrebase",
+        tasks=(
+            ()->rebase(k, ψ, targetbands|>geteigenvectors) 
+            for (k, ψ) in inputbands|>geteigenvectors),
+        count=inputbands|>geteigenvectors|>length)|>parallel|>Dict
+
+    return CrystalSpectrum{inputbands|>getcrystal|>dimension}(
+        inputbands|>getcrystal, inputbands|>geteigenmodes, inputbands|>geteigenvalues, 
+        purified, inputbands.bandcount)
+end
+export svdrebase

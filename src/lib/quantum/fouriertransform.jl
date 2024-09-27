@@ -258,12 +258,12 @@ end
 
 """ Diagonal composition. """
 function Base.broadcasted(::typeof(*), left::FourierMap, right::InvFourierMap)
-    @assert(left.crystal == right.crystal)
+    # @assert(left.crystal == right.crystal)
     multiplied = paralleltasks(
         name="FourierMap * InvFourierMap",
         tasks=(()->(k, k)=>block*right.data[k] for (k, block) in left.data),
         count=left.data|>length)|>parallel|>Dict
-    return crystalfockmap(left.crystal, left.crystal, multiplied)
+    return crystalfockmap(left.crystal, right.crystal, multiplied)
 end
 
 function Base.:transpose(fockmap::FourierMapType)

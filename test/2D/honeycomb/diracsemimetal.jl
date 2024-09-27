@@ -26,7 +26,7 @@ modes::Subset{Mode} = quantize(unitcell, 1)|>orderedmodes
 m0, m1 = members(modes)
 
 t_a = 0 + 0im
-t_b = 0 + 0im
+t_b = -0 + 0im
 tₙ = -1 + 0im
 
 onsite = [
@@ -47,6 +47,12 @@ sort([(mode,abs(eval)) for (mode,eval) in energyspectrum|>geteigenvalues],by=x->
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstateprojector = groundstates|>crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
+
+crystalfock = correlations|>getoutspace
+localrestrict = fourier(crystalfock, quantize(unitcell,1)) / (crystal|>vol|>sqrt)
+localcorrelations = localrestrict'*correlations*localrestrict
+[(localcorrelations[mode,mode]|>rep)[1,1]|>abs for mode in quantize(unitcell,1)]
+
 
 function zer(correlations)
     @info("Starting RG...")

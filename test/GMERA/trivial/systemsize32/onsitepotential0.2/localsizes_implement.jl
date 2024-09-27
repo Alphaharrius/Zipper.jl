@@ -24,7 +24,7 @@ scalingswifnoofrgsteps = [(2^i,power-i+1) for i in 1:power-1]
 for (scaling,noofrgsteps) in scalingswifnoofrgsteps
     fiodir("../../../../../../../../storage/data/slwongag/GMERA/trivial/systemsize$systemsize/onsitepotential$onsitepotential-localsize$scaling")
     @info("first gmera step")
-    rgH,rgcorrelations,couriercomposemap,gmeraapproximatecorrelationsofar,blockedcorrelations,noofflavourpermodeforlaterrg = firstgmerastep(correlations,H,scaling)
+    rgH,rgcorrelations,couriercomposemap,gmeraapproximatecorrelationsofar,blockedcorrelations, noofflavourpermodeforlaterrg= firstgmerastep(correlations,H,scaling)
     refcorrelations = rgcorrelations
     refH = rgH
     refgmeraapproximatecorrelation = gmeraapproximatecorrelationsofar
@@ -32,7 +32,7 @@ for (scaling,noofrgsteps) in scalingswifnoofrgsteps
     for rgstep in 2:noofrgsteps
         if rgstep == noofrgsteps
             @info("final gmera step")
-            finalgmerastep(refcorrelations,refH,refcouriercomposemap,refgmeraapproximatecorrelation,blockedcorrelations,rgstep,noofflavourpermodeforlaterrg,systemsize)
+            finalgmerastep(refcorrelations,refH,refcouriercomposemap,refgmeraapproximatecorrelation,blockedcorrelations,rgstep,systemsize,noofflavourpermodeforlaterrg)
         else
             @info("intermediate gmera step")
             rgH,rgcorrelations,couriercomposemap,gmeraapproximatecorrelationsofar = intermediategmerastep(refcorrelations,refH,refcouriercomposemap,refgmeraapproximatecorrelation,rgstep,noofflavourpermodeforlaterrg)

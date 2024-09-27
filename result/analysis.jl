@@ -1,228 +1,292 @@
 using Zipper
 using LinearAlgebra,Plots
 plotlyjs()
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.1-localsize2")
-gmeraalldiffL1normtriviallocal2onsite01 = fioload("gmeraalldiffL1norm")
-gmera1triviallocal2onsite01firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1triviallocal2onsite01secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1triviallocal2onsite01thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2triviallocal2onsite01firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2triviallocal2onsite01secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2triviallocal2onsite01thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3triviallocal2onsite01firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3triviallocal2onsite01secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3triviallocal2onsite01thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera4triviallocal2onsite01firstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
-gmera4triviallocal2onsite01secondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
-gmera4triviallocal2onsite01thirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
-gmera4triviallocal2onsite01thirdlocalcorrelations|>eigspech|>visualize
+
+# Dirac
+#systemsize24
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize2/")
+size24local2gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
+size24local2blockedcorrelations = fioload("blockedcorrelations")
+size24local2blockedcrystalfock = size24local2blockedcorrelations|>getoutspace
+size24local2blockedcrystal::Crystal = size24local2blockedcrystalfock|>getcrystal
+size24local2blockedspace::RealSpace = size24local2blockedcrystal|>getspace
+
+refrot = inv([2/3 -1/3; -1/3 2/3]')
+c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+c3 = c6^2
+size24local2center = [0,0] ∈ size24local2blockedspace
+size24local2hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local2blockedcrystal, center=size24local2center, metricspace=size24local2blockedspace)
+size24local2hexagonalregionfock = quantize(size24local2hexagonalregion,1)
+
+# @info "Computing local correlations..."
+size24local2localrestrict = fourier(size24local2blockedcrystalfock, size24local2hexagonalregionfock) / (size24local2blockedcrystal|>vol|>sqrt)
+size24local2localcorrelations = size24local2localrestrict'*size24local2blockedcorrelations*size24local2localrestrict
+
+size24local2localspectrum = size24local2localcorrelations|>eigspec
+size24local2localspectrum|>visualize|>display
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize4/")
+size24local4gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
+size24local4blockedcorrelations = fioload("blockedcorrelations")
+size24local4blockedcrystalfock = size24local4blockedcorrelations|>getoutspace
+size24local4blockedcrystal::Crystal = size24local4blockedcrystalfock|>getcrystal
+size24local4blockedspace::RealSpace = size24local4blockedcrystal|>getspace
+
+refrot = inv([2/3 -1/3; -1/3 2/3]')
+c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+c3 = c6^2
+size24local4center = [0,0] ∈ size24local4blockedspace
+size24local4hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local4blockedcrystal, center=size24local4center, metricspace=size24local4blockedspace)
+size24local4hexagonalregionfock = quantize(size24local4hexagonalregion,1)
+
+# @info "Computing local correlations..."
+size24local4localrestrict = fourier(size24local4blockedcrystalfock, size24local4hexagonalregionfock) / (size24local4blockedcrystal|>vol|>sqrt)
+size24local4localcorrelations = size24local4localrestrict'*size24local4blockedcorrelations*size24local4localrestrict
+
+size24local4localspectrum = size24local4localcorrelations|>eigspec
+size24local4localspectrum|>visualize|>display
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize6/")
+size24local6gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
+size24local6blockedcorrelations = fioload("blockedcorrelations")
+size24local6blockedcrystalfock = size24local6blockedcorrelations|>getoutspace
+size24local6blockedcrystal::Crystal = size24local6blockedcrystalfock|>getcrystal
+size24local6blockedspace::RealSpace = size24local6blockedcrystal|>getspace
+
+refrot = inv([2/3 -1/3; -1/3 2/3]')
+c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+c3 = c6^2
+size24local6center = [0,0] ∈ size24local6blockedspace
+size24local6hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local6blockedcrystal, center=size24local6center, metricspace=size24local6blockedspace)
+size24local6hexagonalregionfock = quantize(size24local6hexagonalregion,1)
+
+# @info "Computing local correlations..."
+size24local6localrestrict = fourier(size24local6blockedcrystalfock, size24local6hexagonalregionfock) / (size24local6blockedcrystal|>vol|>sqrt)
+size24local6localcorrelations = size24local6localrestrict'*size24local6blockedcorrelations*size24local6localrestrict
+size24local6localspectrum = eigspec(size24local6localcorrelations,groupingthreshold=1e-15)
+size24local6localspectrum|>visualize|>display
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize8/")
+size24local8gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
+size24local8blockedcorrelations = fioload("blockedcorrelations")
+size24local8blockedcrystalfock = size24local8blockedcorrelations|>getoutspace
+size24local8blockedcrystal::Crystal = size24local8blockedcrystalfock|>getcrystal
+size24local8blockedspace::RealSpace = size24local8blockedcrystal|>getspace
+
+refrot = inv([2/3 -1/3; -1/3 2/3]')
+c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+c3 = c6^2
+size24local8center = [0,0] ∈ size24local8blockedspace
+size24local8hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local8blockedcrystal, center=size24local8center, metricspace=size24local8blockedspace)
+size24local8hexagonalregionfock = quantize(size24local8hexagonalregion,1)
+
+# @info "Computing local correlations..."
+size24local8localrestrict = fourier(size24local8blockedcrystalfock, size24local8hexagonalregionfock) / (size24local8blockedcrystal|>vol|>sqrt)
+size24local8localcorrelations = size24local8localrestrict'*size24local8blockedcorrelations*size24local8localrestrict
+size24local8localspectrum = eigspec(size24local8localcorrelations,groupingthreshold=1e-10)
+size24local8localspectrum|>visualize|>display
+
+sort([abs(eval) for (_,eval) in size24local8localspectrum|>geteigenvalues])[97]
+sort([abs(eval) for (_,eval) in size24local8localspectrum|>geteigenvalues])[96]
+
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize12/")
+size24local12gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
+size24local12blockedcorrelations = fioload("blockedcorrelations")
+size24local12blockedcrystalfock = size24local12blockedcorrelations|>getoutspace
+size24local12blockedcrystal::Crystal = size24local12blockedcrystalfock|>getcrystal
+size24local12blockedspace::RealSpace = size24local12blockedcrystal|>getspace
+
+refrot = inv([2/3 -1/3; -1/3 2/3]')
+c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
+c3 = c6^2
+size24local12center = [0,0] ∈ size24local12blockedspace
+size24local12hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local12blockedcrystal, center=size24local12center, metricspace=size24local12blockedspace)
+size24local12hexagonalregionfock = quantize(size24local12hexagonalregion,1)
+
+# @info "Computing local correlations..."
+size24local12localrestrict = fourier(size24local12blockedcrystalfock, size24local12hexagonalregionfock) / (size24local12blockedcrystal|>vol|>sqrt)
+size24local12localcorrelations = size24local12localrestrict'*size24local12blockedcorrelations*size24local12localrestrict
+size24local12localspectrum = eigspec(size24local12localcorrelations,groupingthreshold=1e-17)
+size24local12localspectrum|>visualize|>display
+
+sort([abs(eval) for (m,eval) in size24local12localspectrum|>geteigenvalues])[217]
+sort([abs(eval) for (m,eval) in size24local12localspectrum|>geteigenvalues])[216]
 
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.1-localsize4")
-gmeraalldiffL1normtriviallocal4onsite01 = fioload("gmeraalldiffL1norm")
-gmera1triviallocal4onsite01firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1triviallocal4onsite01secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1triviallocal4onsite01thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2triviallocal4onsite01firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2triviallocal4onsite01secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2triviallocal4onsite01thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3triviallocal4onsite01firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3triviallocal4onsite01secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3triviallocal4onsite01thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera3triviallocal4onsite01secondlocalcorrelations|>eigspech|>visualize
+radius_list = [2,4,6,8,12]
+radius_list = [2,4,6,8]
+# size24L1normdirac_list = log.([size24local2gmeraalldiffL1normdirac,size24local4gmeraalldiffL1normdirac,size24local6gmeraalldiffL1normdirac,size24local8gmeraalldiffL1normdirac,size24local12gmeraalldiffL1normdirac])
+size24L1normdirac_list = log.([size24local2gmeraalldiffL1normdirac,size24local4gmeraalldiffL1normdirac,size24local6gmeraalldiffL1normdirac,size24local8gmeraalldiffL1normdirac])
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.1-localsize8")
-gmeraalldiffL1normtriviallocal8onsite01 = fioload("gmeraalldiffL1norm")
-gmera1triviallocal8onsite01firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1triviallocal8onsite01secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1triviallocal8onsite01thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2triviallocal8onsite01firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2triviallocal8onsite01secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2triviallocal8onsite01thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera2triviallocal8onsite01thirdlocalcorrelations|>eigspech|>visualize
+#systemsize48
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize48/localsize2/")
+size48local2gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
 
+# Trivial 
+#onsite0.05
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize2")
+size24local2gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.2-localsize2")
-gmeraalldiffL1normtriviallocal2onsite02 = fioload("gmeraalldiffL1norm")
-gmera1triviallocal2onsite02firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1triviallocal2onsite02secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1triviallocal2onsite02thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2triviallocal2onsite02firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2triviallocal2onsite02secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2triviallocal2onsite02thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3triviallocal2onsite02firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3triviallocal2onsite02secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3triviallocal2onsite02thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera4triviallocal2onsite02firstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
-gmera4triviallocal2onsite02secondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
-gmera4triviallocal2onsite02thirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
-gmera4triviallocal2onsite02thirdlocalcorrelations|>eigspech|>visualize
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize4")
+size24local4gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.2-localsize4")
-gmeraalldiffL1normtriviallocal4onsite02 = fioload("gmeraalldiffL1norm")
-gmera1triviallocal4onsite02firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1triviallocal4onsite02secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1triviallocal4onsite02thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2triviallocal4onsite02firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2triviallocal4onsite02secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2triviallocal4onsite02thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3triviallocal4onsite02firstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3triviallocal4onsite02secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3triviallocal4onsite02thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera3triviallocal4onsite02secondlocalcorrelations|>eigspech|>visualize
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize6")
+size24local6gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize32/onsitepotential0.2-localsize8")
-gmeraalldiffL1normtriviallocal8onsite02 = fioload("gmeraalldiffL1norm")
-gmera1triviallocal8onsite02firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1triviallocal8onsite02secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1triviallocal8onsite02thirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2triviallocal8onsite02firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2triviallocal8onsite02secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2triviallocal8onsite02thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera2triviallocal8onsite02thirdlocalcorrelations|>eigspech|>visualize
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize8")
+size24local8gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.2im-localsize2")
-gmeraalldiffL1normchernlocal2nnhopping02im = fioload("gmeraalldiffL1norm")
-gmera1chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1chernlocal2nnhopping02imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2chernlocal2nnhopping02imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
-gmera2chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3chernlocal2nnhopping02imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera4chernlocal2nnhopping02imfirstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
-gmera4chernlocal2nnhopping02imsecondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
-gmera4chernlocal2nnhopping02imthirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
-gmera4chernlocal2nnhopping02imthirdlocalcorrelations|>eigspech|>visualize
+# fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize12")
+# size24local12gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.2im-localsize4")
-gmeraalldiffL1normchernlocal4nnhopping02im = fioload("gmeraalldiffL1norm")
-gmera1chernlocal4nnhopping02imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1chernlocal4nnhopping02imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1chernlocal4nnhopping02imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2chernlocal4nnhopping02imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2chernlocal4nnhopping02imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
-gmera2chernlocal4nnhopping02imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3chernlocal4nnhopping02imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3chernlocal4nnhopping02imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3chernlocal4nnhopping02imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera3chernlocal4nnhopping02imthirdlocalcorrelations|>eigspech|>visualize
+# size24L1normtrivialonsite005_list = log.([size24local2gmeraalldiffL1normtrivialonsite005,size24local4gmeraalldiffL1normtrivialonsite005,size24local6gmeraalldiffL1normtrivialonsite005,size24gmeraalldiffL1normtriviallocal8onsite005,size24gmeraalldiffL1normtriviallocal12onsite005])
+size24L1normtrivialonsite005_list = log.([size24local2gmeraalldiffL1normtrivialonsite005,size24local4gmeraalldiffL1normtrivialonsite005,size24local6gmeraalldiffL1normtrivialonsite005,size24local8gmeraalldiffL1normtrivialonsite005])
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.2im-localsize8")
-gmeraalldiffL1normchernlocal8nnhopping02im = fioload("gmeraalldiffL1norm")
-gmera1chernlocal8nnhopping02imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1chernlocal8nnhopping02imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1chernlocal8nnhopping02imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2chernlocal8nnhopping02imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2chernlocal8nnhopping02imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
-gmera2chernlocal8nnhopping02imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera2chernlocal8nnhopping02imthirdlocalcorrelations|>eigspech|>visualize
+#onsite0.1
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize2")
+size24local2gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.4im-localsize2")
-gmeraalldiffL1normchernlocal2nnhopping04im = fioload("gmeraalldiffL1norm")
-gmera1chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1chernlocal2nnhopping04imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2chernlocal2nnhopping04imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
-gmera2chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3chernlocal2nnhopping04imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera4chernlocal2nnhopping04imfirstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
-gmera4chernlocal2nnhopping04imsecondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
-gmera4chernlocal2nnhopping04imthirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
-gmera4chernlocal2nnhopping04imthirdlocalcorrelations|>eigspech|>visualize
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize4")
+size24local4gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.4im-localsize4")
-gmeraalldiffL1normchernlocal4nnhopping04im = fioload("gmeraalldiffL1norm")
-gmera1chernlocal4nnhopping04imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1chernlocal4nnhopping04imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1chernlocal4nnhopping04imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2chernlocal4nnhopping04imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2chernlocal4nnhopping04imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
-gmera2chernlocal4nnhopping04imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3chernlocal4nnhopping04imfirstlocalcorrelations = fioload("gmera3firstlocalcorrelations")
-gmera3chernlocal4nnhopping04imsecondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3chernlocal4nnhopping04imthirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera1chernlocal4nnhopping04imthirdlocalcorrelations|>eigspech|>visualize
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize6")
+size24local6gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize32/nnhopping0.0 + 0.4im-localsize8")
-gmeraalldiffL1normchernlocal8nnhopping04im = fioload("gmeraalldiffL1norm")
-gmera1chernlocal8nnhopping04imfirstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1chernlocal8nnhopping04imsecondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1chernlocal8nnhopping04imthirdlocalcorrelations = fioload("gmera1thirdlocalcorrelations")
-gmera2chernlocal8nnhopping04imfirstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2chernlocal8nnhopping04imsecondlocalcorrelations  = fioload("gmera2secondlocalcorrelations")
-gmera2chernlocal8nnhopping04imthirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera2chernlocal8nnhopping04imthirdlocalcorrelations|>eigspech|>visualize
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize8")
+size24local8gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
 
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize12")
+size24local12gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/localsize2")
-gmeraalldiffL1normdiraclocal2 = fioload("gmeraalldiffL1norm")
-gmera1diraclocal2firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1diraclocal2secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1diraclocal2thirdlocalcorrelations= fioload("gmera1thirdlocalcorrelations")
-gmera2diraclocal2firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2diraclocal2secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2diraclocal2thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3diraclocal2firstlocalcorrelations= fioload("gmera3firstlocalcorrelations")
-gmera3diraclocal2secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3diraclocal2thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera4diraclocal2firstlocalcorrelations = fioload("gmera4firstlocalcorrelations")
-gmera4diraclocal2secondlocalcorrelations = fioload("gmera4secondlocalcorrelations")
-gmera4diraclocal2thirdlocalcorrelations = fioload("gmera4thirdlocalcorrelations")
-gmera4diraclocal2thirdlocalcorrelations|>eigspech|>visualize
+# size24L1normtrivialonsite01_list = log.([size24local2gmeraalldiffL1normtrivialonsite01,size24local4gmeraalldiffL1normtrivialonsite01,size24local6gmeraalldiffL1normtrivialonsite01,size24local8gmeraalldiffL1normtrivialonsite01,size24local12gmeraalldiffL1normtrivialonsite01])
+size24L1normtrivialonsite01_list = log.([size24local2gmeraalldiffL1normtrivialonsite01,size24local4gmeraalldiffL1normtrivialonsite01,size24local6gmeraalldiffL1normtrivialonsite01,size24local8gmeraalldiffL1normtrivialonsite01])
 
-diraclocal2blockedH = fioload("blockedH")
-diraclocal2blockedH|>crystalspectrum|>visualize
-gmera1diraclocal2firstcourierH = fioload("gmera1firstcourierH")
-gmera1diraclocal2firstcourierH|>crystalspectrum|>visualize
-gmera1diraclocal2secondcourierH = fioload("gmera1secondcourierH")
-gmera1diraclocal2secondcourierH|>crystalspectrum|>visualize
+#onsite0.15
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize2")
+size24local2gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize4")
+size24local4gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize6")
+size24local6gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize8")
+size24local8gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize12")
+size24local12gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+
+# size24L1normtrivialonsite015_list = log.([size24local2gmeraalldiffL1normtrivialonsite015,size24local4gmeraalldiffL1normtrivialonsite015,size24local6gmeraalldiffL1normtrivialonsite015,size24local8gmeraalldiffL1normtrivialonsite015,size24local12gmeraalldiffL1normtrivialonsite015])
+size24L1normtrivialonsite015_list = log.([size24local2gmeraalldiffL1normtrivialonsite015,size24local4gmeraalldiffL1normtrivialonsite015,size24local6gmeraalldiffL1normtrivialonsite015,size24local8gmeraalldiffL1normtrivialonsite015])
+
+#onsite0.2
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize2")
+size24local2gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize4")
+size24local4gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize6")
+size24local6gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize8")
+size24local8gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize12")
+size24local12gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+
+# size24L1normtrivialonsite02_list = log.([size24local2gmeraalldiffL1normtrivialonsite02,size24local4gmeraalldiffL1normtrivialonsite02,size24local6gmeraalldiffL1normtrivialonsite02,size24local8gmeraalldiffL1normtrivialonsite02,size24local12gmeraalldiffL1normtrivialonsite02])
+size24L1normtrivialonsite02_list = log.([size24local2gmeraalldiffL1normtrivialonsite02,size24local4gmeraalldiffL1normtrivialonsite02,size24local6gmeraalldiffL1normtrivialonsite02,size24local8gmeraalldiffL1normtrivialonsite02])
+
+#result of chern
+#0.1im
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize2")
+size24local2gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize4")
+size24local4gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize6")
+size24local6gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize8")
+size24local8gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize12")
+size24local12gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
+
+#0.2im
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize2")
+size24local2gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize4")
+size24local4gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize6")
+size24local6gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize8")
+size24local8gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize12")
+size24local12gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+
+#0.3im
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize2")
+size24local2gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize4")
+size24local4gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize6")
+size24local6gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize8")
+size24local8gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize12")
+size24local12gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+
+#0.4im
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize2")
+size24local2gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize4")
+size24local4gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize6")
+size24local6gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize8")
+size24local8gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize12")
+size24local12gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
 
 
-fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/localsize4")
-gmeraalldiffL1normdiraclocal4 = fioload("gmeraalldiffL1norm")
-gmera1diraclocal4firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1diraclocal4secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1diraclocal4thirdlocalcorrelations= fioload("gmera1thirdlocalcorrelations")
-gmera2diraclocal4firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2diraclocal4secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2diraclocal4thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera3diraclocal4firstlocalcorrelations= fioload("gmera3firstlocalcorrelations")
-gmera3diraclocal4secondlocalcorrelations = fioload("gmera3secondlocalcorrelations")
-gmera3diraclocal4thirdlocalcorrelations = fioload("gmera3thirdlocalcorrelations")
-gmera3diraclocal4thirdlocalcorrelations|>eigspech|>visualize
+size24L1normchernnn01im_list = log.([size24local2gmeraalldiffL1normchernnn01im,size24local4gmeraalldiffL1normchernnn01im,size24local6gmeraalldiffL1normchernnn01im,size24local8gmeraalldiffL1normchernnn01im])
+size24L1normchernnn02im_list = log.([size24local2gmeraalldiffL1normchernnn02im,size24local4gmeraalldiffL1normchernnn02im,size24local6gmeraalldiffL1normchernnn02im,size24local8gmeraalldiffL1normchernnn02im])
+size24L1normchernnn03im_list = log.([size24local2gmeraalldiffL1normchernnn03im,size24local4gmeraalldiffL1normchernnn03im,size24local6gmeraalldiffL1normchernnn03im,size24local8gmeraalldiffL1normchernnn03im])
+size24L1normchernnn04im_list = log.([size24local2gmeraalldiffL1normchernnn04im,size24local4gmeraalldiffL1normchernnn04im,size24local6gmeraalldiffL1normchernnn04im,size24local8gmeraalldiffL1normchernnn04im])
 
-fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/localsize8")
-gmeraalldiffL1normdiraclocal8 = fioload("gmeraalldiffL1norm")
-gmera1diraclocal8firstlocalcorrelations = fioload("gmera1firstlocalcorrelations")
-gmera1diraclocal8secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1diraclocal8thirdlocalcorrelations= fioload("gmera1thirdlocalcorrelations")
-gmera2diraclocal8firstlocalcorrelations = fioload("gmera2firstlocalcorrelations")
-gmera2diraclocal8secondlocalcorrelations = fioload("gmera2secondlocalcorrelations")
-gmera2diraclocal8thirdlocalcorrelations = fioload("gmera2thirdlocalcorrelations")
-gmera2diraclocal8thirdlocalcorrelations|>eigspech|>visualize
+scatter(radius_list,size24L1normdirac_list,title="log(error) vs radius",label="Dirac: t/V=1/0=inf")
+scatter!(radius_list,size24L1normtrivialonsite005_list,label="Trivial: t/V=1/0.05=20")
+scatter!(radius_list,size24L1normtrivialonsite01_list,label="Trivial: t/V=1/0.1=10")
+scatter!(radius_list,size24L1normtrivialonsite015_list,label="Trivial: t/V=1/0.15=6.67")
+scatter!(radius_list,size24L1normtrivialonsite02_list,label="Trivial: t/V=1/0.2=5")
+xlabel!("radius")
+ylabel!("log of vectorize L1 norm of diff")
 
-radius = [2,4,8]
-logradius = log.(radius)
-erroracrossradiustrivialonsite01 = log.([gmeraalldiffL1normtriviallocal2onsite01,gmeraalldiffL1normtriviallocal4onsite01,gmeraalldiffL1normtriviallocal8onsite01])
-erroracrossradiustrivialonsite02 = log.([gmeraalldiffL1normtriviallocal2onsite02,gmeraalldiffL1normtriviallocal4onsite02,gmeraalldiffL1normtriviallocal8onsite02])
-erroracrossradiusdirac = log.([gmeraalldiffL1normdiraclocal2,gmeraalldiffL1normdiraclocal4,gmeraalldiffL1normdiraclocal8])
-erroracrossradiuschernnnhopping02im = log.([gmeraalldiffL1normchernlocal2nnhopping02im,gmeraalldiffL1normchernlocal4nnhopping02im,gmeraalldiffL1normchernlocal8nnhopping02im])
-erroracrossradiuschernnnhopping04im = log.([gmeraalldiffL1normchernlocal2nnhopping04im,gmeraalldiffL1normchernlocal4nnhopping04im,gmeraalldiffL1normchernlocal8nnhopping04im])
+scatter!(radius_list,size24L1normchernnn01im_list,label="Chern: t=1,tt=0.1im")
+scatter!(radius_list,size24L1normchernnn02im_list,label="Chern: t=1,tt=0.2im")
+scatter!(radius_list,size24L1normchernnn03im_list,label="Chern: t=1,tt=0.3im")
+scatter!(radius_list,size24L1normchernnn04im_list,label="Chern: t=1,tt=0.4im")
+xlabel!("radius")
+ylabel!("log of vectorize L1 norm of diff")
 
 
-scatter(radius,erroracrossradiusdirac,label="Dirac: t/V=1/0=inf",xlabel="radius",ylabel = "log of L1 norm of diff",title = "log(error) of all rg vs radius")
-scatter!(radius,erroracrossradiustrivialonsite01,label="Trivial: t/V=1/0.1=10")
-scatter!(radius,erroracrossradiustrivialonsite02,label="Trivial: t/V=1/0.2=5")
-scatter!(radius,erroracrossradiuschernnnhopping02im,label="Chern: t=1,tt=0.2im")
-scatter!(radius,erroracrossradiuschernnnhopping04im,label="Chern: t=1,tt=0.4im")
-
-
-fiodir("/Users/slwongag/Desktop/data/dirac/systemsize32/testing")
-gmera1secondlocalcorrelations = fioload("gmera1secondlocalcorrelations")
-gmera1secondlocalcorrelations|>eigspech|>visualize
+#Dirac across RG
+fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize2/")
+size24local2gmera1terminatedalldiffL1norm = fioload("gmera1terminatedalldiffL1norm")
+size24local2gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")

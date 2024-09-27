@@ -32,7 +32,7 @@ for (scaling,noofrgsteps) in scalingswifnoofrgsteps
     for rgstep in 2:noofrgsteps
         if rgstep == noofrgsteps
             @info("final gmera step")
-            finalgmerastep(refcorrelations,refH,refcouriercomposemap,refgmeraapproximatecorrelation,blockedcorrelations,rgstep,noofflavourpermodeforlaterrg,systemsize)
+            finalgmerastep(refcorrelations,refH,refcouriercomposemap,refgmeraapproximatecorrelation,blockedcorrelations,rgstep,systemsize,noofflavourpermodeforlaterrg)
         else
             @info("intermediate gmera step")
             rgH,rgcorrelations,couriercomposemap,gmeraapproximatecorrelationsofar = intermediategmerastep(refcorrelations,refH,refcouriercomposemap,refgmeraapproximatecorrelation,rgstep,noofflavourpermodeforlaterrg)

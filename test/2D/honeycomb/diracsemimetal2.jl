@@ -46,6 +46,7 @@ energyspectrum = @time computeenergyspectrum(bonds, crystal=crystal)
 groundstates::CrystalSpectrum = groundstatespectrum(energyspectrum, perunitcellfillings=1)
 groundstateprojector = groundstates|>crystalprojector
 correlations = idmap(groundstateprojector|>getoutspace) - groundstateprojector
+correlations|>crystalspectrum|>visualize
 
 @info("Starting RG...")
 crystalfock = correlations|>getoutspace

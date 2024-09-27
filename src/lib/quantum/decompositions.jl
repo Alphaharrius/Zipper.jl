@@ -81,7 +81,7 @@ with the attributes supplied by `attrs`.
 - `groupingthreshold`   The threshold for grouping degenerated eigenvalues, since the eigenvalues are complex 
                         numbers, this threshold will be applied to the real and imaginary parts separately.
 """
-function eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-10)::EigenSpectrum
+function eigspec(fockmap::FockMap, attrs::Pair{Symbol}...; groupingthreshold::Real = 1e-18)::EigenSpectrum
     vals, U = fockmap |> rep |> Matrix |> eigen
     eigenvalues::Base.Iterators.Flatten = digesteigenvalues(Tuple, Complex, vals, groupingthreshold, attrs...)
     eigenvectors::FockMap = FockMap(fockmap |> getoutspace, FockSpace(m for (m, _) in eigenvalues), U)

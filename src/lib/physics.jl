@@ -69,7 +69,8 @@ spectrum by filling all fermionic degrees of freedom below the Fermi energy.
 The `CrystalSpectrum` object that contains the ground state energy spectrum.
 """
 # TODO: This function requires revisit as the performance is bad, but the results are correct.
-function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-7)::CrystalSpectrum
+# function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-20)::CrystalSpectrum
+function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfillings::Number, energyresolution::Real = 1e-10)
     perunitcellfillings > 0 || error("Filling must be positive!")
     
     unitcellvacancies::Integer = energyspectrum |> geteigenvectors |> values |> first |> getinspace |> dimension
@@ -83,8 +84,13 @@ function groundstatespectrum(energyspectrum::CrystalSpectrum; perunitcellfilling
         for (eval, modeset) in groupedeigenvalues
             if round(eval,digits=10)==0
                 mlist = [m for m in modeset]
-                push!(modesets,Subset(mlist[1:div(length(mlist),2)]))
-                push!(modesets,Subset(mlist[div(length(mlist),2)+1:end]))
+                println("length of mlist",length(mlist))
+                # push!(modesets,Subset(mlist[1:div(length(mlist),2)]))
+                # push!(modesets,Subset(mlist[div(length(mlist),2)+1:end]))
+                # push!(modesets,Subset(mlist[1:2:length(mlist)]))
+                # push!(modesets,Subset(mlist[2:2:length(mlist)]))
+                push!(modesets,Subset(mlist[1],mlist[3]))
+                push!(modesets,Subset(mlist[2],mlist[4]))
             else
                 push!(modesets,modeset)
             end

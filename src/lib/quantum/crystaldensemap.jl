@@ -194,6 +194,19 @@ function Base.:transpose(fockmap::CrystalDenseMap)
     return CrystalDenseMap(
         inspace, outspace, chunkcount, chunksize, data, nzids)
 end
+
+function vectorizeL1norm(fockmap::CrystalDenseMap)
+    function vectorizeL1normofblocks(v)
+        return sum([sum(abs.(spmat|>rep)) for spmat in v if typeof(spmat)!=Zipper.NullFockMap])
+    end
+    results = paralleltasks(
+        name="vectorizeL1norm",
+        tasks=(()->(n, vectorizeL1normofblocks(v)) for (n, v) in fockmap.data|>enumerate),
+        count=fockmap.chunkcount)|>parallel|>collect
+    data = sum([el for (_, el) in sort(results, by=first)])
+    return data
+end
+export vectorizeL1norm
 #\end
 
 #\begin:CrystalDenseMap APIs

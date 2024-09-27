@@ -11,6 +11,8 @@ nnhopping = 0
 systemsize=2^power
 correlations,H = generatesystem(-onsitepotential+0im, onsitepotential+0im,-1 + 0im,-nnhopping,systemsize)
 crystalfock = correlations|>getoutspace
+correlations
+correlations|>crystalspectrum
 
 scaling = 2
 

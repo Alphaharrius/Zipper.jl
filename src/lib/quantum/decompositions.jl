@@ -324,9 +324,11 @@ function groupbands(spectrum::CrystalSpectrum; bandgrouping=[spectrum.bandcount|
         return CrystalSpectrum(spectrum|>getcrystal, eigenmodes, eigenvalues, eigenvectors)
     end
 
-    return paralleltasks(name="groupbands",
-        tasks=(()->getgroupspectrum(n) for n in 1:length(bandgrouping)),
+    result = paralleltasks(name="groupbands",
+        tasks=(()->(n=>getgroupspectrum(n)) for n in 1:length(bandgrouping)),
         count=length(bandgrouping))|>parallel|>collect
+    
+    return [v for (_, v) in sort(result|>collect, by=first)]
 end
 export groupbands
 

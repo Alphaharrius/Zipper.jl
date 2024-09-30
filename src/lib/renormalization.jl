@@ -282,6 +282,50 @@ function wannierprojection(;
 end
 export wannierprojection
 
+function wannierprojection(targetbands::CrystalSpectrum, seedstates::RegionState)
+    localseeds = seedstates|>FockMap
+
+    outspace = targetbands|>crystalprojector|>getoutspace
+    transform = fourier(outspace, localseeds|>getoutspace)
+    crystalseeds = transform * localseeds
+    crystalseeds = Dict(k=>crystalseeds[k, :] for k in targetbands|>getcrystal|>brillouinzone)
+    pseudoidens = (u' * u for (_, u) in crystalseeds)
+    lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
+    lineardepmetric < 0.5 && @warn "Wannierization local seeds linear-dependence metric: $lineardepmetric"
+
+    return wannierprojection(
+        crystalisometries=targetbands|>geteigenvectors,
+        crystal=targetbands|>getcrystal, crystalseeds=crystalseeds)
+end
+
+function getlocalstates(crystalisometry, region::Region)::RegionState
+    regionfock = getregionfock(crystalisometry|>getoutspace, region)
+    leftrestrict = fourier(crystalisometry|>getoutspace, regionfock)
+    rightfock = crystalisometry|>getinspace|>unitcellfock|>RegionFock
+    rightrestrict = fourier(crystalisometry|>getinspace, rightfock)
+    return leftrestrict'*crystalisometry*rightrestrict|>RegionState|>normalize
+end
+export getlocalstates
+
+function getlocalstates(correlations; region::Region, count::Real)
+    localfock = getregionfock(correlations|>getoutspace, region)
+    restrict = fourier(correlations|>getoutspace, localfock)
+    crystalvol = correlations|>getoutspace|>getcrystal|>vol
+    localcorrelations = restrict'*correlations*restrict/crystalvol
+    localspectrum = localcorrelations|>eigspech
+    states = []
+    maxvalue = 0
+    for i in 1:count
+        localvector = geteigenvectors(localspectrum)[:, i]
+        push!(states, localvector|>RegionState)
+        m = localvector|>getinspace|>first
+        v = geteigenvalues(localspectrum)[m]
+        v > maxvalue && (maxvalue = v)
+    end
+    @info "Maximum local correlation value: $maxvalue"
+    return states|>sum
+end
+
 """
     svdrebase(inputbands::CrystalSpectrum, targetbands::CrystalSpectrum)
 

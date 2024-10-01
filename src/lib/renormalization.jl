@@ -314,16 +314,20 @@ function getlocalstates(correlations; region::Region, count::Real)
     localcorrelations = restrict'*correlations*restrict/crystalvol
     localspectrum = localcorrelations|>eigspech
     states = []
-    maxvalue = 0
     for i in 1:count
         localvector = geteigenvectors(localspectrum)[:, i]
-        push!(states, localvector|>RegionState)
         m = localvector|>getinspace|>first
         v = geteigenvalues(localspectrum)[m]
-        v > maxvalue && (maxvalue = v)
+        push!(states, (localvector|>RegionState, v))
     end
-    @info "Maximum local correlation value: $maxvalue"
-    return states|>sum
+
+    @info "Showing local states with associated eigenvalues..."
+    header = ["Index", "Eigenvalue"]
+    rowlength = length(header)
+    rows = (reshape([Int(n), val], (1, rowlength)) for (n, (_, val)) in states|>enumerate)
+    pretty_table(vcat(rows...), header=header)
+
+    return sum(state for (state, _) in states)
 end
 
 """

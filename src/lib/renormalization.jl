@@ -282,6 +282,14 @@ function wannierprojection(;
 end
 export wannierprojection
 
+"""
+    wannierprojection(targetbands::CrystalSpectrum, seedstates::RegionState)
+
+Perform projective wannierization on the target bands with the seeding states. Since the wannier states will
+be based on the seed states, if the seed states under the crystal translational symmetry are not orthogonal,
+a warning will be displayed in the terminal. Non-orthogonal wannier functions will result in mixing of information
+based on those groups of modes which will have negative effect on some operations requires mode grouping.
+"""
 function wannierprojection(targetbands::CrystalSpectrum, seedstates::RegionState)
     localseeds = seedstates|>FockMap
 
@@ -298,6 +306,12 @@ function wannierprojection(targetbands::CrystalSpectrum, seedstates::RegionState
         crystal=targetbands|>getcrystal, crystalseeds=crystalseeds)
 end
 
+"""
+    getlocalstates(crystalisometry, region::Region)::RegionState
+
+Given the translational invariant state in the crystal represented by the `crystalisometry`, 
+find its spatial representation within `region` as a `RegionState`.
+"""
 function getlocalstates(crystalisometry, region::Region)::RegionState
     regionfock = getregionfock(crystalisometry|>getoutspace, region)
     leftrestrict = fourier(crystalisometry|>getoutspace, regionfock)
@@ -307,7 +321,14 @@ function getlocalstates(crystalisometry, region::Region)::RegionState
 end
 export getlocalstates
 
-function getlocalstates(correlations; region::Region, count::Real)
+"""
+    getlocalstates(correlations::FockMap, region::Region, count::Int)::RegionState
+
+Given the crystal correlations `correlations`, find `count` number of spatial eigenvectors 
+in ascending order of the associated eigenvalues, from the specified `region`. The associated
+eigenvalues will be displayed as a table in the terminal.
+"""
+function getlocalstates(correlations; region::Region, count::Int)::RegionState
     localfock = getregionfock(correlations|>getoutspace, region)
     restrict = fourier(correlations|>getoutspace, localfock)
     crystalvol = correlations|>getoutspace|>getcrystal|>vol

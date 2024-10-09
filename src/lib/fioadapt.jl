@@ -262,7 +262,7 @@ end
 
 fiolower((RGData, :data), function (data::Dict)
     objectnamelist = []
-    savergdata!(data, "rgdata", objectnamelist)
+    savergdata!(data, fiotargetname(), objectnamelist)
     return objectnamelist
 end)
 

@@ -104,7 +104,7 @@ export fioparser
 A wrapper to the `JSON` library for a custom lowering method for the `<:Element` types, 
 the output will contain the Julia type information that assist in later deserializations.
 """
-function JSON.lower(o::Element)
+function JSON.lower(o::Union{Element, RGData})
     type::Type = typeof(o)
     data = Dict()
     for fieldname in type|>fieldnames

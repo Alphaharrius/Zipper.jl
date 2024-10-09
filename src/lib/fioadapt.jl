@@ -216,3 +216,70 @@ end)
 fioparser((CrystalDense, :nonzeroids), function (vec::Vector)
     return Set(tuple(el...) for el in vec)
 end)
+
+function savergdata!(d::Dict, name::String, objectnamelist::Vector)
+    targetname = "$name-target"
+    target = d[:target]
+    fiosave(target, name=targetname)
+    push!(objectnamelist, targetname)
+
+    if haskey(d, :step)
+        stepname = "$name-step"
+        step = d[:step]
+        fiosave(step, name=stepname)
+        push!(objectnamelist, stepname)
+    end
+
+    haskey(d, :steps) || return objectnamelist
+    for (k, v) in d[:steps]
+        objectname = "$name.$k"
+        savergdata!(v, objectname, objectnamelist)
+    end
+
+    return objectnamelist
+end
+
+function loadrgdata(objectnamelist::Vector)
+    data = Dict{Symbol, Any}()
+
+    for objectname in objectnamelist
+        entry = split(objectname, "-")
+        entryname = entry|>first
+        subnames = split(entryname, ".")[2:end]
+        
+        home = data
+        for subname in subnames
+            haskey(home, :steps) || (home[:steps] = Dict{String, Any}())
+            haskey(home[:steps], subname) || (home[:steps][subname] = Dict{Symbol, Any}())
+            home = home[:steps][subname]
+        end
+
+        home[entry|>last|>Symbol] = fioload(objectname)
+    end
+
+    return data
+end
+
+fiolower((RGData, :data), function (data::Dict)
+    objectnamelist = []
+    savergdata!(data, "rgdata", objectnamelist)
+    return objectnamelist
+end)
+
+fioparser((RGData, :data), function (objectnamelist::Vector)
+    return loadrgdata(objectnamelist)
+end)
+
+fiolower((RGData, :head), function (_)
+    return 0
+end)
+
+fioparser((RGData, :head), function (_)
+    return Dict{Symbol, Any}()
+end)
+
+fioconstructor(RGData, function (data, headloc, _)
+    ret = RGData(data, headloc, data)
+    head!(ret, headloc...)
+    return ret
+end)

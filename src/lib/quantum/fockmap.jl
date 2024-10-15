@@ -78,7 +78,7 @@ Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 """ Matrix product of two `FockMap` aligned with their corresponding `FockSpace`. """
 function Base.:*(a::FockMap, b::FockMap)::FockMap
     # Even if the fockspaces are different, composition works as long as they have same span.
-    @assert(hassamespan(a|>getinspace, b|>getoutspace))
+    hassamespan(a|>getinspace, b|>getoutspace) || error("FockSpace span mismatch $(a|>getinspace) <-> $(b|>getoutspace)")
     return FockMap(a|>getoutspace, b|>getinspace, rep(a) * rep(permute(b, outspace=a|>getinspace, inspace=b|>getinspace)))
 end
     

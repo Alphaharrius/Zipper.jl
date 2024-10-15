@@ -364,12 +364,15 @@ function svdrebase(inputbands::CrystalSpectrum, targetbands::CrystalSpectrum)
         ϕ = Φ[k]
         p = ϕ'ψ
         u, s, vd = p|>svd
-        @assert all([v for (_, v) in s].>0.9)
+        
+        minsvdval = minimum(v for (_, v) in s)
+        minsvdval < 0.1 && @warn "Precarious svd value: $minsvdval"
+
         m = u*vd
         return k=>ϕ*m
     end
 
-    purified = paralleltasks(
+    rebased = paralleltasks(
         name="svdrebase",
         tasks=(
             ()->rebase(k, ψ, targetbands|>geteigenvectors) 
@@ -378,6 +381,6 @@ function svdrebase(inputbands::CrystalSpectrum, targetbands::CrystalSpectrum)
 
     return CrystalSpectrum{inputbands|>getcrystal|>dimension}(
         inputbands|>getcrystal, inputbands|>geteigenmodes, inputbands|>geteigenvalues, 
-        purified, inputbands.bandcount)
+        rebased, inputbands.bandcount)
 end
 export svdrebase

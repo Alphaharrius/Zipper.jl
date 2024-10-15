@@ -345,7 +345,7 @@ function getlocalstates(correlations; region::Region, count::Int)::RegionState
     @info "Showing local states with associated eigenvalues..."
     header = ["Index", "Eigenvalue"]
     rowlength = length(header)
-    rows = (reshape([Int(n), val], (1, rowlength)) for (n, (_, val)) in states|>enumerate)
+    rows = (reshape([n|>Int|>string, val], (1, rowlength)) for (n, (_, val)) in states|>enumerate)
     pretty_table(vcat(rows...), header=header)
 
     return sum(state for (state, _) in states)

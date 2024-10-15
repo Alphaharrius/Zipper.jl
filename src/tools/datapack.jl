@@ -133,3 +133,20 @@ function getsteptransform(data::RGData, names...)
     return transform
 end
 export getsteptransform
+
+function showsteps(rg, data, currentname::String, name::String, first::Bool, traceloc::Vector)
+    newtraceloc = copy(traceloc)
+    push!(newtraceloc, name)
+    prefix = first ? currentname : repeat(" ", length(currentname))
+    link = first ? " -> " : " └> "
+    pname = rg.headloc == newtraceloc[2:end] ? "($name)" : name
+    haskey(data, :steps) && !isempty(data[:steps]) || return println("$prefix$link$pname")
+    firstline = true
+    for (k, v) in data[:steps]
+        showsteps(rg, v, "$prefix$link$pname", k, firstline, newtraceloc)
+        firstline = false
+    end
+end
+export showsteps
+
+showsteps(rg) = showsteps(rg, rg.data, "", "root", true, Vector{String}())

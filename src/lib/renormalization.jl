@@ -102,7 +102,7 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
             return localisometry
         end
         inspace::FockSpace = localisometry.inspace |> orderedmodes |> setattr(:k => k) |> removeattr(:r) |> FockSpace
-        return FockMap(localisometry, inspace=inspace, performpermute=false)
+        return FockMap(localisometry, inspace=inspace, permute=false)
     end
 
     isometries = paralleltasks(
@@ -113,24 +113,6 @@ function crystalisometries(; localisometry::FockMap, crystalfock::CrystalFock,
     return isometries
 end
 export crystalisometries
-
-"""
-    crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-
-Given a `localisometry` that is defined within a `RegionFock`, perform fourier transform to obtain the k-space representation of the isometry.
-The `inspace` of the returned `FockMap` will be a `CrystalFock` spanned by the `inspace` of the input `localisometry` as the unitcell fockspace and
-the brillouin zone of the `crystalfock`.
-"""
-function crystalisometry(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
-    isometries = crystalisometries(
-        localisometry=localisometry, crystalfock=crystalfock, addinspacemomentuminfo=true)
-    isometryunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in localisometry.inspace |> orderedmodes)
-    isometrycrystal::Crystal = Crystal(isometryunitcell, crystal.sizes)
-    isometry::FockMap = (isometry for (_, isometry) in isometries) |> directsum
-    isometrycrystalfock::CrystalFock = FockSpace(isometry.inspace, reflected=isometrycrystal)
-    return FockMap(isometry, inspace=isometrycrystalfock, outspace=crystalfock)
-end
-export crystalisometry
 
 function crystalprojector(; localisometry::FockMap, crystalfock::CrystalFock)::FockMap
     momentumisometries = crystalisometries(localisometry=localisometry, crystalfock=crystalfock)
@@ -146,7 +128,7 @@ end
 export crystalprojector
 
 function crystalprojector(spectrum::CrystalSpectrum)::FockMap
-    blocks::Dict = paralleltasks(
+    blocks = paralleltasks(
         name="crystalprojector",
         tasks=(()->((k, k)=>u*u') for (k, u) in spectrum|>geteigenvectors),
         count=spectrum|>getcrystal|>vol)|>parallel|>Dict
@@ -271,7 +253,7 @@ function wannierprojection(;
     crystalisometries::Dict{Momentum, <:FockMap}, crystal::Crystal, crystalseeds::Dict{Momentum, <:FockMap}, svdorthothreshold::Number = 1e-1)
 
     wannierunitcell::Subset{Offset} = Subset(mode |> getattr(:b) for mode in (crystalseeds |> first |> last).inspace |> orderedmodes)
-    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal.sizes)
+    wanniercrystal::Crystal = Crystal(wannierunitcell, crystal|>getbc)
     precarioussvdvalues::Vector = []
     function approximateisometry(k::Momentum, isometry::FockMap, overlap::FockMap)::FockMap
         U, Σ, Vt = overlap |> svd
@@ -283,7 +265,7 @@ function wannierprojection(;
         approximated::FockMap = isometry * unitary
 
         inspace=FockSpace(approximated|>getinspace|>mapmodes(m->m|>setattr(:k=>k)|>removeattr(:r)))
-        return FockMap(approximated, inspace=inspace, performpermute=false)
+        return FockMap(approximated, inspace=inspace, permute=false)
     end
     if (precarioussvdvalues |> length) > 0
         @warn "Precarious wannier projection with minimum svdvalue of $(precarioussvdvalues |> minimum)"
@@ -299,3 +281,106 @@ function wannierprojection(;
     return crystalfockmap(crystal, wanniercrystal, blocks)
 end
 export wannierprojection
+
+"""
+    wannierprojection(targetbands::CrystalSpectrum, seedstates::RegionState)
+
+Perform projective wannierization on the target bands with the seeding states. Since the wannier states will
+be based on the seed states, if the seed states under the crystal translational symmetry are not orthogonal,
+a warning will be displayed in the terminal. Non-orthogonal wannier functions will result in mixing of information
+based on those groups of modes which will have negative effect on some operations requires mode grouping.
+"""
+function wannierprojection(targetbands::CrystalSpectrum, seedstates::RegionState)
+    localseeds = seedstates|>FockMap
+
+    outspace = targetbands|>crystalprojector|>getoutspace
+    transform = fourier(outspace, localseeds|>getoutspace)
+    crystalseeds = transform * localseeds
+    crystalseeds = Dict(k=>crystalseeds[k, :] for k in targetbands|>getcrystal|>brillouinzone)
+    pseudoidens = (u' * u for (_, u) in crystalseeds)
+    lineardepmetric = (v for id in pseudoidens for (_, v) in id|>eigvalsh)|>minimum
+    lineardepmetric < 0.5 && @warn "Wannierization local seeds linear-dependence metric: $lineardepmetric"
+
+    return wannierprojection(
+        crystalisometries=targetbands|>geteigenvectors,
+        crystal=targetbands|>getcrystal, crystalseeds=crystalseeds)
+end
+
+"""
+    getlocalstates(crystalisometry, region::Region)::RegionState
+
+Given the translational invariant state in the crystal represented by the `crystalisometry`, 
+find its spatial representation within `region` as a `RegionState`.
+"""
+function getlocalstates(crystalisometry, region::Region)::RegionState
+    regionfock = getregionfock(crystalisometry|>getoutspace, region)
+    leftrestrict = fourier(crystalisometry|>getoutspace, regionfock)
+    rightfock = crystalisometry|>getinspace|>unitcellfock|>RegionFock
+    rightrestrict = fourier(crystalisometry|>getinspace, rightfock)
+    return leftrestrict'*crystalisometry*rightrestrict|>RegionState|>normalize
+end
+export getlocalstates
+
+"""
+    getlocalstates(correlations::FockMap, region::Region, count::Int)::RegionState
+
+Given the crystal correlations `correlations`, find `count` number of spatial eigenvectors 
+in ascending order of the associated eigenvalues, from the specified `region`. The associated
+eigenvalues will be displayed as a table in the terminal.
+"""
+function getlocalstates(correlations; region::Region, count::Int)::RegionState
+    localfock = getregionfock(correlations|>getoutspace, region)
+    restrict = fourier(correlations|>getoutspace, localfock)
+    crystalvol = correlations|>getoutspace|>getcrystal|>vol
+    localcorrelations = restrict'*correlations*restrict/crystalvol
+    localspectrum = localcorrelations|>eigspech
+    states = []
+    for i in 1:count
+        localvector = geteigenvectors(localspectrum)[:, i]
+        m = localvector|>getinspace|>first
+        v = geteigenvalues(localspectrum)[m]
+        push!(states, (localvector|>RegionState, v))
+    end
+
+    @info "Showing local states with associated eigenvalues..."
+    header = ["Index", "Eigenvalue"]
+    rowlength = length(header)
+    rows = (reshape([n|>Int|>string, val], (1, rowlength)) for (n, (_, val)) in states|>enumerate)
+    pretty_table(vcat(rows...), header=header)
+
+    return sum(state for (state, _) in states)
+end
+
+"""
+    svdrebase(inputbands::CrystalSpectrum, targetbands::CrystalSpectrum)
+
+Map the `inputbands` to the basis spanning the `targetbands` using the SVD projection.
+
+### Output
+The purified `CrystalSpectrum` object with the same span of the input bands.
+"""
+function svdrebase(inputbands::CrystalSpectrum, targetbands::CrystalSpectrum)
+    function rebase(k, ψ, Φ)
+        ϕ = Φ[k]
+        p = ϕ'ψ
+        u, s, vd = p|>svd
+        
+        minsvdval = minimum(v for (_, v) in s)
+        minsvdval < 0.1 && @warn "Precarious svd value: $minsvdval"
+
+        m = u*vd
+        return k=>ϕ*m
+    end
+
+    rebased = paralleltasks(
+        name="svdrebase",
+        tasks=(
+            ()->rebase(k, ψ, targetbands|>geteigenvectors) 
+            for (k, ψ) in inputbands|>geteigenvectors),
+        count=inputbands|>geteigenvectors|>length)|>parallel|>Dict
+
+    return CrystalSpectrum{inputbands|>getcrystal|>dimension}(
+        inputbands|>getcrystal, inputbands|>geteigenmodes, inputbands|>geteigenvalues, 
+        rebased, inputbands.bandcount)
+end
+export svdrebase

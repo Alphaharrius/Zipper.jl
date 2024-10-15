@@ -55,11 +55,15 @@ Base.:getindex(fockmap::FockMap, rowspace::FockSpace, ::Colon) = rows(fockmap, r
 # ◆ FockMap arithmetics ◆
 Base.:+(v::Number, fockmap::FockMap) = idmap(fockmap|>getoutspace, fockmap|>getinspace)*v + fockmap
 Base.:-(v::Number, fockmap::FockMap) = v + (-fockmap)
+Base.:+(fockmap::FockMap, v::Number) = fockmap + idmap(fockmap|>getoutspace, fockmap|>getinspace)*v
+Base.:-(fockmap::FockMap, v::Number) = fockmap + (-v)
 
 """ Shorthand to update the `outspace` of the `FockMap`. """
 Base.:*(fockspace::FockSpace, fockmap::FockMap)::FockMap = FockMap(fockmap, outspace=fockspace)
+Base.broadcasted(::typeof(*), fockspace::FockSpace, fockmap::FockMap) = FockMap(fockmap, outspace=fockspace, permute=false)
 """ Shorthand to update the `inspace` of the `FockMap`. """
 Base.:*(fockmap::FockMap, fockspace::FockSpace)::FockMap = FockMap(fockmap, inspace=fockspace)
+Base.broadcasted(::typeof(*), fockmap::FockMap, fockspace::FockSpace) = FockMap(fockmap, inspace=fockspace, permute=false)
 
 LinearAlgebra.:tr(fockmap::FockMap) = fockmap|>rep|>tr
 LinearAlgebra.:det(fockmap::FockMap) = fockmap|>rep|>det
@@ -74,7 +78,7 @@ Base.:-(a::FockMap, b::FockMap)::FockMap = a + (-b)
 """ Matrix product of two `FockMap` aligned with their corresponding `FockSpace`. """
 function Base.:*(a::FockMap, b::FockMap)::FockMap
     # Even if the fockspaces are different, composition works as long as they have same span.
-    @assert(hassamespan(a|>getinspace, b|>getoutspace))
+    hassamespan(a|>getinspace, b|>getoutspace) || error("FockSpace span mismatch $(a|>getinspace) <-> $(b|>getoutspace)")
     return FockMap(a|>getoutspace, b|>getinspace, rep(a) * rep(permute(b, outspace=a|>getinspace, inspace=b|>getinspace)))
 end
     

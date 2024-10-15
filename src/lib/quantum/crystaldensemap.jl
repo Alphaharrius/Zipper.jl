@@ -18,9 +18,9 @@ Zipper.getinspace(fockmap::CrystalDenseMap) = fockmap.inspace
 
 #\begin:CrystalDenseMap internal support utilities
 function getchunkinfo(outcrystal::Crystal, incrystal::Crystal)
-    chunkcount::Integer = maximum((size(outcrystal)..., size(incrystal)...))
+    chunkcount::Integer = max(outcrystal|>vol|>sqrt, incrystal|>vol|>sqrt)|>ceil
     datalength::Integer = vol(outcrystal) * vol(incrystal)
-    chunksize::Integer = datalength/chunkcount|>round
+    chunksize::Integer = datalength/chunkcount|>ceil
     return datalength, chunkcount, chunksize
 end
 
@@ -203,7 +203,7 @@ function usecrystaldensemap()
 end
 export usecrystaldensemap
 
-function CrystalDenseMap(outcrystal::Crystal, incrystal::Crystal, blocks)
+function CrystalDenseMap(outcrystal::Crystal, incrystal::Crystal, blocks::Dict)
     _, chunkcount, chunksize = getchunkinfo(outcrystal, incrystal)
     data::Vector{SparseVector} = preparedense(chunkcount, chunksize)
     locks::Vector{ReentrantLock} = preparedenselocks(chunkcount)
@@ -271,6 +271,9 @@ function outspacesubmaps(fockmap::CrystalDenseMap)
     return paralleldivideconquer(
         merge, entries, length(entries), "*(::CrystalDenseMap, ::CrystalDenseMap) indextable")
 end
+
+# TODO: Implement specific for CrystalDenseMap.
+crystalsubmaps(fockmap::CrystalDenseMap) = fockmap|>CrystalFockMap|>crystalsubmaps
 #\end
 
 #\begin:CrystalDenseMap conversions

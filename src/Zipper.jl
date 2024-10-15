@@ -10,6 +10,7 @@ include("tools/memoization.jl")
 
 using ProgressMeter
 include("tools/parallel.jl")
+include("tools/datapack.jl")
 
 include("core.jl")
 

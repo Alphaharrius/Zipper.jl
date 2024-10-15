@@ -42,6 +42,8 @@ end)
 # The blocks of CrystalFockMap is a Dict keyed by (::Momentum, ::Momentum), we have to lower 
 # it into a vector to make everything serializable.
 fiolower((CrystalFockMap, :blocks), d -> [[ok, ik, v] for ((ok, ik), v) in d])
+# The rules attribute is a Matrix form.
+fiolower((BoundaryCondition, :rules), m -> [v for v in eachcol(m)])
 
 # The Dict keys from deserialization are type of String, convert them back to Symbol.
 fioconstructor(Mode, d -> Dict(Symbol(k)=>v for (k, v) in d)|>Mode)
@@ -63,12 +65,13 @@ fioparser((CrystalFock, :korderings), v -> Dict((fioparse(k), i) for (k, i) in v
 # The rep of SparseFockMap is stored in a CSV file, we have to read it back.
 fioparser((SparseFockMap, :rep), function (d::Dict)
     filename = d["filename"]
-    readsparse(filename)
     @debug "$filepath -> sparse"
     return readsparse(filename)
 end)
 # The keys and values of blocks are serialized into Dict, we have to deserialize them back.
 fioparser((CrystalFockMap, :blocks), v -> Dict((fioparse(el[1]), fioparse(el[2]))=>fioparse(el[3]) for el in v))
+# Reconstruct the rules Matrix from Vector{Vector}.
+fioparser((BoundaryCondition, :rules), v -> hcat(v...))
 
 struct CrystalFockMapBlob <: Element{Any}
     storagemap::FockMap
@@ -212,4 +215,71 @@ end)
 # The dataframe is stored in a CSV file.
 fioparser((CrystalDense, :nonzeroids), function (vec::Vector)
     return Set(tuple(el...) for el in vec)
+end)
+
+function savergdata!(d::Dict, name::String, objectnamelist::Vector)
+    targetname = "$name-target"
+    target = d[:target]
+    fiosave(target, name=targetname)
+    push!(objectnamelist, targetname)
+
+    if haskey(d, :step)
+        stepname = "$name-step"
+        step = d[:step]
+        fiosave(step, name=stepname)
+        push!(objectnamelist, stepname)
+    end
+
+    haskey(d, :steps) || return objectnamelist
+    for (k, v) in d[:steps]
+        objectname = "$name.$k"
+        savergdata!(v, objectname, objectnamelist)
+    end
+
+    return objectnamelist
+end
+
+function loadrgdata(objectnamelist::Vector)
+    data = Dict{Symbol, Any}()
+
+    for objectname in objectnamelist
+        entry = split(objectname, "-")
+        entryname = entry|>first
+        subnames = split(entryname, ".")[2:end]
+        
+        home = data
+        for subname in subnames
+            haskey(home, :steps) || (home[:steps] = Dict{String, Any}())
+            haskey(home[:steps], subname) || (home[:steps][subname] = Dict{Symbol, Any}())
+            home = home[:steps][subname]
+        end
+
+        home[entry|>last|>Symbol] = fioload(objectname)
+    end
+
+    return data
+end
+
+fiolower((RGData, :data), function (data::Dict)
+    objectnamelist = []
+    savergdata!(data, fiotargetname(), objectnamelist)
+    return objectnamelist
+end)
+
+fioparser((RGData, :data), function (objectnamelist::Vector)
+    return loadrgdata(objectnamelist)
+end)
+
+fiolower((RGData, :head), function (_)
+    return 0
+end)
+
+fioparser((RGData, :head), function (_)
+    return Dict{Symbol, Any}()
+end)
+
+fioconstructor(RGData, function (data, headloc, _)
+    ret = RGData(data, headloc, data)
+    head!(ret, headloc...)
+    return ret
 end)

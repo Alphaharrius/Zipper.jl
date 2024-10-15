@@ -229,24 +229,17 @@ function crystaldirectsum(kfockmaps; outcrystal::Crystal, incrystal::Crystal)::C
 end
 export crystaldirectsum
 
-function truncatetoregion(crystalmap::CrystalFockMap, region::Region)
-    crystalfock = crystalmap|>getoutspace
-    crystal = crystalfock|>getcrystal
-    truncatefock = getregionfock(crystalfock, region)
-    transform = fourier(crystalfock, truncatefock)
-
-    localcorrelations = transform' * crystalmap * transform / (crystal|>vol)
-    modecombinations = Iterators.product(localcorrelations|>getoutspace, localcorrelations|>getoutspace)
-
-    getconn(from::Mode, to::Mode) = (
-        getattr(to, :r) - getattr(from, :r), from|>removeattr(:r), to|>removeattr(:r))
-    # Using a Dict to filter out unique (:r, :b) -> (:r', :b') connections and get the corresponding indices 
-    # that we wish to kept.
-    modebonds = Dict(
-        getconn(frommode, tomode)=>(frommode, tomode) for (frommode, tomode) in modecombinations)
-    pruningindices = (index for (_, index) in modebonds)
-    crystalpruned = transform * extractindices(localcorrelations, pruningindices)
-    return crystalpruned .* crystalpruned'
+function truncatetoregion(hermitian, region::Region)
+    regionfock = getregionfock(hermitian|>getoutspace, region)
+    restrict = fourier(hermitian|>getoutspace, regionfock)
+    localcorrelations = restrict'*hermitian*restrict/(hermitian|>getoutspace|>getcrystal|>vol)
+    localindices = Iterators.product(localcorrelations|>getoutspace, localcorrelations|>getoutspace)
+    pruningindices = Dict(
+        (getattr(to, :r) - getattr(from, :r), from|>removeattr(:r), to|>removeattr(:r))=>(from, to) 
+        for (from, to) in localindices)
+    pruningindices = (index for (_, index) in pruningindices)
+    pruned = extractindices(localcorrelations, pruningindices)
+    return restrict * pruned .* restrict'
 end
 export truncatetoregion
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -287,7 +280,7 @@ end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 # ◆ CrystalFockMap extension to other APIs ◆
 function idmap(fockspace::CrystalFock)
-    blocks::Dict = paralleltasks(
+    blocks = paralleltasks(
         name="idmap",
         tasks=(()->((k, k)=>idmap(getsubspace(fockspace, k))) for k in fockspace|>getcrystal|>brillouinzone),
         count=fockspace|>getcrystal|>vol)|>parallel|>Dict

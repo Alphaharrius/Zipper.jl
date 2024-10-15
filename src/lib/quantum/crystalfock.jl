@@ -128,7 +128,8 @@ end
 
 Retrieve the `RegionFock` which contain all the modes within the specified `region` from the `crystalfock`.
 """
-function getregionfock(crystalfock::CrystalFock, region::Region)::RegionFock
+# TODO: Fix
+function getregionfock(crystalfock::CrystalFock, region::Region)
     crystalspace = crystalfock|>getcrystal|>getspace
     transformed = (crystalspace*r for r in region)
     offsets = (r-basispoint(r) for r in transformed)

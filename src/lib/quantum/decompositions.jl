@@ -154,6 +154,21 @@ function CrystalSpectrum(crystal::Crystal, crystaleigenmodes, args...)
     unwatchprogress()
     return CrystalSpectrum{crystal|>dimension}(crystal, crystaleigenmodes, args..., (minbands, maxbands))
 end
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ MonoBand implementation ◆
+struct MonoBand{Dim}
+    data::Dict{Momentum, Number}
+end
+export MonoBand
+
+Base.:show(io::IO, band::MonoBand{Dim}) where {Dim} = print(io, "$(band|>typeof)(datacount=$(band.data|>length))")
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+
+
+# ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
+# ◆ CrystalSpectrum arithmetics ◆
+Base.:+(a::CrystalSpectrum, b::CrystalSpectrum) = crystalfockmap(a)+crystalfockmap(b)|>crystalspectrum
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
@@ -183,6 +198,56 @@ end
 export crystalspectrum
 
 """
+    getbandcount(spectrum::CrystalSpectrum)
+
+Get the band count of the spectrum, if the band count is not uniform 
+over the brillouin zone, an error will be thrown.
+"""
+function getbandcount(spectrum::CrystalSpectrum)
+    if first(spectrum.bandcount) != last(spectrum.bandcount)
+        error("Band count is not uniform over the brillouin zone!")
+    end
+    return first(spectrum.bandcount)
+end
+export getbandcount
+
+function getbands(spectrum::CrystalSpectrum; paddirection::Symbol=:top)
+    eigenmodes = spectrum|>geteigenmodes
+    eigenvalues = spectrum|>geteigenvalues
+    crystal = spectrum|>getcrystal
+    kspectrum = Dict(
+        k=>(haskey(eigenmodes, k) ? [eigenvalues[mode] for mode in eigenmodes[k]]|>sort : []) 
+        for k in crystal|>brillouinzone)
+    bandcount = spectrum.bandcount[2]
+
+    function dopadding(k, values)
+        pad = repeat([NaN], bandcount - length(values))
+        if paddirection == :bottom
+            kspectrum[k] = [pad..., values...]
+        elseif paddirection == :top
+            kspectrum[k] = [values..., pad...]
+        else
+            error("Invalid paddirection: $paddirection")
+        end
+    end
+
+    if spectrum.bandcount[1] != bandcount
+        watchprogress(desc="visualize(::$(spectrum|>typeof))")
+        for k in spectrum|>getcrystal|>brillouinzone
+            values = haskey(kspectrum, k) ? kspectrum[k] : []
+            length(values) < bandcount && dopadding(k, values)
+            updateprogress()
+        end
+        unwatchprogress()
+    end
+    
+    getband(n) = MonoBand{spectrum|>getcrystal|>dimension}(Dict(k=>kspectrum[k][n] for k in kspectrum|>keys))
+
+    return [getband(n) for n in 1:bandcount]
+end
+export getbands
+
+"""
     crystalspectrum(fockmap::FockMap)::CrystalSpectrum
 
 Given a Hermitian `FockMap` with `inspace` and `outspace` of type 
@@ -201,16 +266,16 @@ Since some spectrum might be defined in a crystal that is implicitly on 1-D spac
 the 2D plane, inorder to visualize the spectrum properly instead of using the plot in the original 
 dimension, we can embed the spectrum into a 1-D space for plotting.
 """
-function linespectrum(spectrum::CrystalSpectrum)::CrystalSpectrum{1}
+function linespectrum(spectrum::CrystalSpectrum)
     crystal::Crystal = spectrum|>getcrystal
     nontrivialbasis = Iterators.filter(
-        v -> (v[1]) == 1, zip(crystal|>size, crystal|>getspace|>getbasisvectors))|>collect
+        v -> (v[1]) == 1, zip(crystal|>getboundsize, crystal|>getspace|>getbasisvectors))|>collect
     @assert(nontrivialbasis|>collect|>length == 1, "More than 1 non-trivial basis in this crystal.")
     embeddedbasis::Real = nontrivialbasis[1][2]|>norm
     embeddedspace::RealSpace = RealSpace([embeddedbasis][:, :])
     unitcelllength = crystal|>getunitcell|>length
     dummyunitcell::Region = Subset([r / unitcelllength] ∈ embeddedspace for r in (0:unitcelllength - 1))
-    embeddedcrystal::Crystal = Crystal(dummyunitcell, [nontrivialbasis[1][1]])
+    embeddedcrystal::Crystal = Crystal(dummyunitcell, crystal|>getbc)
     return CrystalSpectrum(
         embeddedcrystal, spectrum|>geteigenmodes, spectrum|>geteigenvalues, spectrum|>geteigenvectors)
 end
@@ -265,9 +330,11 @@ function groupbands(spectrum::CrystalSpectrum; bandgrouping=[spectrum.bandcount|
         return CrystalSpectrum(spectrum|>getcrystal, eigenmodes, eigenvalues, eigenvectors)
     end
 
-    return paralleltasks(name="groupbands",
-        tasks=(()->getgroupspectrum(n) for n in 1:length(bandgrouping)),
+    result = paralleltasks(name="groupbands",
+        tasks=(()->(n=>getgroupspectrum(n)) for n in 1:length(bandgrouping)),
         count=length(bandgrouping))|>parallel|>collect
+    
+    return [v for (_, v) in sort(result|>collect, by=first)]
 end
 export groupbands
 
@@ -400,7 +467,7 @@ function FockMap(crystalspectrum::CrystalSpectrum)::FockMap
     end
     fockmap::FockMap = directsum(k |> momentumfockmap for (k, _) in crystalspectrum.eigenmodes)
     crystalfock::FockSpace = FockSpace(fockmap|>getinspace, reflected=crystalspectrum.crystal)
-    return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, performpermute=false)
+    return FockMap(fockmap, inspace=crystalfock, outspace=crystalfock, permute=false)
 end
 # ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃
 

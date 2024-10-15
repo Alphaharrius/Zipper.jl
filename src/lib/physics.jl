@@ -130,19 +130,22 @@ end
 export entanglemententropy
 
 function momentumoccupations(correlations::FockMap)::FockMap
-    kcorrelations::Base.Generator = correlations |> crystalsubmaps
-    crystal::Crystal = correlations |> getoutspace |> getcrystal
-    center::Offset = crystal |> getspace |> getorigin
-    tracecrystal::Crystal = Crystal(center |> Subset, crystal |> size)
+    kcorrelations::Base.Generator = correlations|>crystalsubmaps
+    crystal::Crystal = correlations|>getoutspace|>getcrystal
+    center::Offset = crystal|>getspace|>getorigin
+    tracecrystal::Crystal = Crystal(center|>Subset, crystal|>getbc)
     mode::Mode = Mode(:b => center)
 
-    function tracing(k::Momentum, corr::FockMap)::FockMap
-        space::FockSpace = mode |> setattr(:k => k) |> FockSpace
-        return FockMap(space, space, [corr |> tr][:, :] |> SparseMatrixCSC) / dimension(corr |> getoutspace)
+    function tracing(k::Momentum, corr::FockMap)
+        space::FockSpace = mode|>setattr(:k => k)|>FockSpace
+        return (k, k)=>FockMap(space, space, [corr|>tr][:, :]|>SparseMatrixCSC) / dimension(corr|>getoutspace)
     end
 
-    occupations::FockMap = directsum(tracing(k, corr) for (k, corr) in kcorrelations)
-    fockspace::FockSpace = FockSpace(occupations |> getoutspace, reflected=tracecrystal)
-    return FockMap(occupations, inspace=fockspace, outspace=fockspace)
+    blocks = paralleltasks(
+        name="crystalprojector",
+        tasks=(()->tracing(k, corr) for (k, corr) in kcorrelations),
+        count=tracecrystal|>vol)|>parallel|>Dict
+
+    return crystalfockmap(tracecrystal, tracecrystal, blocks)
 end
 export momentumoccupations

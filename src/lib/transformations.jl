@@ -391,6 +391,14 @@ Zipper.:getspace(scale::Scale)::RealSpace = scale.localspace
 
 Base.:convert(::Type{Matrix{Float64}}, source::Scale) = source.rep
 
+function Base.:hash(scale::Scale)::UInt
+    matrixhash = hash(map(v -> Rational{Int64}(round(v * 10000000)) // 10000000, scale|>rep))
+    spacehash = hash(scale|>getspace)
+    return hash((matrixhash, spacehash))
+end
+
+Base.:(==)(a::Scale, b::Scale)::Bool = isapprox(a|>rep, b|>rep) && (a|>getspace) == (b|>getspace)
+
 Base.:inv(scale::Scale)::Scale = Scale(scale |> rep |> inv, scale |> getspace)
 
 Base.:*(a::Scale, b::Scale)::Scale = Scale((a |> rep) * ((a |> getspace) * b |> rep), a |> getspace)
@@ -405,15 +413,28 @@ end
 Base.:*(scale::Scale, space::RealSpace)::RealSpace = RealSpace(*(space |> rep, space * scale |> rep))
 
 Base.:*(scale::Scale, space::MomentumSpace)::MomentumSpace = MomentumSpace(
-    *(space |> rep, convert(RealSpace, space) * scale |> inv |> rep))
-Base.:*(scale::Scale, point::Point)::Point = *(scale, point |> getspace) * point
+    *(space |> rep, convert(RealSpace, space)*scale|>rep|>transpose|>inv))
+Base.:*(scale::Scale, r::Offset)::Offset = *(scale, r|>getspace)*r
+
+function Base.:*(scale::Scale, k::Momentum)
+    kspace = k|>getspace
+    return (scale*kspace)*k
+end
+
 Base.:*(scale::Scale, subset::Subset)::Subset = Subset(scale * element for element in subset)
 
+function Base.:*(scale::Scale, bc::BoundaryCondition)
+    scaledspace = scale*bc.localspace
+    scaledrules = bc.rules*rep(bc.localspace*scale)
+    return BoundaryCondition(scaledspace, scaledrules, bc.bounds)
+end
+
 function Base.:*(scale::Scale, crystal::Crystal)
-    _, uniform, _ = dosnf(scale|>rep)
-    newsize = map(Int, size(crystal)./diag(uniform))
-    homesize = map(Int, size(crystal)./newsize)
-    homeoffs = (getspace(crystal)*r for r in Iterators.product((0:s-1 for s in homesize)...))
-    newunitcell = Subset(scale*(off+r) for off in homeoffs for r in crystal|>getunitcell)
-    return Crystal(newunitcell, newsize)
+    scaledspace = scale*(crystal|>getspace)
+    genlengths = (
+        norm(a)/norm(b)|>ceil|>Integer 
+        for (a, b) in zip(scaledspace|>getbasisvectors, crystal|>getspace|>getbasisvectors))
+    ucsamples = buildregion(crystal, genlengths...)
+    newunitcell = Subset(scale*r|>basispoint for r in ucsamples)
+    return Crystal(newunitcell, scale*(crystal|>getbc))
 end

@@ -94,6 +94,18 @@ function step!(data::RGData, name::String)
 end
 export step!
 
+step!(name::String) = (data::RGData) -> step!(data, name)
+
+function steps!(data::RGData, names::String...)
+    for name in names
+        data|>step!(name)
+    end
+    return data
+end
+export steps!
+
+steps!(names::String...) = (data::RGData) -> steps!(data, names...)
+
 function head!(data::RGData, names...)
     head = tracedata(data.data, names)
     data.headloc = names|>collect

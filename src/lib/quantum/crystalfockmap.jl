@@ -171,6 +171,10 @@ function Base.:*(left::CrystalFockMap, right::CrystalFockMap)
     return CrystalFockMap(left.outcrystal, right.incrystal, blocks)
 end
 
+function matrixL2norm(fockmap::CrystalFockMap)
+    fockmap
+end
+
 function Base.:*(fockmap::CrystalFockMap, num::Number)
     blocks::Dict = paralleltasks(
         name="CrystalFockMap * Number",

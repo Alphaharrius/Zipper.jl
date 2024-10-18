@@ -1,292 +1,1290 @@
 using Zipper
-using LinearAlgebra,Plots
+using LinearAlgebra,Plots,LsqFit
 plotlyjs()
+usecrystaldensemap()
+
+function getchunkinfo(outcrystal::Crystal, incrystal::Crystal)
+    chunkcount::Integer = maximum((size(outcrystal)..., size(incrystal)...))
+    datalength::Integer = vol(outcrystal) * vol(incrystal)
+    chunksize::Integer = datalength/chunkcount|>round
+    return datalength, chunkcount, chunksize
+end
 
 # Dirac
 #systemsize24
 fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize2/")
-size24local2gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
-size24local2blockedcorrelations = fioload("blockedcorrelations")
-size24local2blockedcrystalfock = size24local2blockedcorrelations|>getoutspace
-size24local2blockedcrystal::Crystal = size24local2blockedcrystalfock|>getcrystal
-size24local2blockedspace::RealSpace = size24local2blockedcrystal|>getspace
+size24local2gmera1thirddiffL2normdirac = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normdirac = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normdirac = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normdirac = fioload("gmeraalldiffL2norm")["re"]
 
-refrot = inv([2/3 -1/3; -1/3 2/3]')
-c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
-c3 = c6^2
-size24local2center = [0,0] ∈ size24local2blockedspace
-size24local2hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local2blockedcrystal, center=size24local2center, metricspace=size24local2blockedspace)
-size24local2hexagonalregionfock = quantize(size24local2hexagonalregion,1)
+# RGstpes_systemsize24_local2_list = [1,2,3,4]
 
-# @info "Computing local correlations..."
-size24local2localrestrict = fourier(size24local2blockedcrystalfock, size24local2hexagonalregionfock) / (size24local2blockedcrystal|>vol|>sqrt)
-size24local2localcorrelations = size24local2localrestrict'*size24local2blockedcorrelations*size24local2localrestrict
-
-size24local2localspectrum = size24local2localcorrelations|>eigspec
-size24local2localspectrum|>visualize|>display
+# size24local2gmeradirac_acrossRGlist = [size24local2gmera1thirddiffL2norm,size24local2gmera2thirddiffL2norm,size24local2gmera3thirddiffL2norm,size24local2gmeraalldiffL2normdirac]
+# scatter(RGstpes_list_local2,size24local2gmeradirac_acrossRGlist,title="error terminated at different <br> RG steps - Dirac",label="block size = 2")
 
 fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize4/")
-size24local4gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
-size24local4blockedcorrelations = fioload("blockedcorrelations")
-size24local4blockedcrystalfock = size24local4blockedcorrelations|>getoutspace
-size24local4blockedcrystal::Crystal = size24local4blockedcrystalfock|>getcrystal
-size24local4blockedspace::RealSpace = size24local4blockedcrystal|>getspace
+size24local4gmera1thirdalldiffL2norm = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2norm = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normdirac = fioload("gmeraalldiffL2norm")["re"]
 
-refrot = inv([2/3 -1/3; -1/3 2/3]')
-c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
-c3 = c6^2
-size24local4center = [0,0] ∈ size24local4blockedspace
-size24local4hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local4blockedcrystal, center=size24local4center, metricspace=size24local4blockedspace)
-size24local4hexagonalregionfock = quantize(size24local4hexagonalregion,1)
+# RGstpes_systemsize24_local4_list = [1,2,3]
 
-# @info "Computing local correlations..."
-size24local4localrestrict = fourier(size24local4blockedcrystalfock, size24local4hexagonalregionfock) / (size24local4blockedcrystal|>vol|>sqrt)
-size24local4localcorrelations = size24local4localrestrict'*size24local4blockedcorrelations*size24local4localrestrict
-
-size24local4localspectrum = size24local4localcorrelations|>eigspec
-size24local4localspectrum|>visualize|>display
+# size24local4gmeradirac_acrossRGlist = [size24local4gmera1thirdalldiffL2norm,size24local4gmera2thirdalldiffL2norm,size24local4gmeraalldiffL2normdirac]
+# scatter!(RGstpes_systemsize24_local4_list,size24local4gmeradirac_acrossRGlist,label="block size = 4")
 
 fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize6/")
-size24local6gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
-size24local6blockedcorrelations = fioload("blockedcorrelations")
-size24local6blockedcrystalfock = size24local6blockedcorrelations|>getoutspace
-size24local6blockedcrystal::Crystal = size24local6blockedcrystalfock|>getcrystal
-size24local6blockedspace::RealSpace = size24local6blockedcrystal|>getspace
+size24local6gmera1thirdalldiffL2norm = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2norm = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normdirac = fioload("gmeraalldiffL2norm")["re"]
 
-refrot = inv([2/3 -1/3; -1/3 2/3]')
-c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
-c3 = c6^2
-size24local6center = [0,0] ∈ size24local6blockedspace
-size24local6hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local6blockedcrystal, center=size24local6center, metricspace=size24local6blockedspace)
-size24local6hexagonalregionfock = quantize(size24local6hexagonalregion,1)
+# RGstpes_systemsize24_local6_list = [1,2,3]
 
-# @info "Computing local correlations..."
-size24local6localrestrict = fourier(size24local6blockedcrystalfock, size24local6hexagonalregionfock) / (size24local6blockedcrystal|>vol|>sqrt)
-size24local6localcorrelations = size24local6localrestrict'*size24local6blockedcorrelations*size24local6localrestrict
-size24local6localspectrum = eigspec(size24local6localcorrelations,groupingthreshold=1e-15)
-size24local6localspectrum|>visualize|>display
+# size24local6gmeradirac_acrossRGlist = [size24local6gmera1thirdalldiffL2norm,size24local6gmera2thirdalldiffL2norm,size24local6gmeraalldiffL2normdirac]
+# scatter!(RGstpes_systemsize24_local6_list,size24local6gmeradirac_acrossRGlist,label="block size = 6")
 
 fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize8/")
-size24local8gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
-size24local8blockedcorrelations = fioload("blockedcorrelations")
-size24local8blockedcrystalfock = size24local8blockedcorrelations|>getoutspace
-size24local8blockedcrystal::Crystal = size24local8blockedcrystalfock|>getcrystal
-size24local8blockedspace::RealSpace = size24local8blockedcrystal|>getspace
+size24local8gmera1thirdalldiffL2norm = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normdirac = fioload("gmeraalldiffL2norm")["re"]
 
-refrot = inv([2/3 -1/3; -1/3 2/3]')
-c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
-c3 = c6^2
-size24local8center = [0,0] ∈ size24local8blockedspace
-size24local8hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local8blockedcrystal, center=size24local8center, metricspace=size24local8blockedspace)
-size24local8hexagonalregionfock = quantize(size24local8hexagonalregion,1)
+# RGstpes_systemsize24_local8_list = [1,2]
 
-# @info "Computing local correlations..."
-size24local8localrestrict = fourier(size24local8blockedcrystalfock, size24local8hexagonalregionfock) / (size24local8blockedcrystal|>vol|>sqrt)
-size24local8localcorrelations = size24local8localrestrict'*size24local8blockedcorrelations*size24local8localrestrict
-size24local8localspectrum = eigspec(size24local8localcorrelations,groupingthreshold=1e-10)
-size24local8localspectrum|>visualize|>display
+# size24local8gmeradirac_acrossRGlist = [size24local8gmera1thirdalldiffL2norm,size24local8gmeraalldiffL2normdirac]
+# scatter!(RGstpes_systemsize24_local8_list,size24local8gmeradirac_acrossRGlist,label="block size = 8")
 
-sort([abs(eval) for (_,eval) in size24local8localspectrum|>geteigenvalues])[97]
-sort([abs(eval) for (_,eval) in size24local8localspectrum|>geteigenvalues])[96]
-
-fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize12/")
-size24local12gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
-size24local12blockedcorrelations = fioload("blockedcorrelations")
-size24local12blockedcrystalfock = size24local12blockedcorrelations|>getoutspace
-size24local12blockedcrystal::Crystal = size24local12blockedcrystalfock|>getcrystal
-size24local12blockedspace::RealSpace = size24local12blockedcrystal|>getspace
-
-refrot = inv([2/3 -1/3; -1/3 2/3]')
-c6 = pointgrouptransform([cos(π/3) -sin(π/3); sin(π/3) cos(π/3)])
-c3 = c6^2
-size24local12center = [0,0] ∈ size24local12blockedspace
-size24local12hexagonalregion = gethexagonalregion(rot = refrot,crystal=size24local12blockedcrystal, center=size24local12center, metricspace=size24local12blockedspace)
-size24local12hexagonalregionfock = quantize(size24local12hexagonalregion,1)
-
-# @info "Computing local correlations..."
-size24local12localrestrict = fourier(size24local12blockedcrystalfock, size24local12hexagonalregionfock) / (size24local12blockedcrystal|>vol|>sqrt)
-size24local12localcorrelations = size24local12localrestrict'*size24local12blockedcorrelations*size24local12localrestrict
-size24local12localspectrum = eigspec(size24local12localcorrelations,groupingthreshold=1e-17)
-size24local12localspectrum|>visualize|>display
-
-sort([abs(eval) for (m,eval) in size24local12localspectrum|>geteigenvalues])[217]
-sort([abs(eval) for (m,eval) in size24local12localspectrum|>geteigenvalues])[216]
-
-
-radius_list = [2,4,6,8,12]
-radius_list = [2,4,6,8]
-# size24L1normdirac_list = log.([size24local2gmeraalldiffL1normdirac,size24local4gmeraalldiffL1normdirac,size24local6gmeraalldiffL1normdirac,size24local8gmeraalldiffL1normdirac,size24local12gmeraalldiffL1normdirac])
-size24L1normdirac_list = log.([size24local2gmeraalldiffL1normdirac,size24local4gmeraalldiffL1normdirac,size24local6gmeraalldiffL1normdirac,size24local8gmeraalldiffL1normdirac])
-
-#systemsize48
-fiodir("/Users/slwongag/Desktop/data/dirac/systemsize48/localsize2/")
-size48local2gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
+# radius_list = [2,4,6,8]
+# size24L2normdirac_list = log.([size24local2gmeraalldiffL2normdirac,size24local4gmeraalldiffL2normdirac,size24local6gmeraalldiffL2normdirac,size24local8gmeraalldiffL2normdirac])
 
 # Trivial 
 #onsite0.05
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize2")
-size24local2gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
+size24local2gmera1thirdalldiffL2normtrivialonsite005 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirdalldiffL2normtrivialonsite005 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirdalldiffL2normtrivialonsite005 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite005 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite005_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite005,size24local2gmera2thirddiffL2normtrivialonsite005,size24local2gmera3thirddiffL2normtrivialonsite005,size24local2gmeraalldiffL2normtrivialonsite005]
+scatter([2/size24trivialonsite005correlationlength,4/size24trivialonsite005correlationlength,8/size24trivialonsite005correlationlength,24/size24trivialonsite005correlationlength],log.(size24local2gmeratrivialonsite005_acrossRGlist),title="error terminated at different <br> RG steps",label="onsite = 0.05")
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize4")
-size24local4gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
+size24local4gmera1thirdalldiffL2normtrivialonsite005 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite005 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite005 = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize6")
-size24local6gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
+size24local6gmera1thirdalldiffL2normtrivialonsite005 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite005 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite005 = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize8")
-size24local8gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
+size24local8gmera1thirdalldiffL2normtrivialonsite005 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite005 = fioload("gmeraalldiffL2norm")["re"]
 
-# fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.05-localsize12")
-# size24local12gmeraalldiffL1normtrivialonsite005 = fioload("gmeraalldiffL1norm")
+raiduslist= [2,4,6,8]
+errorlist = [size24local2gmeraalldiffL2normtrivialonsite005,size24local4gmeraalldiffL2normtrivialonsite005]
 
-# size24L1normtrivialonsite005_list = log.([size24local2gmeraalldiffL1normtrivialonsite005,size24local4gmeraalldiffL1normtrivialonsite005,size24local6gmeraalldiffL1normtrivialonsite005,size24gmeraalldiffL1normtriviallocal8onsite005,size24gmeraalldiffL1normtriviallocal12onsite005])
-size24L1normtrivialonsite005_list = log.([size24local2gmeraalldiffL1normtrivialonsite005,size24local4gmeraalldiffL1normtrivialonsite005,size24local6gmeraalldiffL1normtrivialonsite005,size24local8gmeraalldiffL1normtrivialonsite005])
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite005correlationlength = fioload("correlationlength005")
+
+size24trivialonsite005block2overcorrelationlength = 2/size24trivialonsite005correlationlength
+size24trivialonsite005block4overcorrelationlength = 4/size24trivialonsite005correlationlength
+size24trivialonsite005block6overcorrelationlength = 6/size24trivialonsite005correlationlength
+size24trivialonsite005block8overcorrelationlength = 8/size24trivialonsite005correlationlength
+size24trivialonsite005block16overcorrelationlength = 16/size24trivialonsite005correlationlength
 
 #onsite0.1
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize2")
-size24local2gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
+size24local2gmera1thirddiffL2normtrivialonsite01 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normtrivialonsite01 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normtrivialonsite01 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite01 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite01_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite01,size24local2gmera2thirddiffL2normtrivialonsite01,size24local2gmera3thirddiffL2normtrivialonsite01,size24local2gmeraalldiffL2normtrivialonsite01]
+scatter!([2/size24trivialonsite01correlationlength,4/size24trivialonsite01correlationlength,8/size24trivialonsite01correlationlength,24/size24trivialonsite01correlationlength],log.(size24local2gmeratrivialonsite01_acrossRGlist),label="onsite = 0.1")
+
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize4")
-size24local4gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
+size24local4gmera1thirdalldiffL2normtrivialonsite01 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite01 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite01 = fioload("gmeraalldiffL2norm")["re"]
+
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize6")
-size24local6gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
+size24local6gmera1thirdalldiffL2normtrivialonsite01 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite01 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite01 = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize8")
-size24local8gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
+size24local8gmera1thirdalldiffL2normtrivialonsite01 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite01 = fioload("gmeraalldiffL2norm")["re"]
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.1-localsize12")
-size24local12gmeraalldiffL1normtrivialonsite01 = fioload("gmeraalldiffL1norm")
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite01correlationlength = fioload("correlationlength01")
 
-# size24L1normtrivialonsite01_list = log.([size24local2gmeraalldiffL1normtrivialonsite01,size24local4gmeraalldiffL1normtrivialonsite01,size24local6gmeraalldiffL1normtrivialonsite01,size24local8gmeraalldiffL1normtrivialonsite01,size24local12gmeraalldiffL1normtrivialonsite01])
-size24L1normtrivialonsite01_list = log.([size24local2gmeraalldiffL1normtrivialonsite01,size24local4gmeraalldiffL1normtrivialonsite01,size24local6gmeraalldiffL1normtrivialonsite01,size24local8gmeraalldiffL1normtrivialonsite01])
+size24trivialonsite01block2overcorrelationlength = 2/size24trivialonsite01correlationlength
+size24trivialonsite01block4overcorrelationlength = 4/size24trivialonsite01correlationlength
+size24trivialonsite01block6overcorrelationlength = 6/size24trivialonsite01correlationlength
+size24trivialonsite01block8overcorrelationlength = 8/size24trivialonsite01correlationlength
+size24trivialonsite01block16overcorrelationlength = 16/size24trivialonsite01correlationlength
 
 #onsite0.15
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize2")
-size24local2gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+size24local2gmera1thirddiffL2normtrivialonsite015 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normtrivialonsite015 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normtrivialonsite015 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite015 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite015_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite015,size24local2gmera2thirddiffL2normtrivialonsite015,size24local2gmera3thirddiffL2normtrivialonsite015,size24local2gmeraalldiffL2normtrivialonsite015]
+scatter!([2/size24trivialonsite015correlationlength,4/size24trivialonsite015correlationlength,8/size24trivialonsite015correlationlength,24/size24trivialonsite015correlationlength],log.(size24local2gmeratrivialonsite015_acrossRGlist),label="onsite = 0.15")
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize4")
-size24local4gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+size24local4gmera1thirdalldiffL2normtrivialonsite015 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite015 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite015 = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize6")
-size24local6gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+size24local6gmera1thirdalldiffL2normtrivialonsite015 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite015 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite015 = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize8")
-size24local8gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+size24local8gmera1thirdalldiffL2normtrivialonsite015 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite015 = fioload("gmeraalldiffL2norm")["re"]
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.15-localsize12")
-size24local12gmeraalldiffL1normtrivialonsite015 = fioload("gmeraalldiffL1norm")
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite015correlationlength = fioload("correlationlength015")
 
-# size24L1normtrivialonsite015_list = log.([size24local2gmeraalldiffL1normtrivialonsite015,size24local4gmeraalldiffL1normtrivialonsite015,size24local6gmeraalldiffL1normtrivialonsite015,size24local8gmeraalldiffL1normtrivialonsite015,size24local12gmeraalldiffL1normtrivialonsite015])
-size24L1normtrivialonsite015_list = log.([size24local2gmeraalldiffL1normtrivialonsite015,size24local4gmeraalldiffL1normtrivialonsite015,size24local6gmeraalldiffL1normtrivialonsite015,size24local8gmeraalldiffL1normtrivialonsite015])
+size24trivialonsite015block2overcorrelationlength = 2/size24trivialonsite015correlationlength
+size24trivialonsite015block4overcorrelationlength = 4/size24trivialonsite015correlationlength
+size24trivialonsite015block6overcorrelationlength = 6/size24trivialonsite015correlationlength
+size24trivialonsite015block8overcorrelationlength = 8/size24trivialonsite015correlationlength
+size24trivialonsite015block16overcorrelationlength = 16/size24trivialonsite015correlationlength
 
 #onsite0.2
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize2")
-size24local2gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+size24local2gmera1thirddiffL2normtrivialonsite02 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normtrivialonsite02 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normtrivialonsite02 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite02 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite02_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite02,size24local2gmera2thirddiffL2normtrivialonsite02,size24local2gmera3thirddiffL2normtrivialonsite02,size24local2gmeraalldiffL2normtrivialonsite02]
+scatter!([2/size24trivialonsite02correlationlength,4/size24trivialonsite02correlationlength,8/size24trivialonsite02correlationlength,24/size24trivialonsite02correlationlength],log.(size24local2gmeratrivialonsite02_acrossRGlist),label="onsite = 0.2")
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize4")
-size24local4gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+size24local4gmera1thirdalldiffL2normtrivialonsite02 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite02 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite02 = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize6")
-size24local6gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+size24local6gmera1thirdalldiffL2normtrivialonsite02 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite02 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite02 = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize8")
-size24local8gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+size24local8gmera1thirdalldiffL2normtrivialonsite02 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite02 = fioload("gmeraalldiffL2norm")["re"]
 
-fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.2-localsize12")
-size24local12gmeraalldiffL1normtrivialonsite02 = fioload("gmeraalldiffL1norm")
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite02correlationlength = fioload("correlationlength02")
 
-# size24L1normtrivialonsite02_list = log.([size24local2gmeraalldiffL1normtrivialonsite02,size24local4gmeraalldiffL1normtrivialonsite02,size24local6gmeraalldiffL1normtrivialonsite02,size24local8gmeraalldiffL1normtrivialonsite02,size24local12gmeraalldiffL1normtrivialonsite02])
-size24L1normtrivialonsite02_list = log.([size24local2gmeraalldiffL1normtrivialonsite02,size24local4gmeraalldiffL1normtrivialonsite02,size24local6gmeraalldiffL1normtrivialonsite02,size24local8gmeraalldiffL1normtrivialonsite02])
+size24trivialonsite02block2overcorrelationlength = 2/size24trivialonsite02correlationlength
+size24trivialonsite02block4overcorrelationlength = 4/size24trivialonsite02correlationlength
+size24trivialonsite02block6overcorrelationlength = 6/size24trivialonsite02correlationlength
+size24trivialonsite02block8overcorrelationlength = 8/size24trivialonsite02correlationlength
+size24trivialonsite02block16overcorrelationlength = 16/size24trivialonsite02correlationlength
+
+#onsite0.25
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.25-localsize2")
+size24local2gmera1thirddiffL2normtrivialonsite025 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normtrivialonsite025 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normtrivialonsite025 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite025 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite025_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite025,size24local2gmera2thirddiffL2normtrivialonsite025,size24local2gmera3thirddiffL2normtrivialonsite025,size24local2gmeraalldiffL2normtrivialonsite025]
+scatter!([2/size24trivialonsite025correlationlength,4/size24trivialonsite025correlationlength,8/size24trivialonsite025correlationlength,24/size24trivialonsite025correlationlength],log.(size24local2gmeratrivialonsite025_acrossRGlist),label="onsite = 0.25")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.25-localsize4")
+size24local4gmera1thirdalldiffL2normtrivialonsite025 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite025 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite025 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.25-localsize6")
+size24local6gmera1thirdalldiffL2normtrivialonsite025 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite025 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite025 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.25-localsize8")
+size24local8gmera1thirdalldiffL2normtrivialonsite025 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite025 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite025correlationlength = fioload("correlationlength025")
+
+size24trivialonsite025block2overcorrelationlength = 2/size24trivialonsite025correlationlength
+size24trivialonsite025block4overcorrelationlength = 4/size24trivialonsite025correlationlength
+size24trivialonsite025block6overcorrelationlength = 6/size24trivialonsite025correlationlength
+size24trivialonsite025block8overcorrelationlength = 8/size24trivialonsite025correlationlength
+size24trivialonsite025block16overcorrelationlength = 16/size24trivialonsite025correlationlength
+
+#onsite0.3
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.3-localsize2")
+size24local2gmera1thirddiffL2normtrivialonsite03 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normtrivialonsite03 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normtrivialonsite03 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite03 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite03_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite03,size24local2gmera2thirddiffL2normtrivialonsite03,size24local2gmera3thirddiffL2normtrivialonsite03,size24local2gmeraalldiffL2normtrivialonsite03]
+scatter!([2/size24trivialonsite03correlationlength,4/size24trivialonsite03correlationlength,8/size24trivialonsite03correlationlength,24/size24trivialonsite03correlationlength],log.(size24local2gmeratrivialonsite03_acrossRGlist),label="onsite = 0.15")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.3-localsize4")
+size24local4gmera1thirdalldiffL2normtrivialonsite03 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite03 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite03 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.3-localsize6")
+size24local6gmera1thirdalldiffL2normtrivialonsite03 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite03 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite03 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.3-localsize8")
+size24local8gmera1thirdalldiffL2normtrivialonsite03 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite03 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite03correlationlength = fioload("correlationlength03")
+
+size24trivialonsite03block2overcorrelationlength = 2/size24trivialonsite03correlationlength
+size24trivialonsite03block4overcorrelationlength = 4/size24trivialonsite03correlationlength
+size24trivialonsite03block6overcorrelationlength = 6/size24trivialonsite03correlationlength
+size24trivialonsite03block8overcorrelationlength = 8/size24trivialonsite03correlationlength
+size24trivialonsite03block16overcorrelationlength = 16/size24trivialonsite03correlationlength
+
+#onsite0.35
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.35-localsize2")
+size24local2gmera1thirddiffL2normtrivialonsite035 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normtrivialonsite035 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normtrivialonsite035 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite035 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite035_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite035,size24local2gmera2thirddiffL2normtrivialonsite035,size24local2gmera3thirddiffL2normtrivialonsite035,size24local2gmeraalldiffL2normtrivialonsite035]
+scatter!([2/size24trivialonsite035correlationlength,4/size24trivialonsite035correlationlength,8/size24trivialonsite035correlationlength,24/size24trivialonsite035correlationlength],log.(size24local2gmeratrivialonsite035_acrossRGlist),label="onsite = 0.35")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.35-localsize4")
+size24local4gmera1thirdalldiffL2normtrivialonsite035 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite035 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite035 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.35-localsize6")
+size24local6gmera1thirdalldiffL2normtrivialonsite035 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite035 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite035 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.35-localsize8")
+size24local8gmera1thirdalldiffL2normtrivialonsite035 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite035 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite035correlationlength = fioload("correlationlength035")
+
+size24trivialonsite035block2overcorrelationlength = 2/size24trivialonsite035correlationlength
+size24trivialonsite035block4overcorrelationlength = 4/size24trivialonsite035correlationlength
+size24trivialonsite035block6overcorrelationlength = 6/size24trivialonsite035correlationlength
+size24trivialonsite035block8overcorrelationlength = 8/size24trivialonsite035correlationlength
+size24trivialonsite035block16overcorrelationlength = 16/size24trivialonsite035correlationlength
+
+#onsite0.4
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.4-localsize2")
+size24local2gmera1thirddiffL2normtrivialonsite04 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normtrivialonsite04 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normtrivialonsite04 = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normtrivialonsite04 = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmeratrivialonsite04_acrossRGlist = [size24local2gmera1thirddiffL2normtrivialonsite04,size24local2gmera2thirddiffL2normtrivialonsite04,size24local2gmera3thirddiffL2normtrivialonsite04,size24local2gmeraalldiffL2normtrivialonsite04]
+scatter!([2/size24trivialonsite04correlationlength,4/size24trivialonsite04correlationlength,8/size24trivialonsite04correlationlength,24/size24trivialonsite04correlationlength],log.(size24local2gmeratrivialonsite04_acrossRGlist),label="onsite = 0.4")
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.4-localsize4")
+size24local4gmera1thirdalldiffL2normtrivialonsite04 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirdalldiffL2normtrivialonsite04 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normtrivialonsite04 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.4-localsize6")
+size24local6gmera1thirdalldiffL2normtrivialonsite04 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirdalldiffL2normtrivialonsite04 = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normtrivialonsite04 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24/onsitepotential0.4-localsize8")
+size24local8gmera1thirdalldiffL2normtrivialonsite04 = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normtrivialonsite04 = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite04correlationlength = fioload("correlationlength04")
+
+size24trivialonsite04block2overcorrelationlength = 2/size24trivialonsite04correlationlength
+size24trivialonsite04block4overcorrelationlength = 4/size24trivialonsite04correlationlength
+size24trivialonsite04block6overcorrelationlength = 6/size24trivialonsite04correlationlength
+size24trivialonsite04block8overcorrelationlength = 8/size24trivialonsite04correlationlength
+size24trivialonsite04block16overcorrelationlength = 16/size24trivialonsite04correlationlength
+
+# Make sense of it
+size24trivialblock2overcorrelationlengthlist = [size24trivialonsite005block2overcorrelationlength,size24trivialonsite01block2overcorrelationlength,size24trivialonsite015block2overcorrelationlength,size24trivialonsite02block2overcorrelationlength,size24trivialonsite025block2overcorrelationlength,size24trivialonsite03block2overcorrelationlength,size24trivialonsite035block2overcorrelationlength,size24trivialonsite04block2overcorrelationlength]
+size24trivialblock2gmera1errorL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite005,size24local2gmera1thirddiffL2normtrivialonsite01,size24local2gmera1thirddiffL2normtrivialonsite015,size24local2gmera1thirddiffL2normtrivialonsite02,size24local2gmera1thirddiffL2normtrivialonsite025,size24local2gmera1thirddiffL2normtrivialonsite03,size24local2gmera1thirddiffL2normtrivialonsite035,size24local2gmera1thirddiffL2normtrivialonsite04]
+size24trivialblock2gmera2errorL2normlist = [size24local2gmera2thirddiffL2normtrivialonsite005,size24local2gmera2thirddiffL2normtrivialonsite01,size24local2gmera2thirddiffL2normtrivialonsite015,size24local2gmera2thirddiffL2normtrivialonsite02,size24local2gmera2thirddiffL2normtrivialonsite025,size24local2gmera2thirddiffL2normtrivialonsite03,size24local2gmera2thirddiffL2normtrivialonsite035,size24local2gmera2thirddiffL2normtrivialonsite04]
+size24trivialblock2gmera3errorL2normlist = [size24local2gmera3thirddiffL2normtrivialonsite005,size24local2gmera3thirddiffL2normtrivialonsite01,size24local2gmera3thirddiffL2normtrivialonsite015,size24local2gmera3thirddiffL2normtrivialonsite02,size24local2gmera3thirddiffL2normtrivialonsite025,size24local2gmera3thirddiffL2normtrivialonsite03,size24local2gmera3thirddiffL2normtrivialonsite035,size24local2gmera3thirddiffL2normtrivialonsite04]
+size24trivialblock2gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite005,size24local2gmeraalldiffL2normtrivialonsite01,size24local2gmeraalldiffL2normtrivialonsite015,size24local2gmeraalldiffL2normtrivialonsite02,size24local2gmeraalldiffL2normtrivialonsite025,size24local2gmeraalldiffL2normtrivialonsite03,size24local2gmeraalldiffL2normtrivialonsite035,size24local2gmeraalldiffL2normtrivialonsite04]
+
+size24trivialblock4overcorrelationlengthlist = [size24trivialonsite005block4overcorrelationlength,size24trivialonsite01block4overcorrelationlength,size24trivialonsite015block4overcorrelationlength,size24trivialonsite02block4overcorrelationlength,size24trivialonsite025block4overcorrelationlength,size24trivialonsite03block4overcorrelationlength,size24trivialonsite035block4overcorrelationlength,size24trivialonsite04block4overcorrelationlength]
+size24trivialblock4gmera1errorL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite005,size24local4gmera1thirdalldiffL2normtrivialonsite01,size24local4gmera1thirdalldiffL2normtrivialonsite015,size24local4gmera1thirdalldiffL2normtrivialonsite02,size24local4gmera1thirdalldiffL2normtrivialonsite025,size24local4gmera1thirdalldiffL2normtrivialonsite03,size24local4gmera1thirdalldiffL2normtrivialonsite035,size24local4gmera1thirdalldiffL2normtrivialonsite04]
+size24trivialblock4gmera2errorL2normlist = [size24local4gmera2thirdalldiffL2normtrivialonsite005,size24local4gmera2thirdalldiffL2normtrivialonsite01,size24local4gmera2thirdalldiffL2normtrivialonsite015,size24local4gmera2thirdalldiffL2normtrivialonsite02,size24local4gmera2thirdalldiffL2normtrivialonsite025,size24local4gmera2thirdalldiffL2normtrivialonsite03,size24local4gmera2thirdalldiffL2normtrivialonsite035,size24local4gmera2thirdalldiffL2normtrivialonsite04]
+size24trivialblock4gmeraalldifferrorL2normlist = [size24local4gmeraalldiffL2normtrivialonsite005,size24local4gmeraalldiffL2normtrivialonsite01,size24local4gmeraalldiffL2normtrivialonsite015,size24local4gmeraalldiffL2normtrivialonsite02,size24local4gmeraalldiffL2normtrivialonsite025,size24local4gmeraalldiffL2normtrivialonsite03,size24local4gmeraalldiffL2normtrivialonsite035,size24local4gmeraalldiffL2normtrivialonsite04]
+
+size24trivialblock6overcorrelationlengthlist = [size24trivialonsite005block6overcorrelationlength,size24trivialonsite01block6overcorrelationlength,size24trivialonsite015block6overcorrelationlength,size24trivialonsite02block6overcorrelationlength,size24trivialonsite025block6overcorrelationlength,size24trivialonsite03block6overcorrelationlength,size24trivialonsite035block6overcorrelationlength,size24trivialonsite04block6overcorrelationlength]
+size24trivialblock6gmera1errorL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite005,size24local6gmera1thirdalldiffL2normtrivialonsite01,size24local6gmera1thirdalldiffL2normtrivialonsite015,size24local6gmera1thirdalldiffL2normtrivialonsite02,size24local6gmera1thirdalldiffL2normtrivialonsite025,size24local6gmera1thirdalldiffL2normtrivialonsite03,size24local6gmera1thirdalldiffL2normtrivialonsite035,size24local6gmera1thirdalldiffL2normtrivialonsite04]
+size24trivialblock6gmera2errorL2normlist = [size24local6gmera2thirdalldiffL2normtrivialonsite005,size24local6gmera2thirdalldiffL2normtrivialonsite01,size24local6gmera2thirdalldiffL2normtrivialonsite015,size24local6gmera2thirdalldiffL2normtrivialonsite02,size24local6gmera2thirdalldiffL2normtrivialonsite025,size24local6gmera2thirdalldiffL2normtrivialonsite03,size24local6gmera2thirdalldiffL2normtrivialonsite035,size24local6gmera2thirdalldiffL2normtrivialonsite04]
+size24trivialblock6gmeraalldifferrorL2normlist = [size24local6gmeraalldiffL2normtrivialonsite005,size24local6gmeraalldiffL2normtrivialonsite01,size24local6gmeraalldiffL2normtrivialonsite015,size24local6gmeraalldiffL2normtrivialonsite02,size24local6gmeraalldiffL2normtrivialonsite025,size24local6gmeraalldiffL2normtrivialonsite03,size24local6gmeraalldiffL2normtrivialonsite035,size24local6gmeraalldiffL2normtrivialonsite04]
+
+size24trivialblock8overcorrelationlengthlist = [size24trivialonsite005block8overcorrelationlength,size24trivialonsite01block8overcorrelationlength,size24trivialonsite015block8overcorrelationlength,size24trivialonsite02block8overcorrelationlength,size24trivialonsite025block8overcorrelationlength,size24trivialonsite03block8overcorrelationlength,size24trivialonsite035block8overcorrelationlength,size24trivialonsite04block8overcorrelationlength]
+size24trivialblock8gmera1errorL2normlist = [size24local8gmera1thirdalldiffL2normtrivialonsite005,size24local8gmera1thirdalldiffL2normtrivialonsite01,size24local8gmera1thirdalldiffL2normtrivialonsite015,size24local8gmera1thirdalldiffL2normtrivialonsite02,size24local8gmera1thirdalldiffL2normtrivialonsite025,size24local8gmera1thirdalldiffL2normtrivialonsite03,size24local8gmera1thirdalldiffL2normtrivialonsite035,size24local8gmera1thirdalldiffL2normtrivialonsite04]
+size24trivialblock8gmeraalldifferrorL2normlist = [size24local8gmeraalldiffL2normtrivialonsite005,size24local8gmeraalldiffL2normtrivialonsite01,size24local8gmeraalldiffL2normtrivialonsite015,size24local8gmeraalldiffL2normtrivialonsite02,size24local8gmeraalldiffL2normtrivialonsite025,size24local8gmeraalldiffL2normtrivialonsite03,size24local8gmeraalldiffL2normtrivialonsite035,size24local8gmeraalldiffL2normtrivialonsite04]
+
+scatter(size24trivialblock2overcorrelationlengthlist,log.(size24trivialblock2gmera1errorL2normlist))
+scatter!(size24trivialblock2overcorrelationlengthlist,log.((size24trivialblock2gmera2errorL2normlist)))
+scatter!(size24trivialblock2overcorrelationlengthlist,log.((size24trivialblock2gmera3errorL2normlist)))
+scatter!(size24trivialblock2overcorrelationlengthlist,log.((size24trivialblock2gmeraalldifferrorL2normlist)))
+
+scatter(size24trivialblock4overcorrelationlengthlist,log.(size24trivialblock4gmera1errorL2normlist))
+scatter!(size24trivialblock4overcorrelationlengthlist,log.(size24trivialblock4gmera2errorL2normlist))
+scatter!(size24trivialblock4overcorrelationlengthlist,log.(size24trivialblock4gmeraalldifferrorL2normlist))
+
+scatter(size24trivialblock6overcorrelationlengthlist,log.(size24trivialblock6gmera1errorL2normlist))
+scatter!(size24trivialblock6overcorrelationlengthlist,log.(size24trivialblock6gmera2errorL2normlist))
+scatter!(size24trivialblock6overcorrelationlengthlist,log.(size24trivialblock6gmeraalldifferrorL2normlist))
+
+scatter(size24trivialblock8overcorrelationlengthlist,log.(size24trivialblock8gmera1errorL2normlist))
+scatter!(size24trivialblock8overcorrelationlengthlist,log.(size24trivialblock8gmeraalldifferrorL2normlist))
+
+model(t, p) = p[1] .+ p[2]*t 
+p0 = [1.0, 1.0]
+
+size24trivialblock2rg1fit = curve_fit(model, size24trivialblock2overcorrelationlengthlist,log.(size24trivialblock2gmera1errorL2normlist), p0)
+size24trivialblock2rg1param = size24trivialblock2rg1fit.param
+size24trivialblock2rg1slope = size24trivialblock2rg1param[2]
+
+size24trivialblock2rg2fit = curve_fit(model, size24trivialblock2overcorrelationlengthlist,log.(size24trivialblock2gmera2errorL2normlist), p0)
+size24trivialblock2rg2param = size24trivialblock2rg2fit.param
+size24trivialblock2rg2slope = size24trivialblock2rg2param[2]
+
+size24trivialblock2rg3fit = curve_fit(model, size24trivialblock2overcorrelationlengthlist,log.(size24trivialblock2gmera3errorL2normlist), p0)
+size24trivialblock2rg3param = size24trivialblock2rg3fit.param
+size24trivialblock2rg3slope = size24trivialblock2rg3param[2]
+
+ize24trivialblock2allrgfit = curve_fit(model, size24trivialblock2overcorrelationlengthlist,log.(size24trivialblock2gmeraalldifferrorL2normlist), p0)
+size24trivialblock2allrgparam = ize24trivialblock2allrgfit.param
+size24trivialblock2allrgslope = size24trivialblock2allrgparam[2]
+
+ize24trivialblock4fit = curve_fit(model, size24trivialblock4overcorrelationlengthlist,log.((size24trivialblock4gmeraalldifferrorL2normlist)), p0)
+size24trivialblock4param = ize24trivialblock4fit.param
+size24trivialblock4slope = size24trivialblock4param[2]
+
+ize24trivialblock6fit = curve_fit(model, size24trivialblock6overcorrelationlengthlist,log.((size24trivialblock6gmeraalldifferrorL2normlist)), p0)
+size24trivialblock6param = ize24trivialblock6fit.param
+size24trivialblock6slope = size24trivialblock6param[2]
+
+ize24trivialblock8fit = curve_fit(model, size24trivialblock8overcorrelationlengthlist,log.((size24trivialblock8gmeraalldifferrorL2normlist)), p0)
+size24trivialblock8param = ize24trivialblock8fit.param
+size24trivialblock8slope = size24trivialblock8param[2]
+
+scatter([2,4,6,8],[size24trivialblock2slope,size24trivialblock4slope,size24trivialblock6slope,size24trivialblock8slope])
+
+radius_list = [2,4,6,8]
+size24trivialonsite005lbovercorrelationlengthlist = [size24trivialonsite005block2overcorrelationlength,size24trivialonsite005block4overcorrelationlength,size24trivialonsite005block6overcorrelationlength,size24trivialonsite005block8overcorrelationlength]
+size24trivialonsite01lbovercorrelationlengthlist = [size24trivialonsite01block2overcorrelationlength,size24trivialonsite01block4overcorrelationlength,size24trivialonsite01block6overcorrelationlength,size24trivialonsite01block8overcorrelationlength]
+size24trivialonsite015lbovercorrelationlengthlist = [size24trivialonsite015block2overcorrelationlength,size24trivialonsite015block4overcorrelationlength,size24trivialonsite015block6overcorrelationlength,size24trivialonsite015block8overcorrelationlength]
+size24trivialonsite02lbovercorrelationlengthlist = [size24trivialonsite02block2overcorrelationlength,size24trivialonsite02block4overcorrelationlength,size24trivialonsite02block6overcorrelationlength,size24trivialonsite02block8overcorrelationlength]
+size24trivialonsite025lbovercorrelationlengthlist = [size24trivialonsite025block2overcorrelationlength,size24trivialonsite025block4overcorrelationlength,size24trivialonsite025block6overcorrelationlength,size24trivialonsite025block8overcorrelationlength]
+size24trivialonsite03lbovercorrelationlengthlist = [size24trivialonsite03block2overcorrelationlength,size24trivialonsite03block4overcorrelationlength,size24trivialonsite03block6overcorrelationlength,size24trivialonsite03block8overcorrelationlength]
+size24trivialonsite035lbovercorrelationlengthlist = [size24trivialonsite035block2overcorrelationlength,size24trivialonsite035block4overcorrelationlength,size24trivialonsite035block6overcorrelationlength,size24trivialonsite035block8overcorrelationlength]
+size24trivialonsite04lbovercorrelationlengthlist = [size24trivialonsite04block2overcorrelationlength,size24trivialonsite04block4overcorrelationlength,size24trivialonsite04block6overcorrelationlength,size24trivialonsite04block8overcorrelationlength]
+
+size24diracgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normdirac,size24local4gmeraalldiffL2normdirac,size24local6gmeraalldiffL2normdirac,size24local8gmeraalldiffL2normdirac]
+size24trivialonsite005gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite005,size24local4gmeraalldiffL2normtrivialonsite005,size24local6gmeraalldiffL2normtrivialonsite005,size24local8gmeraalldiffL2normtrivialonsite005]
+size24trivialonsite01gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite01,size24local4gmeraalldiffL2normtrivialonsite01,size24local6gmeraalldiffL2normtrivialonsite01,size24local8gmeraalldiffL2normtrivialonsite01]
+size24trivialonsite015gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite015,size24local4gmeraalldiffL2normtrivialonsite015,size24local6gmeraalldiffL2normtrivialonsite015,size24local8gmeraalldiffL2normtrivialonsite015]
+size24trivialonsite02gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite02,size24local4gmeraalldiffL2normtrivialonsite02,size24local6gmeraalldiffL2normtrivialonsite02,size24local8gmeraalldiffL2normtrivialonsite02]
+size24trivialonsite025gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite025,size24local4gmeraalldiffL2normtrivialonsite025,size24local6gmeraalldiffL2normtrivialonsite025,size24local8gmeraalldiffL2normtrivialonsite025]
+size24trivialonsite03gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite03,size24local4gmeraalldiffL2normtrivialonsite03,size24local6gmeraalldiffL2normtrivialonsite03,size24local8gmeraalldiffL2normtrivialonsite03]
+size24trivialonsite035gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite035,size24local4gmeraalldiffL2normtrivialonsite035,size24local6gmeraalldiffL2normtrivialonsite035,size24local8gmeraalldiffL2normtrivialonsite035]
+size24trivialonsite04gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normtrivialonsite04,size24local4gmeraalldiffL2normtrivialonsite04,size24local6gmeraalldiffL2normtrivialonsite04,size24local8gmeraalldiffL2normtrivialonsite04]
+
+scatter(size24trivialonsite005lbovercorrelationlengthlist,log.(size24trivialonsite005gmeraalldifferrorL2normlist),title = "log(error) vs lb/correlationlength",label="onsite = 0.05",xlabel="lb/correlationlength",ylabel="log(error)")
+scatter!(size24trivialonsite01lbovercorrelationlengthlist,log.(size24trivialonsite01gmeraalldifferrorL2normlist),label="onsite = 0.1")
+scatter!(size24trivialonsite015lbovercorrelationlengthlist,log.(size24trivialonsite015gmeraalldifferrorL2normlist),label="onsite = 0.15")
+scatter!(size24trivialonsite02lbovercorrelationlengthlist,log.(size24trivialonsite02gmeraalldifferrorL2normlist),label="onsite = 0.2")
+scatter!(size24trivialonsite025lbovercorrelationlengthlist,log.(size24trivialonsite025gmeraalldifferrorL2normlist),label="onsite = 0.25")
+scatter!(size24trivialonsite03lbovercorrelationlengthlist,log.(size24trivialonsite03gmeraalldifferrorL2normlist),label="onsite = 0.3")
+scatter!(size24trivialonsite035lbovercorrelationlengthlist,log.(size24trivialonsite035gmeraalldifferrorL2normlist),label="onsite = 0.35")
+scatter!(size24trivialonsite04lbovercorrelationlengthlist,log.(size24trivialonsite04gmeraalldifferrorL2normlist),label="onsite = 0.4")
+
+model(t, p) = p[1] .+ p[2]*t 
+p0 = [1.0, 1.0]
+
+size24trivialonsite005fit = curve_fit(model, size24trivialonsite005lbovercorrelationlengthlist, log.(size24trivialonsite005gmeraalldifferrorL2normlist), p0)
+size24trivialonsite005param = size24trivialonsite005fit.param
+size24trivialonsite005slope = size24trivialonsite005param[2]
+
+size24trivialonsite01fit = curve_fit(model, size24trivialonsite01lbovercorrelationlengthlist, log.(size24trivialonsite01gmeraalldifferrorL2normlist), p0)
+size24trivialonsite01param = size24trivialonsite01fit.param
+size24trivialonsite01slope = size24trivialonsite01param[2]
+
+size24trivialonsite015fit = curve_fit(model, size24trivialonsite015lbovercorrelationlengthlist, log.(size24trivialonsite015gmeraalldifferrorL2normlist), p0)
+size24trivialonsite015param = size24trivialonsite015fit.param
+size24trivialonsite015slope = size24trivialonsite015param[2]
+
+size24trivialonsite02fit = curve_fit(model, size24trivialonsite02lbovercorrelationlengthlist, log.(size24trivialonsite02gmeraalldifferrorL2normlist), p0)
+size24trivialonsite02param = size24trivialonsite02fit.param
+size24trivialonsite02slope = size24trivialonsite02param[2]
+
+size24trivialonsite025fit = curve_fit(model, size24trivialonsite025lbovercorrelationlengthlist, log.(size24trivialonsite025gmeraalldifferrorL2normlist), p0)
+size24trivialonsite025param = size24trivialonsite025fit.param
+size24trivialonsite025slope = size24trivialonsite025param[2]
+
+size24trivialonsite03fit = curve_fit(model, size24trivialonsite03lbovercorrelationlengthlist, log.(size24trivialonsite03gmeraalldifferrorL2normlist), p0)
+size24trivialonsite03param = size24trivialonsite03fit.param
+size24trivialonsite03slope = size24trivialonsite03param[2]
+
+size24trivialonsite035fit = curve_fit(model, size24trivialonsite035lbovercorrelationlengthlist, log.(size24trivialonsite035gmeraalldifferrorL2normlist), p0)
+size24trivialonsite035param = size24trivialonsite035fit.param
+size24trivialonsite035slope = size24trivialonsite035param[2]
+
+size24trivialonsite04fit = curve_fit(model, size24trivialonsite04lbovercorrelationlengthlist, log.(size24trivialonsite04gmeraalldifferrorL2normlist), p0)
+size24trivialonsite04param = size24trivialonsite04fit.param
+size24trivialonsite04slope = size24trivialonsite04param[2]
+
+size24trivialonsite005param[1]
+size24trivialonsite01param[1]
+size24trivialonsite015param[1]
+size24trivialonsite02param[1]
+size24trivialonsite025param[1]
+size24trivialonsite03param[1]
+size24trivialonsite035param[1]
+size24trivialonsite04param[1]
+
+correlationlengthlist = [size24trivialonsite005correlationlength,size24trivialonsite01correlationlength,size24trivialonsite015correlationlength,size24trivialonsite02correlationlength,size24trivialonsite025correlationlength,size24trivialonsite03correlationlength,size24trivialonsite035correlationlength,size24trivialonsite04correlationlength]
+trivialslopelist = [size24trivialonsite005slope,size24trivialonsite01slope,size24trivialonsite015slope,size24trivialonsite02slope,size24trivialonsite025slope,size24trivialonsite03slope,size24trivialonsite035slope,size24trivialonsite04slope]
+
+scatter(correlationlengthlist,trivialslopelist,title="slope of the same color vs correlation length", xlabel="correlation length",ylabel = "slope")
+
+radiuslist= [2,4,6,8]
+scatter(radiuslist,log.(size24diracgmeraalldifferrorL2normlist),title = "log(error) vs lb",label="onsite = 0",xlabel="lb",ylabel="log(error)")
+scatter!(radiuslist,log.(size24trivialonsite005gmeraalldifferrorL2normlist),label="onsite = 0.05")
+scatter!(radiuslist,log.(size24trivialonsite01gmeraalldifferrorL2normlist),label="onsite = 0.1")
+scatter!(radiuslist,log.(size24trivialonsite015gmeraalldifferrorL2normlist),label="onsite = 0.15")
+scatter!(radiuslist,log.(size24trivialonsite02gmeraalldifferrorL2normlist),label="onsite = 0.2")
+scatter!(radiuslist,log.(size24trivialonsite025gmeraalldifferrorL2normlist),label="onsite = 0.25")
+scatter!(radiuslist,log.(size24trivialonsite03gmeraalldifferrorL2normlist),label="onsite = 0.3")
+scatter!(radiuslist,log.(size24trivialonsite035gmeraalldifferrorL2normlist),label="onsite = 0.35")
+scatter!(radiuslist,log.(size24trivialonsite04gmeraalldifferrorL2normlist),label="onsite = 0.4")
+
+model(t, p) = p[1] .+ p[2]*t 
+p0 = [1.0, 1.0]
+
+size24diraclbfit = curve_fit(model, radiuslist, log.(size24diracgmeraalldifferrorL2normlist), p0)
+size24diraclbparam = size24diraclbfit.param
+slope0 = size24diraclbparam[2]
+oneoverslope0 = 1/slope0
+
+size24trivialonsite005lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite005gmeraalldifferrorL2normlist), p0)
+size24trivialonsite005lbparam = size24trivialonsite005lbfit.param
+slope005 = size24trivialonsite005lbparam[2]
+oneoverslope005 = 1/slope005
+
+size24trivialonsite01lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite01gmeraalldifferrorL2normlist), p0)
+size24trivialonsite01lbparam = size24trivialonsite01lbfit.param
+slope01 = size24trivialonsite01lbparam[2]
+oneoverslope01 = 1/slope01
+
+size24trivialonsite015lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite015gmeraalldifferrorL2normlist), p0)
+size24trivialonsite015lbparam = size24trivialonsite015lbfit.param
+slope015 = size24trivialonsite015lbparam[2]
+oneoverslope015 = 1/slope015
+
+size24trivialonsite02lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite02gmeraalldifferrorL2normlist), p0)
+size24trivialonsite02lbparam = size24trivialonsite02lbfit.param
+slope02 = size24trivialonsite02lbparam[2]
+oneoverslope02 = 1/slope02
+
+size24trivialonsite025lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite025gmeraalldifferrorL2normlist), p0)
+size24trivialonsite025lbparam = size24trivialonsite025lbfit.param
+slope025 = size24trivialonsite025lbparam[2]
+oneoverslope025 = 1/slope025
+
+size24trivialonsite03lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite03gmeraalldifferrorL2normlist), p0)
+size24trivialonsite03lbparam = size24trivialonsite03lbfit.param
+slope03 = size24trivialonsite03lbparam[2]
+oneoverslope03 = 1/slope03
+
+size24trivialonsite035lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite035gmeraalldifferrorL2normlist), p0)
+size24trivialonsite035lbparam = size24trivialonsite035lbfit.param
+slope035 = size24trivialonsite035lbparam[2]
+oneoverslope035 = 1/slope035
+
+size24trivialonsite04lbfit = curve_fit(model, radiuslist, log.(size24trivialonsite04gmeraalldifferrorL2normlist), p0)
+size24trivialonsite04lbparam = size24trivialonsite04lbfit.param
+slope04 = size24trivialonsite04lbparam[2]
+oneoverslope04 = 1/slope04
+
+size24trivialonsite005param[1]
+size24trivialonsite01param[1]
+size24trivialonsite015param[1]
+size24trivialonsite02param[1]
+size24trivialonsite025param[1]
+size24trivialonsite03param[1]
+size24trivialonsite035param[1]
+size24trivialonsite04param[1]
+size24trivialonsite005param[2]
+size24trivialonsite01param[2]
+size24trivialonsite015param[2]
+size24trivialonsite02param[2]
+size24trivialonsite025param[2]
+size24trivialonsite03param[2]
+size24trivialonsite035param[2]
+size24trivialonsite04param[2]
+
+size24trivialonsite005lbparam[1]
+size24trivialonsite01lbparam[1]
+size24trivialonsite015lbparam[1]
+size24trivialonsite02lbparam[1]
+size24trivialonsite025lbparam[1]
+size24trivialonsite03lbparam[1]
+size24trivialonsite035lbparam[1]
+size24trivialonsite04lbparam[1]
+size24trivialonsite005lbparam[2]
+size24trivialonsite01lbparam[2]
+size24trivialonsite015lbparam[2]
+size24trivialonsite02lbparam[2]
+size24trivialonsite025lbparam[2]
+size24trivialonsite03lbparam[2]
+size24trivialonsite035lbparam[2]
+size24trivialonsite04lbparam[2]
+
+slope015
+size24trivialonsite005param[2]/size24trivialonsite005lbparam[2]
+size24trivialonsite005correlationlength
+size24trivialonsite01param[2]/size24trivialonsite01lbparam[2]
+size24trivialonsite01correlationlength
+size24trivialonsite015param[2]/size24trivialonsite015lbparam[2]
+size24trivialonsite015correlationlength
+size24trivialonsite02param[2]/size24trivialonsite02lbparam[2]
+size24trivialonsite02correlationlength
+size24trivialonsite025param[2]/size24trivialonsite025lbparam[2]
+size24trivialonsite025correlationlength
+size24trivialonsite03param[2]/size24trivialonsite03lbparam[2]
+size24trivialonsite03correlationlength
+size24trivialonsite035param[2]/size24trivialonsite035lbparam[2]
+size24trivialonsite035correlationlength
+size24trivialonsite04param[2]/size24trivialonsite04lbparam[2]
+size24trivialonsite04correlationlength
+
+
+correlationlengthlist = [size24trivialonsite005correlationlength,size24trivialonsite01correlationlength,size24trivialonsite015correlationlength,size24trivialonsite02correlationlength,size24trivialonsite025correlationlength,size24trivialonsite03correlationlength,size24trivialonsite035correlationlength,size24trivialonsite04correlationlength]
+oneovercorrelationlengthlist = [1/size24trivialonsite005correlationlength,1/size24trivialonsite01correlationlength,1/size24trivialonsite015correlationlength,1/size24trivialonsite02correlationlength,1/size24trivialonsite025correlationlength,1/size24trivialonsite03correlationlength,1/size24trivialonsite035correlationlength,1/size24trivialonsite04correlationlength]
+trivialoverslopelist = [slope005,slope01,slope015,slope02,slope025,slope03,slope035,slope04]
+trivialoneoverslopelist = [oneoverslope005,oneoverslope01,oneoverslope015,oneoverslope02,oneoverslope025,oneoverslope03,oneoverslope035,oneoverslope04]
+
+scatter(correlationlengthlist,trivialoneoverslopelist,title="1/slope of the same color vs correlation length", xlabel="correlation length",ylabel = "1/slope")
+scatter(oneovercorrelationlengthlist,trivialoverslopelist,title="slope of the same color vs correlation length", xlabel="1/correlation length",ylabel = "slope")
+
+onsitepotentiallist = [0.05,0.06,0.08,0.1,0.12,0.14,0.15,0.16,0.18,0.20,0.22,0.24,0.25]
+
+fiodir("/Users/slwongag/Desktop/data/trivial/systemsize24")
+size24trivialonsite006correlationlength = fioload("correlationlength006")
+size24trivialonsite008correlationlength = fioload("correlationlength008")
+size24trivialonsite012correlationlength = fioload("correlationlength012")
+size24trivialonsite014correlationlength = fioload("correlationlength014")
+size24trivialonsite016correlationlength = fioload("correlationlength016")
+size24trivialonsite018correlationlength = fioload("correlationlength018")
+size24trivialonsite022correlationlength = fioload("correlationlength022")
+size24trivialonsite024correlationlength = fioload("correlationlength024")
+
+trivialcorrelationlengthlist = [size24trivialonsite005correlationlength,size24trivialonsite006correlationlength,size24trivialonsite008correlationlength,size24trivialonsite01correlationlength,size24trivialonsite012correlationlength,size24trivialonsite014correlationlength,size24trivialonsite015correlationlength,size24trivialonsite016correlationlength,size24trivialonsite018correlationlength,size24trivialonsite02correlationlength,size24trivialonsite022correlationlength,size24trivialonsite024correlationlength,size24trivialonsite025correlationlength]
+scatter(onsitepotentiallist,trivialcorrelationlengthlist,title="correlation length vs val of onsite potential",xlabel="val of onsite potential",ylabel="correlation length")
+
+size24trivialonsite005local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite005,size24local2gmera2thirddiffL2normtrivialonsite005,size24local2gmera3thirddiffL2normtrivialonsite005,size24local2gmeraalldiffL2normtrivialonsite005]
+size24trivialonsite01local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite01,size24local2gmera2thirddiffL2normtrivialonsite01,size24local2gmera3thirddiffL2normtrivialonsite01,size24local2gmeraalldiffL2normtrivialonsite01]
+size24trivialonsite015local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite015,size24local2gmera2thirddiffL2normtrivialonsite015,size24local2gmera3thirddiffL2normtrivialonsite015,size24local2gmeraalldiffL2normtrivialonsite015]
+size24trivialonsite02local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite02,size24local2gmera2thirddiffL2normtrivialonsite02,size24local2gmera3thirddiffL2normtrivialonsite02,size24local2gmeraalldiffL2normtrivialonsite02]
+size24trivialonsite025local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite025,size24local2gmera2thirddiffL2normtrivialonsite025,size24local2gmera3thirddiffL2normtrivialonsite025,size24local2gmeraalldiffL2normtrivialonsite025]
+size24trivialonsite03local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite03,size24local2gmera2thirddiffL2normtrivialonsite03,size24local2gmera3thirddiffL2normtrivialonsite03,size24local2gmeraalldiffL2normtrivialonsite03]
+size24trivialonsite035local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite035,size24local2gmera2thirddiffL2normtrivialonsite035,size24local2gmera3thirddiffL2normtrivialonsite035,size24local2gmeraalldiffL2normtrivialonsite035]
+size24trivialonsite04local2acrossRGL2normlist = [size24local2gmera1thirddiffL2normtrivialonsite04,size24local2gmera2thirddiffL2normtrivialonsite04,size24local2gmera3thirddiffL2normtrivialonsite04,size24local2gmeraalldiffL2normtrivialonsite04]
+
+
+scatter(size24trivialonsite005lbovercorrelationlengthlist,log.(size24trivialonsite005acrossRGL2normlist))
+scatter!(size24trivialonsite01lbovercorrelationlengthlist,log.(size24trivialonsite01acrossRGL2normlist))
+scatter!(size24trivialonsite015lbovercorrelationlengthlist,log.(size24trivialonsite015acrossRGL2normlist))
+scatter!(size24trivialonsite02lbovercorrelationlengthlist,log.(size24trivialonsite02acrossRGL2normlist))
+scatter!(size24trivialonsite025lbovercorrelationlengthlist,log.(size24trivialonsite025acrossRGL2normlist))
+scatter!(size24trivialonsite03lbovercorrelationlengthlist,log.(size24trivialonsite03acrossRGL2normlist))
+scatter!(size24trivialonsite035lbovercorrelationlengthlist,log.(size24trivialonsite035acrossRGL2normlist))
+scatter!(size24trivialonsite04lbovercorrelationlengthlist,log.(size24trivialonsite04acrossRGL2normlist))
+
+size24trivialonsite005local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite005,size24local4gmera2thirdalldiffL2normtrivialonsite005,size24local4gmeraalldiffL2normtrivialonsite005]
+size24trivialonsite01local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite01,size24local4gmera2thirdalldiffL2normtrivialonsite01,size24local4gmeraalldiffL2normtrivialonsite01]
+size24trivialonsite015local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite015,size24local4gmera2thirdalldiffL2normtrivialonsite015,size24local4gmeraalldiffL2normtrivialonsite015]
+size24trivialonsite02local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite02,size24local4gmera2thirdalldiffL2normtrivialonsite02,size24local4gmeraalldiffL2normtrivialonsite02]
+size24trivialonsite025local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite025,size24local4gmera2thirdalldiffL2normtrivialonsite025,size24local4gmeraalldiffL2normtrivialonsite025]
+size24trivialonsite03local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite03,size24local4gmera2thirdalldiffL2normtrivialonsite03,size24local4gmeraalldiffL2normtrivialonsite03]
+size24trivialonsite035local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite035,size24local4gmera2thirdalldiffL2normtrivialonsite035,size24local4gmeraalldiffL2normtrivialonsite035]
+size24trivialonsite04local4acrossRGL2normlist = [size24local4gmera1thirdalldiffL2normtrivialonsite04,size24local4gmera2thirdalldiffL2normtrivialonsite04,size24local4gmeraalldiffL2normtrivialonsite04]
+
+scatter(size24trivialonsite005lbovercorrelationlengthlist[2:end],log.(size24trivialonsite005local4acrossRGL2normlist))
+scatter!(size24trivialonsite01lbovercorrelationlengthlist[2:end],log.(size24trivialonsite01local4acrossRGL2normlist))
+scatter!(size24trivialonsite015lbovercorrelationlengthlist[2:end],log.(size24trivialonsite015local4acrossRGL2normlist))
+scatter!(size24trivialonsite02lbovercorrelationlengthlist[2:end],log.(size24trivialonsite02local4acrossRGL2normlist))
+scatter!(size24trivialonsite025lbovercorrelationlengthlist[2:end],log.(size24trivialonsite025local4acrossRGL2normlist))
+scatter!(size24trivialonsite03lbovercorrelationlengthlist[2:end],log.(size24trivialonsite03local4acrossRGL2normlist))
+scatter!(size24trivialonsite035lbovercorrelationlengthlist[2:end],log.(size24trivialonsite035local4acrossRGL2normlist))
+scatter!(size24trivialonsite04lbovercorrelationlengthlist[2:end],log.(size24trivialonsite04local4acrossRGL2normlist))
+
+size24trivialonsite005local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite005,size24local6gmera2thirdalldiffL2normtrivialonsite005,size24local6gmeraalldiffL2normtrivialonsite005]
+size24trivialonsite01local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite01,size24local6gmera2thirdalldiffL2normtrivialonsite01,size24local6gmeraalldiffL2normtrivialonsite01]
+size24trivialonsite015local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite015,size24local6gmera2thirdalldiffL2normtrivialonsite015,size24local6gmeraalldiffL2normtrivialonsite015]
+size24trivialonsite02local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite02,size24local6gmera2thirdalldiffL2normtrivialonsite02,size24local6gmeraalldiffL2normtrivialonsite02]
+size24trivialonsite025local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite025,size24local6gmera2thirdalldiffL2normtrivialonsite025,size24local6gmeraalldiffL2normtrivialonsite025]
+size24trivialonsite03local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite03,size24local6gmera2thirdalldiffL2normtrivialonsite03,size24local6gmeraalldiffL2normtrivialonsite03]
+size24trivialonsite035local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite035,size24local6gmera2thirdalldiffL2normtrivialonsite035,size24local6gmeraalldiffL2normtrivialonsite035]
+size24trivialonsite04local6acrossRGL2normlist = [size24local6gmera1thirdalldiffL2normtrivialonsite04,size24local6gmera2thirdalldiffL2normtrivialonsite04,size24local6gmeraalldiffL2normtrivialonsite04]
+
+scatter([1,2,3,4],(size24trivialonsite005local2acrossRGL2normlist))
+scatter!([1,2,3,4],(size24trivialonsite01local2acrossRGL2normlist))
+scatter!([1,2,3,4],(size24trivialonsite015local2acrossRGL2normlist))
+scatter!([1,2,3,4],(size24trivialonsite02local2acrossRGL2normlist))
+scatter!([1,2,3,4],(size24trivialonsite025local2acrossRGL2normlist))
+scatter!([1,2,3,4],(size24trivialonsite03local2acrossRGL2normlist))
+scatter!([1,2,3,4],(size24trivialonsite035local2acrossRGL2normlist))
+scatter!([1,2,3,4],(size24trivialonsite04local2acrossRGL2normlist))
+
+scatter([2,3,4],(size24trivialonsite005local4acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite01local4acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite015local4acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite02local4acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite025local4acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite03local4acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite035local4acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite04local4acrossRGL2normlist))
+
+scatter([2,3,4],(size24trivialonsite005local6acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite01local6acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite015local6acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite02local6acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite025local6acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite03local6acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite035local6acrossRGL2normlist))
+scatter!([2,3,4],(size24trivialonsite04local6acrossRGL2normlist))
+
+size24block2overdifferentcorrelationlengthlist = [size24trivialonsite005block2overcorrelationlength,size24trivialonsite01block2overcorrelationlength,size24trivialonsite015block2overcorrelationlength,size24trivialonsite02block2overcorrelationlength,size24trivialonsite025block2overcorrelationlength,size24trivialonsite03block2overcorrelationlength,size24trivialonsite035block2overcorrelationlength,size24trivialonsite04block2overcorrelationlength]
+size24block4overdifferentcorrelationlengthlist = [size24trivialonsite005block4overcorrelationlength,size24trivialonsite01block4overcorrelationlength,size24trivialonsite015block4overcorrelationlength,size24trivialonsite02block4overcorrelationlength,size24trivialonsite025block4overcorrelationlength,size24trivialonsite03block4overcorrelationlength,size24trivialonsite035block4overcorrelationlength,size24trivialonsite04block4overcorrelationlength]
+size24block8overdifferentcorrelationlengthlist = [size24trivialonsite005block8overcorrelationlength,size24trivialonsite01block8overcorrelationlength,size24trivialonsite015block8overcorrelationlength,size24trivialonsite02block8overcorrelationlength,size24trivialonsite025block8overcorrelationlength,size24trivialonsite03block8overcorrelationlength,size24trivialonsite035block8overcorrelationlength,size24trivialonsite04block8overcorrelationlength]
+size24block16overdifferentcorrelationlengthlist = [size24trivialonsite005block16overcorrelationlength,size24trivialonsite01block16overcorrelationlength,size24trivialonsite015block16overcorrelationlength,size24trivialonsite02block16overcorrelationlength,size24trivialonsite025block16overcorrelationlength,size24trivialonsite03block16overcorrelationlength,size24trivialonsite035block16overcorrelationlength,size24trivialonsite04block16overcorrelationlength]
+
+size24trivialblock2diffcorrelatinlengthgmera1 = [size24local2gmera1thirddiffL2normtrivialonsite005,size24local2gmera1thirddiffL2normtrivialonsite01,size24local2gmera1thirddiffL2normtrivialonsite015,size24local2gmera1thirddiffL2normtrivialonsite02,size24local2gmera1thirddiffL2normtrivialonsite025,size24local2gmera1thirddiffL2normtrivialonsite03,size24local2gmera1thirddiffL2normtrivialonsite035,size24local2gmera1thirddiffL2normtrivialonsite04]
+size24trivialblock2diffcorrelatinlengthgmera2 = [size24local2gmera2thirddiffL2normtrivialonsite005,size24local2gmera2thirddiffL2normtrivialonsite01,size24local2gmera2thirddiffL2normtrivialonsite015,size24local2gmera2thirddiffL2normtrivialonsite02,size24local2gmera2thirddiffL2normtrivialonsite025,size24local2gmera2thirddiffL2normtrivialonsite03,size24local2gmera2thirddiffL2normtrivialonsite035,size24local2gmera2thirddiffL2normtrivialonsite04]
+size24trivialblock2diffcorrelatinlengthgmera3 = [size24local2gmera3thirddiffL2normtrivialonsite005,size24local2gmera3thirddiffL2normtrivialonsite01,size24local2gmera3thirddiffL2normtrivialonsite015,size24local2gmera3thirddiffL2normtrivialonsite02,size24local2gmera3thirddiffL2normtrivialonsite025,size24local2gmera3thirddiffL2normtrivialonsite03,size24local2gmera3thirddiffL2normtrivialonsite035,size24local2gmera3thirddiffL2normtrivialonsite04]
+size24trivialblock2diffcorrelatinlengthgmeraall = [size24local2gmeraalldiffL2normtrivialonsite005,size24local2gmeraalldiffL2normtrivialonsite01,size24local2gmeraalldiffL2normtrivialonsite015,size24local2gmeraalldiffL2normtrivialonsite02,size24local2gmeraalldiffL2normtrivialonsite025,size24local2gmeraalldiffL2normtrivialonsite03,size24local2gmeraalldiffL2normtrivialonsite035,size24local2gmeraalldiffL2normtrivialonsite04]
+
+scatter(size24block2overdifferentcorrelationlengthlist,log.(size24trivialblock2diffcorrelatinlengthgmera1))
+scatter!(size24block2overdifferentcorrelationlengthlist,log.(size24trivialblock2diffcorrelatinlengthgmera2))
+scatter!(size24block2overdifferentcorrelationlengthlist,log.(size24trivialblock2diffcorrelatinlengthgmera3))
+
+size24trivialblock4diffcorrelatinlengthgmera1 = [size24local4gmera1thirdalldiffL2normtrivialonsite005,size24local4gmera1thirdalldiffL2normtrivialonsite01,size24local4gmera1thirdalldiffL2normtrivialonsite015,size24local4gmera1thirdalldiffL2normtrivialonsite02,size24local4gmera1thirdalldiffL2normtrivialonsite025,size24local4gmera1thirdalldiffL2normtrivialonsite03,size24local4gmera1thirdalldiffL2normtrivialonsite035,size24local4gmera1thirdalldiffL2normtrivialonsite04]
+size24trivialblock4diffcorrelatinlengthgmera2 = [size24local4gmera2thirdalldiffL2normtrivialonsite005,size24local4gmera2thirdalldiffL2normtrivialonsite01,size24local4gmera2thirdalldiffL2normtrivialonsite015,size24local4gmera2thirdalldiffL2normtrivialonsite02,size24local4gmera2thirdalldiffL2normtrivialonsite025,size24local4gmera2thirdalldiffL2normtrivialonsite03,size24local4gmera2thirdalldiffL2normtrivialonsite035,size24local4gmera2thirdalldiffL2normtrivialonsite04]
+size24trivialblock4diffcorrelatinlengthgmeraall = [size24local4gmeraalldiffL2normtrivialonsite005,size24local4gmeraalldiffL2normtrivialonsite01,size24local4gmeraalldiffL2normtrivialonsite015,size24local4gmeraalldiffL2normtrivialonsite02,size24local4gmeraalldiffL2normtrivialonsite025,size24local4gmeraalldiffL2normtrivialonsite03,size24local4gmeraalldiffL2normtrivialonsite035,size24local4gmeraalldiffL2normtrivialonsite04]
+
+scatter!(size24block4overdifferentcorrelationlengthlist,log.(size24trivialblock4diffcorrelatinlengthgmera1))
+scatter!(size24block4overdifferentcorrelationlengthlist,log.(size24trivialblock4diffcorrelatinlengthgmera2))
+scatter!(size24block4overdifferentcorrelationlengthlist,log.(size24trivialblock4diffcorrelatinlengthgmeraall))
 
 #result of chern
+#0.05im 
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.05im-localsize2")
+size24local2gmera1thirddiffL2normchern005im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern005im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern005im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn005im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.05im-localsize4")
+size24local4gmera1thirddiffL2normchern005im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern005im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn005im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.05im-localsize6")
+size24local6gmera1thirddiffL2normchern005im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern005im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn005im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.05im-localsize8")
+size24local8gmera1thirddiffL2normchern005im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn005im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn005imcorrelationlength = fioload("correlationlength005im")
+
+size24chernnn005imblock2overcorrelationlength = 2/size24chernnn005imcorrelationlength
+size24chernnn005imblock4overcorrelationlength = 4/size24chernnn005imcorrelationlength
+size24chernnn005imblock6overcorrelationlength = 6/size24chernnn005imcorrelationlength
+size24chernnn005imblock8overcorrelationlength = 8/size24chernnn005imcorrelationlength
+
+#0.06im 
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.06im-localsize2")
+size24local2gmeraalldiffL2normchernnn006im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.06im-localsize4")
+size24local4gmeraalldiffL2normchernnn006im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.06im-localsize6")
+size24local6gmeraalldiffL2normchernnn006im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.06im-localsize8")
+size24local8gmeraalldiffL2normchernnn006im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn006imcorrelationlength = fioload("correlationlength006im")
+
+size24chernnn006imblock2overcorrelationlength = 2/size24chernnn006imcorrelationlength
+size24chernnn006imblock4overcorrelationlength = 4/size24chernnn006imcorrelationlength
+size24chernnn006imblock6overcorrelationlength = 6/size24chernnn006imcorrelationlength
+size24chernnn006imblock8overcorrelationlength = 8/size24chernnn006imcorrelationlength
+
+#0.08im 
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.08im-localsize2")
+size24local2gmeraalldiffL2normchernnn008im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.08im-localsize4")
+size24local4gmeraalldiffL2normchernnn008im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.08im-localsize6")
+size24local6gmeraalldiffL2normchernnn008im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.08im-localsize8")
+size24local8gmeraalldiffL2normchernnn008im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn008imcorrelationlength = fioload("correlationlength008im")
+
+size24chernnn008imblock2overcorrelationlength = 2/size24chernnn008imcorrelationlength
+size24chernnn008imblock4overcorrelationlength = 4/size24chernnn008imcorrelationlength
+size24chernnn008imblock6overcorrelationlength = 6/size24chernnn008imcorrelationlength
+size24chernnn008imblock8overcorrelationlength = 8/size24chernnn008imcorrelationlength
+
 #0.1im
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize2")
+size24local2gmera1thirddiffL2normchern01im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern01im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern01im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn01im = fioload("gmeraalldiffL2norm")["re"]
+
+size24local2gmera1thirddiffL1normchern01im = fioload("gmera1thirdalldiffL1norm")
+size24local2gmera2thirddiffL1normchern01im = fioload("gmera2thirdalldiffL1norm")
+size24local2gmera3thirddiffL1normchern01im = fioload("gmera3thirdalldiffL1norm")
 size24local2gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize4")
+size24local4gmera1thirddiffL2normchern01im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern01im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn01im = fioload("gmeraalldiffL2norm")["re"]
+
+size24local4gmera1thirddiffL1normchern01im = fioload("gmera1thirdalldiffL1norm")
+size24local4gmera2thirddiffL1normchern01im = fioload("gmera2thirdalldiffL1norm")
 size24local4gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize6")
+size24local6gmera1thirddiffL2normchern01im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern01im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn01im = fioload("gmeraalldiffL2norm")["re"]
+
+size24local6gmera1thirddiffL1normchern01im = fioload("gmera1thirdalldiffL1norm")
+size24local6gmera2thirddiffL1normchern01im = fioload("gmera2thirdalldiffL1norm")
 size24local6gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize8")
+size24local8gmera1thirddiffL2normchern01im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn01im = fioload("gmeraalldiffL2norm")["re"]
+
+size24local8gmera1thirddiffL1normchern01im = fioload("gmera1thirdalldiffL1norm")
 size24local8gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.1im-localsize12")
-size24local12gmeraalldiffL1normchernnn01im = fioload("gmeraalldiffL1norm")
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn01imcorrelationlength = fioload("correlationlength01im")
+
+size24chernnn01imblock2overcorrelationlength = 2/size24chernnn01imcorrelationlength
+size24chernnn01imblock4overcorrelationlength = 4/size24chernnn01imcorrelationlength
+size24chernnn01imblock6overcorrelationlength = 6/size24chernnn01imcorrelationlength
+size24chernnn01imblock8overcorrelationlength = 8/size24chernnn01imcorrelationlength
+
+#0.12im 
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.12im-localsize2")
+size24local2gmeraalldiffL2normchernnn012im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.12im-localsize4")
+size24local4gmeraalldiffL2normchernnn012im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.12im-localsize6")
+size24local6gmeraalldiffL2normchernnn012im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.12im-localsize8")
+size24local8gmeraalldiffL2normchernnn012im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn012imcorrelationlength = fioload("correlationlength012im")
+
+size24chernnn012imblock2overcorrelationlength = 2/size24chernnn012imcorrelationlength
+size24chernnn012imblock4overcorrelationlength = 4/size24chernnn012imcorrelationlength
+size24chernnn012imblock6overcorrelationlength = 6/size24chernnn012imcorrelationlength
+size24chernnn012imblock8overcorrelationlength = 8/size24chernnn012imcorrelationlength
+
+#0.14im 
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.14im-localsize2")
+size24local2gmeraalldiffL2normchernnn014im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.14im-localsize4")
+size24local4gmeraalldiffL2normchernnn014im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.14im-localsize6")
+size24local6gmeraalldiffL2normchernnn014im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.14im-localsize8")
+size24local8gmeraalldiffL2normchernnn014im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn014imcorrelationlength = fioload("correlationlength014im")
+
+size24chernnn014imblock2overcorrelationlength = 2/size24chernnn014imcorrelationlength
+size24chernnn014imblock4overcorrelationlength = 4/size24chernnn014imcorrelationlength
+size24chernnn014imblock6overcorrelationlength = 6/size24chernnn014imcorrelationlength
+size24chernnn014imblock8overcorrelationlength = 8/size24chernnn014imcorrelationlength
+
+#0.15im
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.15im-localsize2")
+size24local2gmera1thirddiffL2normchern015im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern015im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern015im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn015im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.15im-localsize4")
+size24local4gmera1thirddiffL2normchern015im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern015im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn015im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.15im-localsize6")
+size24local6gmera1thirddiffL2normchern015im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern015im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn015im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.15im-localsize8")
+size24local8gmera1thirddiffL2normchern015im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn015im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn015imcorrelationlength = fioload("correlationlength015im")
+
+size24chernnn015imblock2overcorrelationlength = 2/size24chernnn015imcorrelationlength
+size24chernnn015imblock4overcorrelationlength = 4/size24chernnn015imcorrelationlength
+size24chernnn015imblock6overcorrelationlength = 6/size24chernnn015imcorrelationlength
+size24chernnn015imblock8overcorrelationlength = 8/size24chernnn015imcorrelationlength
+
+#0.16im 
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.16im-localsize2")
+size24local2gmeraalldiffL2normchernnn016im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.16im-localsize4")
+size24local4gmeraalldiffL2normchernnn016im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.16im-localsize6")
+size24local6gmeraalldiffL2normchernnn016im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.16im-localsize8")
+size24local8gmeraalldiffL2normchernnn016im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn016imcorrelationlength = fioload("correlationlength012im")
+
+size24chernnn016imblock2overcorrelationlength = 2/size24chernnn016imcorrelationlength
+size24chernnn016imblock4overcorrelationlength = 4/size24chernnn016imcorrelationlength
+size24chernnn016imblock6overcorrelationlength = 6/size24chernnn016imcorrelationlength
+size24chernnn016imblock8overcorrelationlength = 8/size24chernnn016imcorrelationlength
+
+#0.18im 
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.18im-localsize2")
+size24local2gmeraalldiffL2normchernnn018im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.18im-localsize4")
+size24local4gmeraalldiffL2normchernnn018im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.18im-localsize6")
+size24local6gmeraalldiffL2normchernnn018im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.18im-localsize8")
+size24local8gmeraalldiffL2normchernnn018im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn018imcorrelationlength = fioload("correlationlength018im")
+
+size24chernnn018imblock2overcorrelationlength = 2/size24chernnn018imcorrelationlength
+size24chernnn018imblock4overcorrelationlength = 4/size24chernnn018imcorrelationlength
+size24chernnn018imblock6overcorrelationlength = 6/size24chernnn018imcorrelationlength
+size24chernnn018imblock8overcorrelationlength = 8/size24chernnn018imcorrelationlength
 
 #0.2im
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize2")
-size24local2gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+size24local2gmera1thirddiffL2normchern02im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern02im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern02im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn02im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize4")
-size24local4gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+size24local4gmera1thirddiffL2normchern02im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern02im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn02im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize6")
-size24local6gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+size24local6gmera1thirddiffL2normchern02im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern02im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn02im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize8")
-size24local8gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+size24local8gmera1thirddiffL2normchern02im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn02im = fioload("gmeraalldiffL2norm")["re"]
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.2im-localsize12")
-size24local12gmeraalldiffL1normchernnn02im = fioload("gmeraalldiffL1norm")
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn02imcorrelationlength = fioload("correlationlength02im")
+
+size24chernnn02imblock2overcorrelationlength = 2/size24chernnn02imcorrelationlength
+size24chernnn02imblock4overcorrelationlength = 4/size24chernnn02imcorrelationlength
+size24chernnn02imblock6overcorrelationlength = 6/size24chernnn02imcorrelationlength
+size24chernnn02imblock8overcorrelationlength = 8/size24chernnn02imcorrelationlength
+
+#0.25im
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.25im-localsize2")
+size24local2gmera1thirddiffL2normchern025im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern025im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern025im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn025im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.25im-localsize4")
+size24local4gmera1thirddiffL2normchern025im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern025im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn025im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.25im-localsize6")
+size24local6gmera1thirddiffL2normchern025im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern025im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn025im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.25im-localsize8")
+size24local8gmera1thirddiffL2normchern025im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn025im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn025imcorrelationlength = fioload("correlationlength025im")
+
+size24chernnn025imblock2overcorrelationlength = 2/size24chernnn025imcorrelationlength
+size24chernnn025imblock4overcorrelationlength = 4/size24chernnn025imcorrelationlength
+size24chernnn025imblock6overcorrelationlength = 6/size24chernnn025imcorrelationlength
+size24chernnn025imblock8overcorrelationlength = 8/size24chernnn025imcorrelationlength
 
 #0.3im
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize2")
-size24local2gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+size24local2gmera1thirddiffL2normchern03im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern03im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern03im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn03im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize4")
-size24local4gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+size24local4gmera1thirddiffL2normchern03im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern03im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn03im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize6")
-size24local6gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+size24local6gmera1thirddiffL2normchern03im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern03im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn03im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize8")
-size24local8gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+size24local8gmera1thirddiffL2normchern03im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn03im = fioload("gmeraalldiffL2norm")["re"]
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.3im-localsize12")
-size24local12gmeraalldiffL1normchernnn03im = fioload("gmeraalldiffL1norm")
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn03imcorrelationlength = fioload("correlationlength03im")
+
+size24chernnn03imblock2overcorrelationlength = 2/size24chernnn03imcorrelationlength
+size24chernnn03imblock4overcorrelationlength = 4/size24chernnn03imcorrelationlength
+size24chernnn03imblock6overcorrelationlength = 6/size24chernnn03imcorrelationlength
+size24chernnn03imblock8overcorrelationlength = 8/size24chernnn03imcorrelationlength
+
+#0.35im
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.35im-localsize2")
+size24local2gmera1thirddiffL2normchern035im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern035im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern035im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn035im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.35im-localsize4")
+size24local4gmera1thirddiffL2normchern035im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern035im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn035im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.35im-localsize6")
+size24local6gmera1thirddiffL2normchern035im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern035im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn035im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.35im-localsize8")
+size24local8gmera1thirddiffL2normchern035im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn035im = fioload("gmeraalldiffL2norm")["re"]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn035imcorrelationlength = fioload("correlationlength035im")
+
+size24chernnn035imblock2overcorrelationlength = 2/size24chernnn035imcorrelationlength
+size24chernnn035imblock4overcorrelationlength = 4/size24chernnn035imcorrelationlength
+size24chernnn035imblock6overcorrelationlength = 6/size24chernnn035imcorrelationlength
+size24chernnn035imblock8overcorrelationlength = 8/size24chernnn035imcorrelationlength
 
 #0.4im
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize2")
-size24local2gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+size24local2gmera1thirddiffL2normchern04im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local2gmera2thirddiffL2normchern04im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local2gmera3thirddiffL2normchern04im = fioload("gmera3thirdalldiffL2norm")["re"]
+size24local2gmeraalldiffL2normchernnn04im = fioload("gmeraalldiffL2norm")["re"]
+
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize4")
-size24local4gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+size24local4gmera1thirddiffL2normchern04im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local4gmera2thirddiffL2normchern04im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local4gmeraalldiffL2normchernnn04im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize6")
-size24local6gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+size24local6gmera1thirddiffL2normchern04im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local6gmera2thirddiffL2normchern04im = fioload("gmera2thirdalldiffL2norm")["re"]
+size24local6gmeraalldiffL2normchernnn04im = fioload("gmeraalldiffL2norm")["re"]
 
 fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize8")
-size24local8gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+size24local8gmera1thirddiffL2normchern04im = fioload("gmera1thirdalldiffL2norm")["re"]
+size24local8gmeraalldiffL2normchernnn04im = fioload("gmeraalldiffL2norm")["re"]
 
-fiodir("/Users/slwongag/Desktop/data/chern/systemsize24/nnhopping0.0 + 0.4im-localsize12")
-size24local12gmeraalldiffL1normchernnn04im = fioload("gmeraalldiffL1norm")
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn04imcorrelationlength = fioload("correlationlength04im")
+
+size24chernnn04imblock2overcorrelationlength = 2/size24chernnn04imcorrelationlength
+size24chernnn04imblock4overcorrelationlength = 4/size24chernnn04imcorrelationlength
+size24chernnn04imblock6overcorrelationlength = 6/size24chernnn04imcorrelationlength
+size24chernnn04imblock8overcorrelationlength = 8/size24chernnn04imcorrelationlength
+
+# Make sense of it
+size24chernblock2overcorrelationlengthlist = [size24chernnn005imblock2overcorrelationlength,size24chernnn01imblock2overcorrelationlength,size24chernnn015imblock2overcorrelationlength,size24chernnn02imblock2overcorrelationlength,size24chernnn025imblock2overcorrelationlength,size24chernnn03imblock2overcorrelationlength,size24chernnn035imblock2overcorrelationlength,size24chernnn04imblock2overcorrelationlength]
+# size24chernblock2gmera1errorL2normlist = [size24local2gmeraalldiffL2normchernnn005im,size24local2gmeraalldiffL2normchernnn01im,size24local2gmeraalldiffL2normchernnn015im,size24local2gmeraalldiffL2normchernnn02im,size24local2gmeraalldiffL2normchernnn025im,size24local2gmeraalldiffL2normchernnn03im,size24local2gmeraalldiffL2normchernnn035im,size24local2gmeraalldiffL2normchernnn04im]
+size24chernblock2gmera1errorL2normlist = [size24local2gmera1thirddiffL2normchern005im,size24local2gmera1thirddiffL2normchern01im,size24local2gmera1thirddiffL2normchern015im,size24local2gmera1thirddiffL2normchern02im,size24local2gmera1thirddiffL2normchern025im,size24local2gmera1thirddiffL2normchern03im,size24local2gmera1thirddiffL2normchern035im,size24local2gmera1thirddiffL2normchern04im]
+size24chernblock2gmera2errorL2normlist = [size24local2gmera2thirddiffL2normchern005im,size24local2gmera2thirddiffL2normchern01im,size24local2gmera2thirddiffL2normchern015im,size24local2gmera2thirddiffL2normchern02im,size24local2gmera2thirddiffL2normchern025im,size24local2gmera2thirddiffL2normchern03im,size24local2gmera2thirddiffL2normchern035im,size24local2gmera2thirddiffL2normchern04im]
+size24chernblock2gmera3errorL2normlist = [size24local2gmera3thirddiffL2normchern005im,size24local2gmera3thirddiffL2normchern01im,size24local2gmera3thirddiffL2normchern015im,size24local2gmera3thirddiffL2normchern02im,size24local2gmera3thirddiffL2normchern025im,size24local2gmera3thirddiffL2normchern03im,size24local2gmera3thirddiffL2normchern035im,size24local2gmera3thirddiffL2normchern04im]
+size24chernblock2gmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn005im,size24local2gmeraalldiffL2normchernnn01im,size24local2gmeraalldiffL2normchernnn015im,size24local2gmeraalldiffL2normchernnn02im,size24local2gmeraalldiffL2normchernnn025im,size24local2gmeraalldiffL2normchernnn03im,size24local2gmeraalldiffL2normchernnn035im,size24local2gmeraalldiffL2normchernnn04im]
+
+size24chernblock4overcorrelationlengthlist = [size24chernnn005imblock4overcorrelationlength,size24chernnn01imblock4overcorrelationlength,size24chernnn015imblock4overcorrelationlength,size24chernnn02imblock4overcorrelationlength,size24chernnn025imblock4overcorrelationlength,size24chernnn03imblock4overcorrelationlength,size24chernnn035imblock4overcorrelationlength,size24chernnn04imblock4overcorrelationlength]
+size24chernblock4gmera1errorL2normlist = [size24local4gmera1thirddiffL2normchern005im,size24local4gmera1thirddiffL2normchern01im,size24local4gmera1thirddiffL2normchern015im,size24local4gmera1thirddiffL2normchern02im,size24local4gmera1thirddiffL2normchern025im,size24local4gmera1thirddiffL2normchern03im,size24local4gmera1thirddiffL2normchern035im,size24local4gmera1thirddiffL2normchern04im]
+size24chernblock4gmera2errorL2normlist = [size24local4gmera2thirddiffL2normchern005im,size24local4gmera2thirddiffL2normchern01im,size24local4gmera2thirddiffL2normchern015im,size24local4gmera2thirddiffL2normchern02im,size24local4gmera2thirddiffL2normchern025im,size24local4gmera2thirddiffL2normchern03im,size24local4gmera2thirddiffL2normchern035im,size24local4gmera2thirddiffL2normchern04im]
+size24chernblock4gmeraalldifferrorL2normlist = [size24local4gmeraalldiffL2normchernnn005im,size24local4gmeraalldiffL2normchernnn01im,size24local4gmeraalldiffL2normchernnn015im,size24local4gmeraalldiffL2normchernnn02im,size24local4gmeraalldiffL2normchernnn025im,size24local4gmeraalldiffL2normchernnn03im,size24local4gmeraalldiffL2normchernnn035im,size24local4gmeraalldiffL2normchernnn04im]
+
+size24chernblock6overcorrelationlengthlist = [size24chernnn005imblock6overcorrelationlength,size24chernnn01imblock6overcorrelationlength,size24chernnn015imblock6overcorrelationlength,size24chernnn02imblock6overcorrelationlength,size24chernnn025imblock6overcorrelationlength,size24chernnn03imblock6overcorrelationlength,size24chernnn035imblock6overcorrelationlength,size24chernnn04imblock6overcorrelationlength]
+size24chernblock6gmera1errorL2normlist = [size24local6gmera1thirddiffL2normchern005im,size24local6gmera1thirddiffL2normchern01im,size24local6gmera1thirddiffL2normchern015im,size24local6gmera1thirddiffL2normchern02im,size24local6gmera1thirddiffL2normchern025im,size24local6gmera1thirddiffL2normchern03im,size24local6gmera1thirddiffL2normchern035im,size24local6gmera1thirddiffL2normchern04im]
+size24chernblock6gmera2errorL2normlist = [size24local6gmera2thirddiffL2normchern005im,size24local6gmera2thirddiffL2normchern01im,size24local6gmera2thirddiffL2normchern015im,size24local6gmera2thirddiffL2normchern02im,size24local6gmera2thirddiffL2normchern025im,size24local6gmera2thirddiffL2normchern03im,size24local6gmera2thirddiffL2normchern035im,size24local6gmera2thirddiffL2normchern04im]
+size24chernblock6gmeraalldifferrorL2normlist = [size24local6gmeraalldiffL2normchernnn005im,size24local6gmeraalldiffL2normchernnn01im,size24local6gmeraalldiffL2normchernnn015im,size24local6gmeraalldiffL2normchernnn02im,size24local6gmeraalldiffL2normchernnn025im,size24local6gmeraalldiffL2normchernnn03im,size24local6gmeraalldiffL2normchernnn035im,size24local6gmeraalldiffL2normchernnn04im]
+
+size24chernblock8overcorrelationlengthlist = [size24chernnn005imblock8overcorrelationlength,size24chernnn01imblock8overcorrelationlength,size24chernnn015imblock8overcorrelationlength,size24chernnn02imblock8overcorrelationlength,size24chernnn025imblock8overcorrelationlength,size24chernnn03imblock8overcorrelationlength,size24chernnn035imblock8overcorrelationlength,size24chernnn04imblock8overcorrelationlength]
+size24chernblock8gmera1errorL2normlist = [size24local8gmera1thirddiffL2normchern005im,size24local8gmera1thirddiffL2normchern01im,size24local8gmera1thirddiffL2normchern015im,size24local8gmera1thirddiffL2normchern02im,size24local8gmera1thirddiffL2normchern025im,size24local8gmera1thirddiffL2normchern03im,size24local8gmera1thirddiffL2normchern035im,size24local8gmera1thirddiffL2normchern04im]
+size24chernblock8gmeraalldifferrorL2normlist = [size24local8gmeraalldiffL2normchernnn005im,size24local8gmeraalldiffL2normchernnn01im,size24local8gmeraalldiffL2normchernnn015im,size24local8gmeraalldiffL2normchernnn02im,size24local8gmeraalldiffL2normchernnn025im,size24local8gmeraalldiffL2normchernnn03im,size24local8gmeraalldiffL2normchernnn035im,size24local8gmeraalldiffL2normchernnn04im]
+
+scatter(size24chernblock2overcorrelationlengthlist,(size24chernblock2gmera1errorL2normlist))
+scatter!(size24chernblock2overcorrelationlengthlist,(size24chernblock2gmera2errorL2normlist))
+scatter!(size24chernblock2overcorrelationlengthlist,(size24chernblock2gmera3errorL2normlist))
+scatter(size24chernblock2overcorrelationlengthlist,(size24chernblock2gmeraalldifferrorL2normlist))
+
+scatter!(size24chernblock4overcorrelationlengthlist,(size24chernblock4gmera1errorL2normlist))
+scatter!(size24chernblock4overcorrelationlengthlist,(size24chernblock4gmera2errorL2normlist))
+scatter!(size24chernblock4overcorrelationlengthlist,(size24chernblock4gmeraalldifferrorL2normlist))
+
+scatter!(size24chernblock6overcorrelationlengthlist,(size24chernblock6gmera1errorL2normlist))
+scatter!(size24chernblock6overcorrelationlengthlist,(size24chernblock6gmera2errorL2normlist))
+scatter!(size24chernblock6overcorrelationlengthlist,(size24chernblock6gmeraalldifferrorL2normlist))
+
+scatter!(size24chernblock8overcorrelationlengthlist,(size24chernblock8gmera1errorL2normlist))
+scatter!(size24chernblock8overcorrelationlengthlist,(size24chernblock8gmeraalldifferrorL2normlist))
 
 
-size24L1normchernnn01im_list = log.([size24local2gmeraalldiffL1normchernnn01im,size24local4gmeraalldiffL1normchernnn01im,size24local6gmeraalldiffL1normchernnn01im,size24local8gmeraalldiffL1normchernnn01im])
-size24L1normchernnn02im_list = log.([size24local2gmeraalldiffL1normchernnn02im,size24local4gmeraalldiffL1normchernnn02im,size24local6gmeraalldiffL1normchernnn02im,size24local8gmeraalldiffL1normchernnn02im])
-size24L1normchernnn03im_list = log.([size24local2gmeraalldiffL1normchernnn03im,size24local4gmeraalldiffL1normchernnn03im,size24local6gmeraalldiffL1normchernnn03im,size24local8gmeraalldiffL1normchernnn03im])
-size24L1normchernnn04im_list = log.([size24local2gmeraalldiffL1normchernnn04im,size24local4gmeraalldiffL1normchernnn04im,size24local6gmeraalldiffL1normchernnn04im,size24local8gmeraalldiffL1normchernnn04im])
+size24chernnn005imlbovercorrelationlengthlist = [size24chernnn005imblock2overcorrelationlength,size24chernnn005imblock4overcorrelationlength,size24chernnn005imblock6overcorrelationlength,size24chernnn005imblock8overcorrelationlength]
+size24chernnn006imlbovercorrelationlengthlist = [size24chernnn006imblock2overcorrelationlength,size24chernnn006imblock4overcorrelationlength,size24chernnn006imblock6overcorrelationlength,size24chernnn006imblock8overcorrelationlength]
+size24chernnn008imlbovercorrelationlengthlist = [size24chernnn008imblock2overcorrelationlength,size24chernnn008imblock4overcorrelationlength,size24chernnn008imblock6overcorrelationlength,size24chernnn008imblock8overcorrelationlength]
+size24chernnn01imlbovercorrelationlengthlist = [size24chernnn01imblock2overcorrelationlength,size24chernnn01imblock4overcorrelationlength,size24chernnn01imblock6overcorrelationlength,size24chernnn01imblock8overcorrelationlength]
+size24chernnn012imlbovercorrelationlengthlist = [size24chernnn012imblock2overcorrelationlength,size24chernnn012imblock4overcorrelationlength,size24chernnn012imblock6overcorrelationlength,size24chernnn012imblock8overcorrelationlength]
+size24chernnn014imlbovercorrelationlengthlist = [size24chernnn014imblock2overcorrelationlength,size24chernnn014imblock4overcorrelationlength,size24chernnn014imblock6overcorrelationlength,size24chernnn014imblock8overcorrelationlength]
+size24chernnn015imlbovercorrelationlengthlist = [size24chernnn015imblock2overcorrelationlength,size24chernnn015imblock4overcorrelationlength,size24chernnn015imblock6overcorrelationlength,size24chernnn015imblock8overcorrelationlength]
+size24chernnn016imlbovercorrelationlengthlist = [size24chernnn016imblock2overcorrelationlength,size24chernnn016imblock4overcorrelationlength,size24chernnn016imblock6overcorrelationlength,size24chernnn016imblock8overcorrelationlength]
+size24chernnn018imlbovercorrelationlengthlist = [size24chernnn018imblock2overcorrelationlength,size24chernnn018imblock4overcorrelationlength,size24chernnn018imblock6overcorrelationlength,size24chernnn018imblock8overcorrelationlength]
+size24chernnn02imlbovercorrelationlengthlist = [size24chernnn02imblock2overcorrelationlength,size24chernnn02imblock4overcorrelationlength,size24chernnn02imblock6overcorrelationlength,size24chernnn02imblock8overcorrelationlength]
+size24chernnn025imlbovercorrelationlengthlist = [size24chernnn025imblock2overcorrelationlength,size24chernnn025imblock4overcorrelationlength,size24chernnn025imblock6overcorrelationlength,size24chernnn025imblock8overcorrelationlength]
+size24chernnn03imlbovercorrelationlengthlist = [size24chernnn03imblock2overcorrelationlength,size24chernnn03imblock4overcorrelationlength,size24chernnn03imblock6overcorrelationlength,size24chernnn03imblock8overcorrelationlength]
+size24chernnn035imlbovercorrelationlengthlist = [size24chernnn035imblock2overcorrelationlength,size24chernnn035imblock4overcorrelationlength,size24chernnn035imblock6overcorrelationlength,size24chernnn035imblock8overcorrelationlength]
+size24chernnn04imlbovercorrelationlengthlist = [size24chernnn04imblock2overcorrelationlength,size24chernnn04imblock4overcorrelationlength,size24chernnn04imblock6overcorrelationlength,size24chernnn04imblock8overcorrelationlength]
 
-scatter(radius_list,size24L1normdirac_list,title="log(error) vs radius",label="Dirac: t/V=1/0=inf")
-scatter!(radius_list,size24L1normtrivialonsite005_list,label="Trivial: t/V=1/0.05=20")
-scatter!(radius_list,size24L1normtrivialonsite01_list,label="Trivial: t/V=1/0.1=10")
-scatter!(radius_list,size24L1normtrivialonsite015_list,label="Trivial: t/V=1/0.15=6.67")
-scatter!(radius_list,size24L1normtrivialonsite02_list,label="Trivial: t/V=1/0.2=5")
-xlabel!("radius")
-ylabel!("log of vectorize L1 norm of diff")
+size24chernnn005imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn005im,size24local4gmeraalldiffL2normchernnn005im,size24local6gmeraalldiffL2normchernnn005im,size24local8gmeraalldiffL2normchernnn005im]
+size24chernnn006imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn006im,size24local4gmeraalldiffL2normchernnn006im,size24local6gmeraalldiffL2normchernnn006im,size24local8gmeraalldiffL2normchernnn006im]
+size24chernnn008imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn008im,size24local4gmeraalldiffL2normchernnn008im,size24local6gmeraalldiffL2normchernnn008im,size24local8gmeraalldiffL2normchernnn008im]
+size24chernnn01imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn01im,size24local4gmeraalldiffL2normchernnn01im,size24local6gmeraalldiffL2normchernnn01im,size24local8gmeraalldiffL2normchernnn01im]
+size24chernnn012imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn012im,size24local4gmeraalldiffL2normchernnn012im,size24local6gmeraalldiffL2normchernnn012im,size24local8gmeraalldiffL2normchernnn012im]
+size24chernnn014imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn014im,size24local4gmeraalldiffL2normchernnn014im,size24local6gmeraalldiffL2normchernnn014im,size24local8gmeraalldiffL2normchernnn014im]
+size24chernnn015imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn015im,size24local4gmeraalldiffL2normchernnn015im,size24local6gmeraalldiffL2normchernnn015im,size24local8gmeraalldiffL2normchernnn015im]
+size24chernnn016imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn016im,size24local4gmeraalldiffL2normchernnn016im,size24local6gmeraalldiffL2normchernnn016im,size24local8gmeraalldiffL2normchernnn016im]
+size24chernnn018imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn018im,size24local4gmeraalldiffL2normchernnn018im,size24local6gmeraalldiffL2normchernnn018im,size24local8gmeraalldiffL2normchernnn018im]
+size24chernnn02imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn02im,size24local4gmeraalldiffL2normchernnn02im,size24local6gmeraalldiffL2normchernnn02im,size24local8gmeraalldiffL2normchernnn02im]
+size24chernnn025imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn025im,size24local4gmeraalldiffL2normchernnn025im,size24local6gmeraalldiffL2normchernnn025im,size24local8gmeraalldiffL2normchernnn025im]
+size24chernnn03imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn03im,size24local4gmeraalldiffL2normchernnn03im,size24local6gmeraalldiffL2normchernnn03im,size24local8gmeraalldiffL2normchernnn03im]
+size24chernnn035imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn035im,size24local4gmeraalldiffL2normchernnn035im,size24local6gmeraalldiffL2normchernnn035im,size24local8gmeraalldiffL2normchernnn035im]
+size24chernnn04imgmeraalldifferrorL2normlist = [size24local2gmeraalldiffL2normchernnn04im,size24local4gmeraalldiffL2normchernnn04im,size24local6gmeraalldiffL2normchernnn04im,size24local8gmeraalldiffL2normchernnn04im]
 
-scatter!(radius_list,size24L1normchernnn01im_list,label="Chern: t=1,tt=0.1im")
-scatter!(radius_list,size24L1normchernnn02im_list,label="Chern: t=1,tt=0.2im")
-scatter!(radius_list,size24L1normchernnn03im_list,label="Chern: t=1,tt=0.3im")
-scatter!(radius_list,size24L1normchernnn04im_list,label="Chern: t=1,tt=0.4im")
-xlabel!("radius")
-ylabel!("log of vectorize L1 norm of diff")
+scatter(size24chernnn005imlbovercorrelationlengthlist,log.(size24chernnn005imgmeraalldifferrorL2normlist),title = "log(error) vs lb/correlationlength",label="haldane = 0.05im",xlabel="lb/correlationlength",ylabel="log(error)")
+scatter!(size24chernnn006imlbovercorrelationlengthlist,log.(size24chernnn006imgmeraalldifferrorL2normlist),label="haldane = 0.06im")
+scatter!(size24chernnn008imlbovercorrelationlengthlist,log.(size24chernnn008imgmeraalldifferrorL2normlist),label="haldane = 0.08im")
+scatter!(size24chernnn01imlbovercorrelationlengthlist,log.(size24chernnn01imgmeraalldifferrorL2normlist),label="haldane = 0.1im")
+scatter!(size24chernnn012imlbovercorrelationlengthlist,log.(size24chernnn012imgmeraalldifferrorL2normlist),label="haldane = 0.12im")
+scatter!(size24chernnn014imlbovercorrelationlengthlist,log.(size24chernnn014imgmeraalldifferrorL2normlist),label="haldane = 0.14im")
+scatter!(size24chernnn015imlbovercorrelationlengthlist,log.(size24chernnn015imgmeraalldifferrorL2normlist),label="haldane = 0.15im")
+# scatter!(size24chernnn016imlbovercorrelationlengthlist,log.(size24chernnn016imgmeraalldifferrorL2normlist),label="haldane = 0.16im")
+# scatter!(size24chernnn018imlbovercorrelationlengthlist,log.(size24chernnn018imgmeraalldifferrorL2normlist),label="haldane = 0.18im")
+# scatter!(size24chernnn02imlbovercorrelationlengthlist,log.(size24chernnn02imgmeraalldifferrorL2normlist),label="haldane = 0.2im")
+scatter!(size24chernnn025imlbovercorrelationlengthlist,log.(size24chernnn025imgmeraalldifferrorL2normlist))
+scatter!(size24chernnn03imlbovercorrelationlengthlist,log.(size24chernnn03imgmeraalldifferrorL2normlist))
+scatter!(size24chernnn035imlbovercorrelationlengthlist,log.(size24chernnn035imgmeraalldifferrorL2normlist))
+scatter!(size24chernnn04imlbovercorrelationlengthlist,log.(size24chernnn04imgmeraalldifferrorL2normlist))
+
+model(t, p) = p[1] .+ p[2]*t 
+p0 = [1.0, 1.0]
+
+size24chernnn005imfit = curve_fit(model, size24chernnn005imlbovercorrelationlengthlist, log.(size24chernnn005imgmeraalldifferrorL2normlist), p0)
+size24chernnn005imparam = size24chernnn005imfit.param
+size24chernnn005imslope = size24chernnn005imparam[2]
+
+size24chernnn006imfit = curve_fit(model, size24chernnn006imlbovercorrelationlengthlist, log.(size24chernnn006imgmeraalldifferrorL2normlist), p0)
+size24chernnn006imparam = size24chernnn006imfit.param
+size24chernnn006imslope = size24chernnn006imparam[2]
+
+size24chernnn008imfit = curve_fit(model, size24chernnn008imlbovercorrelationlengthlist, log.(size24chernnn008imgmeraalldifferrorL2normlist), p0)
+size24chernnn008imparam = size24chernnn008imfit.param
+size24chernnn008imslope = size24chernnn008imparam[2]
+
+size24chernnn01imfit = curve_fit(model, size24chernnn01imlbovercorrelationlengthlist, log.(size24chernnn01imgmeraalldifferrorL2normlist), p0)
+size24chernnn01imparam = size24chernnn01imfit.param
+size24chernnn01imslope = size24chernnn01imparam[2]
+
+size24chernnn012imfit = curve_fit(model, size24chernnn012imlbovercorrelationlengthlist, log.(size24chernnn012imgmeraalldifferrorL2normlist), p0)
+size24chernnn012imparam = size24chernnn012imfit.param
+size24chernnn012imslope = size24chernnn012imparam[2]
+
+size24chernnn014imfit = curve_fit(model, size24chernnn014imlbovercorrelationlengthlist, log.(size24chernnn014imgmeraalldifferrorL2normlist), p0)
+size24chernnn014imparam = size24chernnn014imfit.param
+size24chernnn014imslope = size24chernnn014imparam[2]
+
+size24chernnn015imfit = curve_fit(model, size24chernnn015imlbovercorrelationlengthlist, log.(size24chernnn015imgmeraalldifferrorL2normlist), p0)
+size24chernnn015imparam = size24chernnn015imfit.param
+size24chernnn015imslope = size24chernnn015imparam[2]
+
+size24chernnn016imfit = curve_fit(model, size24chernnn016imlbovercorrelationlengthlist, log.(size24chernnn016imgmeraalldifferrorL2normlist), p0)
+size24chernnn016imparam = size24chernnn016imfit.param
+size24chernnn016imslope = size24chernnn016imparam[2]
+
+size24chernnn018imfit = curve_fit(model, size24chernnn018imlbovercorrelationlengthlist, log.(size24chernnn018imgmeraalldifferrorL2normlist), p0)
+size24chernnn018imparam = size24chernnn018imfit.param
+size24chernnn018imslope = size24chernnn018imparam[2]
+
+size24chernnn02imfit = curve_fit(model, size24chernnn02imlbovercorrelationlengthlist, log.(size24chernnn02imgmeraalldifferrorL2normlist), p0)
+size24chernnn02imparam = size24chernnn02imfit.param
+size24chernnn02imslope = size24chernnn02imparam[2]
+
+size24chernnn025imfit = curve_fit(model, size24chernnn025imlbovercorrelationlengthlist, log.(size24chernnn025imgmeraalldifferrorL2normlist), p0)
+size24chernnn025imparam = size24chernnn025imfit.param
+size24chernnn025imslope = size24chernnn025imparam[2]
+
+size24chernnn03imfit = curve_fit(model, size24chernnn03imlbovercorrelationlengthlist, log.(size24chernnn03imgmeraalldifferrorL2normlist), p0)
+size24chernnn03imparam = size24chernnn03imfit.param
+size24chernnn03imslope = size24chernnn03imparam[2]
+
+size24chernnn035imfit = curve_fit(model, size24chernnn035imlbovercorrelationlengthlist, log.(size24chernnn035imgmeraalldifferrorL2normlist), p0)
+size24chernnn035imparam = size24chernnn035imfit.param
+size24chernnn035imslope = size24chernnn035imparam[2]
+
+size24chernnn04imfit = curve_fit(model, size24chernnn04imlbovercorrelationlengthlist, log.(size24chernnn04imgmeraalldifferrorL2normlist), p0)
+size24chernnn04imparam = size24chernnn04imfit.param
+size24chernnn04imslope = size24chernnn04imparam[2]
+
+# cherncorrelationlengthlist = [size24chernnn005imcorrelationlength,size24chernnn01imcorrelationlength,size24chernnn015imcorrelationlength,size24chernnn02imcorrelationlength,size24chernnn025imcorrelationlength,size24chernnn03imcorrelationlength,size24chernnn035imcorrelationlength,size24chernnn04imcorrelationlength]
+# chernslopelist = [size24chernnn005imslope,size24chernnn01imslope,size24chernnn015imslope,size24chernnn02imslope,size24chernnn025imslope,size24chernnn03imslope,size24chernnn025imslope,size24chernnn04imslope]
+
+fiodir("/Users/slwongag/Desktop/data/chern/systemsize24")
+size24chernnn006imcorrelationlength = fioload("correlationlength006im")
+size24chernnn007imcorrelationlength = fioload("correlationlength007im")
+size24chernnn008imcorrelationlength = fioload("correlationlength008im")
+size24chernnn009imcorrelationlength = fioload("correlationlength009im")
+size24chernnn011imcorrelationlength = fioload("correlationlength011im")
+size24chernnn012imcorrelationlength = fioload("correlationlength012im")
+size24chernnn013imcorrelationlength = fioload("correlationlength013im")
+size24chernnn014imcorrelationlength = fioload("correlationlength014im")
+size24chernnn016imcorrelationlength = fioload("correlationlength016im")
+size24chernnn017imcorrelationlength = fioload("correlationlength017im")
+size24chernnn018imcorrelationlength = fioload("correlationlength018im")
+size24chernnn019imcorrelationlength = fioload("correlationlength019im")
+
+size24chernnn022imcorrelationlength = fioload("correlationlength022im")
+size24chernnn024imcorrelationlength = fioload("correlationlength024im")
+size24chernnn026imcorrelationlength = fioload("correlationlength026im")
+size24chernnn028imcorrelationlength = fioload("correlationlength028im")
+size24chernnn032imcorrelationlength = fioload("correlationlength032im")
+size24chernnn034imcorrelationlength = fioload("correlationlength034im")
+size24chernnn036imcorrelationlength = fioload("correlationlength036im")
+size24chernnn038imcorrelationlength = fioload("correlationlength038im")
+size24chernnn042imcorrelationlength = fioload("correlationlength042im")
+size24chernnn044imcorrelationlength = fioload("correlationlength044im")
+size24chernnn046imcorrelationlength = fioload("correlationlength046im")
+size24chernnn048imcorrelationlength = fioload("correlationlength048im")
+size24chernnn05imcorrelationlength = fioload("correlationlength05im")
+
+nnhoppinglist = [0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15,0.16,0.17,0.18,0.19]
+cherncorrelationlist = [size24chernnn005imcorrelationlength,size24chernnn006imcorrelationlength,size24chernnn007imcorrelationlength,size24chernnn008imcorrelationlength,size24chernnn009imcorrelationlength,size24chernnn01imcorrelationlength,size24chernnn011imcorrelationlength,size24chernnn012imcorrelationlength,size24chernnn013imcorrelationlength,size24chernnn014imcorrelationlength,size24chernnn015imcorrelationlength,size24chernnn016imcorrelationlength,size24chernnn017imcorrelationlength,size24chernnn018imcorrelationlength,size24chernnn019imcorrelationlength]
+
+scatter(nnhoppinglist,log.(log.(cherncorrelationlist)))
+
+nnhoppinglist = [0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15,0.16,0.17,0.18,0.19,0.2,0.22,0.24,0.25,0.26,0.28,0.30,0.32,0.34,0.35,0.36,0.38,0.4,0.42,0.44,0.46,0.48,0.5]
+cherncorrelationlist = [size24chernnn005imcorrelationlength,size24chernnn006imcorrelationlength,size24chernnn007imcorrelationlength,size24chernnn008imcorrelationlength,size24chernnn009imcorrelationlength,size24chernnn01imcorrelationlength,size24chernnn011imcorrelationlength,size24chernnn012imcorrelationlength,size24chernnn013imcorrelationlength,size24chernnn014imcorrelationlength,size24chernnn015imcorrelationlength,size24chernnn016imcorrelationlength,size24chernnn017imcorrelationlength,size24chernnn018imcorrelationlength,size24chernnn019imcorrelationlength,size24chernnn02imcorrelationlength,size24chernnn022imcorrelationlength,size24chernnn024imcorrelationlength,size24chernnn025imcorrelationlength,size24chernnn026imcorrelationlength,size24chernnn028imcorrelationlength,size24chernnn03imcorrelationlength,size24chernnn032imcorrelationlength,size24chernnn034imcorrelationlength,size24chernnn035imcorrelationlength,size24chernnn036imcorrelationlength,size24chernnn038imcorrelationlength,size24chernnn04imcorrelationlength,size24chernnn042imcorrelationlength,size24chernnn044imcorrelationlength,size24chernnn046imcorrelationlength,size24chernnn048imcorrelationlength,size24chernnn05imcorrelationlength]
+
+scatter(nnhoppinglist,((cherncorrelationlist)),title = "correlatinlength vs val of haldane term",xlabel="val of haldane",ylabel="correlationlength")
+
+cherncorrelationlengthlist = [size24chernnn005imcorrelationlength,size24chernnn006imcorrelationlength,size24chernnn008imcorrelationlength,size24chernnn01imcorrelationlength,size24chernnn012imcorrelationlength,size24chernnn014imcorrelationlength,size24chernnn015imcorrelationlength]
+chernslopelist = [size24chernnn005imslope,size24chernnn006imslope,size24chernnn008imslope,size24chernnn01imslope,size24chernnn012imslope,size24chernnn014imslope,size24chernnn015imslope]
+
+cherncorrelationlengthlist = [size24chernnn025imcorrelationlength,size24chernnn03imcorrelationlength,size24chernnn035imcorrelationlength,size24chernnn04imcorrelationlength]
+chernslopelist = [size24chernnn025imslope,size24chernnn03imslope,size24chernnn035imslope,size24chernnn04imslope]
 
 
-#Dirac across RG
-fiodir("/Users/slwongag/Desktop/data/dirac/systemsize24/localsize2/")
-size24local2gmera1terminatedalldiffL1norm = fioload("gmera1terminatedalldiffL1norm")
-size24local2gmeraalldiffL1normdirac = fioload("gmeraalldiffL1norm")
+scatter(cherncorrelationlengthlist,chernslopelist,title="slope of the same color vs correlation length", xlabel="correlation length",ylabel = "slope")
+
+# radiuslist = [2,4,6,8]
+# errorlist01im = [size24local2gmera2thirddiffL2normchern01im,size24local4gmera2thirddiffL2normchern01im,size24local6gmera2thirddiffL2normchern01im,size24local8gmera1thirddiffL2normchern01im]
+# errorlist02im = [size24local2gmera1thirddiffL2normchern02im,size24local4gmera1thirddiffL2normchern02im,size24local6gmera1thirddiffL2normchern02im,size24local8gmera1thirddiffL2normchern02im]
+# errorlist03im = [size24local2gmera1thirddiffL2normchern03im,size24local4gmera1thirddiffL2normchern03im,size24local6gmera1thirddiffL2normchern03im,size24local8gmera1thirddiffL2normchern03im]
+# errorlist04im = [size24local2gmera1thirddiffL2normchern04im,size24local4gmera1thirddiffL2normchern04im,size24local6gmera1thirddiffL2normchern04im,size24local8gmera1thirddiffL2normchern04im]
+
+# errorlist01im = [size24local2gmeraalldiffL2normchernnn01im,size24local4gmeraalldiffL2normchernnn01im,size24local6gmeraalldiffL2normchernnn01im,size24local8gmeraalldiffL2normchernnn01im]
+# scatter(radiuslist,log.(errorlist01im))
+
+# radiuslist = [2,4,8]
+# errorlist01im = [size24local2gmera3thirddiffL2normchern04im,size24local4gmera2thirddiffL2normchern04im,size24local8gmera1thirddiffL2normchern04im]
+# scatter(radiuslist,errorlist01im)
+
+# scatter!(radiuslist,errorlist02im)
+# scatter!(radiuslist,errorlist03im)
+# scatter(radiuslist,log.(errorlist04im))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   bj 

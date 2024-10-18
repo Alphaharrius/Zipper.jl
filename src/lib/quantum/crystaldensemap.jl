@@ -139,6 +139,49 @@ function Base.:*(left::CrystalDenseMap, right::CrystalDenseMap)
     return CrystalDenseMap(loutspace, rinspace, chunkcount, chunksize, data, nonzeroids)
 end
 
+function simplifiedmultiplicationforL2norm(left::CrystalDenseMap, right::CrystalDenseMap)
+    loutspace = left|>getoutspace
+    linspace = left|>getinspace
+    routspace = right|>getoutspace
+    rinspace = right|>getinspace
+    @assert hassamespan(linspace, routspace)
+
+    _, chunkcount, chunksize = getchunkinfo(loutspace|>getcrystal, rinspace|>getcrystal)
+    data = preparedense(chunkcount, chunksize)
+    locks = preparedenselocks(chunkcount)
+
+    rindextable = outspacesubmaps(right)
+
+    function process(chunkno, chunkid)
+        # Get all the non-zero blocks from the right for this block on the left.
+        denseindex = getdenseindex(chunkno, chunkid, left.chunksize)
+        outkl, inkl = getdensemomentums(loutspace|>getcrystal, linspace|>getcrystal, denseindex)
+        rblocks = rindextable[inkl]
+        lblock = left.data[chunkno][chunkid]
+        products = (
+            (getdenseindex(loutspace|>getcrystal, rinspace|>getcrystal, outkl, inkr), lblock*rblock) 
+            for (inkr, rblock) in rblocks if outkl==inkr)
+        nzids = []
+        for (did, block) in products
+            cno, cid = getchunkindices(did, chunksize)
+            locks[cno]|>lock
+            data[cno][cid] += block
+            locks[cno]|>unlock
+            push!(nzids, (cno, cid))
+        end
+        return nzids
+    end
+
+    nonzerobatches = paralleltasks(
+        name="simplified *(::CrystalDenseMap, ::CrystalDenseMap)",
+        tasks=(()->process(chunkno, chunkid) for (chunkno, chunkid) in left.nonzeroids),
+        count=length(left.nonzeroids))|>parallel
+    nonzeroids = Set(v for batch in nonzerobatches for v in batch)
+    
+    return CrystalDenseMap(loutspace, rinspace, chunkcount, chunksize, data, nonzeroids)
+end
+export simplifiedmultiplicationforL2norm
+
 function Base.:adjoint(fockmap::CrystalDenseMap)
     outspace = fockmap|>getoutspace
     inspace = fockmap|>getinspace
@@ -195,18 +238,69 @@ function Base.:transpose(fockmap::CrystalDenseMap)
         inspace, outspace, chunkcount, chunksize, data, nzids)
 end
 
-function vectorizeL1norm(fockmap::CrystalDenseMap)
-    function vectorizeL1normofblocks(v)
-        return sum([sum(abs.(spmat|>rep)) for spmat in v if typeof(spmat)!=Zipper.NullFockMap])
+# function vectorizeL1norm(fockmap::CrystalDenseMap)
+#     function vectorizeL1normofblocks(v)
+#         return sum([sum(abs.(spmat|>rep)) for spmat in v if typeof(spmat)!=Zipper.NullFockMap])
+#     end
+#     results = paralleltasks(
+#         name="vectorizeL1norm",
+#         tasks=(()->(n, vectorizeL1normofblocks(v)) for (n, v) in fockmap.data|>enumerate),
+#         count=fockmap.chunkcount)|>parallel|>collect
+#     data = sum([el for (_, el) in sort(results, by=first)])
+#     return data
+# end
+# export vectorizeL1norm
+
+
+function matrixL2norm(fockmap::CrystalDenseMap,systemsize::Integer)
+    fockmapsquare = fockmap*fockmap'
+    outcrystal::Crystal = fockmapsquare|>getoutspace|>getcrystal
+    incrystal::Crystal = fockmapsquare|>getinspace|>getcrystal
+
+    function blocktrace(chunkno, chunkid)
+        block = fockmapsquare.data[chunkno][chunkid]
+        denseindex = getdenseindex(chunkno, chunkid, fockmapsquare.chunksize)
+        outk, ink = getdensemomentums(outcrystal, incrystal, denseindex)
+        if outk==ink
+            return tr(block)
+        else
+            return 0 
+        end
     end
+
     results = paralleltasks(
-        name="vectorizeL1norm",
-        tasks=(()->(n, vectorizeL1normofblocks(v)) for (n, v) in fockmap.data|>enumerate),
-        count=fockmap.chunkcount)|>parallel|>collect
-    data = sum([el for (_, el) in sort(results, by=first)])
-    return data
+        name="CrystalFockMap(::CrystalDenseMap)",
+        tasks=(()->blocktrace(chunkno, chunkid) for (chunkno, chunkid) in fockmapsquare.nonzeroids),
+        count=length(fockmapsquare.nonzeroids))|>parallel|>collect
+
+    return sqrt(sum(results))
 end
-export vectorizeL1norm
+export matrixL2norm
+
+function matrixL2normmod(fockmap::CrystalDenseMap,systemsize::Integer)
+    fockmapsquare = simplifiedmultiplicationforL2norm(fockmap,fockmap')
+    outcrystal::Crystal = fockmapsquare|>getoutspace|>getcrystal
+    incrystal::Crystal = fockmapsquare|>getinspace|>getcrystal
+
+    function blocktrace(chunkno, chunkid)
+        block = fockmapsquare.data[chunkno][chunkid]
+        denseindex = getdenseindex(chunkno, chunkid, fockmapsquare.chunksize)
+        outk, ink = getdensemomentums(outcrystal, incrystal, denseindex)
+        if outk==ink
+            return tr(block)
+        else
+            return 0 
+        end
+    end
+
+    results = paralleltasks(
+        name="CrystalFockMap(::CrystalDenseMap)",
+        tasks=(()->blocktrace(chunkno, chunkid) for (chunkno, chunkid) in fockmapsquare.nonzeroids),
+        count=length(fockmapsquare.nonzeroids))|>parallel|>collect
+
+    return sqrt(sum(results))
+end
+export matrixL2normmod
 #\end
 
 #\begin:CrystalDenseMap APIs
